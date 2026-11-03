@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { BANK_FIELD_NAMES, bankDetailsSchema, DETAILS_FIELD_NAMES, DOCUMENT_TAX_ID_INVALID, documentDetailsSchema } from "@/features/tax/schema";
 import { BANK_COLUMNS, bankDetailsFromRow, bankTransferText, DETAILS_COLUMNS, documentAddress, documentDetailsFromRow } from "@/features/tax/settings";
+import { BUSINESS_EMAIL_LATIN, dbErrorMessage } from "@/lib/errors";
 
 const empty = Object.fromEntries(DETAILS_FIELD_NAMES.map((name) => [name, ""]));
 const parse = (values: Record<string, string>) => documentDetailsSchema.safeParse({ ...empty, ...values });
@@ -24,6 +25,18 @@ describe("business details for documents (TAX-02)", () => {
     const bankColumns = [...bank.matchAll(/^  (bank_[a-z_]+)\s+text/gm)].map((m) => m[1]);
     expect(bankColumns).toEqual([...BANK_FIELD_NAMES]);
     expect(BANK_COLUMNS.split(", ")).toEqual([...BANK_FIELD_NAMES]);
+  });
+
+  it("owner (114) א: the business email takes Latin letters only, with its own message", () => {
+    expect(parse({ email: "Info@Biz.co.il" }).data?.email).toBe("info@biz.co.il");
+    expect(parse({ email: "" }).data?.email).toBeNull();
+    expect(parse({ email: "not an email" }).error?.issues.map((issue) => issue.message)).toEqual(["כתובת האימייל אינה תקינה."]);
+    for (const bad of ["info@קפה.com", "שלום@biz.co.il", "infoж@biz.co.il"]) {
+      const result = parse({ email: bad });
+      expect(result.success, bad).toBe(false);
+      expect(result.error?.issues.map((issue) => issue.message), bad).toEqual([BUSINESS_EMAIL_LATIN]);
+    }
+    expect(dbErrorMessage({ code: "P0001", hint: "document_settings:email_latin", message: "" }, "x")).toBe(BUSINESS_EMAIL_LATIN);
   });
 
   it("everything is optional; empty fields are stored as null", () => {

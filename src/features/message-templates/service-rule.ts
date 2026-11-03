@@ -13,7 +13,7 @@ import { MERGE_FIELD_PATTERN, MESSAGE_MERGE_FIELDS, type MergeFieldKey } from ".
 // Every future sender (AUT-08, the quote screen, the reminder senders, the OPS-04 message.send path) calls
 // assertTemplateSendable() (or app.message_template_sendable in SQL) right before it sends, and never sends on a problem.
 
-export type TemplateProblem = "field_not_allowed" | "external_link" | "too_long";
+export type TemplateProblem = "field_not_allowed" | "glued_address" | "external_link" | "too_long";
 export type ServiceMessageType = (typeof SERVICE_MESSAGE_TYPES)[number];
 
 const NAMES: readonly MergeFieldKey[] = ["firstName", "fullName", "userName", "businessName", "businessPhone", "businessAddress"];
@@ -143,8 +143,9 @@ function domainSuffix(part: string): string | null {
   const labels = part.split(".");
   const n = labels.length;
   if (n < 2) return null;
-  // a top-level label glued to Hebrew or Arabic letters ("evil.comשלום") is its ASCII part
-  labels[n - 1] = labels[n - 1].replace(/^([a-z]{2,63})[א-תء-ي]+$/, "$1");
+  // a top-level label glued to Hebrew or Arabic letters ("evil.comשלום"), or joined to them by a hyphen
+  // ("evil.com-שלום"), is its ASCII part
+  labels[n - 1] = labels[n - 1].replace(/^([a-z]{2,63})-?[א-תء-ي]+$/, "$1");
   // owner (110) ב: only an ending on the closed list, or punycode
   if (!(TLDS.has(labels[n - 1]) || /^xn--[a-z0-9-]{1,59}$/.test(labels[n - 1])) || FILES.has(labels[n - 1])) return null;
   let length = labels[n - 1].length;
@@ -171,12 +172,25 @@ function partLink(part: string, own: string): boolean {
 }
 
 /**
- * = app.message_token_link: an email address (exactly local@domain, a Hebrew/Arabic prefix with a hyphen and "." "-" at
- * both ends cut off) is a link when its local part is itself a host; else allowed when it is the business's plain email
- * (already through plainBusinessEmail()) or its domain is the business's own (owner (111) ב); any other token: each
- * "@"-free part.
+ * = app.message_token_pieces: a token cut at every ending followed by Hebrew or Arabic letters, with or without a hyphen
+ * between ("info@gmail.com-שלום-תודה" -> "info@gmail.com", "-שלום-תודה"); each piece is judged on its own.
  */
+function tokenPieces(token: string): string[] {
+  return token.replace(/([.][A-Za-z]{2,63})(-?[א-תء-ي])/g, "$1\u0002$2").split("\u0002");
+}
+
+/** = app.message_token_link: the token rule, piece by piece. */
 function tokenLink(token: string, own: string, businessEmail: string | null): boolean {
+  return tokenPieces(token).some((piece) => piece !== "" && tokenPieceLink(piece, own, businessEmail));
+}
+
+/**
+ * = app.message_token_piece_link: an email address (exactly local@domain, a Hebrew/Arabic prefix with a hyphen and "."
+ * "-" at both ends cut off) is a link when its local part is itself a host; else allowed when it is the business's plain
+ * email (already through plainBusinessEmail()) or its domain is the business's own (owner (111) ב); any other piece:
+ * each "@"-free part.
+ */
+function tokenPieceLink(token: string, own: string, businessEmail: string | null): boolean {
   const value = trimChars(asciiLower(token).replace(/^[א-תء-ي]+-/, ""), ".-");
   if (/^[^@]+@[^@]+$/.test(value)) {
     const [local, domain] = value.split("@");
@@ -208,6 +222,11 @@ const WIDE_DOTS = /[。．｡]/g;
 // soft hyphen, zero-width characters, word joiner, BOM, direction marks, embeddings and isolates (= the chr() list in SQL)
 const INVISIBLE = /[\u00AD\u200B-\u200F\u202A-\u202E\u2060\u2066-\u2069\uFEFF]/g;
 
+/** The text as the link rules read it: NFKC, invisible format characters out, wide dots as dots (= app.message_link_text). */
+function linkText(text: string): string {
+  return text.normalize("NFKC").replace(INVISIBLE, "").replace(WIDE_DOTS, ".");
+}
+
 /** ASCII letters to lower case, nothing else (= app.message_ascii_lower). */
 export function asciiLower(value: string): string {
   return value.replace(/[A-Z]+/g, (letters) => letters.toLowerCase());
@@ -234,7 +253,8 @@ export function localPartHost(local: string): boolean {
  */
 export function plainBusinessEmail(email: string | null | undefined): string | null {
   const value = asciiLower((email ?? "").replace(/^ +| +$/g, ""));
-  if (!/^[a-z0-9]([a-z0-9.-]*[a-z0-9])?@[^@]+$/.test(value)) return null;
+  // owner (114) א: an address in non-Latin letters is never the business email
+  if (!/^[a-z0-9]([a-z0-9.-]*[a-z0-9])?@[^@]+$/.test(value) || !/^[\x21-\x7e]+$/.test(value)) return null;
   const [local, domain] = value.split("@");
   if (domainSuffix(domain) !== domain || value.includes("..") || localPartHost(local) || domainSuffix(local) !== null) return null;
   return value;
@@ -242,13 +262,186 @@ export function plainBusinessEmail(email: string | null | undefined): string | n
 
 /** True when the text holds a link that is not the business's own domain or its own email (= app.message_external_link). */
 export function messageExternalLink(text: string, ownDomain: string | null = null, businessEmail: string | null = null): boolean {
-  const value = text.normalize("NFKC").replace(INVISIBLE, "").replace(WIDE_DOTS, ".");
+  const value = linkText(text);
   const own = (ownDomain ?? "").trim().toLowerCase();
   const email = plainBusinessEmail(businessEmail);
   // the scheme scan comes first and knows nothing of the business email ("https://info@gmail.com" stays a link)
   for (const match of value.matchAll(AUTHORITY)) if (authorityLink(match[1], own)) return true;
   for (const match of value.matchAll(TOKEN)) if (tokenLink(match[0], own, email)) return true;
   return false;
+}
+
+// Owner (113) א (3 November 2026): the business email is recognised only in its exact form, with a word boundary; an
+// address glued to text is another address, and the template is stopped with its own code, glued_address. = the rule of
+// migration glued_address (its header says exactly which tokens are glued); both run the shared fixture.
+
+/**
+ * Code points above ASCII that do NOT glue an address, as inclusive [from, to] pairs (= app.message_glue_boundary,
+ * between the markers glue-boundaries:start/end; unit test): spaces, punctuation, quotes, dashes, symbols, arrows,
+ * currency, emoji. Any other character above ASCII next to an address (a letter or digit of any script, a point) glues it.
+ */
+export const GLUE_BOUNDARY_RANGES: readonly (readonly [number, number])[] = [
+  [160, 191], [215, 215], [247, 247], [1470, 1470], [1472, 1472], [1475, 1475], [1523, 1524], [1548, 1548], [1563, 1563],
+  [1567, 1567], [1642, 1645], [1748, 1748], [8192, 8303], [8352, 8399], [8592, 11263], [12288, 12291], [12296, 12305],
+  [65024, 65039], [126976, 129791],
+];
+
+/** A merge field written right next to an address glues it once filled ("{שם}info@..."). */
+const GLUE_ASCII = "{}";
+/** "*", "~", "'" and "_" around the business email pass only as a pair (WhatsApp formatting and quotes). */
+const MARKS = "*~'_";
+/** Other characters an address may hold that the tokens split on: right before the business email, another address. */
+const ADDRESS_BEFORE = "!#$%&+/=?^`|";
+const ATEXT = "!#$%&'*+/=?^_`{|}~";
+
+/** = app.message_glue_char: the text's character directly next to an address glues it. */
+function glueChar(char: string): boolean {
+  if (char === "") return false;
+  const code = char.codePointAt(0) as number;
+  if (code <= 127) return GLUE_ASCII.includes(char);
+  return !GLUE_BOUNDARY_RANGES.some(([from, to]) => code >= from && code <= to);
+}
+
+/** = app.message_mark_outer_ok: the character outside a formatting pair ends it (no address character). */
+function markOuterOk(char: string, close: boolean): boolean {
+  if (char === "") return true;
+  const code = char.codePointAt(0) as number;
+  if (code <= 127) return (!/[A-Za-z0-9.@-]/.test(char) && !ATEXT.includes(char)) || (close && ".!?".includes(char));
+  return !/[א-תء-ي]/.test(char) && !glueChar(char);
+}
+
+const PLACEHOLDER = "\u0001";
+const TOUCHES_PLACEHOLDER = /[a-z0-9א-תء-ي]\u0001|\u0001[a-z0-9א-תء-ي]/;
+const MIXED_SCRIPT = /[א-תء-ي][a-z0-9]|[a-z0-9][א-תء-ي]/;
+const DASH_ENDING = /[.][a-z]{2,63}-[a-z0-9-]+$/;
+
+type Glue = "glued" | "other" | null;
+
+/** = app.message_own_address: a well-formed address on the business's own domain (the link rule allows it). */
+function ownAddress(value: string, own: string): boolean {
+  if (!/^[^@]+@[^@]+$/.test(value)) return false;
+  const [local, domain] = value.split("@");
+  return domainSuffix(domain) === domain && !localPartHost(local) && domainSuffix(local) === null && isOwnHost(domain, own);
+}
+
+type Around = { before: string; after: string; outerBefore: string; outerAfter: string };
+
+/**
+ * = app.message_glued_token: one piece holding "@", the characters of the text next to it (and outside those), the own
+ * domain (lower-cased, trimmed) and the plain business email (or null). "glued" = an address glued to text; "other" = an
+ * address that is a link ((c) the business email made into a longer address, (d) an ending followed by "-" and letters or
+ * digits); null = neither. Cheap string tests first.
+ */
+function gluedToken(token: string, around: Around, own: string, businessEmail: string | null): Glue {
+  const { before, after } = around;
+  const lowered = asciiLower(token);
+  const cut = lowered.replace(/^[א-תء-ي]+-/, "");
+  const value = trimChars(cut, ".-");
+  // (a) the business email with a letter or digit touching it, unless the piece is itself an allowed own-domain address
+  if (
+    businessEmail !== null &&
+    value !== businessEmail &&
+    value.includes(businessEmail) &&
+    TOUCHES_PLACEHOLDER.test(value.split(businessEmail).join(PLACEHOLDER)) &&
+    !ownAddress(value, own)
+  ) {
+    return "glued";
+  }
+  if (!/^[^@]+@[^@]+$/.test(value)) return null;
+  const startKept = cut === lowered && cut[0] !== "." && cut[0] !== "-";
+  const endKept = cut.length > 0 && cut[cut.length - 1] !== "." && cut[cut.length - 1] !== "-";
+  // (b1) Hebrew or Arabic letters touching ASCII letters or digits; (b2) the text's character next to the piece
+  const mixed = MIXED_SCRIPT.test(value);
+  const side = (startKept && glueChar(before)) || (endKept && glueChar(after));
+  // (c) the business email next to an address character; the four marks pass only as a pair with nothing outside it
+  let other = false;
+  if (value === businessEmail) {
+    const markBefore = startKept && before !== "" && MARKS.includes(before);
+    const markAfter = endKept && after !== "" && MARKS.includes(after);
+    if (markBefore || markAfter) {
+      other = !(markBefore && markAfter && before === after && markOuterOk(around.outerBefore, false) && markOuterOk(around.outerAfter, true));
+    } else {
+      other = startKept && before !== "" && ADDRESS_BEFORE.includes(before);
+    }
+  }
+  // (d) an ending followed by "-" and ASCII letters or digits ("dana@evil.com-x")
+  const domain = value.split("@")[1];
+  const dash = DASH_ENDING.test(domain);
+  if (!(mixed || side || other || dash)) return null;
+  if ((mixed || side) && domainSuffix(domain) !== null) return "glued";
+  if (other && domainSuffix(domain) === domain && !ownAddress(value, own)) return "other";
+  if (dash) {
+    const bare = domain.replace(/-[a-z0-9-]+$/, "");
+    if (domainSuffix(bare) === bare && !isOwnHost(bare, own)) return "other";
+  }
+  return null;
+}
+
+/** The whole code point that ends just before index i (a surrogate pair counts as one). */
+function charBefore(value: string, i: number): string {
+  if (i <= 0) return "";
+  const low = value.charCodeAt(i - 1);
+  if (low >= 0xdc00 && low <= 0xdfff && i >= 2) {
+    const high = value.charCodeAt(i - 2);
+    if (high >= 0xd800 && high <= 0xdbff) return value.slice(i - 2, i);
+  }
+  return value[i - 1];
+}
+
+/** The whole code point that starts at index i, or "". */
+function charAt(value: string, i: number): string {
+  return i < value.length ? String.fromCodePoint(value.codePointAt(i) as number) : "";
+}
+
+/**
+ * = app.message_address_glue: "glued_address" at the first address glued to text; else "external_link" when an address
+ * is a link the token rule does not see ((c), (d)) or a listed ending follows a letter outside ASCII, Hebrew and Arabic
+ * with no space ((e): "x@café.com", "evilж.com"; fail closed); else null. A token holding "@" is judged piece by piece.
+ */
+export function messageAddressGlue(
+  text: string,
+  ownDomain: string | null = null,
+  businessEmail: string | null = null,
+): "glued_address" | "external_link" | null {
+  const value = linkText(text);
+  const own = (ownDomain ?? "").trim().toLowerCase();
+  const email = plainBusinessEmail(businessEmail);
+  let link = false;
+  for (const match of value.matchAll(TOKEN)) {
+    const token = match[0];
+    const start = match.index;
+    const before = charBefore(value, start);
+    // (e) a listed ending right after a letter of another script
+    if (
+      !link &&
+      token.startsWith(".") &&
+      before !== "" &&
+      (before.codePointAt(0) as number) > 127 &&
+      glueChar(before) &&
+      domainSuffix(`x${asciiLower(token)}`) !== null
+    ) {
+      link = true;
+    }
+    if (!token.includes("@")) continue;
+    const end = start + token.length;
+    const after = charAt(value, end);
+    const outerBefore = before === "" ? "" : charBefore(value, start - before.length);
+    const outerAfter = after === "" ? "" : charAt(value, end + after.length);
+    const pieces = tokenPieces(token);
+    for (let i = 0; i < pieces.length; i += 1) {
+      if (!pieces[i].includes("@")) continue;
+      const around: Around = {
+        before: i === 0 ? before : pieces[i - 1].slice(-1),
+        after: i === pieces.length - 1 ? after : charAt(pieces[i + 1], 0),
+        outerBefore: i === 0 ? outerBefore : "",
+        outerAfter: i === pieces.length - 1 ? outerAfter : "",
+      };
+      const glue = gluedToken(pieces[i], around, own, email);
+      if (glue === "glued") return "glued_address";
+      if (glue === "other") link = true;
+    }
+  }
+  return link ? "external_link" : null;
 }
 
 function isService(type: MessageType): type is ServiceMessageType {
@@ -288,7 +481,10 @@ export function fieldsNotAllowed(template: TemplateText): string[] {
 export function messageTemplateProblem(template: TemplateText): TemplateProblem | null {
   if (!isService(template.messageType)) return null;
   if (fieldsNotAllowed(template).length > 0) return "field_not_allowed";
-  if (messageExternalLink(`${template.subject ?? ""}\n${template.body}`, template.ownDomain ?? null, template.businessEmail ?? null)) {
+  const text = `${template.subject ?? ""}\n${template.body}`;
+  const glue = messageAddressGlue(text, template.ownDomain ?? null, template.businessEmail ?? null);
+  if (glue === "glued_address") return "glued_address";
+  if (glue === "external_link" || messageExternalLink(text, template.ownDomain ?? null, template.businessEmail ?? null)) {
     return "external_link";
   }
   if ([...template.body].length > SERVICE_BODY_MAX[template.channel]) return "too_long";
@@ -302,6 +498,9 @@ export function templateProblemText(template: TemplateText): string | null {
   if (problem === "field_not_allowed") {
     const allowed = SERVICE_TYPE_FIELDS[template.messageType].map((key) => MESSAGE_MERGE_FIELDS[key].token).join(" ");
     return `התבנית לא תישלח: בהודעת שירות מהסוג הזה אפשר להשתמש רק בשדות ${allowed}. צריך להוריד את ${fieldsNotAllowed(template).join(", ")}.`;
+  }
+  if (problem === "glued_address") {
+    return "התבנית לא תישלח: הכתובת צמודה לטקסט. צריך להפריד אותה ברווח מהמילים שלפניה ואחריה.";
   }
   if (problem === "external_link") {
     // owner (111) ב: an email address is allowed only on the business's own domain, or the business's own email
@@ -358,6 +557,7 @@ export function envelopedFilledProblem(message: EnvelopeInput, fill: (text: stri
 export const SEND_REFUSAL_LABELS: Record<TemplateProblem | "inactive", string> = {
   too_long: "ארוכה מדי",
   field_not_allowed: "שדה שלא מתאים לסוג ההודעה",
+  glued_address: "כתובת צמודה לטקסט",
   external_link: "קישור חיצוני",
   inactive: "התבנית כבויה",
 };

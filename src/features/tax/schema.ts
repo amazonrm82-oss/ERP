@@ -1,7 +1,8 @@
 import { z } from "zod";
 
+import { BUSINESS_EMAIL_LATIN } from "@/lib/errors";
 import { israeliIdNumber } from "@/lib/israeli-id";
-import { optionalEmail, optionalPhone, optionalText } from "@/lib/validation";
+import { optionalPhone, optionalText } from "@/lib/validation";
 
 import { PRICES_MODE_OPTIONS } from "./prices";
 import { LEGAL_FORMS, VAT_STATUS_OTHER_MAX, VAT_STATUSES } from "./status";
@@ -91,7 +92,14 @@ export const documentDetailsSchema = z.object({
   city: optionalText(100, "שם היישוב ארוך מדי."),
   postal_code: digitsField(/^(\d{5}|\d{7})$/, "מיקוד הוא 7 ספרות (או 5 ספרות בכתובת ישנה)."),
   phone: optionalPhone,
-  email: optionalEmail,
+  // MSG-02 (114) א: Latin letters only (= trigger org_document_settings_email_latin), judged before the address shape so a
+  // non-Latin address gets this message
+  email: z
+    .preprocess((value) => (typeof value === "string" ? value.trim() : ""), z.string())
+    .refine((value) => !/[^\x00-\x7f]/.test(value), { error: BUSINESS_EMAIL_LATIN })
+    // then optionalEmail's rule
+    .pipe(z.union([z.literal(""), z.email({ error: "כתובת האימייל אינה תקינה." }).max(254)]))
+    .transform((value) => (value === "" ? null : value.toLowerCase())),
 });
 
 export type DocumentDetailsInput = z.infer<typeof documentDetailsSchema>;

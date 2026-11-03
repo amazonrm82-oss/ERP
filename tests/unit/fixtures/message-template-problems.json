@@ -1153,12 +1153,12 @@
     "businessEmail": "biz.office@gmail.com"
   },
   {
-    "note": "owner (111) ב: a longer local part is another address",
+    "note": "owner (111) ב: a longer local part is another address (owner (113) א: glued)",
     "channel": "sms",
     "messageType": "collection",
     "subject": null,
     "body": "xbiz.office@gmail.com",
-    "problem": "external_link",
+    "problem": "glued_address",
     "businessEmail": "biz.office@gmail.com"
   },
   {
@@ -1180,12 +1180,12 @@
     "businessEmail": "biz.office@gmail.com"
   },
   {
-    "note": "owner (111) ב: the business email glued to Hebrew",
+    "note": "owner (111) ב: the business email glued to Hebrew (owner (113) א: glued)",
     "channel": "sms",
     "messageType": "collection",
     "subject": null,
     "body": "biz.office@gmail.comשלום",
-    "problem": "external_link",
+    "problem": "glued_address",
     "businessEmail": "biz.office@gmail.com"
   },
   {
@@ -1479,5 +1479,1095 @@
     "body": "1.2.3.4@gmail.com",
     "problem": "external_link",
     "businessEmail": "1.2.3.4@gmail.com"
+  },
+  {
+    "note": "owner (113) א: the business email alone",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "info@gmail.com",
+    "problem": null,
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: the business email after a space and before a comma",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "כתבו info@gmail.com, תודה",
+    "problem": null,
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: the business email with a Hebrew prefix and a hyphen",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "כתבו ל-info@gmail.com",
+    "problem": null,
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: the business email in quotes",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "כתבו \"info@gmail.com\" או ״info@gmail.com״",
+    "problem": null,
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: the business email before a Hebrew question mark and an emoji",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "שאלות? info@gmail.com🙂",
+    "problem": null,
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: the business email between dashes",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "פרטים – info@gmail.com – תודה",
+    "problem": null,
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: Hebrew letters glued after the business email",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "info@gmail.comשלום",
+    "problem": "glued_address",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: Hebrew letters glued before the business email",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "שלוםinfo@gmail.com",
+    "problem": "glued_address",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: a Hebrew prefix without a hyphen glues",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "כתבו לinfo@gmail.com",
+    "problem": "glued_address",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: a Latin letter before the business email",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "xinfo@gmail.com",
+    "problem": "glued_address",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: a Latin letter after the business email",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "info@gmail.comx",
+    "problem": "glued_address",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: a digit after the business email",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "info@gmail.com1",
+    "problem": "glued_address",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: a digit before the business email",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "1info@gmail.com",
+    "problem": "glued_address",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: an underscore before makes the business email another address, judged as a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "dana_info@gmail.com",
+    "problem": "external_link",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: a plus before makes the business email another address, judged as a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x+info@gmail.com",
+    "problem": "external_link",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: an underscore after makes the business email another address, judged as a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "info@gmail.com_x",
+    "problem": "external_link",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: a merge field written right before the business email",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "שלום {שם פרטי}info@gmail.com",
+    "problem": "glued_address",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: a merge field written right after the business email",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "info@gmail.com{שם העסק}",
+    "problem": "glued_address",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: a Cyrillic letter glued after the business email",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "info@gmail.comж",
+    "problem": "glued_address",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: a Greek letter glued before the business email",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "αinfo@gmail.com",
+    "problem": "glued_address",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: a Persian letter glued after the business email",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "info@gmail.comپ",
+    "problem": "glued_address",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: a Hebrew point glued after the business email",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "info@gmail.comָ",
+    "problem": "glued_address",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: a fullwidth letter glued after the business email (NFKC)",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "info@gmail.comｘ",
+    "problem": "glued_address",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: a dot before is another address, judged as a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "a.info@gmail.com",
+    "problem": "external_link",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: a longer domain is another address, judged as a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "info@gmail.com.il",
+    "problem": "external_link",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: a hyphen before is another address, judged as a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x-info@gmail.com",
+    "problem": "external_link",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: a glued address beside another link is glued",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "xinfo@gmail.com https://evil.com",
+    "problem": "glued_address",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: the business email inside a scheme stays a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "https://info@gmail.com",
+    "problem": "external_link",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: glued in the subject",
+    "channel": "email",
+    "messageType": "requested_document",
+    "subject": "מאתinfo@gmail.com",
+    "body": "שלום",
+    "problem": "glued_address",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: marketing is not judged",
+    "channel": "sms",
+    "messageType": "marketing",
+    "subject": null,
+    "body": "שלוםinfo@gmail.com",
+    "problem": null,
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: another address glued to Hebrew, no business email",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "שלוםdana@example.com",
+    "problem": "glued_address"
+  },
+  {
+    "note": "owner (113) א: an own-domain address glued to Hebrew",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "כתבו לsales@biz.co.il",
+    "problem": "glued_address",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "owner (113) א: an own-domain address glued after",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "sales@biz.co.ilתודה",
+    "problem": "glued_address",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "owner (113) א: an own-domain address with spaces is allowed",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "כתבו ל-sales@biz.co.il תודה",
+    "problem": null,
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "owner (113) א: an own-domain address glued to a Cyrillic letter",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "sales@biz.co.ilж",
+    "problem": "glued_address",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "owner (113) א: an own-domain address glued to an emoji is not glued",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "sales@biz.co.il👍",
+    "problem": null,
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "lead's decision on (113): an own-domain address that extends the business email is allowed (owner (105)/(111))",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "moreinfo@biz.co.il",
+    "problem": null,
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@biz.co.il"
+  },
+  {
+    "note": "owner (113) א: Hebrew glued to text without an address is a link, not glued",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "evil.comשלום",
+    "problem": "external_link"
+  },
+  {
+    "note": "owner (113) א: text with an @ but no address is not glued",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "שלום@עולם",
+    "problem": null
+  },
+  {
+    "note": "owner (113) א: owner (114) א: a business email in Hebrew letters never counts",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "info@קפה.com",
+    "problem": "external_link",
+    "businessEmail": "info@קפה.com"
+  },
+  {
+    "note": "owner (113) א: a slash before makes the business email another address, judged as a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "a/info@gmail.com",
+    "problem": "external_link",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "owner (113) א: an underscore before an own-domain address is the own domain's (not the business email)",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "dana_cohen@biz.co.il",
+    "problem": null,
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "lead's decision on (113): an extended business email on another domain is still glued",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "xinfo@gmail.com",
+    "problem": "glued_address",
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "lead's decision on (113): an own-domain address extending the business email, with text beside it",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "כתבו ל-moreinfo@biz.co.il תודה",
+    "problem": null,
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@biz.co.il"
+  },
+  {
+    "note": "lead's decision on (113): an own-domain address extending the business email, glued to Hebrew",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "כתבו לmoreinfo@biz.co.il",
+    "problem": "glued_address",
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@biz.co.il"
+  },
+  {
+    "note": "lead's decision on (113): an own-domain address extending the business email, glued to a Cyrillic letter",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "moreinfo@biz.co.ilж",
+    "problem": "glued_address",
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@biz.co.il"
+  },
+  {
+    "note": "lead's decision on (113): the business email extended past the own domain is not an own address",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "info@biz.co.ilx",
+    "problem": "glued_address",
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@biz.co.il"
+  },
+  {
+    "note": "lead's decision on (113): without an own domain, an extended business email is glued",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "moreinfo@biz.co.il",
+    "problem": "glued_address",
+    "businessEmail": "info@biz.co.il"
+  },
+  {
+    "note": "lead's decision on (113): a host-like local part on the own domain is a link, not an own address",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "evil.com.info@biz.co.il",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@biz.co.il"
+  },
+  {
+    "note": "lead's decision on the hyphen gap: an address whose ending is joined to Hebrew by a hyphen is a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x@evil.com-שלום",
+    "problem": "external_link"
+  },
+  {
+    "note": "lead's decision on the hyphen gap: a domain joined to Hebrew by a hyphen is a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "evil.com-שלום",
+    "problem": "external_link"
+  },
+  {
+    "note": "lead's decision on the hyphen gap: a domain joined to Arabic by a hyphen is a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "evil.co.il-مرحبا",
+    "problem": "external_link"
+  },
+  {
+    "note": "review item 5: the business email followed by a hyphen and a Hebrew word is the business email",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "info@gmail.com-שלום",
+    "problem": null,
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "lead's decision on the hyphen gap: an own-domain address joined to Hebrew by a hyphen is allowed",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "sales@biz.co.il-תודה",
+    "problem": null,
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "lead's decision on the hyphen gap: an own domain joined to Hebrew by a hyphen is allowed",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "biz.co.il-תודה",
+    "problem": null,
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "lead's decision on the hyphen gap: a file name joined to Hebrew by a hyphen is not a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "doc.pdf-שלום",
+    "problem": null
+  },
+  {
+    "note": "review item 1: an own-domain address split by an address character is allowed: dana_info@biz.co.il",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "dana_info@biz.co.il",
+    "problem": null,
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@biz.co.il"
+  },
+  {
+    "note": "review item 1: an own-domain address split by an address character is allowed: x+info@biz.co.il",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x+info@biz.co.il",
+    "problem": null,
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@biz.co.il"
+  },
+  {
+    "note": "review item 1: an own-domain address split by an address character is allowed: info@biz.co.il_x",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "info@biz.co.il_x",
+    "problem": null,
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@biz.co.il"
+  },
+  {
+    "note": "review item 1: WhatsApp formatting and quotes are boundaries: *info@gmail.com*",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "*info@gmail.com*",
+    "problem": null,
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "review item 1: WhatsApp formatting and quotes are boundaries: ~info@gmail.com~",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "~info@gmail.com~",
+    "problem": null,
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "review item 1: WhatsApp formatting and quotes are boundaries: _info@gmail.com_",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "_info@gmail.com_",
+    "problem": null,
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "review item 1: WhatsApp formatting and quotes are boundaries: 'info@gmail.com'",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "'info@gmail.com'",
+    "problem": null,
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: a single formatting mark is not a pair, so another address",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "*info@gmail.com",
+    "problem": "external_link",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "review item 1: WhatsApp formatting and quotes are boundaries: שלום *info@gmail.com* תודה",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "שלום *info@gmail.com* תודה",
+    "problem": null,
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "review item 1: an underscore on one side only is still another address",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "_info@gmail.com",
+    "problem": "external_link",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "review item 3: a listed ending after a letter of another script is a link: x@café.com",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x@café.com",
+    "problem": "external_link"
+  },
+  {
+    "note": "review item 3: a listed ending after a letter of another script is a link: café.com",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "café.com",
+    "problem": "external_link"
+  },
+  {
+    "note": "review item 3: a listed ending after a letter of another script is a link: x@evilж.com",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x@evilж.com",
+    "problem": "external_link"
+  },
+  {
+    "note": "review item 3: a listed ending after a letter of another script is a link: x@例子.com",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x@例子.com",
+    "problem": "external_link"
+  },
+  {
+    "note": "review item 3: a listed ending after a letter of another script is a link: x@evilι.com",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x@evilι.com",
+    "problem": "external_link"
+  },
+  {
+    "note": "review item 3: a listed ending after a letter of another script is a link: פרטים ב-привет.co.il",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "פרטים ב-привет.co.il",
+    "problem": "external_link"
+  },
+  {
+    "note": "review item 3: not a link: שלום café. com",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "שלום café. com",
+    "problem": null
+  },
+  {
+    "note": "review item 3: not a link: Привет. Как дела",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "Привет. Как дела",
+    "problem": null
+  },
+  {
+    "note": "review item 3: not a link: файл.pdf",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "файл.pdf",
+    "problem": null
+  },
+  {
+    "note": "review item 3: not a link: 🙂.com",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "🙂.com",
+    "problem": null
+  },
+  {
+    "note": "review item 3: not a link: Ура.",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "Ура.",
+    "problem": null
+  },
+  {
+    "note": "review item 3: not a link: café",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "café",
+    "problem": null
+  },
+  {
+    "note": "review item 4: an address whose ending is followed by a hyphen and letters",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "dana@evil.com-x",
+    "problem": "external_link"
+  },
+  {
+    "note": "review item 4: an address whose ending is followed by a hyphen and digits",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "dana@evil.com-1",
+    "problem": "external_link"
+  },
+  {
+    "note": "review item 4: an own-domain address followed by a hyphen and letters is allowed",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "dana@biz.co.il-x",
+    "problem": null,
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "review item 4: a bare domain followed by a hyphen and letters stays as it was (not judged)",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "evil.com-x",
+    "problem": null
+  },
+  {
+    "note": "review item 5: an own-domain business email followed by a hyphen and a Hebrew word",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "info@biz.co.il-שלום",
+    "problem": null,
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@biz.co.il"
+  },
+  {
+    "note": "re-review items 1+2: not a formatting pair, so another address: dana_info@gmail.com_",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "dana_info@gmail.com_",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: not a formatting pair, so another address: x _a_info@gmail.com_",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x _a_info@gmail.com_",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: not a formatting pair, so another address: _info@gmail.com_x",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "_info@gmail.com_x",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: not a formatting pair, so another address: dana*info@gmail.com",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "dana*info@gmail.com",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: not a formatting pair, so another address: dana~info@gmail.com",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "dana~info@gmail.com",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: not a formatting pair, so another address: o'info@gmail.com",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "o'info@gmail.com",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: not a formatting pair, so another address: *info@gmail.com",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "*info@gmail.com",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: not a formatting pair, so another address: info@gmail.com*",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "info@gmail.com*",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: not a formatting pair, so another address: *info@gmail.com*x",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "*info@gmail.com*x",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: not a formatting pair, so another address: x*info@gmail.com*",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x*info@gmail.com*",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: not a formatting pair, so another address: **info@gmail.com**",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "**info@gmail.com**",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: not a formatting pair, so another address: *info@gmail.com~",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "*info@gmail.com~",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: not a formatting pair, so another address: שלום*info@gmail.com*",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "שלום*info@gmail.com*",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: a formatting pair around the business email: *info@gmail.com*",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "*info@gmail.com*",
+    "problem": null,
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: a formatting pair around the business email: _info@gmail.com_",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "_info@gmail.com_",
+    "problem": null,
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: a formatting pair around the business email: ~info@gmail.com~",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "~info@gmail.com~",
+    "problem": null,
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: a formatting pair around the business email: 'info@gmail.com'",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "'info@gmail.com'",
+    "problem": null,
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: a formatting pair around the business email: שלום *info@gmail.com* תודה",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "שלום *info@gmail.com* תודה",
+    "problem": null,
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: a formatting pair around the business email: *info@gmail.com*.",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "*info@gmail.com*.",
+    "problem": null,
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: a formatting pair around the business email: (*info@gmail.com*)",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "(*info@gmail.com*)",
+    "problem": null,
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: a formatting pair around the business email: \"*info@gmail.com*\"",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "\"*info@gmail.com*\"",
+    "problem": null,
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: a formatting pair around the business email: *info@gmail.com*, תודה",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "*info@gmail.com*, תודה",
+    "problem": null,
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review items 1+2: a formatting pair around the business email: כתבו: _info@gmail.com_!",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "כתבו: _info@gmail.com_!",
+    "problem": null,
+    "ownDomain": "biz.co.il",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review item 3: the ASCII run before the Hebrew is judged: x@evil.com-שלום-תודה",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x@evil.com-שלום-תודה",
+    "problem": "external_link"
+  },
+  {
+    "note": "re-review item 3: the ASCII run before the Hebrew is judged: evil.com-שלום-תודה",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "evil.com-שלום-תודה",
+    "problem": "external_link"
+  },
+  {
+    "note": "re-review item 3: the ASCII run before the Hebrew is judged: x@evil.com-ב-תודה",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x@evil.com-ב-תודה",
+    "problem": "external_link"
+  },
+  {
+    "note": "re-review item 3: the ASCII run before the Hebrew is judged: x@evil.com-שלום-x",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x@evil.com-שלום-x",
+    "problem": "external_link"
+  },
+  {
+    "note": "re-review item 3: the ASCII run before the Hebrew is judged: x@evil.com-שלום-1",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x@evil.com-שלום-1",
+    "problem": "external_link"
+  },
+  {
+    "note": "re-review item 3: the ASCII run before the Hebrew is judged: x@evil.com-שלוםx",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x@evil.com-שלוםx",
+    "problem": "external_link"
+  },
+  {
+    "note": "re-review item 3: the ASCII run before the Hebrew is judged: x@evil.co-שלום-תודה",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x@evil.co-שלום-תודה",
+    "problem": "external_link"
+  },
+  {
+    "note": "re-review item 3: the ASCII run before the Hebrew is judged: evil.co.il-שלום-תודה",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "evil.co.il-שלום-תודה",
+    "problem": "external_link"
+  },
+  {
+    "note": "re-review item 3: the ASCII run before the Hebrew is judged: x@evil.com-ש-ת",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x@evil.com-ש-ת",
+    "problem": "external_link"
+  },
+  {
+    "note": "re-review item 3: the ASCII run before the Hebrew is judged: x@evil.comשלום-x",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x@evil.comשלום-x",
+    "problem": "glued_address"
+  },
+  {
+    "note": "re-review item 3: the ASCII run before the Hebrew is judged: info@gmail.com-שלום-evil.com",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "info@gmail.com-שלום-evil.com",
+    "problem": "external_link"
+  },
+  {
+    "note": "re-review item 3: an own-domain address before a chain of Hebrew words",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "sales@biz.co.il-תודה-רבה",
+    "problem": null,
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "re-review item 3: the business email before a chain of Hebrew words",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "info@gmail.com-שלום-תודה",
+    "problem": null,
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review item 3: the business email glued to Hebrew before a chain is glued",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "info@gmail.comשלום-תודה",
+    "problem": "glued_address",
+    "businessEmail": "info@gmail.com"
+  },
+  {
+    "note": "re-review item 4 (accepted, fail closed): a listed ending after a foreign letter with no space",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "Thé.It was great",
+    "problem": "external_link"
   }
 ]

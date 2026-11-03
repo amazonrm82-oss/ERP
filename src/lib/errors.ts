@@ -17,6 +17,8 @@ type ErrorLike = {
 };
 
 export const GENERIC_ERROR = "משהו השתבש. נסו שוב בעוד רגע.";
+/** MSG-02 (114) א: the business email (business details) takes Latin letters only; the form and the database say the same. */
+export const BUSINESS_EMAIL_LATIN = "את כתובת האימייל של העסק כותבים באותיות לועזיות בלבד.";
 export const NETWORK_ERROR = "אין חיבור לשרת כרגע. בדקו את החיבור לאינטרנט ונסו שוב.";
 export const NO_PERMISSION = "אין לכם הרשאה לבצע את הפעולה הזו.";
 export const NOT_FOUND = "הרשומה לא נמצאה. ייתכן שנמחקה או שאין לכם גישה אליה.";
@@ -498,6 +500,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "profile:locale": "השפה שנבחרה אינה נתמכת.",
   "profile:timezone": "אזור הזמן הזה אינו נתמך. בחרו עיר אחרת באותו אזור זמן.",
   "org:timezone": "אזור הזמן שנבחר לעסק אינו מוכר.",
+  // MSG-02 (114) א (trigger org_document_settings_email_latin)
+  "document_settings:email_latin": BUSINESS_EMAIL_LATIN,
   "org:website": "אי אפשר להשתמש בכתובת הזו כאתר העסק. צריך כתובת של אתר שלכם (למשל biz.co.il או החנות שלכם ב-wixsite.com), לא סיומת כללית, אתר משותף או קיצור קישורים.",
   "profile:avatar": "התמונה לא נשמרה. העלו אותה שוב.",
   "branding:logo": "הלוגו לא נשמר. העלו אותו שוב.",

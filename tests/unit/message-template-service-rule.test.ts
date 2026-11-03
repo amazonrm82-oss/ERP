@@ -5,10 +5,12 @@ import {
   assertTemplateSendable,
   envelopedFilledProblem,
   FILE_EXTENSIONS,
+  GLUE_BOUNDARY_RANGES,
   LINK_TLDS,
   asciiLower,
   plainBusinessEmail,
   MARKETING_BODY_MAX,
+  messageAddressGlue,
   messageExternalLink,
   messageFilledProblem,
   ownDomainOk,
@@ -34,6 +36,7 @@ import { latestMigration } from "./helpers/migrations";
 const sql = latestMigration("create or replace function app.message_type_fields(")?.sql ?? "";
 const sendSql = latestMigration("create or replace function app.message_filled_problem(")?.sql ?? "";
 const tldSql = latestMigration("create or replace function app.message_link_tld(")?.sql ?? "";
+const gluedSql = latestMigration("create or replace function app.message_glue_boundary(")?.sql ?? "";
 
 describe("service template rule (MSG-02, owner (90) ג)", () => {
   it.each(cases.map((c) => [c.note, c]))("%s", (_note, c) => {
@@ -153,6 +156,44 @@ describe("service template rule (MSG-02, owner (90) ג)", () => {
     expect(messageExternalLink("info@gmail.com", null, "info@gmail.com")).toBe(false);
     expect(messageExternalLink("https://info@gmail.com", null, "info@gmail.com")).toBe(true);
     expect(messageExternalLink("info@gmail.com", null, null)).toBe(true);
+  });
+
+  it("owner (113) א: the glue boundaries equal app.message_glue_boundary, and the code has its texts", () => {
+    const block = gluedSql.split("-- glue-boundaries:start")[1]?.split("-- glue-boundaries:end")[0] ?? "";
+    const numbers = [...block.replace(/--[^\n]*/g, "").matchAll(/\d+/g)].map((m) => Number(m[0]));
+    expect(numbers).toEqual(GLUE_BOUNDARY_RANGES.flat());
+    for (const [from, to] of GLUE_BOUNDARY_RANGES) expect(from <= to && from > 127, `${from}-${to}`).toBe(true);
+    expect(gluedSql).toContain("when 'glued_address' then 'יש בתבנית כתובת צמודה לטקסט'");
+    expect(SEND_REFUSAL_LABELS.glued_address).toBe("כתובת צמודה לטקסט");
+    const base = { channel: "sms" as const, messageType: "collection" as const, subject: null, businessEmail: "info@gmail.com" };
+    expect(templateProblemText({ ...base, body: "שלוםinfo@gmail.com" })).toContain("הכתובת צמודה לטקסט");
+    expect(templateProblemText({ ...base, body: "שלום info@gmail.com" })).toBeNull();
+    expect(messageAddressGlue("dana_info@gmail.com", null, "info@gmail.com")).toBe("external_link");
+    expect(messageAddressGlue("info@gmail.com", null, "info@gmail.com")).toBeNull();
+    expect(messageAddressGlue("moreinfo@biz.co.il", "biz.co.il", "info@biz.co.il")).toBeNull();
+  });
+
+  it("the glue rule is linear on long hostile text", () => {
+    const hostile = [
+      "a@b.co".repeat(30_000),
+      "שa@b.co ".repeat(25_000),
+      "ж".repeat(100_000) + "a@b.co",
+      "a@".repeat(100_000),
+      "@".repeat(200_000),
+      "a.".repeat(100_000) + "@b.co",
+      "_a@b.co".repeat(30_000),
+      "{x}a@b.co".repeat(20_000),
+      "🙂a@b.co".repeat(25_000),
+      "ж.com".repeat(40_000),
+      "a@evil.com-x".repeat(15_000),
+      "a@b.co-שלום ".repeat(15_000),
+      "-ש".repeat(100_000),
+    ];
+    for (const text of hostile) {
+      const started = performance.now();
+      messageAddressGlue(text, "biz.co.il", "a@b.co");
+      expect(performance.now() - started).toBeLessThan(500);
+    }
   });
 
   it("the link rule is linear on long hostile text", () => {

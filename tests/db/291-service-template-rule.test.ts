@@ -62,7 +62,12 @@ describe("service template rule (MSG-02)", () => {
                                  'app.message_platform_domain(text)', 'app.message_website_ok(text)',
                                  'app.message_host_own(text, text)', 'app.message_filled_problem(text, text, text, text)',
                                  'app.message_marketing_body_max(text)', 'app.organizations_website_check()',
-                                 'app.message_send_refusal_text(text)', 'app.message_send_refused(uuid, uuid, text)']) as f(f)`,
+                                 'app.message_send_refusal_text(text)', 'app.message_send_refused(uuid, uuid, text)',
+                                 'app.message_link_text(text)', 'app.message_glue_boundary(integer)', 'app.message_glue_char(text)',
+                                 'app.message_glued_token(text, text, text, text, text, text, text)', 'app.message_address_glue(text, text, text)',
+                                 'app.message_token_pieces(text)', 'app.message_mark_outer_ok(text, boolean)', 'app.message_token_piece_link(text, text, text)',
+                                 'app.message_own_address(text, text)',
+                                 'app.org_document_settings_email_latin()']) as f(f)`,
           )
         ).rows,
     );
@@ -93,6 +98,78 @@ describe("service template rule (MSG-02)", () => {
     // another business's template is not found
     const other = await createOrg(owner.id, "עסק אחר");
     expect(await gate(await insert("collection", "שלום {שם העסק}"), other)).toBe("not_found");
+  });
+
+  it("owner (113) א: a glued address stops the template with its own code at the sender gate", async () => {
+    await asUser(owner.id, (q) =>
+      q(
+        "insert into public.org_document_settings (organization_id, email) values ($1, 'info@gmail.com') on conflict (organization_id) do update set email = excluded.email",
+        [org],
+      ),
+    );
+    const id = await asUser(
+      owner.id,
+      async (q) =>
+        (
+          await q<{ id: string }>(
+            "insert into public.message_templates (organization_id, name, channel, message_type, body) values ($1, 'צמודה', 'sms', 'collection', 'כתבו לinfo@gmail.com') returning id",
+            [org],
+          )
+        ).rows[0].id,
+    );
+    const gate = () => asAdmin(async (q) => (await q<{ p: string | null }>("select app.message_template_sendable($1, $2) as p", [org, id])).rows[0].p);
+    expect(await gate()).toBe("glued_address");
+    await asUser(owner.id, (q) => q("update public.message_templates set body = 'כתבו ל-info@gmail.com' where id = $1", [id]));
+    expect(await gate()).toBeNull();
+    const text = await asAdmin(async (q) => (await q<{ t: string }>("select app.message_send_refusal_text('glued_address') as t")).rows[0].t);
+    expect(text).toBe("יש בתבנית כתובת צמודה לטקסט");
+  });
+
+  it("review item 2: the glue step stops at the first glued address and stays cheap on a full-cap template", async () => {
+    const timed = async (sql: string) =>
+      asAdmin(async (q) => {
+        const started = performance.now();
+        const answer = (await q<{ p: string | null }>(sql)).rows[0].p;
+        return { answer, ms: performance.now() - started };
+      });
+    const glued = await timed(
+      "select app.message_template_problem('email', 'collection', repeat('ש', 150), repeat('שa@b.co ', 250), 'biz.co.il', 'a@b.co') as p",
+    );
+    expect(glued.answer).toBe("glued_address");
+    expect(glued.ms).toBeLessThan(500);
+    const plain = await timed("select app.message_address_glue(repeat('a@b.co ', 10000), 'biz.co.il', 'a@b.co') as p");
+    expect(plain.answer).toBeNull();
+    expect(plain.ms).toBeLessThan(3000);
+  });
+
+  it("owner (114) א: the business email takes Latin letters only, judged on a new or changed value for every writer", async () => {
+    const other = await createOrg(owner.id, "עסק לטיני");
+    const write = (email: string) =>
+      asUser(owner.id, (q) =>
+        q(
+          "insert into public.org_document_settings (organization_id, email) values ($1, $2) on conflict (organization_id) do update set email = excluded.email",
+          [other, email],
+        ),
+      );
+    for (const bad of ["info@קפה.com", "שלום@biz.co.il", "infoж@biz.co.il"]) {
+      const error = await pgError(write(bad));
+      expect(error?.hint, bad).toBe("document_settings:email_latin");
+    }
+    await write("info@biz.co.il");
+    // a server write is judged too
+    const serverError = await pgError(
+      asAdmin((q) => q("update public.org_document_settings set email = 'אינפו@biz.co.il' where organization_id = $1", [other])),
+    );
+    expect(serverError?.hint).toBe("document_settings:email_latin");
+    // a stored value is not judged again when another column changes
+    await asAdmin(async (q) => {
+      await q("alter table public.org_document_settings disable trigger org_document_settings_email_latin");
+      await q("update public.org_document_settings set email = 'אינפו@biz.co.il' where organization_id = $1", [other]);
+      await q("alter table public.org_document_settings enable trigger org_document_settings_email_latin");
+    });
+    await asUser(owner.id, (q) => q("update public.org_document_settings set phone = '03-5555555' where organization_id = $1", [other]));
+    const stored = await asAdmin(async (q) => (await q<{ e: string }>("select email as e from public.org_document_settings where organization_id = $1", [other])).rows[0].e);
+    expect(stored).toBe("אינפו@biz.co.il");
   });
 
   it("changing a template's type is recorded in the audit log, old and new", async () => {

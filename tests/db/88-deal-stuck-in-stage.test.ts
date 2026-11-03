@@ -49,6 +49,8 @@ const RERUN = [
   migrationFile("_service_message_send_rules.sql"),
   // MSG-02 (110)/(111) redefines the link rule of _service_message_send_rules.sql last (closed endings, business email)
   migrationFile("_message_link_tlds.sql"),
+  // MSG-02 (113)/(114) redefines app.message_template_problem() of _message_link_tlds.sql last (glued addresses)
+  migrationFile("_glued_address.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its
