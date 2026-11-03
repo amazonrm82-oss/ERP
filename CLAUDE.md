@@ -584,7 +584,8 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   logo; no view, no status change, no notice, no automation; see hard rule 5); any other User-Agent gets the normal page, so a human's
   metadata still carries the name `quote_public`/`order_public` return. `next.config.ts` `htmlLimitedBots` = Next's default list plus
   TelegramBot|Facebot (metadata in `<head>` for them). Test 253 compares each kind's "not found" with its page function's answer and
-  pins the md5(prosrc) of the six page functions: redefining one fails the test until the preview rule is checked again.
+  pins the md5(prosrc) of the six page functions: redefining one fails the test until the preview rule is checked again. A changed
+  value there carries a comment line saying what was rechecked (RVW-65).
 - Thank-you WhatsApp (CAP-05, migration 0106): `forms.whatsapp_button/whatsapp_phone/whatsapp_text` (column grants).
   `intake_form()` adds `thanks {whatsapp, whatsapp_text}`: the form's number or `organizations.phone`, normalized, only when
   on and valid E.164 (same rule as `src/features/intake/whatsapp.ts`). A redirect URL still wins. `/f/[token]/qr` is branded.

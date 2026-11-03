@@ -511,8 +511,11 @@ describe("link previews for preview bots (WAB-05)", () => {
     // OPS-02 (public_sender_limit, owner (41) ב) adds only a per-sender view limit after the link's window, answering
     // {rate_limited}; it counts only with the x-crm-sender header, which the preview never sends; every not-found branch is
     // unchanged (rechecked)
+    // TAX-02 (021087, bank details) adds only `bank` to the full page; every not-found branch is unchanged (rechecked 3 November
+    // 2026 against the not-found matrix above, RVW-65)
     // PRD-09 (product_bundles) adds only `components` to each line of the full page; every not-found branch is unchanged (rechecked)
     "public.quote_public(text)": "ac15f8460f5149554788af11722bdbce",
+    // TAX-02 (021087, bank details) adds only `bank` to the full page (rechecked 3 November 2026, RVW-65)
     // ORD-05 PDF (order_pdfs) adds only the `pdf` key to the full page; every not-found branch is unchanged (rechecked)
     // PRD-09 (product_bundles) adds only `components` to each line of the full page (rechecked)
     "public.order_public(text,text)": "8dfb0e7e80c09621dc8ef72f36657856",
