@@ -694,6 +694,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_message_types.sql",
       // MSG-02 (103) redefines app.job_payload_ok() of _message_types.sql and app.jobs_record_message() of _messages.sql last
       "_service_message_send_rules.sql",
+      // MSG-02 (110)/(111) redefines the link rule of _service_message_send_rules.sql last (closed endings, business email)
+      "_message_link_tlds.sql",
       // PAY-08 redefines public.payment_credit() of _credit_advances_list.sql, public.money_allocation_state() of
       // _money_allocation_state_speed.sql, app.payment_allocations_check() and public.customer_ledger() of _opening_credit.sql and
       // public.report_collection() of _collection_report_answers.sql last (a payment counts less its active refunds)

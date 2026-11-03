@@ -312,20 +312,20 @@
     "problem": null
   },
   {
-    "note": "email address is not a link",
+    "note": "owner (111) ב: an email address on another domain is a link",
     "channel": "sms",
     "messageType": "collection",
     "subject": null,
     "body": "לשאלות: info@example.co.il",
-    "problem": null
+    "problem": "external_link"
   },
   {
-    "note": "email address with a dotted name",
+    "note": "owner (111) ב: a dotted email address on another domain is a link",
     "channel": "sms",
     "messageType": "collection",
     "subject": null,
     "body": "dana.cohen@example.com",
-    "problem": null
+    "problem": "external_link"
   },
   {
     "note": "a lone \"www.\" with nothing after it is a word",
@@ -775,12 +775,12 @@
     "problem": "external_link"
   },
   {
-    "note": "review 5 accepted: Mr.Cohen reads as a domain",
+    "note": "owner (110) ב: Mr.Cohen is not a link (cohen is not an ending)",
     "channel": "sms",
     "messageType": "collection",
     "subject": null,
     "body": "Mr.Cohen",
-    "problem": "external_link"
+    "problem": null
   },
   {
     "note": "own domain after a Hebrew prefix with a maqaf",
@@ -958,5 +958,526 @@
     "body": "y.amazonaws.com",
     "problem": "external_link",
     "ownDomain": "x.amazonaws.com"
+  },
+  {
+    "note": "owner (110) ב: St.Louis is not a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "נפגש ב-St.Louis",
+    "problem": null
+  },
+  {
+    "note": "owner (110) ב: today.Tomorrow is not a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "today.Tomorrow",
+    "problem": null
+  },
+  {
+    "note": "owner (110) ב: example.co.il is a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "example.co.il",
+    "problem": "external_link"
+  },
+  {
+    "note": "owner (110) ב: evil.com is a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "evil.com",
+    "problem": "external_link"
+  },
+  {
+    "note": "owner (110) ב: x.io is a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x.io",
+    "problem": "external_link"
+  },
+  {
+    "note": "owner (110) ב: a.shop is a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "a.shop",
+    "problem": "external_link"
+  },
+  {
+    "note": "owner (110) ב: a country code is a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "example.de",
+    "problem": "external_link"
+  },
+  {
+    "note": "owner (110) ב: an Israeli second level is a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "school.k12.il",
+    "problem": "external_link"
+  },
+  {
+    "note": "owner (110) ב accepted: an ending not on the list is not seen",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x.museum",
+    "problem": null
+  },
+  {
+    "note": "owner (110) ב: www is a link whatever the ending",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "www.x.museum",
+    "problem": "external_link"
+  },
+  {
+    "note": "owner (110) ב: a scheme is a link whatever the ending",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "https://x.local/pay",
+    "problem": "external_link"
+  },
+  {
+    "note": "owner (110) ב: punycode stays a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "shop.xn--4dbrk0ce",
+    "problem": "external_link"
+  },
+  {
+    "note": "owner (110) ב: an ending glued to Hebrew",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "evil.ioשלום",
+    "problem": "external_link"
+  },
+  {
+    "note": "owner (110) ב: a word ending not glued to a TLD",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "שם.Cohenשלום",
+    "problem": null
+  },
+  {
+    "note": "owner (111) ב: an email on the own domain",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "לשאלות: info@biz.co.il",
+    "problem": null,
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "owner (111) ב: an email on an own sub-domain",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "dana@shop.biz.co.il",
+    "problem": null,
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "owner (111) ב: an email on another domain with an own website",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "info@other.co.il",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "owner (111) ב: an email on a domain that only ends like the own one",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "info@notbiz.co.il",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "owner (111) ב: an email on a shared host's other site",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "a@other.wixsite.com",
+    "problem": "external_link",
+    "ownDomain": "mybiz.wixsite.com"
+  },
+  {
+    "note": "owner (111) ב: the business email",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "כתבו ל-biz.office@gmail.com ונחזור אליכם",
+    "problem": null,
+    "businessEmail": "biz.office@gmail.com"
+  },
+  {
+    "note": "owner (111) ב: the business email in other case",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "BIZ.Office@Gmail.COM",
+    "problem": null,
+    "businessEmail": "biz.office@gmail.com"
+  },
+  {
+    "note": "owner (111) ב: the business email in brackets and before a comma",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "(biz.office@gmail.com), biz.office@gmail.com, תודה",
+    "problem": null,
+    "businessEmail": "biz.office@gmail.com"
+  },
+  {
+    "note": "owner (111) ב: the business email at the end of a sentence",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "biz.office@gmail.com.",
+    "problem": null,
+    "businessEmail": "biz.office@gmail.com"
+  },
+  {
+    "note": "owner (111) ב: a longer local part is another address",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "xbiz.office@gmail.com",
+    "problem": "external_link",
+    "businessEmail": "biz.office@gmail.com"
+  },
+  {
+    "note": "owner (111) ב: a longer domain is another address",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "biz.office@gmail.com.il",
+    "problem": "external_link",
+    "businessEmail": "biz.office@gmail.com"
+  },
+  {
+    "note": "owner (111) ב: the business email as userinfo",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "https://biz.office@gmail.com",
+    "problem": "external_link",
+    "businessEmail": "biz.office@gmail.com"
+  },
+  {
+    "note": "owner (111) ב: the business email glued to Hebrew",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "biz.office@gmail.comשלום",
+    "problem": "external_link",
+    "businessEmail": "biz.office@gmail.com"
+  },
+  {
+    "note": "owner (111) ב: another email beside the business email",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "biz.office@gmail.com או a@evil.com",
+    "problem": "external_link",
+    "businessEmail": "biz.office@gmail.com"
+  },
+  {
+    "note": "owner (111) ב: a link beside the business email",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "biz.office@gmail.com evil.com",
+    "problem": "external_link",
+    "businessEmail": "biz.office@gmail.com"
+  },
+  {
+    "note": "owner (111) ב accepted: a business email with an underscore is not plain, so not recognized",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "dana_cohen@gmail.com",
+    "problem": "external_link",
+    "businessEmail": "dana_cohen@gmail.com"
+  },
+  {
+    "note": "owner (111) ב: an underscore address that is not the business's",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "dana_cohen@evil.com",
+    "problem": "external_link",
+    "businessEmail": "dana@evil.co.il"
+  },
+  {
+    "note": "owner (111) ב accepted: a business email with a plus is not plain, so not recognized",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "a+b@gmail.com",
+    "problem": "external_link",
+    "businessEmail": "a+b@gmail.com"
+  },
+  {
+    "note": "owner (111) ב: a plus is not a regex quantifier",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "aab@gmail.com",
+    "problem": "external_link",
+    "businessEmail": "a+b@gmail.com"
+  },
+  {
+    "note": "owner (111) ב: a dot is not a regex wildcard",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "bizXoffice@gmail.com",
+    "problem": "external_link",
+    "businessEmail": "biz.office@gmail.com"
+  },
+  {
+    "note": "owner (111) ב: the business email and the own domain together",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "biz.office@gmail.com www.biz.co.il",
+    "problem": null,
+    "businessEmail": "biz.office@gmail.com",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "owner (111) ב: not an address when there is no ending",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "user@localhost",
+    "problem": null
+  },
+  {
+    "note": "owner (111) ב: the business email in the subject",
+    "channel": "email",
+    "messageType": "requested_document",
+    "subject": "שאלות? biz.office@gmail.com",
+    "body": "שלום",
+    "problem": null,
+    "businessEmail": "biz.office@gmail.com"
+  },
+  {
+    "note": "owner (111) ב: marketing is not judged",
+    "channel": "sms",
+    "messageType": "marketing",
+    "subject": null,
+    "body": "כתבו ל-a@evil.com",
+    "problem": null
+  },
+  {
+    "note": "review 7fe2fa4 (1): a URL-shaped business email never hides a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "https://evil.com/x@y.co",
+    "problem": "external_link",
+    "businessEmail": "https://evil.com/x@y.co"
+  },
+  {
+    "note": "review 7fe2fa4 (1): a www-shaped business email never hides a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "www.evil.com/x@y.co",
+    "problem": "external_link",
+    "businessEmail": "www.evil.com/x@y.co"
+  },
+  {
+    "note": "review 7fe2fa4 (1): a URL-shaped business email, the text beside it",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "שאלות: https://evil.com/x@y.co תודה",
+    "problem": "external_link",
+    "businessEmail": "https://evil.com/x@y.co",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "review 7fe2fa4 (1): the plain business email is still allowed",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "לשאלות: Biz.Office@gmail.com, תודה",
+    "problem": null,
+    "businessEmail": "biz.office@gmail.com"
+  },
+  {
+    "note": "review 7fe2fa4 (1): the business email with spaces around it as stored",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "biz.office@gmail.com",
+    "problem": null,
+    "businessEmail": " biz.office@gmail.com "
+  },
+  {
+    "note": "review 7fe2fa4 (2): a local part starting with www on the own domain",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "www.evil.com@biz.co.il",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "review 7fe2fa4 (2): a local part that is a domain on the own domain",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "evil.com@biz.co.il",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "review 7fe2fa4 (2): a business email whose local part is a domain is not plain",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "evil.com@gmail.com",
+    "problem": "external_link",
+    "businessEmail": "evil.com@gmail.com"
+  },
+  {
+    "note": "review 7fe2fa4 (2): a dotted local part that is not a host stays allowed",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "dana.cohen@biz.co.il",
+    "problem": null,
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "review 7fe2fa4 (4): icu is an ending",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "promo.icu",
+    "problem": "external_link"
+  },
+  {
+    "note": "review 7fe2fa4 (4): cfd is an ending",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x.cfd",
+    "problem": "external_link"
+  },
+  {
+    "note": "review 7fe2fa4 (4): sbs is an ending",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "win.sbs",
+    "problem": "external_link"
+  },
+  {
+    "note": "review 7fe2fa4 (4): cyou is an ending",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "gift.cyou",
+    "problem": "external_link"
+  },
+  {
+    "note": "review 7fe2fa4 (4): ir is an ending",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "site.ir",
+    "problem": "external_link"
+  },
+  {
+    "note": "re-review 5fb474a: a host-like local part on the own domain (evil.com.@biz.co.il)",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "evil.com.@biz.co.il",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "re-review 5fb474a: a host-like local part on the own domain (evil.com-@biz.co.il)",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "evil.com-@biz.co.il",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "re-review 5fb474a: a host-like local part on the own domain (1.2.3.4@biz.co.il)",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "1.2.3.4@biz.co.il",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "re-review 5fb474a: a host-like local part on the own domain (evil..com@biz.co.il)",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "evil..com@biz.co.il",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "re-review 5fb474a: a host-like business email is not plain (evil.com.x@gmail.com)",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "evil.com.x@gmail.com",
+    "problem": "external_link",
+    "businessEmail": "evil.com.x@gmail.com"
+  },
+  {
+    "note": "re-review 5fb474a: a host-like business email is not plain (evil..com@gmail.com)",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "evil..com@gmail.com",
+    "problem": "external_link",
+    "businessEmail": "evil..com@gmail.com"
+  },
+  {
+    "note": "re-review 5fb474a: a host-like business email is not plain (evil.com-x@gmail.com)",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "evil.com-x@gmail.com",
+    "problem": "external_link",
+    "businessEmail": "evil.com-x@gmail.com"
+  },
+  {
+    "note": "re-review 5fb474a: a host-like business email is not plain (1.2.3.4@gmail.com)",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "1.2.3.4@gmail.com",
+    "problem": "external_link",
+    "businessEmail": "1.2.3.4@gmail.com"
   }
 ]

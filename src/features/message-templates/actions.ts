@@ -29,15 +29,21 @@ const FIELDS = ["name", "channel", "message_type", "subject", "body", "locale", 
 /** Owner (90) ג: a service template that will not be sent is still saved; the answer says why (null when it may be sent). */
 async function sendProblem(orgId: string, input: MessageTemplateInput): Promise<string | null> {
   // owners (97), (104): the business's own domain is allowed; a failed read judges without it (the stricter answer)
+  // owner (111) ב: and its email from the business details; a failed read judges without it
   const supabase = await createClient();
-  const { data, error } = await supabase.from("organizations").select("website").eq("id", orgId).maybeSingle();
-  const website = error ? null : (data?.website ?? null);
+  const [org, details] = await Promise.all([
+    supabase.from("organizations").select("website").eq("id", orgId).maybeSingle(),
+    supabase.from("org_document_settings").select("email").eq("organization_id", orgId).maybeSingle(),
+  ]);
+  const website = org.error ? null : (org.data?.website ?? null);
+  const businessEmail = details.error ? null : (details.data?.email ?? null);
   return templateProblemText({
     channel: input.channel,
     messageType: input.message_type,
     subject: input.subject,
     body: input.body,
     ownDomain: websiteDomain(website),
+    businessEmail,
   });
 }
 

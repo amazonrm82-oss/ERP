@@ -5,6 +5,9 @@ import {
   assertTemplateSendable,
   envelopedFilledProblem,
   FILE_EXTENSIONS,
+  LINK_TLDS,
+  asciiLower,
+  plainBusinessEmail,
   MARKETING_BODY_MAX,
   messageExternalLink,
   messageFilledProblem,
@@ -30,6 +33,7 @@ import { latestMigration } from "./helpers/migrations";
 
 const sql = latestMigration("create or replace function app.message_type_fields(")?.sql ?? "";
 const sendSql = latestMigration("create or replace function app.message_filled_problem(")?.sql ?? "";
+const tldSql = latestMigration("create or replace function app.message_link_tld(")?.sql ?? "";
 
 describe("service template rule (MSG-02, owner (90) ג)", () => {
   it.each(cases.map((c) => [c.note, c]))("%s", (_note, c) => {
@@ -126,6 +130,31 @@ describe("service template rule (MSG-02, owner (90) ג)", () => {
     expect(templateProblemText({ ...base, body: "other.com" })).toContain("פרטי העסק");
   });
 
+  it("owner (110) ב: the endings equal app.message_link_tld, each once, letters only, and none names a file", () => {
+    const block = tldSql.split("-- link-tlds:start")[1]?.split("-- link-tlds:end")[0] ?? "";
+    expect([...block.matchAll(/'([^']+)'/g)].map((m) => m[1])).toEqual([...LINK_TLDS]);
+    expect(new Set(LINK_TLDS).size).toBe(LINK_TLDS.length);
+    for (const tld of LINK_TLDS) {
+      expect(tld, tld).toMatch(/^[a-z]{2,63}$/);
+      expect(FILE_EXTENSIONS, tld).not.toContain(tld);
+    }
+    // the redefinitions of this migration build on 021160's bodies
+    expect(tldSql).toContain("create or replace function app.message_domain_suffix(");
+    expect(tldSql).toContain("create or replace function app.message_external_link(p_text text, p_own_domain text, p_business_email text)");
+  });
+
+  it("owner (111) ב: only a plain business email counts, ASCII letters folded only", () => {
+    expect(asciiLower("ABC אב İ")).toBe("abc אב İ");
+    expect(plainBusinessEmail(" Biz.Office@Gmail.COM ")).toBe("biz.office@gmail.com");
+    for (const bad of ["https://evil.com/x@y.co", "www.evil.com/x@y.co", "evil.com@y.co", "www.x@y.co", "a_b@y.co", "a+b@y.co", ".a@y.co", "a@localhost", "evil.com.x@gmail.com", "evil..com@gmail.com", "evil.com-x@gmail.com", "1.2.3.4@gmail.com", "", null])
+      expect(plainBusinessEmail(bad), String(bad)).toBeNull();
+    expect(messageExternalLink("info@biz.co.il", "biz.co.il", null)).toBe(false);
+    expect(plainBusinessEmail("dana.cohen@gmail.com")).toBe("dana.cohen@gmail.com");
+    expect(messageExternalLink("info@gmail.com", null, "info@gmail.com")).toBe(false);
+    expect(messageExternalLink("https://info@gmail.com", null, "info@gmail.com")).toBe(true);
+    expect(messageExternalLink("info@gmail.com", null, null)).toBe(true);
+  });
+
   it("the link rule is linear on long hostile text", () => {
     const hostile = [
       "a.".repeat(100_000) + "1",
@@ -138,9 +167,10 @@ describe("service template rule (MSG-02, owner (90) ג)", () => {
       "1.".repeat(100_000),
       "א.".repeat(100_000) + "com",
     ];
+    hostile.push("a@b.co".repeat(30_000), "(a@b.co)".repeat(30_000), "a@b.co.".repeat(30_000), "ל-a@b.co".repeat(30_000));
     for (const text of hostile) {
       const started = performance.now();
-      messageExternalLink(text, "biz.co.il");
+      messageExternalLink(text, "biz.co.il", "a@b.co");
       expect(performance.now() - started).toBeLessThan(500);
     }
   });

@@ -47,6 +47,8 @@ const RERUN = [
   migrationFile("_message_types.sql"),
   // MSG-02 (103) redefines app.job_payload_ok() of _message_types.sql and app.jobs_record_message() of _messages.sql last
   migrationFile("_service_message_send_rules.sql"),
+  // MSG-02 (110)/(111) redefines the link rule of _service_message_send_rules.sql last (closed endings, business email)
+  migrationFile("_message_link_tlds.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

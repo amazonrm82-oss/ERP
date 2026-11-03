@@ -40,6 +40,9 @@ export default async function MessageTemplatesPage({ params }: Props) {
   // owner (97): the business's own domain is the one address a service message may hold
   const site = websiteDomain(orgRow?.website ?? null);
   const ownDomain = ownDomainOk(site) ? site : null;
+  // owner (111) ב: the business's own email (business details) may appear in a service message
+  const businessEmail = details.email?.trim() || null;
+  const own = { ownDomain, businessEmail };
 
   return (
     <div className="space-y-4">
@@ -54,7 +57,8 @@ export default async function MessageTemplatesPage({ params }: Props) {
           </p>
           <p>
             בתבנית של הודעת שירות אפשר להשתמש רק בשדות שמתאימים לסוג שלה, אי אפשר לכתוב בה קישור או כתובת אתר (המערכת מוסיפה את הקישורים שלה דרך
-            השדות; {ownDomain ? `הכתובת של האתר של העסק, ${ownDomain}, מותרת` : "כתובת האתר של העסק מותרת אחרי שממלאים אותה בפרטי העסק"}), והאורך
+            השדות; {ownDomain ? `הכתובת של האתר של העסק, ${ownDomain}, מותרת` : "כתובת האתר של העסק מותרת אחרי שממלאים אותה בפרטי העסק"}; אימייל מותר רק
+            בדומיין של האתר של העסק או כשהוא האימייל של העסק מפרטי העסק{businessEmail ? `, ${businessEmail}` : ""}), והאורך
             מוגבל: עד {SERVICE_BODY_MAX.sms} תווים ב-SMS, עד {SERVICE_BODY_MAX.whatsapp.toLocaleString("he-IL")} ב-WhatsApp ועד{" "}
             {SERVICE_BODY_MAX.email.toLocaleString("he-IL")} באימייל. תבנית כזאת נשמרת גם כשהיא לא עומדת בכללים, אבל לא תישלח, וליד התבנית כתוב למה.
             האורך נבדק שוב בזמן השליחה, אחרי שהשדות מולאו: הודעה ארוכה מדי לא נשלחת ולא מקוצרת, ובעלים ומנהלי מערכת מקבלים התראה. גם הודעה
@@ -82,7 +86,7 @@ export default async function MessageTemplatesPage({ params }: Props) {
         </CardBody>
         {templates.length > 0 ? (
           <div className="mt-3 border-t border-line">
-            <MessageTemplateList orgId={orgId} templates={templates} editable={editable} ownDomain={ownDomain} />
+            <MessageTemplateList orgId={orgId} templates={templates} editable={editable} own={own} />
           </div>
         ) : (
           <EmptyState
@@ -95,7 +99,7 @@ export default async function MessageTemplatesPage({ params }: Props) {
         )}
         {editable && templates.length < MESSAGE_TEMPLATES_PER_ORG ? (
           <CardBody className="border-t border-line">
-            <AddMessageTemplateForm orgId={orgId} ownDomain={ownDomain} />
+            <AddMessageTemplateForm orgId={orgId} own={own} />
           </CardBody>
         ) : null}
       </Card>

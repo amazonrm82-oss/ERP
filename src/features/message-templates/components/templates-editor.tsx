@@ -12,7 +12,7 @@ import type { FormState } from "@/lib/action-result";
 
 import { addMessageTemplateAction, deleteMessageTemplateAction, updateMessageTemplateAction } from "../actions";
 import type { MessageTemplate } from "../queries";
-import { templateProblemText } from "../service-rule";
+import { templateProblemText, type OwnAddresses } from "../service-rule";
 import {
   isServiceType,
   MESSAGE_TEMPLATE_BODY_MAX,
@@ -73,11 +73,11 @@ const EMPTY: Values = {
 function TemplateFields({
   initial,
   failure,
-  ownDomain,
+  own,
 }: {
   initial: Values;
   failure: Extract<FormState, { ok: false }> | null;
-  ownDomain: string | null;
+  own: OwnAddresses;
 }) {
   const values = failure?.values;
   const [channel, setChannel] = useState<string>(values?.channel ?? initial.channel);
@@ -97,7 +97,7 @@ function TemplateFields({
           messageType: picked,
           subject: pickedChannel === "email" ? subject.trim() : null,
           body: body.replace(/\r\n?/g, "\n").trim(),
-          ownDomain,
+          ...own,
         })
       : null;
   return (
@@ -189,21 +189,21 @@ export function MessageTemplateList({
   orgId,
   templates,
   editable,
-  ownDomain,
+  own,
 }: {
   orgId: string;
   templates: MessageTemplate[];
   editable: boolean;
   /** owner (97): the business's own domain, allowed in a service message */
-  ownDomain: string | null;
+  own: OwnAddresses;
 }) {
   return (
     <ol className="divide-y divide-line">
       {templates.map((template) =>
         editable ? (
-          <EditableRow key={`${template.id}-${template.name}-${template.body}-${template.subject}-${template.messageType}-${template.channel}`} orgId={orgId} template={template} ownDomain={ownDomain} />
+          <EditableRow key={`${template.id}-${template.name}-${template.body}-${template.subject}-${template.messageType}-${template.channel}`} orgId={orgId} template={template} own={own} />
         ) : (
-          <ReadRow key={template.id} template={template} ownDomain={ownDomain} />
+          <ReadRow key={template.id} template={template} own={own} />
         ),
       )}
     </ol>
@@ -222,33 +222,33 @@ function RowHeading({ template }: { template: MessageTemplate }) {
   );
 }
 
-function storedProblem(template: MessageTemplate, ownDomain: string | null): string | null {
-  return templateProblemText({ ...template, ownDomain });
+function storedProblem(template: MessageTemplate, own: OwnAddresses): string | null {
+  return templateProblemText({ ...template, ...own });
 }
 
-function ReadRow({ template, ownDomain }: { template: MessageTemplate; ownDomain: string | null }) {
+function ReadRow({ template, own }: { template: MessageTemplate; own: OwnAddresses }) {
   return (
     <li className="space-y-1 px-4 py-3 sm:px-5">
       <RowHeading template={template} />
-      <SendProblem message={storedProblem(template, ownDomain)} />
+      <SendProblem message={storedProblem(template, own)} />
       {template.subject ? <p className="text-md text-ink">נושא: {template.subject}</p> : null}
       <p className="break-words whitespace-pre-wrap text-md text-ink-soft">{template.body}</p>
     </li>
   );
 }
 
-function EditableRow({ orgId, template, ownDomain }: { orgId: string; template: MessageTemplate; ownDomain: string | null }) {
+function EditableRow({ orgId, template, own }: { orgId: string; template: MessageTemplate; own: OwnAddresses }) {
   const [state, formAction] = useActionState<FormState, FormData>(updateMessageTemplateAction.bind(null, orgId, template.id), null);
   const failure = state && !state.ok ? state : null;
   return (
     <li className="space-y-3 px-4 py-4 sm:px-5">
       <RowHeading template={template} />
-      <SendProblem message={storedProblem(template, ownDomain)} />
+      <SendProblem message={storedProblem(template, own)} />
       <form action={formAction} className="space-y-3" noValidate>
         <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
         <TemplateFields
           failure={failure}
-          ownDomain={ownDomain}
+          own={own}
           initial={{
             name: template.name,
             channel: template.channel,
@@ -282,7 +282,7 @@ function EditableRow({ orgId, template, ownDomain }: { orgId: string; template: 
   );
 }
 
-export function AddMessageTemplateForm({ orgId, ownDomain }: { orgId: string; ownDomain: string | null }) {
+export function AddMessageTemplateForm({ orgId, own }: { orgId: string; own: OwnAddresses }) {
   const [state, formAction] = useActionState<FormState, FormData>(addMessageTemplateAction.bind(null, orgId), null);
   const failure = state && !state.ok ? state : null;
   return (
@@ -290,7 +290,7 @@ export function AddMessageTemplateForm({ orgId, ownDomain }: { orgId: string; ow
       <h3 className="font-semibold">תבנית חדשה</h3>
       {state?.ok && state.message ? <SendProblem message={state.message} /> : null}
       <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
-      <TemplateFields initial={EMPTY} failure={failure} ownDomain={ownDomain} />
+      <TemplateFields initial={EMPTY} failure={failure} own={own} />
       <SubmitButton size="sm" pendingText="מוסיפים…">
         הוספת תבנית
       </SubmitButton>

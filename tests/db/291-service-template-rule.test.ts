@@ -27,12 +27,13 @@ describe("service template rule (MSG-02)", () => {
       const got = await asAdmin(
         async (q) =>
           (
-            await q<{ p: string | null }>("select app.message_template_problem($1, $2, $3, $4, $5) as p", [
+            await q<{ p: string | null }>("select app.message_template_problem($1, $2, $3, $4, $5, $6) as p", [
               c.channel,
               c.messageType,
               c.subject,
               c.body,
               ("ownDomain" in c ? c.ownDomain : null) ?? null,
+              ("businessEmail" in c ? c.businessEmail : null) ?? null,
             ])
           ).rows[0].p,
       );
@@ -47,10 +48,13 @@ describe("service template rule (MSG-02)", () => {
           await q<{ role: string; f: string; ok: boolean }>(
             `select r.role, f.f, has_function_privilege(r.role, f.f, 'execute') as ok
                from unnest(array['anon', 'authenticated', 'service_role']) as r(role),
-                    unnest(array['app.message_template_problem(text, text, text, text, text)', 'app.message_template_sendable(uuid, uuid)',
+                    unnest(array['app.message_template_problem(text, text, text, text, text, text)', 'app.message_template_sendable(uuid, uuid)',
+                                 'app.message_template_problem(text, text, text, text, text)',
+                                 'app.message_external_link(text, text)', 'app.message_link_tld(text)',
+                                 'app.message_ascii_lower(text)', 'app.message_plain_email(text)', 'app.message_local_host(text)', 'app.message_token_link(text, text, text)',
                                  'app.message_type_fields(text)', 'app.message_service_body_max(text)',
                                  'app.message_template_problem_021160_retired(text, text, text, text)',
-                                 'app.message_external_link(text, text)', 'app.message_domain_suffix(text)',
+                                 'app.message_external_link(text, text, text)', 'app.message_domain_suffix(text)',
                                  'app.message_part_link(text, text)', 'app.message_token_link(text, text)',
                                  'app.message_authority_link(text, text)', 'app.message_own_domain_ok(text)',
                                  'app.message_under_shared_host(text)', 'app.message_shared_site_host(text)',
@@ -117,7 +121,7 @@ describe("service template rule (MSG-02)", () => {
     expect(JSON.stringify(changes[0].c.message_type)).toContain("collection");
   });
 
-  it("one app.message_template_problem only, with the own domain as its last argument", async () => {
+  it("the full rules take the own domain and the business email last; 021160's forms stay as wrappers", async () => {
     const rows = await asAdmin(
       async (q) =>
         (
@@ -127,7 +131,34 @@ describe("service template rule (MSG-02)", () => {
           )
         ).rows,
     );
-    expect(rows.map((r) => r.args)).toEqual(["p_channel text, p_message_type text, p_subject text, p_body text, p_own_domain text"]);
+    expect(rows.map((r) => r.args).sort()).toEqual([
+      "p_channel text, p_message_type text, p_subject text, p_body text, p_own_domain text",
+      "p_channel text, p_message_type text, p_subject text, p_body text, p_own_domain text, p_business_email text",
+    ]);
+    const links = await asAdmin(
+      async (q) =>
+        (
+          await q<{ args: string }>(
+            `select pg_get_function_identity_arguments(p.oid) as args from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname = 'app' and p.proname = 'message_external_link'`,
+          )
+        ).rows,
+    );
+    expect(links.map((r) => r.args).sort()).toEqual(["p_text text, p_own_domain text", "p_text text, p_own_domain text, p_business_email text"]);
+    // the wrappers pass no business email; every call form resolves to one function
+    const answers = await asAdmin(
+      async (q) =>
+        (
+          await q<{ a: boolean; b: boolean; c: boolean; d: string | null; e: string | null; f: string | null }>(
+            `select app.message_external_link('a@gmail.com') as a, app.message_external_link('a@gmail.com', null) as b,
+                    app.message_external_link('a@gmail.com', null, 'a@gmail.com') as c,
+                    app.message_template_problem('sms', 'collection', null, 'a@gmail.com') as d,
+                    app.message_template_problem('sms', 'collection', null, 'a@gmail.com', null) as e,
+                    app.message_template_problem('sms', 'collection', null, 'a@gmail.com', null, 'a@gmail.com') as f`,
+          )
+        ).rows[0],
+    );
+    expect(answers).toEqual({ a: true, b: true, c: false, d: "external_link", e: "external_link", f: null });
   });
 
   it("app.message_filled_problem answers the shared fixture like the TS rule (owner (96))", async () => {
@@ -208,6 +239,43 @@ describe("service template rule (MSG-02)", () => {
         ).rows[0].id,
     );
     expect(await gate(other, otherTemplate)).toBe("external_link");
+  });
+
+  it("owner (111) ב: the gate allows the business's own email from its business details, and an address on its own domain", async () => {
+    const own = await createUser("svc-email-owner");
+    const mailOrg = await createOrg(own.id, "עסק עם אימייל");
+    const template = (body: string) =>
+      asUser(
+        own.id,
+        async (q) =>
+          (
+            await q<{ id: string }>(
+              "insert into public.message_templates (organization_id, name, channel, message_type, body) values ($1, $2, 'sms', 'collection', $3) returning id",
+              [mailOrg, `אימייל ${randomUUID().slice(0, 8)}`, body],
+            )
+          ).rows[0].id,
+      );
+    const gate = (id: string) =>
+      asAdmin(async (q) => (await q<{ p: string | null }>("select app.message_template_sendable($1, $2) as p", [mailOrg, id])).rows[0].p);
+    const gmail = await template("לשאלות: Biz.Office@gmail.com");
+    const onSite = await template("לשאלות: info@biz.co.il");
+    const other = await template("לשאלות: other@gmail.com");
+    expect([await gate(gmail), await gate(onSite), await gate(other)]).toEqual(["external_link", "external_link", "external_link"]);
+    await asAdmin((q) =>
+      q(
+        "insert into public.org_document_settings (organization_id, email) values ($1, 'biz.office@gmail.com') on conflict (organization_id) do update set email = excluded.email",
+        [mailOrg],
+      ),
+    );
+    await asUser(own.id, (q) => q("update public.organizations set website = 'biz.co.il' where id = $1", [mailOrg]));
+    expect([await gate(gmail), await gate(onSite), await gate(other)]).toEqual([null, null, "external_link"]);
+    // review of 7fe2fa4 (1): an email the constraint accepts but that is shaped like a link never hides it
+    const shaped = await template("לשאלות: https://evil.com/x@y.co");
+    await asAdmin((q) => q("update public.org_document_settings set email = 'https://evil.com/x@y.co' where organization_id = $1", [mailOrg]));
+    expect([await gate(shaped), await gate(gmail)]).toEqual(["external_link", "external_link"]);
+    // owner (110) ב: a word.word pair is no longer a link; a listed ending is
+    expect(await gate(await template("נפגש עם Mr.Cohen ב-St.Louis"))).toBeNull();
+    expect(await gate(await template("ראו a.shop"))).toBe("external_link");
   });
 
   it("app.message_send_refused tells active owners and admins once a day per template and reason, never raises", async () => {
@@ -325,9 +393,11 @@ describe("service template rule (MSG-02)", () => {
     expect(await ok({ ...base, template_id: 5 })).toBe(false);
   });
 
-  it("re-running 021159 and then this file leaves one current rule and every old one without grants", async () => {
-    const files = readdirSync(MIGRATIONS).filter((f) => f.endsWith("_service_template_rule.sql") || f.endsWith("_service_message_send_rules.sql")).sort();
-    expect(files).toHaveLength(2);
+  it("re-running 021159, 021160 and 021161 leaves one current rule and every old one without grants", async () => {
+    const files = readdirSync(MIGRATIONS)
+      .filter((f) => f.endsWith("_service_template_rule.sql") || f.endsWith("_service_message_send_rules.sql") || f.endsWith("_message_link_tlds.sql"))
+      .sort();
+    expect(files).toHaveLength(3);
     const answer = await pgError(
       asAdmin(async (q) => {
         for (const f of files) await q(readFileSync(join(MIGRATIONS, f), "utf8"));
@@ -336,7 +406,7 @@ describe("service template rule (MSG-02)", () => {
             `select p.proname as name, pg_get_function_identity_arguments(p.oid) as args,
                     has_function_privilege('authenticated', p.oid, 'execute') or has_function_privilege('service_role', p.oid, 'execute') as g
                from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-              where n.nspname = 'app' and p.proname like 'message_template_problem%' order by 1`,
+              where n.nspname = 'app' and (p.proname like 'message_template_problem%' or p.proname like 'message_external_link%') order by 1`,
           )
         ).rows;
         throw new Error(JSON.stringify(rows));
@@ -344,11 +414,14 @@ describe("service template rule (MSG-02)", () => {
     );
     const rows = JSON.parse(answer.message) as { name: string; args: string; g: boolean }[];
     expect(rows.map((r) => r.name)).toEqual([
+      "message_external_link",
+      "message_external_link",
+      "message_template_problem",
       "message_template_problem",
       "message_template_problem_021160_retired",
       "message_template_problem_021160_retired_2",
     ]);
-    expect(rows.find((r) => r.name === "message_template_problem")?.args).toContain("p_own_domain");
+    expect(rows.filter((r) => r.args.includes("p_business_email")).map((r) => r.name)).toEqual(["message_external_link", "message_template_problem"]);
     expect(rows.some((r) => r.g)).toBe(false);
   });
 });
