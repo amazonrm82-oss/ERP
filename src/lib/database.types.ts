@@ -977,6 +977,8 @@ export type FieldDefinitionRow = {
   option_colors: Json;
   // FLD-06 part B: a record_link field's target type (lead|contact|company|deal); null for every other type; never changed
   link_target: string | null;
+  // PRK-01: null | personal | sensitive (check field_definitions_privacy_class_check); information only
+  privacy_class: string | null;
 };
 
 export type SavedViewRow = {
@@ -2850,6 +2852,7 @@ export type Database = {
           condition?: Json | null;
           option_colors?: Json;
           link_target?: string | null;
+          privacy_class?: string | null;
         }
       >;
       saved_views: Table<

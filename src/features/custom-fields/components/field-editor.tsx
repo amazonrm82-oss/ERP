@@ -9,6 +9,7 @@ import { ConfirmButton } from "@/components/ui/confirm-button";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { PRIVACY_CLASS_HINT, PRIVACY_CLASS_LABELS, PRIVACY_CLASSES } from "@/features/privacy-center/classes";
 import type { FormState } from "@/lib/action-result";
 
 import { createFieldAction, moveFieldAction, setFieldActiveAction, updateFieldAction } from "../actions";
@@ -22,6 +23,20 @@ import { CustomFieldInputs } from "./custom-field-inputs";
 
 const UNIQUE_HINT = "שתי רשומות לא יכולות לקבל אותו ערך. סל המחזור ושדה מוסתר לא נבדקים. ליד מטופס באתר נשמר תמיד, ומסומן אם הערך כבר קיים.";
 const READ_ONLY_HINT = "אפשר למלא פעם אחת, ואחר כך הערך נעול לכולם. כדי לשנות ערך, מבטלים זמנית את הסימון כאן.";
+
+/** PRK-01: whether the field holds personal or sensitive information (shown in the privacy center). */
+function PrivacyClassSelect({ value }: { value: string }) {
+  return (
+    <SelectField label="מידע אישי" name="privacy_class" defaultValue={value} hint={PRIVACY_CLASS_HINT} className="sm:max-w-sm">
+      <option value="">לא מסומן</option>
+      {PRIVACY_CLASSES.map((option) => (
+        <option key={option} value={option}>
+          {PRIVACY_CLASS_LABELS[option]}
+        </option>
+      ))}
+    </SelectField>
+  );
+}
 
 /** FLD-07: the "unique" and "read-only" boxes of the field forms. */
 function SettingBoxes({ type, unique, onUnique, readOnly }: { type: FieldType; unique: boolean; onUnique: (value: boolean) => void; readOnly: boolean }) {
@@ -117,6 +132,7 @@ export function CreateFieldForm({ orgId, objectType }: { orgId: string; objectTy
       ) : null}
       <SettingBoxes type={type as FieldType} unique={unique} onUnique={setUnique} readOnly={values?.is_read_only === "on"} />
       {errors.is_unique ? <p className="text-sm text-danger">{errors.is_unique}</p> : null}
+      <PrivacyClassSelect value={values?.privacy_class ?? ""} />
       <p className="text-sm text-ink-soft">ערך ברירת מחדל, ומתי השדה מופיע או חובה, קובעים בכפתור &quot;עריכה&quot; של השדה, אחרי שמוסיפים אותו.</p>
       <SubmitButton pendingText="מוסיפים…">הוספת שדה</SubmitButton>
     </form>
@@ -139,7 +155,7 @@ export function FieldList({ orgId, objectType, fields, builtins, editable, hideW
     <ol className="divide-y divide-line">
       {fields.map((field, index) => (
         <FieldRow
-          key={`${field.id}-${field.label}-${field.isActive}-${field.isRequired}-${field.isUnique}-${field.isReadOnly}-${JSON.stringify(field.defaultValue ?? null)}-${field.options.join("|")}-${JSON.stringify(field.condition ?? null)}`}
+          key={`${field.id}-${field.label}-${field.isActive}-${field.isRequired}-${field.isUnique}-${field.isReadOnly}-${field.privacyClass ?? ""}-${JSON.stringify(field.defaultValue ?? null)}-${field.options.join("|")}-${JSON.stringify(field.condition ?? null)}`}
           orgId={orgId}
           objectType={objectType}
           fields={fields}
@@ -180,6 +196,7 @@ function FieldRow({ orgId, objectType, fields, builtins, field, editable, hideWa
           {field.isRequired ? <Badge tone="warning">חובה</Badge> : null}
           {field.isUnique ? <Badge>ייחודי</Badge> : null}
           {field.isReadOnly ? <Badge>קריאה בלבד</Badge> : null}
+          {field.privacyClass ? <Badge tone={field.privacyClass === "sensitive" ? "warning" : "neutral"}>{PRIVACY_CLASS_LABELS[field.privacyClass]}</Badge> : null}
           {field.condition ? <Badge>מותנה</Badge> : null}
           {!field.condition && field.conditionRemovedAt ? <Badge tone="warning">התנאי הוסר (תהליך המכירה נמחק)</Badge> : null}
           {field.isActive ? null : <Badge>מוסתר</Badge>}
@@ -301,6 +318,7 @@ function EditFieldForm({ orgId, objectType, fields, builtins, field, onDone }: E
       {canHaveDefault(field.type) && !unique ? (
         <CustomFieldInputs definitions={[defaultInput]} stored={{ [field.key]: field.defaultValue ?? null }} submitted={values} errors={errors} />
       ) : null}
+      <PrivacyClassSelect value={values ? (values.privacy_class ?? "") : (field.privacyClass ?? "")} />
       <ConditionEditor field={field} definitions={fields} objectType={objectType} builtins={builtins} submitted={values} error={errors.condition} />
       <div className="flex gap-2">
         <SubmitButton size="sm">שמירה</SubmitButton>

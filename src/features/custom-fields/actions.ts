@@ -12,6 +12,7 @@ import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 import type { Json } from "@/lib/database.types";
 import { pick } from "@/lib/validation";
+import { privacyClassFromForm, type PrivacyClass } from "@/features/privacy-center/classes";
 
 import { buildCondition, sameAsStored, type FieldCondition } from "./conditions";
 import { conditionBuiltinChoices } from "./condition-queries";
@@ -56,6 +57,8 @@ type NewField = {
   is_unique?: boolean;
   is_read_only?: boolean;
   link_target?: FieldObject;
+  // PRK-01
+  privacy_class?: PrivacyClass | null;
 };
 type Context = Extract<Awaited<ReturnType<typeof actionContext>>, { ok: true }>;
 
@@ -81,6 +84,7 @@ async function insertField(context: Context, orgId: string, field: NewField): Pr
     is_unique: field.is_unique === true && canBeUnique(field.field_type),
     link_target: field.field_type === "record_link" ? (field.link_target ?? null) : null,
     is_read_only: field.is_read_only === true,
+    privacy_class: field.privacy_class ?? null,
     help_text: field.help_text,
     position: count ?? 0,
   });
@@ -99,7 +103,7 @@ export async function createFieldAction(orgId: string, _prev: FormState, formDat
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
-  const created = await insertField(context, orgId, parsed.data);
+  const created = await insertField(context, orgId, { ...parsed.data, privacy_class: privacyClassFromForm(formData.get("privacy_class")) });
   if (created.error !== null) {
     return fail(created.error, { values: formValues(formData) });
   }
@@ -224,6 +228,8 @@ export async function updateFieldAction(orgId: string, fieldId: string, _prev: F
       is_unique: isUnique,
       is_read_only: parsed.data.is_read_only,
       default_value: defaultValue,
+      // PRK-01: only when the form carries the choice
+      ...(formData.has("privacy_class") ? { privacy_class: privacyClassFromForm(formData.get("privacy_class")) } : {}),
       ...(withOptions ? { options: parsed.data.options } : {}),
       // FLD-06: a status field's colours, for the options it keeps (a removed option's colour goes with it)
       ...(type === "status" ? { option_colors: colorsForOptions(colorsFromForm(formData), parsed.data.options) } : {}),

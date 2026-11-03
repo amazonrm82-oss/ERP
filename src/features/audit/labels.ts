@@ -230,10 +230,12 @@ export const FIELD_LABELS: Record<string, string> = {
   target_minutes: "יעד בדקות",
   breach_action: "פעולה בחריגה",
   // CON-11
-  // PRK-06
-  privacy_officer_id: "אחראי פרטיות",
   dormant_months: "חודשים עד לקוח רדום",
   former_months: "חודשים עד לקוח לשעבר",
+  // PRK-06
+  privacy_officer_id: "אחראי פרטיות",
+  // PRK-01
+  privacy_class: "סימון מידע אישי",
   // CAP-08
   method: "שיטת חלוקה",
   weights: "משקלים",

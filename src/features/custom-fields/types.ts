@@ -1,6 +1,8 @@
 import type { Json } from "@/lib/database.types";
 import { RECORD_TYPES } from "@/lib/record-types";
 
+import type { PrivacyClass } from "@/features/privacy-center/classes";
+
 import type { FieldCondition } from "./conditions";
 
 // Objects that carry custom fields (field_definitions.object_type).
@@ -97,6 +99,8 @@ export type FieldDefinition = {
   // FLD-09 part B: set by the database when a deleted pipeline left the field with no condition; cleared when
   // the field is saved again (settings list only)
   conditionRemovedAt?: string | null;
+  // PRK-01: marked as personal or sensitive information (privacy center); absent or null = not marked
+  privacyClass?: PrivacyClass | null;
 };
 
 export function isFieldType(value: string): value is FieldType {

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isPrivacyClass } from "@/features/privacy-center/classes";
 import { listMembers } from "@/features/settings/queries";
 import { createClient } from "@/lib/supabase/server";
 
@@ -16,7 +17,7 @@ export async function listFieldDefinitions(
   const supabase = await createClient();
   let query = supabase
     .from("field_definitions")
-    .select("id, key, label, field_type, options, is_required, is_active, help_text, position, is_unique, is_read_only, default_value, condition, condition_removed_at, option_colors, link_target")
+    .select("id, key, label, field_type, options, is_required, is_active, help_text, position, is_unique, is_read_only, default_value, condition, condition_removed_at, option_colors, link_target, privacy_class")
     .eq("organization_id", orgId)
     .eq("object_type", objectType);
   if (!options.includeInactive) {
@@ -45,6 +46,7 @@ export async function listFieldDefinitions(
       defaultValue: row.default_value,
       condition: parseCondition(row.condition),
       conditionRemovedAt: row.condition_removed_at,
+      privacyClass: isPrivacyClass(row.privacy_class) ? row.privacy_class : null,
       // FLD-06 part B
       ...(row.field_type === "record_link" ? { linkTarget: isLinkTarget(row.link_target) ? row.link_target : null } : {}),
       ...(row.field_type === "record_link" || row.field_type === "file" ? { orgId } : {}),

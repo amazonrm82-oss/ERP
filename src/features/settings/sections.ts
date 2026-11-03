@@ -26,6 +26,7 @@ import { consentBlocklistPath } from "@/features/consent-blocklist/paths";
 import { conversionMapSettingsPath } from "@/features/conversion-map/paths";
 import { leadScoreSettingsPath } from "@/features/lead-score/paths";
 import { retentionSettingsPath } from "@/features/lead-retention/paths";
+import { privacyCenterPath } from "@/features/privacy-center/paths";
 import { meetingTypesPath } from "@/features/meeting-types/paths";
 import { priceListsPath } from "@/features/price-lists/paths";
 import { detachedQuotesPath, quoteDesignPath, quoteTemplatesPath } from "@/features/quotes/paths";
@@ -224,6 +225,10 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         // CNS-06: owners and admins only (addresses kept as a hash; the page searches one address)
         ...(access.admin
           ? [{ href: consentBlocklistPath(orgId), label: "רשימת חסימה לדיוור", description: "טלפונים ואימיילים שלעולם לא יקבלו דיוור", icon: LockIcon }]
+          : []),
+        // PRK-01: owners and admins only (privacy, every plan)
+        ...(access.admin
+          ? [{ href: privacyCenterPath(orgId), label: "מרכז פרטיות", description: "איזה מידע אישי נשמר, מי מגיע אליו, קבלני משנה ומדיניות שמירה", icon: LockIcon }]
           : []),
         // PRV-01: owners and admins only (privacy, every plan)
         ...(access.admin

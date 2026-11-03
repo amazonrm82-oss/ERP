@@ -29,8 +29,8 @@ export function SettingsFrame({ orgId, access, children }: Props) {
   const atSection = section !== null && pathname === section.href;
 
   return (
-    <div className="lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-8">
-      <nav aria-label="הגדרות" className="hidden lg:block">
+    <div className="lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-8 print:block">
+      <nav aria-label="הגדרות" className="hidden lg:block print:hidden">
         <div className="sticky top-20 flex flex-col gap-4">
           {groups.map((group) => (
             <div key={group.label}>
@@ -60,7 +60,7 @@ export function SettingsFrame({ orgId, access, children }: Props) {
       </nav>
       <div className="min-w-0">
         {atSection ? (
-          <header className="mb-5 sm:mb-6">
+          <header className="mb-5 sm:mb-6 print:hidden">
             <Link href={home} className="mb-2 inline-flex min-h-8 items-center gap-1 text-sm text-ink-soft hover:text-ink lg:hidden">
               <BackIcon className="size-4" />
               הגדרות
