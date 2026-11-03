@@ -18,7 +18,7 @@ export type PrivacyRequest = Omit<PrivacyRequestRow, "request_type" | "contact_k
 export const REQUESTS_SHOWN = 500;
 
 const COLUMNS =
-  "id, organization_id, request_type, requester_name, contact_kind, contact_value, details, status, received_at, target_date, verify_method, verify_note, verified_at, verified_by, refusal_reason, lead_id, contact_id, former_lead_ids, former_contact_ids, closed_at, closed_by, erased_at, updated_by, created_at, updated_at";
+  "id, organization_id, request_type, requester_name, contact_kind, contact_value, details, status, received_at, target_date, verify_method, verify_note, verified_at, verified_by, refusal_reason, lead_id, contact_id, former_lead_ids, former_contact_ids, closed_at, closed_by, erased_at, updated_by, created_at, updated_at, erased_by_retention";
 
 export async function listPrivacyRequests(orgId: string): Promise<PrivacyRequest[]> {
   const supabase = await createClient();

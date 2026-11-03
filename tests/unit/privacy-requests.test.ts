@@ -4,6 +4,7 @@ import { auditEntryNote } from "@/features/audit/condition-removal";
 import { ACTION_LABELS, ENTITY_LABELS } from "@/features/audit/labels";
 import { notificationHref } from "@/features/notifications/links";
 import {
+  erasedDetailsText,
   isOverdue,
   nextStatuses,
   PRIVACY_REQUEST_STATUSES,
@@ -12,6 +13,7 @@ import {
   privacyPageFrom,
   publicRequestSchema,
   refusalReasonFrom,
+  RETENTION_MONTHS,
   targetLine,
 } from "@/features/privacy-requests/model";
 import { migrationNames, migrationText } from "./helpers/migrations";
@@ -25,6 +27,13 @@ const listIn = (constraint: string) => {
 };
 
 describe("privacy requests (PRK-02)", () => {
+  it("the retention period mirrors the migration, and the emptied line names its cause (owner (76) א)", () => {
+    const retention = migrationText(migrationNames().find((name) => name.endsWith("_privacy_request_retention.sql"))!);
+    expect(retention).toMatch(new RegExp(`app\\.privacy_request_retention_months\\(\\) returns integer[\\s\\S]*?select ${RETENTION_MONTHS} \\$\\$`));
+    expect(erasedDetailsText({ erased_by_retention: true })).toBe("פרטי הבקשה נמחקו לפי מדיניות השמירה");
+    expect(erasedDetailsText({ erased_by_retention: false })).toBe("הפרטים נמחקו (מחיקת פרטיות)");
+  });
+
   it("the closed lists mirror the migration", () => {
     expect(listIn("privacy_requests_type")).toEqual([...PRIVACY_REQUEST_TYPES]);
     expect(listIn("privacy_requests_status")).toEqual([...PRIVACY_REQUEST_STATUSES]);

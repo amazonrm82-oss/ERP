@@ -827,6 +827,8 @@ export type PrivacyRequestRow = {
   updated_by: string | null;
   created_at: string;
   updated_at: string;
+  // PRK-02 (76) א: the retention job emptied the details (12 months after closing, or after receipt); server only
+  erased_by_retention: boolean;
 };
 
 export type MembershipRow = {

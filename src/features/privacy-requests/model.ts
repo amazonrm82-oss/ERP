@@ -142,3 +142,12 @@ export const PUBLIC_TEXTS = {
   receivedLine: "נחזור אליכם בדרך שבחרתם, תוך 30 יום ממועד קבלת הבקשה.",
   draft: "נוסח טיוטה, ממתין לעריכה משפטית.",
 } as const;
+
+/** PRK-02 (76) א: personal details are kept 12 months after closing (or after receipt, if never closed); mirrors
+ * app.privacy_request_retention_months() in migration _privacy_request_retention.sql. */
+export const RETENTION_MONTHS = 12;
+
+/** The line shown in place of an emptied request's name: the retention job, or a privacy erasure of the linked record. */
+export function erasedDetailsText(row: { erased_by_retention: boolean }): string {
+  return row.erased_by_retention ? "פרטי הבקשה נמחקו לפי מדיניות השמירה" : "הפרטים נמחקו (מחיקת פרטיות)";
+}

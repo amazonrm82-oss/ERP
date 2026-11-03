@@ -8,7 +8,7 @@ import { TextLink } from "@/components/ui/text-link";
 import { PersonEraseButton } from "@/features/privacy-erase/components/person-erase-button";
 import { PersonExportLink } from "@/features/privacy-export/components/person-export-link";
 import { LinkForm, RefuseForm, StatusForm, VerifyForm } from "@/features/privacy-requests/components/request-handling";
-import { isClosed, isOverdue, nextStatuses, REQUEST_TYPE_LABELS, STATUS_LABELS, targetLine, VERIFY_METHOD_LABELS } from "@/features/privacy-requests/model";
+import { erasedDetailsText, isClosed, isOverdue, nextStatuses, REQUEST_TYPE_LABELS, STATUS_LABELS, targetLine, VERIFY_METHOD_LABELS } from "@/features/privacy-requests/model";
 import { privacyRequestPath, privacyRequestsPath } from "@/features/privacy-requests/paths";
 import { getPrivacyRequest, linkedRecordName } from "@/features/privacy-requests/queries";
 import { isAdminRole } from "@/features/settings/permissions";
@@ -71,7 +71,7 @@ export default async function PrivacyRequestPage({ params }: Props) {
             {overdue ? <Badge tone="danger">באיחור</Badge> : null}
           </div>
           <dl className="space-y-3">
-            <Row label="שם">{row.requester_name ?? "הפרטים נמחקו (מחיקת פרטיות)"}</Row>
+            <Row label="שם">{row.requester_name ?? erasedDetailsText(row)}</Row>
             <Row label={row.contact_kind === "email" ? "אימייל" : "טלפון"}>
               {row.contact_value ? <bdi dir="ltr">{row.contact_value}</bdi> : "—"}
             </Row>
