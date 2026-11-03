@@ -451,6 +451,11 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // HEB-01 (migration gender)
   "whatsapp_template:variant": VARIANT_PROBLEM_MESSAGES.variant,
   "whatsapp_template:neutral": VARIANT_PROBLEM_MESSAGES.neutral,
+  // MSG-02 (migration message_templates)
+  "message_templates:max": "אפשר לשמור עד 50 תבניות הודעה. מחקו תבנית שלא בשימוש כדי להוסיף חדשה.",
+  "message_template:field": "בנוסח יש שדה שהמערכת לא מכירה. אפשר להשתמש רק בשדות שברשימה, כתובים בדיוק כך, למשל {שם פרטי}.",
+  "message_template:variant": VARIANT_PROBLEM_MESSAGES.variant,
+  "message_template:neutral": VARIANT_PROBLEM_MESSAGES.neutral,
   // CAL-08 (migration meeting_types)
   "meeting_types:max": "אפשר לשמור עד 50 סוגי פגישה. מחקו סוג שלא בשימוש כדי להוסיף חדש.",
   "meeting_type:product": "השירות שנבחר כבר לא פעיל בקטלוג. בחרו שירות פעיל, או השאירו בלי שירות.",

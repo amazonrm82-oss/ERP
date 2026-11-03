@@ -1017,6 +1017,22 @@ export type WhatsappTemplateRow = {
   updated_at: string;
 };
 
+// MSG-02: the business's shared message templates (migration message_templates). channel, message_type and locale are
+// closed lists (MESSAGE_CHANNELS, MESSAGE_TYPES, CONTACT_LOCALES); subject only on email.
+export type MessageTemplateRow = {
+  id: string;
+  organization_id: string;
+  name: string;
+  channel: string;
+  message_type: string;
+  subject: string | null;
+  body: string;
+  locale: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 // CON-02: the contact and company types an organization offers (migration record_types)
 export type RecordTypeObject = "contact" | "company";
 export type RecordTypeOptionRow = {
@@ -2963,6 +2979,29 @@ export type Database = {
         WhatsappTemplateRow,
         { organization_id: string; name: string; body: string; position?: number },
         { name?: string; body?: string; position?: number }
+      >;
+      // MSG-02: the organization is fixed (column-level update grant)
+      message_templates: Table<
+        MessageTemplateRow,
+        {
+          organization_id: string;
+          name: string;
+          channel: string;
+          message_type: string;
+          subject?: string | null;
+          body: string;
+          locale?: string;
+          is_active?: boolean;
+        },
+        {
+          name?: string;
+          channel?: string;
+          message_type?: string;
+          subject?: string | null;
+          body?: string;
+          locale?: string;
+          is_active?: boolean;
+        }
       >;
       // organization and object type are fixed (column-level update grant)
       record_type_options: Table<

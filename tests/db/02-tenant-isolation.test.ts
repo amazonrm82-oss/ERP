@@ -435,6 +435,8 @@ describe("tenant isolation", () => {
     "consents",
     // seeded for every new organization (WA-01)
     "whatsapp_templates",
+    // MSG-02, also seeded
+    "message_templates",
     // DEAL-03, also seeded
     "deal_loss_reasons",
     // CON-03 follow-up, also seeded
@@ -686,6 +688,7 @@ describe("tenant isolation", () => {
       // append-only (CNS-02): no update or delete grant, a permission error is the expected outcome
       consents: "state = state",
       whatsapp_templates: "name = name",
+      message_templates: "name = name",
       deal_loss_reasons: "name = name",
       deal_contact_roles: "name = name",
       activity_types: "name = name",
@@ -860,6 +863,7 @@ describe("tenant isolation", () => {
       ["insert into public.plan_waitlist (organization_id, plan_key) values ($1, 'business')", [orgA]],
       ["insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'sms', 'denied', 'manual', 'x')", [orgA, ids.leadA]],
       ["insert into public.whatsapp_templates (organization_id, name, body) values ($1, 'x', 'x')", [orgA]],
+      ["insert into public.message_templates (organization_id, name, channel, message_type, body) values ($1, 'x', 'sms', 'marketing', 'x')", [orgA]],
       ["insert into public.deal_loss_reasons (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.deal_contact_roles (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.activity_types (organization_id, base_type, name) values ($1, 'meeting', 'x')", [orgA]],
@@ -1001,6 +1005,7 @@ describe("tenant isolation", () => {
       ["plan_waitlist", "created_at = '2001-01-01'", "created_at = '2001-01-01'"],
       ["consents", "state = 'denied'", "state = 'denied'"],
       ["whatsapp_templates", "body = 'HACKED'", "body = 'HACKED'"],
+      ["message_templates", "body = 'HACKED'", "body = 'HACKED'"],
       ["deal_loss_reasons", "is_active = false", "not is_active"],
       ["deal_contact_roles", "is_active = false", "not is_active"],
       ["activity_types", "is_active = false", "not is_active"],

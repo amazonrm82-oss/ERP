@@ -54,6 +54,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   checklist_templates: "תבנית רשימת תיוג",
   // WA-01
   whatsapp_templates: "תבנית WhatsApp",
+  // MSG-02
+  message_templates: "תבנית הודעה",
   // GOL-01
   goals: "יעד",
   // CON-02
