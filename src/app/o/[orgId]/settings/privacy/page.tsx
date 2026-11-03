@@ -12,6 +12,7 @@ import { getMemberPermissions } from "@/features/permissions/queries";
 import { PrintButton } from "@/features/print/components/print-button";
 import { PrintHeader } from "@/features/print/components/print-header";
 import { PRIVACY_CLASS_LABELS } from "@/features/privacy-center/classes";
+import { privacyWordingsPath } from "@/features/privacy-center/paths";
 import { BUILT_IN_PERSONAL_FIELDS, OTHER_PERSONAL_DATA, type BuiltInPersonalField } from "@/features/privacy-center/personal-fields";
 import { activeRoleCounts, markedFields, personalDataGrants, withoutSecondStep } from "@/features/privacy-center/summary";
 import { NO_OFFICER, officerName, PRIVACY_OFFICER_EXPLAIN } from "@/features/privacy-officer/officer";
@@ -211,6 +212,14 @@ export default async function PrivacyCenterPage({ params }: Props) {
           <p className="text-sm print:hidden">
             <TextLink href={retentionSettingsPath(orgId)}>הגדרת מדיניות השמירה</TextLink>
           </p>
+        </CardBody>
+      </Card>
+
+      {/* PRK-04 */}
+      <Card aria-labelledby="privacy-wordings" className="print:hidden">
+        <CardHeader id="privacy-wordings" title="נוסחים מוכנים" />
+        <CardBody className="text-md">
+          <TextLink href={privacyWordingsPath(orgId)}>נוסח הסכמה לטפסים ופסקה להודעת הפרטיות של העסק</TextLink>
         </CardBody>
       </Card>
     </div>
