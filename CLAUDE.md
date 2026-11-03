@@ -1529,7 +1529,8 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   trigger `app.payment_allocations_check` (outsider guard first): tax invoice or proforma only, recorded/confirmed payment, active
   document, same customer (`app.money_same_customer`, never NULL since 021075: same deal, contact, or company via the contact's or the deal's company; mirrored
   inline in `public.money_allocation_candidates`, keep in step), never over the payment or the document (hints `allocation:*`). Lock
-  order payment, document, proforma (an admin's change racing a cancel can deadlock: 40P01, retry). Release triggers are plain
+  order payment, document, proforma (an admin's change racing a cancel can deadlock: 40P01, retry). Punch cards (owner (106) א): payment
+  rows first (in id order), then the order or quote-chain advisory keys, on every path; never a key before a payment. Release triggers are plain
   "after update" with an early return (a status derived by a BEFORE trigger is caught). `accounting_documents.proforma_id`: an active
   tax invoice bills one active proforma of the same customer, set once (partial unique index over active invoices; a cancelled
   invoice frees it; hint `document:proforma`). Counts are read, never stored: `public.money_allocation_state(org, docs, payments)`
