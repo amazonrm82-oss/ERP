@@ -2290,7 +2290,24 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   stay as wrappers, an ACCEPTED EXCEPTION to "never two overloads" (schema app, outside test 07's public check): a rename would
   add a retired copy on every `rerunClosure` re-run of 021160. `app.message_template_sendable` passes both. Re-running 021159
   or 021160 requires re-running 021161 after it. Tests 64 and 88 end with `_service_message_send_rules.sql`,
-  `_message_link_tlds.sql`.
+  `_message_link_tlds.sql`, `_glued_address.sql`.
+  Glued addresses (migration 021162; owner (113) א, (114) א; three reviews): `app.message_address_glue(text, own, business
+  email)` = `messageAddressGlue()` (shared fixture) answers `glued_address` ("הכתובת צמודה לטקסט"), judged after
+  field_not_allowed and before external_link, when a letter or digit touches the business email inside a token, Hebrew/
+  Arabic letters touch ASCII letters or digits in an address, or a merge-field brace or a non-ASCII character outside
+  `app.message_glue_boundary` (= `GLUE_BOUNDARY_RANGES`, between markers) sits right next to an address; it answers
+  external_link for links the token rule misses (the business email made longer by an address character; an ending
+  followed by "-" and ASCII; a listed ending right after a letter of another script, fail closed). A whole token that is an
+  allowed own-domain address is never glued. Around the business email `*` `~` `'` `_` pass only as a matching pair with no
+  address character outside it (`app.message_mark_outer_ok`). Tokens are judged piece by piece (`app.message_token_pieces`:
+  cut at each listed ending followed by Hebrew or Arabic letters); `app.message_token_link` (3 args, last redefined in
+  021162) is that split over `app.message_token_piece_link` (021161's body); `app.message_domain_suffix` (last redefined
+  in 021162) reads an ending joined to Hebrew/Arabic with or without "-" as its ASCII part. `app.message_template_problem`
+  (6 args) and `app.message_send_refusal_text` were last redefined in 021162. `app.message_plain_email` requires printable
+  ASCII; trigger `org_document_settings_email_latin` (invoker, new or changed value, every writer) refuses a business email
+  above ASCII (P0001 `document_settings:email_latin`, `BUSINESS_EMAIL_LATIN`). Re-running 021159-021161 needs 021162 after
+  them. Follow-ups: an IPv4 or `xn--` ending glued to Hebrew is not a link; SQL judges about 2 ms per paired-mark token
+  (fine at the 2,000 cap).
 - Customer sending pause (HEB-09, migrations 021134, 021135; owner (44) א (45) א (46) א): `public.org_sending_pauses` (one row per org; owners/
   admins of a business that is not closed write `paused` + `reason` 1..500; stamps server-kept by `app.org_sending_pauses_stamp`; members
   read; no delete; audited). THE rule is `app.customer_sending_paused(org)` (definer, no grants; no row = not paused): EVERY automatic
