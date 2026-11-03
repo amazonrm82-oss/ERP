@@ -2228,6 +2228,21 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `job:message_type`); a job without one (queued before) is marketing. Mirrored by `MESSAGE_TYPES` / `SERVICE_MESSAGE_TYPES` in
   `src/features/messaging/providers/types.ts`. Follow-ups: conversion leaves a lead's messages on the lead; inbound needs the
   per-provider webhook (wave 3 use (2)).
+- Message templates (MSG-02, migration 021158; owner (68) א, (73) א, (88): every plan, no key): `public.message_templates` (managed
+  list: members read, owners/admins of a writable org write, 50 per org hint `message_templates:max`, audited; name 1..80 unique
+  ignoring case; channel email|sms|whatsapp; `message_type` from `app.message_types()` (a db test pins the check to the function);
+  subject for email only, `message_templates_subject_shape`; name and subject hold no control characters; body 1..2000; locale
+  from CON-10; `is_active`). Merge fields are a closed list, `app.message_merge_fields()` = `MESSAGE_MERGE_FIELDS` in
+  `src/features/message-templates/fields.ts` (unit test reads the migration); invoker trigger `message_templates_check` refuses an
+  unknown `{field}` (`app.message_unknown_field`, hint `message_template:field`) and a broken HEB-01 block (hints
+  `message_template:neutral|variant`). Defaults from `app.seed_message_templates` (trigger `organizations_seed_message_templates`;
+  backfilled once for live businesses with an empty list) = `DEFAULT_MESSAGE_TEMPLATES`, DRAFT wording until the lawyer approves
+  (owner (88)). `marketingEnvelope()` (`src/features/message-templates/envelope.ts`) is THE rule every sender of a marketing
+  message applies before filling fields: "פרסומת: " in front of an email subject (or of the text on SMS/WhatsApp, lead's choice,
+  question 92), the sender line and the unsubscribe line appended, never doubled; a business cannot remove them. Page
+  `/settings/message-templates` previews a template on a lead/contact read with the user's session. Nothing sends from a template
+  yet; WA-01's `whatsapp_templates` stay the record button's wa.me texts. Open owner questions 89-90 (the quote email's type; who
+  may mark a template as a service type) must be settled before any sender reads `message_type` from a template.
 - Customer sending pause (HEB-09, migrations 021134, 021135; owner (44) א (45) א (46) א): `public.org_sending_pauses` (one row per org; owners/
   admins of a business that is not closed write `paused` + `reason` 1..500; stamps server-kept by `app.org_sending_pauses_stamp`; members
   read; no delete; audited). THE rule is `app.customer_sending_paused(org)` (definer, no grants; no row = not paused): EVERY automatic
