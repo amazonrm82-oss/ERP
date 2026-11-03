@@ -1691,6 +1691,23 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   recorder else owners/admins, once per cheque and day in `app.cheque_reminders_sent`, from 08:00). `app.audit_erase_core` was last
   redefined in 020815 (cheque number, foreign bank name, unbounce reason and the reminders' number). DOC-04 follow-up (020810):
   timeline kinds `payment_failed`, `payment_refunded`, and `payment_received` again on failed -> recorded/confirmed.
+- Refunds (PAY-08, migration 021154; owner (71) ב, 3 November 2026; part of `payments`, no new key): `public.payment_refunds` (a
+  refund of one payment: amount 1..1e12 ILS, `refunded_on` not before `paid_on`, method from the payments' list, reference, note,
+  optional active `credit_invoice` of the same customer; owners/admins of a writable business on a recorded/confirmed payment they
+  read; never deleted, cancelled with a reason then frozen; audited). Definer trigger `app.payment_refunds_check` (outsider guard
+  first; payment FOR UPDATE; hints `refund:*`). The counted amount of a payment = amount less active refunds:
+  `public.payment_refunded` / `payment_counted(payments)` (inlined, no SET; advisor findings expected), and every set-based reader
+  writes the same subquery out (keep in step): `payment_credit`, `money_allocation_state`, `app.payment_allocations_check`'s cap,
+  `customer_ledger`, `app.order_money_facts`, `report_collection`, `report_goal_progress`, `statement_public`,
+  `statement_staff_view` (the last two leave out a payment counted at 0); all last redefined in 021154. A refund counts on the
+  payment's own day (lead's choice, owner question 81). Refunded in full = status `refunded` through `app.payment_server = 'refund'`
+  (`app.payment_refunds_apply`; cancelling puts back the cheque's status, else `payment_status_before`); a partial refund releases
+  counted allocations above what remains, newest first, and writes a `system` entry kind `payment_refunded` without an amount.
+  While a payment has active refunds, `payments_zz_refunds` (`app.payments_refund_guard`) allows status moves only between
+  recorded and confirmed and refuses an amount at or below the refunds or below refunds + allocations (hints
+  `payment:has_refunds|refunded_amount|allocated`). Erasure: `payments_zz_refunds_erase` empties reference/note/reason and their
+  audit entries when `app.payment_server = 'erase'`. PAY-03 totals refreshed by the deferred `payment_refunds_credit_companies`.
+  Test 64's re-run list ends with `_payment_refunds.sql`; test 275 pins `statement_public`'s new md5.
 - Files on documents and payments (DOC-01/PAY-01 follow-ups, migrations 020640, 020645; owner 20 October 2026): `files.accounting_document_id`
   and `files.payment_id` (composite FKs cascade; `files_one_subject` counts six columns; never on a note). Read follows the document/payment;
   adding needs `app.can_record_documents` / `app.can_record_payments`, a writable business and the flag; PDF or image only
