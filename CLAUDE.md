@@ -2256,6 +2256,25 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   screen or an automation on its deal, only to the customer address on the quote, never to a group or segment; blocklist and
   erasure stop it) are `QUOTE_SERVICE_CONDITIONS` in `src/features/message-templates/templates.ts`. The rep report's collection
   goal table shows "החזרים" (owner (91) ב), hidden when the column is all zero.
+- Service message at send time (MSG-02 follow-up, migration 021160; owner (96)-(98), (102)-(105); two independent reviews):
+  `app.message_filled_problem` = `messageFilledProblem()` / `envelopedFilledProblem()` (fixture `message-filled-problems.json`)
+  answers `too_long` on the body as it goes out: service types against `app.message_service_body_max` (300/1,000/2,000), every
+  other type against `app.message_marketing_body_max` (600/2,000/20,000) on the enveloped body; never truncated.
+  `app.message_send_refused(org, template, reason)` (definer, no grants, never raises) writes one `system` notice to active owners
+  and admins naming the template only, once per business, template and reason a business day (`app.message_refusal_notices`, schema
+  app; the advisor's rls_enabled_no_policy on it is expected). `app.jobs_record_message` (test 284 md5, reviewed 3 November 2026)
+  calls it when a `message.send` job ends failed with code `too_long` and NO provider (payload's optional `template_id`,
+  `app.job_payload_ok`); the timeline shows "לא נשלחה: ארוכה מדי." only then. EVERY sender asks `app.message_template_sendable`,
+  fills (marketing after `marketingEnvelope()`), asks `app.message_filled_problem`, and on any code sends nothing and records it.
+  Links: `app.message_external_link(text, own_host)` = `messageExternalLink()` (NFKC, invisible characters removed, scheme
+  authorities, `www.`, bare domains incl. Hebrew/Arabic labels and xn--, IPv4; file extensions are not TLDs; a well-formed email
+  is not judged; the 021160 header lists what is accepted). The own host is `app.website_domain(organizations.website)`
+  (column grant like phone; trigger `organizations_website_check`, hint `org:website`; `app.message_website_ok` = `websiteOk()`:
+  http(s) or a bare host, never a public suffix, shared host, URL shortener or big platform), allowed with its registered domain
+  and every host under it, or under a shared site host only exactly (and its www). Closed lists `app.message_shared_site_host` /
+  `message_url_shortener` / `message_platform_domain` / `message_file_extension` are mirrored in `service-rule.ts` between markers.
+  `app.message_template_problem` takes `p_own_domain` (last redefined in 021160; the 4-argument version retired, idempotently);
+  re-running 021159 needs 021160 re-run after it. Tests 64 and 88 end with `_service_message_send_rules.sql`.
 - Customer sending pause (HEB-09, migrations 021134, 021135; owner (44) א (45) א (46) א): `public.org_sending_pauses` (one row per org; owners/
   admins of a business that is not closed write `paused` + `reason` 1..500; stamps server-kept by `app.org_sending_pauses_stamp`; members
   read; no delete; audited). THE rule is `app.customer_sending_paused(org)` (definer, no grants; no row = not paused): EVERY automatic
