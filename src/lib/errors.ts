@@ -485,6 +485,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "org:timezone": "אזור הזמן שנבחר לעסק אינו מוכר.",
   "profile:avatar": "התמונה לא נשמרה. העלו אותה שוב.",
   "branding:logo": "הלוגו לא נשמר. העלו אותו שוב.",
+  // PRK-06 (trigger org_privacy_settings_check)
+  "privacy_officer:member": "אחראי הפרטיות צריך להיות משתמש פעיל בעסק. בחרו משתמש אחר.",
   // FLD-05 (apply_industry_template)
   "template:unknown": "התבנית הזו לא קיימת. רעננו את הדף ובחרו תבנית מהרשימה.",
   // REC-02 (trigger activities_notify_mentions)

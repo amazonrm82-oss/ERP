@@ -117,6 +117,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   customer_status_settings: "סטטוס לקוח",
   // HEB-09
   org_sending_pauses: "עצירת שליחה ללקוחות",
+  // PRK-06
+  org_privacy_settings: "אחראי פרטיות",
   // DQL-01
   completeness_settings: "שדות חשובים",
   // FLD-08
@@ -228,6 +230,8 @@ export const FIELD_LABELS: Record<string, string> = {
   target_minutes: "יעד בדקות",
   breach_action: "פעולה בחריגה",
   // CON-11
+  // PRK-06
+  privacy_officer_id: "אחראי פרטיות",
   dormant_months: "חודשים עד לקוח רדום",
   former_months: "חודשים עד לקוח לשעבר",
   // CAP-08

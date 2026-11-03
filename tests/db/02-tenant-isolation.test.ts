@@ -119,6 +119,8 @@ describe("tenant isolation", () => {
       await q("insert into public.customer_status_settings (organization_id, dormant_months, former_months) values ($1, 4, 10)", [orgA]);
       // HEB-09
       await q("insert into public.org_sending_pauses (organization_id, paused, reason) values ($1, true, 'יום אבל')", [orgA]);
+      // PRK-06
+      await q("insert into public.org_privacy_settings (organization_id, privacy_officer_id) values ($1, $2)", [orgA, a.id]);
       await q("insert into public.lead_response_settings (organization_id, target_minutes) values ($1, 30)", [orgA]);
       await q("insert into public.number_sequences (organization_id, kind, prefix) values ($1, 'quote', 'Q-')", [orgA]);
       await q("insert into public.org_bank_details (organization_id, bank_name, bank_branch, bank_account) values ($1, 'בנק', '800', '1234567')", [orgA]);
@@ -394,6 +396,8 @@ describe("tenant isolation", () => {
     "customer_status_settings",
     // HEB-09
     "org_sending_pauses",
+    // PRK-06
+    "org_privacy_settings",
     "org_bank_details",
     // CAP-10
     "lead_response_settings",
@@ -633,6 +637,8 @@ describe("tenant isolation", () => {
       customer_status_settings: "dormant_months = dormant_months",
       // no delete grant at all: a permission error is the expected outcome for the delete
       org_sending_pauses: "reason = reason",
+      // no delete grant at all: a permission error is the expected outcome for the delete
+      org_privacy_settings: "privacy_officer_id = privacy_officer_id",
       lead_response_settings: "target_minutes = target_minutes",
       // no delete grant at all: a permission error is the expected outcome for the delete
       number_sequences: "prefix = prefix",
@@ -801,6 +807,7 @@ describe("tenant isolation", () => {
       ["insert into public.org_modules (organization_id, companies_enabled) values ($1, false)", [orgA]],
       ["insert into public.customer_status_settings (organization_id, dormant_months) values ($1, 2)", [orgA]],
       ["insert into public.org_sending_pauses (organization_id, paused, reason) values ($1, true, 'x')", [orgA]],
+      ["insert into public.org_privacy_settings (organization_id) values ($1)", [orgA]],
       ["insert into public.lead_response_settings (organization_id, target_minutes) values ($1, 90)", [orgA]],
       ["insert into public.number_sequences (organization_id, kind) values ($1, 'order')", [orgA]],
       ["insert into public.org_bank_details (organization_id, bank_name) values ($1, 'x')", [orgA]],
@@ -937,6 +944,7 @@ describe("tenant isolation", () => {
       ["org_modules", "companies_enabled = false", "companies_enabled = false"],
       ["customer_status_settings", "dormant_months = 9", "dormant_months = 9"],
       ["org_sending_pauses", "reason = 'HACKED'", "reason = 'HACKED'"],
+      ["org_privacy_settings", "privacy_officer_id = null", "privacy_officer_id is null"],
       ["lead_response_settings", "target_minutes = 777", "target_minutes = 777"],
       ["number_sequences", "prefix = 'HACKED'", "prefix = 'HACKED'"],
       ["org_bank_details", "bank_name = 'HACKED'", "bank_name = 'HACKED'"],

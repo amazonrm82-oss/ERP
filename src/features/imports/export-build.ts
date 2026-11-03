@@ -152,6 +152,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "customer_status_settings", file: "customer-status-settings.csv" },
   // HEB-09
   { table: "org_sending_pauses", file: "sending_pause.csv" },
+  // PRK-06
+  { table: "org_privacy_settings", file: "privacy_settings.csv" },
   { table: "org_calendar_settings", file: "calendar_settings.csv" },
   // CAP-09
   { table: "member_leaves", file: "member_leaves.csv" },

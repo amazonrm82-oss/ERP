@@ -779,6 +779,17 @@ export type OrgSendingPausesRow = {
   updated_at: string;
 };
 
+// PRK-06: the business's privacy officer (migration privacy_officer); no row = none. No data rights.
+export type OrgPrivacySettingsRow = {
+  id: string;
+  organization_id: string;
+  // an active member of the business; cleared when they are suspended or leave
+  privacy_officer_id: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type MembershipRow = {
   id: string;
   organization_id: string;
@@ -3127,6 +3138,12 @@ export type Database = {
         OrgSendingPausesRow,
         { organization_id: string; paused?: boolean; reason?: string | null },
         { paused?: boolean; reason?: string | null }
+      >;
+      // PRK-06: column grants (the officer); no delete
+      org_privacy_settings: Table<
+        OrgPrivacySettingsRow,
+        { organization_id: string; privacy_officer_id?: string | null },
+        { privacy_officer_id?: string | null }
       >;
       // ORD-01: column grants; a person inserts a manual draft; status is the only state column a person writes
       orders: Table<OrderRow, OrderWrite & { organization_id: string; deal_id?: string | null; currency?: string }, OrderWrite & { status?: OrderStatus }>;
