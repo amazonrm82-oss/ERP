@@ -1713,8 +1713,14 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `public.payment_refunded` / `payment_counted(payments)` (inlined, no SET; advisor findings expected), and every set-based reader
   writes the same subquery out (keep in step): `payment_credit`, `money_allocation_state`, `app.payment_allocations_check`'s cap,
   `customer_ledger`, `app.order_money_facts`, `report_collection`, `report_goal_progress`, `statement_public`,
-  `statement_staff_view` (the last two leave out a payment counted at 0); all last redefined in 021154. A refund counts on the
-  payment's own day (lead's choice, owner question 81). Refunded in full = status `refunded` through `app.payment_server = 'refund'`
+  `statement_staff_view` (the last two leave out a payment counted at 0); all last redefined in 021154. In the collection report (COL-06) and collection goals (GOL-01 'collected') a payment counts IN FULL in the
+  period of its paid_on (recorded/confirmed, or 'refunded' while it has an active refund record; a hand-set legacy 'refunded'
+  stays out) and each active refund counts NEGATIVE in the period of its refunded_on (owner (81) ב, migration 021156):
+  `report_collection` adds `refunds`, `refund_count`, `net` to totals, by_month, by_method (the refund's own method) and by_rep
+  (the payment's rep, also for the owner filter); a goal's actual nets the period's refunds under the payment's rep/team and
+  cheque rule, and `app.goal_payments_counted` counts the refund rows too (keep in step; an actual may be below 0). The two
+  reports and `app.goal_payments_counted` were last redefined in 021156; test 64's list ends with `_refunds_by_month.sql`.
+  Refunded in full = status `refunded` through `app.payment_server = 'refund'`
   (`app.payment_refunds_apply`; cancelling puts back the cheque's status, else `payment_status_before`); a partial refund releases
   counted allocations above what remains, newest first, and writes a `system` entry kind `payment_refunded` without an amount.
   While a payment has active refunds, `payments_zz_refunds` (`app.payments_refund_guard`) allows status moves only between
