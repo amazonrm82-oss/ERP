@@ -2243,6 +2243,18 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `/settings/message-templates` previews a template on a lead/contact read with the user's session. Nothing sends from a template
   yet; WA-01's `whatsapp_templates` stay the record button's wa.me texts. Open owner questions 89-90 (the quote email's type; who
   may mark a template as a service type) must be settled before any sender reads `message_type` from a template.
+- Service template rule (MSG-02 follow-up, migration 021159; owner (90) ג): `app.message_template_problem(channel, type, subject,
+  body)` = `messageTemplateProblem()` in `src/features/message-templates/service-rule.ts` (shared fixture
+  `message-template-problems.json`, unit test and test 291) answers null or `field_not_allowed` (the type's closed list
+  `app.message_type_fields` = `SERVICE_TYPE_FIELDS`), `external_link` (`http(s)://` or `www.`; system links only through merge
+  fields) or `too_long` (`app.message_service_body_max` = `SERVICE_BODY_MAX`: SMS 300, WhatsApp 1000, email 2000), in that order;
+  marketing is never judged. Saving is never refused; the settings page and the editor show "התבנית לא תישלח: …". EVERY future
+  sender asks `app.message_template_sendable(org, template)` (definer, no grants: `not_found` | `inactive` | the rule's codes) or
+  `assertTemplateSendable()` right before it sends and never sends on a code. `{קוד אימות}` joined `app.message_merge_fields()` (last
+  redefined there). A type change is audited by `app.audit_row`. Owner (89) א's quote-email conditions (sent only from the quote
+  screen or an automation on its deal, only to the customer address on the quote, never to a group or segment; blocklist and
+  erasure stop it) are `QUOTE_SERVICE_CONDITIONS` in `src/features/message-templates/templates.ts`. The rep report's collection
+  goal table shows "החזרים" (owner (91) ב), hidden when the column is all zero.
 - Customer sending pause (HEB-09, migrations 021134, 021135; owner (44) א (45) א (46) א): `public.org_sending_pauses` (one row per org; owners/
   admins of a business that is not closed write `paused` + `reason` 1..500; stamps server-kept by `app.org_sending_pauses_stamp`; members
   read; no delete; audited). THE rule is `app.customer_sending_paused(org)` (definer, no grants; no row = not paused): EVERY automatic
