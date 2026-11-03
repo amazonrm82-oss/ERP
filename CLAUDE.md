@@ -1065,6 +1065,13 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   private notes and their files left out by `withoutOthersPrivate()`, the print rule), calls `public.log_person_export()` (definer,
   `app.is_admin`, record of this org, counts only; audit action `person_export`) before any byte, then streams the ZIP
   (`personZipStream()`, one file per pull, 100 MB of real bytes; skipped files listed in README.txt).
+  Since RVW-62 (weekly review 3 November 2026) it also carries the person's own documents' lines and payment promises (a contact's
+  own promise or one on its document; documents recorded on another contact of the same deal stay listed but without lines or
+  promises), the PDFs of the person's quotes and orders (`files.quote_id`/`order_id`, RLS decides), privacy requests by the current link
+  (former links never), deal lines and task steps. `PERSON_EXPORT_TABLES` / `PERSON_EXPORT_LEFT_OUT` in
+  `src/features/privacy-export/build.ts`; unit test `person-export-tables` fails on a table of `EXPORT_TABLES` that reaches a person and
+  is neither exported nor left out with a reason. `app.import_record_worked` and `app.sample_untouched` were last redefined in 021148
+  (RVW-64: a payment promise is work); tests 64 and 88 end with `_payment_promise_work.sql`.
 - List export (LST-08, migration 0034): `/o/[org]/{leads,contacts,companies}/export` → `exportList()`
   (`src/features/list-export/server.ts`) reads the list with the same params as the page (or `ids=`),
   with the user's session, calls `public.log_list_export()` (owner/admin/manager; audit action `export`)
