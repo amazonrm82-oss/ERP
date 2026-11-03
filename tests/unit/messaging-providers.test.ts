@@ -1,0 +1,98 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { ClaimedJob } from "@/features/jobs/registry";
+import { clearFakeSentMessages, createFakeProvider, fakeSentMessages } from "@/features/messaging/providers/fake";
+import { messagingProviderFor, messagingProviders, providerEnvKey } from "@/features/messaging/providers/select";
+import { MESSAGE_CHANNELS } from "@/features/messaging/providers/types";
+import { createSendHandler } from "@/features/messaging/send-handler";
+
+const root = join(__dirname, "..", "..");
+
+const job = (payload: Record<string, unknown>): ClaimedJob => ({
+  id: "11111111-1111-4111-8111-111111111111",
+  lease: "22222222-2222-4222-8222-222222222222",
+  kind: "message.send",
+  organization_id: "33333333-3333-4333-8333-333333333333",
+  payload,
+  attempt: 1,
+});
+
+describe("MSG-01: a provider per channel", () => {
+  it("names one env variable per channel", () => {
+    expect(MESSAGE_CHANNELS.map(providerEnvKey)).toEqual(["MESSAGING_PROVIDER_EMAIL", "MESSAGING_PROVIDER_SMS", "MESSAGING_PROVIDER_WHATSAPP"]);
+  });
+
+  it("takes the channel's own variable first, then MESSAGING_PROVIDER for every channel", () => {
+    expect(messagingProviders({})).toEqual({});
+    const all = messagingProviders({ MESSAGING_PROVIDER: "fake" });
+    expect(Object.keys(all)).toEqual(["email", "sms", "whatsapp"]);
+    for (const channel of MESSAGE_CHANNELS) expect(all[channel]).toMatchObject({ name: "fake", channel });
+
+    const smsOnly = messagingProviders({ MESSAGING_PROVIDER_SMS: "fake" });
+    expect(Object.keys(smsOnly)).toEqual(["sms"]);
+    // a channel's own unknown code wins over the general one: that channel has no provider
+    const mixed = messagingProviders({ MESSAGING_PROVIDER: "fake", MESSAGING_PROVIDER_WHATSAPP: "someone" });
+    expect(Object.keys(mixed)).toEqual(["email", "sms"]);
+    // empty or spaces = not set
+    expect(messagingProviderFor("email", { MESSAGING_PROVIDER_EMAIL: "  ", MESSAGING_PROVIDER: "fake" })?.name).toBe("fake");
+  });
+
+  it("knows only the fake adapter, and never a code from the object prototype", () => {
+    for (const name of ["real", "sendgrid", "constructor", "toString", "__proto__", "hasOwnProperty"]) {
+      expect(messagingProviderFor("sms", { MESSAGING_PROVIDER: name }), name).toBeNull();
+    }
+    expect(messagingProviderFor("sms", { MESSAGING_PROVIDER: "FAKE" })?.name).toBe("fake");
+  });
+
+  it("refuses the fake on a Vercel production or preview deployment, per channel too", () => {
+    for (const vercel of ["production", "preview"]) {
+      expect(messagingProviders({ MESSAGING_PROVIDER: "fake", VERCEL_ENV: vercel })).toEqual({});
+      expect(messagingProviders({ MESSAGING_PROVIDER_EMAIL: "fake", VERCEL_ENV: vercel })).toEqual({});
+    }
+    expect(Object.keys(messagingProviders({ MESSAGING_PROVIDER_EMAIL: "fake", VERCEL_ENV: "development" }))).toEqual(["email"]);
+  });
+});
+
+describe("MSG-01: the send handler uses the job's channel's provider", () => {
+  beforeEach(() => clearFakeSentMessages());
+
+  it("sends through the channel's provider only", async () => {
+    const providers = messagingProviders({ MESSAGING_PROVIDER_SMS: "fake" });
+    const maySend = vi.fn(async () => ({ may_send: true }));
+    const handler = createSendHandler({ maySend, providerFor: (channel) => providers[channel] ?? null });
+    const sms = await handler(job({ channel: "sms", lead_id: "44444444-4444-4444-8444-444444444444" }));
+    expect(sms.status).toBe("done");
+    // email has no provider: a failed try, and the database is not asked (nothing checked or recorded)
+    const email = await handler(job({ channel: "email", lead_id: "44444444-4444-4444-8444-444444444444" }));
+    expect(email).toEqual({ status: "failed", error: "no provider for channel" });
+    expect(maySend).toHaveBeenCalledTimes(1);
+    expect(fakeSentMessages().map((m) => m.channel)).toEqual(["sms"]);
+  });
+
+  it("never hands a job to a provider of another channel", async () => {
+    const maySend = vi.fn(async () => ({ may_send: true }));
+    const handler = createSendHandler({ maySend, providerFor: () => createFakeProvider({ channel: "email" }) });
+    expect(await handler(job({ channel: "whatsapp", contact_id: "55555555-5555-4555-8555-555555555555" }))).toEqual({
+      status: "failed",
+      error: "no provider for channel",
+    });
+    expect(maySend).not.toHaveBeenCalled();
+    expect(fakeSentMessages()).toEqual([]);
+  });
+
+  it("no module outside the provider layer names an adapter", () => {
+    for (const path of ["src/features/messaging/send-handler.ts", "src/features/jobs/run-server.ts"]) {
+      expect(readFileSync(join(root, path), "utf8"), path).not.toMatch(/createFakeProvider|["']fake["']/);
+    }
+  });
+});
+
+describe("MSG-01: the worker asks only for channels with a provider", () => {
+  it("passes the configured channels to claim_jobs", () => {
+    const code = readFileSync(join(root, "src/features/jobs/run-server.ts"), "utf8");
+    expect(code).toMatch(/rpc\("claim_jobs", \{[^}]*p_channels: Object\.keys\(providers\)/);
+  });
+});

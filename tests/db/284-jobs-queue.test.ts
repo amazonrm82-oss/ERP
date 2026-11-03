@@ -16,7 +16,8 @@ const setKey = (value: string | null) =>
 
 // md5 of the worker's three functions as reviewed: body, security definer, settings and arguments (see the (55) test)
 const REVIEWED_MD5 = {
-  claim_jobs: "de918761f4f48c2c50254db26f65011f",
+  // MSG-01 (021145): p_channels, a channel without a provider is not claimed; needs a fresh review
+  claim_jobs: "3f6b474aca13963df4616cfd19e20010",
   finish_job: "50078fb665234f8655dd361ef51ceefb",
   job_message_may_send: "6af4771a06c407b475af238f2756552d",
 };
@@ -92,7 +93,7 @@ describe("background job queue (OPS-04)", () => {
         async (q) =>
           (
             await q<{ c: boolean; f: boolean; m: boolean }>(
-              `select has_function_privilege($1, 'public.claim_jobs(text[],integer,integer)', 'execute') as c,
+              `select has_function_privilege($1, 'public.claim_jobs(text[],integer,integer,text[])', 'execute') as c,
                       has_function_privilege($1, 'public.finish_job(uuid,uuid,boolean,text,boolean,boolean)', 'execute') as f,
                       has_function_privilege($1, 'public.job_message_may_send(uuid,uuid)', 'execute') as m`,
               [role],
@@ -590,7 +591,7 @@ describe("background job queue (OPS-04)", () => {
         (
           await q<{ name: string; result: string; src: string }>(
             `select p.proname as name, pg_get_function_result(p.oid) as result, p.prosrc as src from pg_proc p
-              where p.oid in ('public.claim_jobs(text[],integer,integer)'::regprocedure,
+              where p.oid in ('public.claim_jobs(text[],integer,integer,text[])'::regprocedure,
                               'public.finish_job(uuid,uuid,boolean,text,boolean,boolean)'::regprocedure,
                               'public.job_message_may_send(uuid,uuid)'::regprocedure)
               order by 1`,
@@ -614,6 +615,36 @@ describe("background job queue (OPS-04)", () => {
   // (55) א: the three functions the worker calls were reviewed against the owner's conditions (only the send check reads
   // customer records and answers may_send/reason/retry; claim and finish answer only what sending needs). A change to any
   // of their bodies fails here until it gets a fresh independent review against those conditions; then update the md5.
+  it("MSG-01: a message of a channel without a provider is neither claimed nor counted; it is claimed once the channel is asked for", async () => {
+    const sms = await enqueue(org, { channel: "sms", lead_id: randomUUID() });
+    const email = await enqueue(org, { channel: "email", lead_id: randomUUID() });
+    const asked = (channels: string[] | null) =>
+      asService(async (q) => (await q<{ r: Claimed[] }>("select public.claim_jobs(array['message.send'], 20, 120, $1) as r", [channels])).rows[0].r);
+    expect((await asked(["email"])).map((j) => j.id)).toEqual([email]);
+    expect(await jobOf(sms)).toMatchObject({ status: "queued", attempts: 0 });
+    expect(await asked(["email"])).toEqual([]);
+    expect(await asked([])).toEqual([]);
+    expect((await asked(["sms", "whatsapp"])).map((j) => j.id)).toEqual([sms]);
+    expect(await jobOf(sms)).toMatchObject({ status: "running", attempts: 1 });
+    // a lease that ran out on the last try is ended only for an asked channel
+    await asAdmin((q) => q("update app.jobs set attempts = 5, locked_until = now() - interval '1 second' where id = $1", [sms]));
+    await asked(["email"]);
+    expect((await jobOf(sms)).status).toBe("running");
+    await asked(null);
+    expect((await jobOf(sms)).status).toBe("dead");
+    // the old three-argument function is retired, without grants
+    const retired = await asAdmin(
+      async (q) =>
+        (
+          await q<{ n: number; g: boolean }>(
+            `select count(*)::int as n, coalesce(bool_or(has_function_privilege('service_role', p.oid, 'execute')), false) as g
+               from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'app' and p.proname = 'claim_jobs_021145_retired'`,
+          )
+        ).rows[0],
+    );
+    expect(retired).toEqual({ n: 1, g: false });
+  });
+
   it("(55) א: the bodies of claim_jobs, finish_job and job_message_may_send are the reviewed ones", async () => {
     const rows = await asAdmin(
       async (q) =>

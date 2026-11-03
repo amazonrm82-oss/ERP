@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createSendHandler } from "@/features/messaging/send-handler";
-import { messagingProvider } from "@/features/messaging/providers/select";
+import { messagingProviders } from "@/features/messaging/providers/select";
 import { bearerSecretMatches } from "@/lib/shared-secret";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -16,7 +16,7 @@ const json = (status: number, body: Record<string, unknown>) =>
  * pg_net, every minute while work is due), never by a user: it carries the push dispatcher's shared secret, checked
  * timing-safe before anything else. With the service role it calls only public.claim_jobs(), public.finish_job() and,
  * for message.send, public.job_message_may_send(); no table is read or written directly (CLAUDE.md hard rule 5, wave 3
- * use (1)). Only kinds with a ready handler are claimed: today message.send, and only with a provider configured.
+ * use (1)). Only kinds with a ready handler are claimed: today message.send, and only with a provider configured for a channel.
  */
 export async function runJobsRoute(request: Request): Promise<Response> {
   const secret = process.env.PUSH_DISPATCH_SECRET?.trim();
@@ -25,11 +25,12 @@ export async function runJobsRoute(request: Request): Promise<Response> {
   const supabase = createServiceClient();
   if (!supabase) return json(503, { error: "jobs are not configured" });
 
-  const provider = messagingProvider();
+  // MSG-01: one provider per channel; message.send is registered while any channel has one
+  const providers = messagingProviders();
   const registry = createRegistry({
-    "message.send": provider
+    "message.send": Object.keys(providers).length > 0
       ? createSendHandler({
-          provider,
+          providerFor: (channel) => providers[channel] ?? null,
           maySend: async (job) => {
             const { data, error } = await supabase.rpc("job_message_may_send", { p_job: job.id, p_lease: job.lease });
             if (error) throw new Error("send check failed");
@@ -43,7 +44,8 @@ export async function runJobsRoute(request: Request): Promise<Response> {
     const summary = await runJobs(
       {
         claim: async (kinds, limit) => {
-          const { data, error } = await supabase.rpc("claim_jobs", { p_kinds: kinds, p_limit: limit });
+          // MSG-01: only messages of a channel with a provider are claimed; the others wait in the queue, uncounted
+          const { data, error } = await supabase.rpc("claim_jobs", { p_kinds: kinds, p_limit: limit, p_channels: Object.keys(providers) });
           if (error) throw new Error("claim failed");
           return data;
         },

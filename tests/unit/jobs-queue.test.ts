@@ -228,7 +228,7 @@ describe("OPS-04: the send handler", () => {
   it("refuses while sending is paused or the address is suppressed, and sends nothing", async () => {
     for (const reason of ["sending_paused", "consent_suppressed", "consent_unknown", "business_closed"]) {
       const maySend = vi.fn(async () => ({ may_send: false, reason }));
-      const handler = createSendHandler({ maySend, provider: createFakeProvider() });
+      const handler = createSendHandler({ maySend, providerFor: () => createFakeProvider({ channel: "email" }) });
       expect(await handler(job())).toEqual({ status: "ended", reason });
       expect(maySend).toHaveBeenCalledWith(job());
     }
@@ -238,14 +238,14 @@ describe("OPS-04: the send handler", () => {
   it("(52) ג: a waiting answer during a pause ends this run without sending (the database queued the job again)", async () => {
     const handler = createSendHandler({
       maySend: async () => ({ may_send: false, reason: "sending_paused", retry: true }),
-      provider: createFakeProvider(),
+      providerFor: () => createFakeProvider(),
     });
     expect(await handler(job())).toEqual({ status: "ended", reason: "sending_paused" });
     expect(fakeSentMessages()).toEqual([]);
   });
 
   it("sends through the provider with ids and codes only once the database says yes", async () => {
-    const handler = createSendHandler({ maySend: async () => ({ may_send: true }), provider: createFakeProvider() });
+    const handler = createSendHandler({ maySend: async () => ({ may_send: true }), providerFor: (channel) => createFakeProvider({ channel }) });
     expect(await handler(job())).toEqual({ status: "done" });
     expect(await handler(job({ id: "c2", payload: { channel: "sms", contact_id: "55555555-5555-4555-8555-555555555555" } }))).toEqual({ status: "done" });
     expect(fakeSentMessages()).toEqual([
@@ -257,16 +257,16 @@ describe("OPS-04: the send handler", () => {
   it("never sends on a malformed answer or payload, and reports a provider failure", async () => {
     const provider = createFakeProvider();
     for (const answer of [null, {}, { may_send: "yes" }, { may_send: false }]) {
-      const handler = createSendHandler({ maySend: async () => answer, provider });
+      const handler = createSendHandler({ maySend: async () => answer, providerFor: () => provider });
       expect((await handler(job())).status).toBe("failed");
     }
     const asked = vi.fn(async () => ({ may_send: true }));
-    const bad = createSendHandler({ maySend: asked, provider });
+    const bad = createSendHandler({ maySend: asked, providerFor: () => provider });
     expect(await bad(job({ payload: { channel: "fax", lead_id: "x" } }))).toEqual({ status: "failed", error: "payload", final: true });
     expect(asked).not.toHaveBeenCalled();
     expect(fakeSentMessages()).toEqual([]);
     const failing = createFakeProvider({ fail: () => ({ ok: false, error: "quota" }) });
-    const handler = createSendHandler({ maySend: async () => ({ may_send: true }), provider: failing });
+    const handler = createSendHandler({ maySend: async () => ({ may_send: true }), providerFor: () => failing });
     expect(await handler(job())).toEqual({ status: "failed", error: "quota", final: undefined });
   });
 

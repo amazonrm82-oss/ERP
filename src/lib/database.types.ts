@@ -4193,7 +4193,8 @@ export type Database = {
       // OPS-04 (service_role only): the worker route's queue calls. claim_jobs answers [{id, lease, kind, organization_id,
       // payload, attempt}]; finish_job answers 'done' | 'failed' | 'dead' | 'released' | 'stale'; job_message_may_send answers
       // {may_send: true} | {may_send: false, reason} and never an address or a name
-      claim_jobs: { Args: { p_kinds: string[]; p_limit?: number; p_lease_seconds?: number }; Returns: Json };
+      // MSG-01: p_channels = the channels with a provider (null = all)
+      claim_jobs: { Args: { p_kinds: string[]; p_limit?: number; p_lease_seconds?: number; p_channels?: string[] }; Returns: Json };
       finish_job: {
         Args: { p_job: string; p_lease: string; p_ok: boolean; p_error?: string; p_final?: boolean; p_started?: boolean };
         Returns: string;
