@@ -2152,6 +2152,12 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   own audit entries, as `app.privacy_requests_erase` (keep the two in step); an update, never a delete; server-only `erased_by_retention`
   makes the page say "פרטי הבקשה נמחקו לפי מדיניות השמירה". `app.privacy_request_notice_days` rows are never cleared (needs a hand-pasted
   delete).
+- Health check (OPS-05 part, migration 021150; owner (72) ב, 3 November 2026): `GET /api/health` (exact public path in
+  `src/lib/supabase/proxy.ts` `PUBLIC_EXACT`; `src/features/health/health-server.ts`) calls `public.health_check()` with a plain anon client
+  (no session, cookies or service key) and answers 200 `{ok:true}` only when it returns true within 3 s, else 503 `{ok:false}`; `no-store`,
+  no error text. The function is sql, stable, invoker, `search_path ''`, body `select true`, and is the ONLY function anon may execute
+  (test 01 names it; test 289-health-check pins body, settings and grants; a change needs a fresh review). OPS-02 lists it as guard
+  `constant` (the route may call only that function, no `.from(`/`.auth.`). Cron runs and queue sizes belong to the platform screen.
 - Customer sending pause (HEB-09, migrations 021134, 021135; owner (44) א (45) א (46) א): `public.org_sending_pauses` (one row per org; owners/
   admins of a business that is not closed write `paused` + `reason` 1..500; stamps server-kept by `app.org_sending_pauses_stamp`; members
   read; no delete; audited). THE rule is `app.customer_sending_paused(org)` (definer, no grants; no row = not paused): EVERY automatic
