@@ -96,6 +96,15 @@ and build this CRM here instead. The old code is preserved on the branch
    channel and text, never shows or confirms that data exists, honeypot and rate limit as LND-13, reaches the owner as a
    `system` notice with a 30-day count. Provider secrets (INT-02) are encrypted with a key the owner sets as a Vercel env var;
    the database keeps ciphertext only; the key is replaced only with a process that re-encrypts every stored secret.
+   In use (PRK-02, owner 26 October 2026, wave 3 use (3), migration 021147): the public privacy-request page
+   (`src/features/privacy-requests/public-server.ts`, page `/f/privacy/<token>`, route `POST /api/forms/privacy/<token>`), which calls
+   only `public.privacy_request_page()` (the business's display name `organizations.name`, logo and colour only) and
+   `public.privacy_request_submit()` (stores only type, name, one contact channel and text; always `{status:'received'}` or
+   `{rate_limited:true}`, whatever the business holds; honeypot hits stored nowhere and told to no one). Limits after the token lookup,
+   the sender before the link: views 60 per sender, then 300 per link, in 10 minutes; submissions 3 per sender in 10 minutes and 10 per
+   sender a day, then 50 stored per link a day. The sender is the keyed IP hash with scope `privacy` (IPv6 by its /64), re-scoped per
+   business; only bucket numbers are kept (`app.privacy_request_counts`). No cookies or visitor id. Embeddable, and left out of OPS-02's
+   shared not-found limit (published like the lead form; lead's choice). In the eslint allow-list.
    In use (OPS-04, owner 26 October 2026, answer (א) and wave 3 use (1); conditions of 2 November 2026, answers (52)-(55); migration
    `_jobs_queue.sql`): the background job worker (`src/features/jobs/run-server.ts`, route `POST /api/jobs/run`, public prefix in
    `src/lib/supabase/proxy.ts`), woken by `app.wake_job_worker()` (pg_cron `crm-jobs-wake`, pg_net; `app.settings` `jobs_run_url`,
@@ -2116,6 +2125,19 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   Wordings (PRK-04, no migration): `/settings/privacy/wordings` shows CAP-07's consent wording and version unchanged, and a privacy-notice
   paragraph versioned in code (`PRIVACY_NOTICE_VERSION`, text pinned by `tests/unit/privacy-wordings.test.ts`; a text change needs a new
   version); both DRAFT until the lawyer edits them. The paragraph names no employee (owner question 74).
+- Privacy requests (PRK-02, migration 021147; privacy, every plan): `public.privacy_requests` is server-written (no insert or delete
+  grant); owners/admins read it and update status, `verify_method`/`verify_note` (once), `refusal_reason` and `lead_id` | `contact_id`
+  (column grants) while `app.privacy_requests_workable` holds (not deleted, suspended or cancelled: a read-only business still handles
+  them). The privacy officer is notified, never given rights. Invoker trigger `app.privacy_requests_check`: person rules for
+  `authenticated` at any depth (identity check before in_progress/done; refused needs a reason, junk = "בקשה לא רצינית / ספאם", never
+  deleted; done/refused freeze; links to live records), only the FK's own set-null passes at depth > 1; every link ever held is kept in
+  server-only `former_lead_ids`/`former_contact_ids`. `target_date` = day received (business zone) + 30. One secret link per business
+  (`app.privacy_request_links`, SHA-256 only; `privacy_request_link_create/revoke/status`, owners/admins, audited without the token).
+  Notices (`system`, to `app.privacy_officer` + active owners/admins, nothing personal): the first 5 of a business's day one by one, then
+  one counting notice (`app.privacy_request_notice_days`). An `erase` audit entry of a lead/contact (so PRV-03 and PRV-01 too) fires
+  `audit_log_privacy_requests_erase`, matching the current or any former link. Merge moves requests through the `merged` entry. Execution
+  is the existing PRV-02 export / PRV-03 erase on `/settings/privacy/requests/[id]`. Audited on update only; in `EXPORT_TABLES`.
+  Open (owner question 76): retention of closed and never-linked requests; `app.privacy_request_notice_days` rows are never cleared.
 - Customer sending pause (HEB-09, migrations 021134, 021135; owner (44) א (45) א (46) א): `public.org_sending_pauses` (one row per org; owners/
   admins of a business that is not closed write `paused` + `reason` 1..500; stamps server-kept by `app.org_sending_pauses_stamp`; members
   read; no delete; audited). THE rule is `app.customer_sending_paused(org)` (definer, no grants; no row = not paused): EVERY automatic
