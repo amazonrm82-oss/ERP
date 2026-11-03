@@ -25,7 +25,15 @@ type Common = {
 };
 
 /** "פגישה חדשה" on a record's meetings card: the form opens as a sheet on a phone. */
-export function NewMeetingButton({ orgId, subject, members, timeZone, meetingTypes, initial }: Common & { initial: MeetingFormValues }) {
+export function NewMeetingButton({
+  orgId,
+  subject,
+  members,
+  timeZone,
+  meetingTypes,
+  initial,
+  note,
+}: Common & { initial: MeetingFormValues; note?: string | null }) {
   const [open, setOpen] = useState(false);
   // the app has no toast region yet: a short notice under the button says it worked
   const [notice, setNotice] = useState<string | null>(null);
@@ -51,6 +59,8 @@ export function NewMeetingButton({ orgId, subject, members, timeZone, meetingTyp
         פגישה חדשה
       </Button>
       <Dialog open={open} onClose={close} title="פגישה חדשה" variant="sheet">
+        {/* PKG-02: the contact's punch card balance while booking */}
+        {open && note ? <p className="mb-4 rounded-md bg-canvas px-3 py-2 text-sm">{note}</p> : null}
         {open ? <MeetingForm
             orgId={orgId}
             subject={subject}

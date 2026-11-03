@@ -9,13 +9,14 @@ import {
   ActivatePunchCardButton,
   CancelPunchCardButton,
   OpenPunchCardButton,
+  ReturnPunchUseButton,
   TransferPunchCardButton,
 } from "./punch-card-forms";
 
 /**
- * PKG-01: the contact's punch cards with their balance. Shown to whoever reads the contact while the plan has
+ * PKG-01, PKG-02: the contact's punch cards with their balance. Shown to whoever reads the contact while the plan has
  * the key, or while the contact holds a card (a card sold before a downgrade keeps showing). Sellers open cards;
- * owners/admins activate by hand, cancel and transfer.
+ * owners/admins activate by hand, cancel and transfer; owners, admins and managers give a used entry back.
  */
 export async function PunchCardsCard({ orgId, contactId, timeZone }: { orgId: string; contactId: string; timeZone: string }) {
   const access = await getPunchAccess(orgId);
@@ -96,6 +97,23 @@ export async function PunchCardsCard({ orgId, contactId, timeZone }: { orgId: st
                     </>
                   ) : null}
                 </div>
+                {card.uses.length > 0 ? (
+                  <details className="text-sm">
+                    <summary className="cursor-pointer text-ink-soft">כניסות שנוצלו ({card.uses.filter((u) => !u.returned).length})</summary>
+                    <ul className="mt-2 space-y-2">
+                      {card.uses.map((use) => (
+                        <li key={use.id} className="space-y-1">
+                          <p className={use.returned ? "text-ink-soft line-through" : undefined}>
+                            {formatDate(use.usedOn)}
+                            {use.meetingTitle ? ` · ${use.meetingTitle}` : ""}
+                          </p>
+                          {use.returnText ? <p className="break-words text-ink-soft">{use.returnText}</p> : null}
+                          {!use.returned && access.canReturn ? <ReturnPunchUseButton orgId={orgId} contactId={contactId} useId={use.id} /> : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                ) : null}
               </li>
             ))}
           </ul>

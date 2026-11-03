@@ -172,9 +172,15 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
   const heldBefore = contactIds.length
     ? await readLinked(supabase, orgId, "punch_cards", "*", `former_contact_ids.ov.{${contactIds.join(",")}}`)
     : [];
-  // PKG-02 adds the entries used on them
-  const cardUses: Row[] = [];
-  const punchCards = ownCards.map((card) => cardForExport(card, cardUses, contactIds, timeZone));
+  // PKG-02: the entries used on them (each card keeps only those made within the person's holdings)
+  const cardUses = await readByIds(supabase, orgId, "punch_card_uses", "*", "card_id", uniqueIds([...ownCards, ...heldBefore].map((c) => c.id)));
+  const currentCards = ownCards.map((card) => cardForExport(card, cardUses, contactIds, timeZone));
+  const punchCardUses = currentCards.flatMap((card) => (Array.isArray(card.uses) ? (card.uses as Row[]) : []));
+  const punchCards = currentCards.map((card) => {
+    const copy = { ...card };
+    delete copy.uses;
+    return copy;
+  });
   // a card the person holds now and held before too (A to B to A) is listed once, as theirs now
   const formerPunchCards = heldBefore.filter((card) => !ownCards.some((own) => own.id === card.id)).map((card) => cardForExport(card, cardUses, contactIds, timeZone));
   // COL-05: the "do not sell" holds set on the person's contacts
@@ -256,6 +262,7 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     payments,
     payment_refunds: paymentRefunds,
     punch_cards: punchCards,
+    punch_card_uses: punchCardUses,
     punch_cards_held_before: formerPunchCards,
     customer_holds: customerHolds,
     order_decisions: orderDecisions,

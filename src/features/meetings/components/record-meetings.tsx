@@ -3,6 +3,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import type { TimelineSubject } from "@/features/activities/schema";
 import { InviteFileLink } from "@/features/calendar-feed/components/invite-file-link";
 import { listMeetingTypeChoices } from "@/features/meeting-types/queries";
+import { usablePunchBalances } from "@/features/punch-cards/queries";
 import { listMembers } from "@/features/settings/queries";
 import { zoneDate } from "@/lib/format";
 
@@ -28,11 +29,14 @@ type Props = {
  * meeting is a stacked block; forms open as a bottom sheet.
  */
 export async function RecordMeetings({ orgId, subject, canWrite, timeZone, userId }: Props) {
-  const [meetings, members, meetingTypes] = await Promise.all([
+  const [meetings, members, meetingTypes, punchBalances] = await Promise.all([
     listRecordMeetings(orgId, subject),
     canWrite ? listMembers(orgId) : Promise.resolve([]),
     listMeetingTypeChoices(orgId),
+    // PKG-02: a contact's usable punch card balance, shown when a meeting is booked
+    subject.kind === "contact" ? usablePunchBalances(orgId, subject.id, timeZone) : Promise.resolve([]),
   ]);
+  const punchNote = punchBalances.length > 0 ? `יתרת כרטיסייה: ${punchBalances.join("; ")}` : null;
   const typeById = new Map(meetingTypes.map((type) => [type.id, type]));
   const options: MemberOption[] = members
     .filter((member) => member.status === "active")
@@ -133,7 +137,8 @@ export async function RecordMeetings({ orgId, subject, canWrite, timeZone, userI
     <Card aria-labelledby="record-meetings-title">
       <CardHeader id="record-meetings-title" title={meetings.length > 0 ? `פגישות (${meetings.length})` : "פגישות"} />
       <CardBody className="space-y-4">
-        {canWrite ? <NewMeetingButton orgId={orgId} subject={subject} members={options} meetingTypes={meetingTypes} timeZone={timeZone} initial={blank} /> : null}
+        {punchNote ? <p className="text-sm text-ink-soft">{punchNote}</p> : null}
+        {canWrite ? <NewMeetingButton orgId={orgId} subject={subject} members={options} meetingTypes={meetingTypes} timeZone={timeZone} initial={blank} note={punchNote} /> : null}
         {meetings.length === 0 ? <p className="text-md text-ink-soft">אין עדיין פגישות עם הרשומה הזו.</p> : null}
         {upcoming.length > 0 ? (
           <section aria-labelledby="meetings-upcoming">

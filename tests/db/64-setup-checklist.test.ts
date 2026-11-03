@@ -716,6 +716,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_punch_card_work.sql",
       // PKG-01 (owner (87) ב) redefines app.audit_erase_core() of _order_pdfs.sql last (punch cards in the erasure)
       "_punch_card_erase.sql",
+      // PKG-02 redefines app.punch_cards_erase() of _punch_card_erase.sql last (the used entries in the erasure)
+      "_punch_card_uses.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

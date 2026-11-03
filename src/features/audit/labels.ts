@@ -110,8 +110,9 @@ export const ENTITY_LABELS: Record<string, string> = {
   // GAP-12
   opening_credit_allocations: "קיזוז יתרת פתיחה",
   customer_holds: "סימון לא למכור עד הסדרת חוב",
-  // PKG-01
+  // PKG-01, PKG-02
   punch_cards: "כרטיסייה",
+  punch_card_uses: "כניסה בכרטיסייה",
   // COL-03
   payment_promises: "הבטחת תשלום",
   // QUO-04
@@ -424,6 +425,10 @@ export const FIELD_LABELS: Record<string, string> = {
   activated_at: "הופעלה",
   payment_void_at: "התשלום בוטל",
   former_contact_ids: "בעלים קודמים",
+  // PKG-02: a used entry
+  used_on: "תאריך הכניסה",
+  returned_at: "הוחזרה",
+  return_reason: "נימוק ההחזרה",
   // CAL-10: a booking page
   token: "קישור",
   intro: "הסבר",

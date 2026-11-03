@@ -90,6 +90,17 @@ export async function transferPunchCardAction(orgId: string, contactId: string, 
   return ok();
 }
 
+export async function returnPunchUseAction(orgId: string, contactId: string, useId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const context = await actionContext(orgId, contactId, useId);
+  if (!context.ok) return context;
+  const reason = reasonSchema.safeParse(formData.get("reason") ?? "");
+  if (!reason.success) return fail(reason.error.issues[0].message, { fieldErrors: { reason: reason.error.issues[0].message }, values: formValues(formData) });
+  const { error } = await context.supabase.rpc("punch_card_use_return", { p_org: orgId, p_use: useId, p_reason: reason.data });
+  if (error) return fail(writeError(error), { values: formValues(formData) });
+  contactPage(orgId, contactId);
+  return ok();
+}
+
 const settingsSchema = z
   .object({
     entries: z.coerce

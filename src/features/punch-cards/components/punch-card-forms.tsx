@@ -18,6 +18,7 @@ import {
   activatePunchCardAction,
   cancelPunchCardAction,
   openPunchCardAction,
+  returnPunchUseAction,
   transferPunchCardAction,
 } from "../actions";
 import { moneyInput, PUNCH_REASON_MAX } from "../balance";
@@ -279,6 +280,15 @@ export function TransferPunchCardButton({ orgId, contactId, cardId }: { orgId: s
           error={failure?.fieldErrors?.to_contact_id}
         />
       )}
+    </DialogForm>
+  );
+}
+
+/** PKG-02: giving a used entry back (owners, admins, managers), with a reason. */
+export function ReturnPunchUseButton({ orgId, contactId, useId }: { orgId: string; contactId: string; useId: string }) {
+  return (
+    <DialogForm label="החזרת כניסה" title="החזרת כניסה" variant="ghost" action={returnPunchUseAction.bind(null, orgId, contactId, useId)} submit="החזרה" pending="מחזירים…">
+      {(failure) => <ReasonField failure={failure} label="למה הכניסה מוחזרת" />}
     </DialogForm>
   );
 }

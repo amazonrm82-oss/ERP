@@ -7,7 +7,8 @@
 -- reaches only what was the person's (second review, finding 5; see the function); entries, dates and amounts stay. The helper answers further
 -- 'entity:id' children for the caller (none here; PKG-02 adds the used entries of the person's gone cards).
 -- * app.audit_erase_core: the body of 021119 (order_pdfs), with 'punch_cards' in the first list and the helper's call.
--- Safe to run twice.
+-- Safe to run twice. Re-running this file requires re-running 021168 (punch_card_uses) right after it: that file redefines
+-- app.punch_cards_erase (second review, finding 10).
 
 -- When a person held a card: from its creation, or the end of the previous holding, to the end of theirs
 -- (holder_history), as closed ranges. Empty when the history does not say (then nothing is known to be theirs).

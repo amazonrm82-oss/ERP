@@ -9,11 +9,12 @@ import { orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext, getUserNames } from "@/features/shell/queries";
 import { must } from "@/lib/db-read";
 import { formatDate, formatMoney, zoneDate } from "@/lib/format";
+import { readAllPagesByIds } from "@/lib/paged-read";
 import { createClient } from "@/lib/supabase/server";
 
 import { punchBalance, refundSuggestion, type PunchBalance } from "./balance";
 
-// PKG-01: a contact's punch cards, read with the user's session (RLS: whoever reads the contact).
+// PKG-01, PKG-02: a contact's punch cards and their entries, read with the user's session (RLS: whoever reads the contact).
 
 export type PunchAccess = {
   inPlan: boolean;
@@ -74,7 +75,27 @@ export async function listContactPunchCards(orgId: string, contactId: string, ti
     "punch cards",
   );
   if (cards.length === 0) return [];
-  const names = await getUserNames(cards.map((c) => c.activated_by));
+  const uses = await readAllPagesByIds(
+    cards.map((c) => c.id),
+    async (ids, from, to) =>
+      must(
+        await supabase
+        .from("punch_card_uses")
+        .select("id, card_id, meeting_id, used_on, returned_at, return_kind, return_reason, returned_by")
+        .eq("organization_id", orgId)
+        .in("card_id", ids)
+        .order("used_on", { ascending: false })
+        .order("id")
+        .range(from, to),
+        "punch card uses",
+      ),
+  );
+  const meetingIds = [...new Set(uses.map((u) => u.meeting_id).filter((id): id is string => Boolean(id)))];
+  const meetings = meetingIds.length
+    ? must(await supabase.from("meetings").select("id, title").eq("organization_id", orgId).in("id", meetingIds), "punch card meetings")
+    : [];
+  const titles = new Map(meetings.map((m) => [m.id, m.title]));
+  const names = await getUserNames([...cards.map((c) => c.activated_by), ...uses.map((u) => u.returned_by)]);
   const paymentIds = [...new Set(cards.map((c) => c.payment_id).filter((id): id is string => Boolean(id)))];
   const payments = paymentIds.length
     ? must(await supabase.from("payments").select("id, method").eq("organization_id", orgId).in("id", paymentIds), "punch card payments")
@@ -82,8 +103,8 @@ export async function listContactPunchCards(orgId: string, contactId: string, ti
   const methods = new Map(payments.map((p) => [p.id, p.method as PaymentMethod]));
   const today = zoneDate(new Date(), timeZone);
   return cards.map((card) => {
-    // PKG-02 adds the entries used by held meetings
-    const live = 0;
+    const own = uses.filter((u) => u.card_id === card.id);
+    const live = own.filter((u) => u.returned_at === null).length;
     const by = card.activated_by ? names.get(card.activated_by) : undefined;
     const balance = punchBalance({ status: card.status, entriesTotal: card.entries_total, expiresOn: card.expires_on }, live, today);
     const method = card.payment_id ? methods.get(card.payment_id) : undefined;
@@ -102,7 +123,18 @@ export async function listContactPunchCards(orgId: string, contactId: string, ti
         card.payment_id && method && card.payment_void_at === null
           ? { paymentId: card.payment_id, method, suggestedAgorot: refundSuggestion(balance.remaining, balance.total, card.price_agorot) }
           : null,
-      uses: [],
+      uses: own.map((u) => ({
+        id: u.id,
+        usedOn: u.used_on,
+        meetingTitle: u.meeting_id ? (titles.get(u.meeting_id) ?? null) : null,
+        returned: u.returned_at !== null,
+        returnText:
+          u.returned_at === null
+            ? null
+            : u.return_kind === "manual"
+              ? `הוחזרה${u.returned_by && names.get(u.returned_by) ? ` על ידי ${names.get(u.returned_by)}` : ""}: ${u.return_reason ?? ""}`
+              : "הוחזרה: הפגישה כבר לא מסומנת \"התקיימה\"",
+      })),
     };
   });
 }
@@ -149,6 +181,14 @@ export async function listContactPayments(orgId: string, contactId: string): Pro
     id: r.id,
     label: `${formatDate(r.paid_on)} · ${formatMoney(r.amount_agorot)} · ${PAYMENT_METHOD_LABELS[r.method as keyof typeof PAYMENT_METHOD_LABELS] ?? r.method}`,
   }));
+}
+
+/** PKG-02: "יתרת כרטיסייה" lines for booking a meeting with the contact: its usable cards only. */
+export async function usablePunchBalances(orgId: string, contactId: string, timeZone: string): Promise<string[]> {
+  const cards = await listContactPunchCards(orgId, contactId, timeZone);
+  return cards
+    .filter((card) => card.balance.usable)
+    .map((card) => `${card.name}: ${card.balance.remaining === 1 ? "נשארה כניסה אחת" : `נשארו ${card.balance.remaining} כניסות`}${card.expiresOn ? `, בתוקף עד ${formatDate(card.expiresOn)}` : ""}`);
 }
 
 export type PunchSettings = {
