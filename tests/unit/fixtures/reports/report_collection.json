@@ -6,12 +6,18 @@
     {
       "amount": 5000,
       "owner_id": "00000000-0000-4000-8000-000000000007",
-      "payments": 1
+      "payments": 1,
+      "refunds": 0,
+      "refund_count": 0,
+      "net": 5000
     }
   ],
   "totals": {
     "amount": 5000,
-    "payments": 1
+    "payments": 1,
+    "refunds": 0,
+    "refund_count": 0,
+    "net": 5000
   },
   "allowed": true,
   "partial": false,
@@ -19,14 +25,20 @@
     {
       "month": "2026-10-01",
       "amount": 5000,
-      "payments": 1
+      "payments": 1,
+      "refunds": 0,
+      "refund_count": 0,
+      "net": 5000
     }
   ],
   "by_method": [
     {
       "amount": 5000,
       "method": "transfer",
-      "payments": 1
+      "payments": 1,
+      "refunds": 0,
+      "refund_count": 0,
+      "net": 5000
     }
   ],
   "collection_days": {

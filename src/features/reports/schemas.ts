@@ -392,7 +392,8 @@ export const REPORT_SCHEMAS = {
       period_start: day,
       metric: z.enum(GOAL_METRIC_KEYS as [GoalMetric, ...GoalMetric[]]),
       target: count,
-      actual: count,
+      // a collection goal's actual nets the refunds made in its period (PAY-08 (81) ב), so it may be below 0
+      actual: z.number().int(),
       elapsed: z.number().min(0).max(1),
     }),
   ),
@@ -508,14 +509,22 @@ export const REPORT_SCHEMAS = {
         today: day,
         from: day,
         to: day,
-        totals: z.object({ amount, payments: count }).strict().nullable(),
-        by_month: z.array(z.object({ month: day, amount, payments: count }).strict()),
+        // PAY-08 (81) ב: amount = the payments in full by paid_on; refunds = active refunds by refunded_on (net = amount - refunds)
+        totals: z.object({ amount, payments: count, refunds: amount, refund_count: count, net: z.number().int() }).strict().nullable(),
+        by_month: z.array(z.object({ month: day, amount, payments: count, refunds: amount, refund_count: count, net: z.number().int() }).strict()),
         by_method: z.array(
           z
-            .object({ method: z.enum(["credit", "transfer", "cash", "cheque", "bit_paybox", "standing_order", "other"]), amount, payments: count })
+            .object({
+              method: z.enum(["credit", "transfer", "cash", "cheque", "bit_paybox", "standing_order", "other"]),
+              amount,
+              payments: count,
+              refunds: amount,
+              refund_count: count,
+              net: z.number().int(),
+            })
             .strict(),
         ),
-        by_rep: z.array(z.object({ owner_id: id, amount, payments: count }).strict()),
+        by_rep: z.array(z.object({ owner_id: id, amount, payments: count, refunds: amount, refund_count: count, net: z.number().int() }).strict()),
         // a partial view: every figure but min_documents is null (an unreadable allocation could hold the real last date)
         collection_days: z
           .object({

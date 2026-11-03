@@ -311,15 +311,15 @@ describe("refunds of payments (PAY-08)", () => {
     );
     expect(ledger.lines.find((l) => l.id === p)!.credit).toBe(7500);
     expect(ledger.credit_balance).toBe(7500);
-    // COL-06: the month of the payment, by method and rep
+    // COL-06 and GOL-01 collection (owner's answer (81) ב): the payment counts in full in its own month; the refund of
+    // October is not in August
     const report = await run(owner, async (q) =>
-      (await one<{ r: { by_month: { month: string; amount: number }[]; totals: { amount: number } } }>(q, "select public.report_collection($1, '2026-08-01', '2026-08-31') as r", [org])).r,
+      (await one<{ r: { by_month: { month: string; amount: number }[]; totals: { amount: number; refunds: number } } }>(q, "select public.report_collection($1, '2026-08-01', '2026-08-31') as r", [org])).r,
     );
-    expect(report.totals.amount).toBe(7500);
-    // GOL-01 collection
+    expect(report.totals).toMatchObject({ amount: 10000, refunds: 0 });
     await run(owner, (q) => q("insert into public.goals (organization_id, scope, period, period_start, metric, target) values ($1, 'org', 'month', '2026-08-01', 'collected', 1)", [org]));
     const goals = await run(owner, async (q) => (await one<{ r: { metric: string; actual: number }[] }>(q, "select public.report_goal_progress($1, 'month', '2026-08-01') as r", [org])).r);
-    expect(goals.find((g) => g.metric === "collected")!.actual).toBe(7500);
+    expect(goals.find((g) => g.metric === "collected")!.actual).toBe(10000);
     // BAL-04: the staff's statement view (the customer's page's own selection) lists the payment at what counts
     await run(owner, (q) => q("update public.payments set paid_on = current_date - 1 where id = $1", [p]));
     const view = await run(owner, async (q) =>
@@ -327,6 +327,218 @@ describe("refunds of payments (PAY-08)", () => {
     );
     expect(view.payments.map((x) => x.amount_agorot)).toEqual([7500]);
     expect(view.totals.credit_agorot).toBe(7500);
+  });
+
+  it("collection report and goals: a payment in full in its month, each refund negative in the month it was made (81) ב", async () => {
+    // a business of its own, so the months hold only these rows
+    const o2 = await createOrg(owner.id, "עסק החזרים לפי חודש");
+    const rep = await addMember(o2, owner.id, "member", "rf-rep");
+    await asAdmin((q) => q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [o2, JSON.stringify({ ...FEATURES, granular_permissions: true, goals_per_rep: true })]));
+    const c2 = await run(owner, async (q) => (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'חודשי', $2) returning id", [o2, owner.id])).id);
+    const c3 = await run(owner, async (q) => (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'של הנציג', $2) returning id", [o2, rep.id])).id);
+    const pay2 = (amount: number, contactId: string, on: string, method = "transfer") =>
+      run(owner, async (q) =>
+        (
+          await one<{ id: string }>(q, "insert into public.payments (organization_id, contact_id, amount_agorot, paid_on, method) values ($1, $2, $3, $4, $5) returning id", [
+            o2,
+            contactId,
+            amount,
+            on,
+            method,
+          ])
+        ).id,
+      );
+    const refund2 = (payment: string, amount: number, on: string, method = "transfer") =>
+      run(owner, async (q) =>
+        (
+          await one<{ id: string }>(q, "insert into public.payment_refunds (organization_id, payment_id, amount_agorot, refunded_on, method) values ($1, $2, $3, $4, $5) returning id", [
+            o2,
+            payment,
+            amount,
+            on,
+            method,
+          ])
+        ).id,
+      );
+    type Row = { amount: number; payments: number; refunds: number; refund_count: number; net: number };
+    const report = (from: string, to: string, ownerId: string | null = null) =>
+      run(owner, async (q) =>
+        (
+          await one<{ r: { totals: Row | null; by_month: (Row & { month: string })[]; by_method: (Row & { method: string })[]; by_rep: (Row & { owner_id: string | null })[] } }>(
+            q,
+            "select public.report_collection($1, $2, $3, $4) as r",
+            [o2, from, to, ownerId],
+          )
+        ).r,
+      );
+    const row = (amount: number, payments: number, refunds: number, refundCount: number) => ({ amount, payments, refunds, refund_count: refundCount, net: amount - refunds });
+
+    // October: 10,000 by transfer refunded 3,000 in November; 4,000 in cash refunded IN FULL in November (by transfer);
+    // 2,000 of the rep's contact refunded 500 in October and that refund cancelled; 1,500 marked refunded by hand (legacy)
+    const p1 = await pay2(10000, c2, "2025-10-05");
+    await refund2(p1, 3000, "2025-11-10");
+    const p2 = await pay2(4000, c2, "2025-10-06", "cash");
+    await refund2(p2, 4000, "2025-11-12");
+    expect((await asAdmin(async (q) => one<{ s: string }>(q, "select status as s from public.payments where id = $1", [p2]))).s).toBe("refunded");
+    const p3 = await pay2(2000, c3, "2025-10-07");
+    const r3 = await refund2(p3, 500, "2025-10-20");
+    await run(owner, (q) => q("update public.payment_refunds set status = 'cancelled', cancel_reason = 'טעות' where id = $1", [r3]));
+    const p4 = await pay2(1500, c2, "2025-10-08");
+    await run(owner, (q) => q("update public.payments set status = 'refunded' where id = $1", [p4]));
+
+    const both = await report("2025-10-01", "2025-11-30");
+    expect(both.totals).toEqual(row(16000, 3, 7000, 2));
+    expect(both.by_month).toEqual([
+      { month: "2025-10-01", ...row(16000, 3, 0, 0) },
+      { month: "2025-11-01", ...row(0, 0, 7000, 2) },
+    ]);
+    // a refund under its own method (the cash payment went back by transfer), under its payment's rep
+    expect(both.by_method).toEqual([
+      { method: "transfer", ...row(12000, 2, 7000, 2) },
+      { method: "cash", ...row(4000, 1, 0, 0) },
+    ]);
+    expect(both.by_rep).toEqual([
+      { owner_id: owner.id, ...row(14000, 2, 7000, 2) },
+      { owner_id: rep.id, ...row(2000, 1, 0, 0) },
+    ]);
+    // October alone: the payments in full, the cancelled refund nowhere
+    expect((await report("2025-10-01", "2025-10-31")).totals).toEqual(row(16000, 3, 0, 0));
+    // November alone: refunds of payments from before the period count in it
+    const nov = await report("2025-11-01", "2025-11-30");
+    expect(nov.totals).toEqual(row(0, 0, 7000, 2));
+    expect(nov.by_method).toEqual([{ method: "transfer", ...row(0, 0, 7000, 2) }]);
+    // the rep filter follows the payment's rep
+    expect((await report("2025-11-01", "2025-11-30", rep.id)).totals).toEqual(row(0, 0, 0, 0));
+    expect((await report("2025-11-01", "2025-11-30", owner.id)).totals).toEqual(row(0, 0, 7000, 2));
+
+    // GOL-01 collection: the same rule, by the payment's rep
+    await run(owner, (q) =>
+      q(
+        `insert into public.goals (organization_id, scope, user_id, period, period_start, metric, target)
+         values ($1, 'org', null, 'month', '2025-10-01', 'collected', 1), ($1, 'org', null, 'month', '2025-11-01', 'collected', 1),
+                ($1, 'org', null, 'quarter', '2025-10-01', 'collected', 1), ($1, 'user', $2, 'month', '2025-11-01', 'collected', 1)`,
+        [o2, owner.id],
+      ),
+    );
+    const actual = async (period: string, start: string, scope = "org") =>
+      (
+        await run(owner, async (q) =>
+          (await one<{ r: { metric: string; scope: string; actual: number }[] }>(q, "select public.report_goal_progress($1, $2, $3) as r", [o2, period, start])).r,
+        )
+      ).find((g) => g.metric === "collected" && g.scope === scope)?.actual;
+    expect(await actual("month", "2025-10-01")).toBe(16000);
+    expect(await actual("month", "2025-11-01")).toBe(-7000);
+    expect(await actual("month", "2025-11-01", "user")).toBe(-7000);
+    expect(await actual("quarter", "2025-10-01")).toBe(9000);
+    // the refunds are counted rows: the definer count agrees with what the owner reads (the goal is shown)
+    const counted = await run(owner, async (q) =>
+      (
+        await q<{ n: string }>(
+          "select app.goal_payments_counted($1, g.id)::text as n from public.goals g where g.organization_id = $1 and g.scope = 'org' order by g.period, g.period_start",
+          [o2],
+        )
+      ).rows.map((r) => Number(r.n)),
+    );
+    expect(counted).toEqual([3, 2, 5]);
+
+    // a member with the payments key who reads only their own contact's payments: the November goal holds refunds of
+    // payments they cannot read, so it is left out (not shown at a wrong figure); October's own rows are partial too
+    await run(owner, (q) => q("select public.set_member_permissions($1, $2, '{record_payments}')", [o2, rep.id]));
+    await asAdmin((q) => q("update public.organizations set record_visibility = 'own' where id = $1", [o2]));
+    const repGoals = await run(rep, async (q) =>
+      (await one<{ r: { metric: string; period_start: string; scope: string }[] }>(q, "select public.report_goal_progress($1, 'month', '2025-11-01') as r", [o2])).r,
+    );
+    expect(repGoals.filter((g) => g.metric === "collected" && g.scope === "org")).toEqual([]);
+    const repReport = await run(rep, async (q) =>
+      (await one<{ r: { partial: boolean; totals: Row | null; by_method: unknown[] } }>(q, "select public.report_collection($1, '2025-11-01', '2025-11-30') as r", [o2])).r,
+    );
+    expect(repReport.partial).toBe(true);
+    expect(repReport.totals).toBeNull();
+    expect(repReport.by_method).toEqual([]);
+  });
+
+  it("collection goals with refunds: a team goal, a cheque not yet due, a member's own goal while the wider goals stay hidden (81) ב", async () => {
+    const o3 = await createOrg(owner.id, "עסק יעדי החזרים");
+    await asAdmin((q) => q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [o3, JSON.stringify({ ...FEATURES, granular_permissions: true, goals_per_rep: true })]));
+    const rep1 = await addMember(o3, owner.id, "member", "rf-goal-rep1");
+    const rep2 = await addMember(o3, owner.id, "member", "rf-goal-rep2");
+    const team = await run(owner, async (q) => {
+      const t = (await one<{ id: string }>(q, "insert into public.teams (organization_id, name) values ($1, 'צוות ההחזרים') returning id", [o3])).id;
+      await q("insert into public.team_members (organization_id, team_id, user_id, is_manager) values ($1, $2, $3, false), ($1, $2, $4, false)", [o3, t, rep1.id, rep2.id]);
+      return t;
+    });
+    const contactOf = (name: string, ownerId: string, teamId: string | null) =>
+      run(owner, async (q) =>
+        (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id, team_id) values ($1, $2, $3, $4) returning id", [o3, name, ownerId, teamId])).id,
+      );
+    const c1 = await contactOf("של נציג 1", rep1.id, team);
+    const c2 = await contactOf("של נציג 2", rep2.id, team);
+    const c0 = await contactOf("של הבעלים", owner.id, null);
+    const payOn = (contactId: string, amount: number, on: string, cheque: { due: string } | null = null) =>
+      run(owner, async (q) =>
+        (
+          await one<{ id: string }>(
+            q,
+            cheque
+              ? "insert into public.payments (organization_id, contact_id, amount_agorot, paid_on, method, cheque_number, cheque_bank, cheque_branch, cheque_due_date, cheque_status) values ($1, $2, $3, $4, 'cheque', '9001', '12', '123', $5, 'in_hand') returning id"
+              : "insert into public.payments (organization_id, contact_id, amount_agorot, paid_on, method) values ($1, $2, $3, $4, 'transfer') returning id",
+            cheque ? [o3, contactId, amount, on, cheque.due] : [o3, contactId, amount, on],
+          )
+        ).id,
+      );
+    const refundOn = (payment: string, amount: number, on: string) =>
+      run(owner, (q) => q("insert into public.payment_refunds (organization_id, payment_id, amount_agorot, refunded_on, method) values ($1, $2, $3, $4, 'transfer')", [o3, payment, amount, on]));
+
+    // October: 5,000 of rep 1 (refunded 1,000 in November), 3,000 of rep 2 (refunded 500 in November), and a cheque of 2,000
+    // on the owner's contact due long after today (refunded 700 in November)
+    await refundOn(await payOn(c1, 5000, "2025-10-05"), 1000, "2025-11-03");
+    await refundOn(await payOn(c2, 3000, "2025-10-06"), 500, "2025-11-04");
+    const cheque = await payOn(c0, 2000, "2025-10-07", { due: "2099-12-31" });
+    await refundOn(cheque, 700, "2025-11-05");
+
+    await run(owner, (q) =>
+      q(
+        `insert into public.goals (organization_id, scope, user_id, team_id, period, period_start, metric, target)
+         values ($1, 'org', null, null, 'month', '2025-10-01', 'collected', 1), ($1, 'org', null, null, 'month', '2025-11-01', 'collected', 1),
+                ($1, 'team', null, $2, 'month', '2025-10-01', 'collected', 1), ($1, 'team', null, $2, 'month', '2025-11-01', 'collected', 1),
+                ($1, 'user', $3, null, 'month', '2025-11-01', 'collected', 1)`,
+        [o3, team, rep1.id],
+      ),
+    );
+    const goals = (u: U, start: string) =>
+      run(u, async (q) =>
+        (await one<{ r: { metric: string; scope: string; actual: number }[] }>(q, "select public.report_goal_progress($1, 'month', $2) as r", [o3, start])).r.filter(
+          (g) => g.metric === "collected",
+        ),
+      );
+    const byScope = (rows: { scope: string; actual: number }[]) => Object.fromEntries(rows.map((g) => [g.scope, g.actual]));
+
+    // the team goal nets its people's refunds in the refund's month; the cheque not yet due is out of every goal, with its
+    // refund (the payment's cheque rule)
+    expect(byScope(await goals(owner, "2025-10-01"))).toEqual({ org: 8000, team: 8000 });
+    expect(byScope(await goals(owner, "2025-11-01"))).toEqual({ org: -1500, team: -1500, user: -1000 });
+    // the collection report counts the cheque and its refund (it has no cheque rule)
+    const r = await run(owner, async (q) =>
+      (await one<{ r: { by_month: { month: string; amount: number; refunds: number }[] } }>(q, "select public.report_collection($1, '2025-10-01', '2025-11-30') as r", [o3])).r,
+    );
+    expect(r.by_month.map((m) => [m.month, m.amount, m.refunds])).toEqual([
+      ["2025-10-01", 10000, 0],
+      ["2025-11-01", 0, 2200],
+    ]);
+    // once the cheque is due, it and its refund count for the goals
+    await asAdmin(async (q) => {
+      await q("set local session_replication_role = replica");
+      await q("update public.payments set cheque_due_date = '2025-10-20' where id = $1", [cheque]);
+    });
+    expect(byScope(await goals(owner, "2025-10-01"))).toEqual({ org: 10000, team: 8000 });
+    expect(byScope(await goals(owner, "2025-11-01"))).toEqual({ org: -2200, team: -1500, user: -1000 });
+
+    // rep 1 records payments and reads only their own records: their own goal shows (with its refund); the business's and
+    // the team's goals hold rows they cannot read (rep 2's and the owner's payments and refunds), so they stay hidden
+    await run(owner, (q) => q("select public.set_member_permissions($1, $2, '{record_payments}')", [o3, rep1.id]));
+    await asAdmin((q) => q("update public.organizations set record_visibility = 'own' where id = $1", [o3]));
+    expect(byScope(await goals(rep1, "2025-11-01"))).toEqual({ user: -1000 });
+    expect(byScope(await goals(rep1, "2025-10-01"))).toEqual({});
   });
 
   it("an order's payment counts less its refunds (ORD-02/04)", async () => {

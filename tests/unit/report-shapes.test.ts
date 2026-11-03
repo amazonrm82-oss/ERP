@@ -233,6 +233,10 @@ describe("report shaping from the saved samples", () => {
     expect(full.sections.map((s) => s.title)).toEqual(["לפי חודש", "לפי אמצעי תשלום", "לפי נציג", "ימי גבייה"]);
     expect(full.sections[1].rows[0]).toMatchObject({ method: "העברה בנקאית", amount: 5000, payments: 1, percent: 100 });
     expect(full.kpis[0]).toMatchObject({ label: "נגבה בתקופה", hint: "תשלום אחד" });
+    // PAY-08 (81) ב: refunds are their own column and KPI, never inside the amount
+    expect(full.sections[0].columns.map((c) => c.label)).toEqual(["חודש", "נגבה", "תשלומים", "החזרים", "נטו"]);
+    expect(full.sections[0].rows[0]).toMatchObject({ amount: 5000, refunds: 0, net: 5000 });
+    expect(full.kpis[1]).toMatchObject({ label: "החזרים בתקופה" });
     expect(full.note).toBeUndefined();
     expect(full.sections[3].note).toContain("נדרשים לפחות 5 מסמכים");
     // the debt aging link only for those who see balances; never exported
@@ -247,7 +251,7 @@ describe("report shaping from the saved samples", () => {
     const partial = await buildReport("00000000-0000-4000-8000-000000000099", "collection", filters);
     expect(partial.note).toBe("דוח חלקי: מוצגים רק התשלומים והמסמכים שיש לך גישה אליהם, ולכן אין סכום כולל וימי הגבייה מוצגים רק בדוח המלא.");
     expect(partial.sections.every((s) => !s.note?.includes("דוח חלקי"))).toBe(true);
-    expect(partial.kpis.map((k) => k.value)).toEqual(["—", "—", "—"]);
+    expect(partial.kpis.map((k) => k.value)).toEqual(["—", "—", "—", "—"]);
     expect(partial.sections[0].rows[0]).toMatchObject({ amount: 5000 });
     expect(partial.sections[1].rows[0].percent).toBeNull();
     expect(partial.sections[3]).toMatchObject({ rows: [], empty: "ימי הגבייה מוצגים רק בדוח המלא." });

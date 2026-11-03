@@ -1515,11 +1515,15 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             { key: "month", label: "חודש", kind: "text" },
             { key: "amount", label: "נגבה", kind: "money" },
             { key: "payments", label: "תשלומים", kind: "number" },
+            { key: "refunds", label: "החזרים", kind: "money" },
+            { key: "net", label: "נטו", kind: "money" },
           ],
-          rows: data.by_month.map((r): ReportRow => ({ month: monthLabel(r.month), amount: r.amount, payments: r.payments })),
+          rows: data.by_month.map(
+            (r): ReportRow => ({ month: monthLabel(r.month), amount: r.amount, payments: r.payments, refunds: r.refunds, net: r.net }),
+          ),
           bar: "amount",
           empty: "אין חודשים בתקופה הזו.",
-          note: "נספרים תשלומים שנרשמו או אושרו, לפי תאריך התשלום. תשלומים שנכשלו, הוחזרו או בוטלו לא נספרים. סכומים כפי שנרשמו בתשלום.",
+          note: "נספרים תשלומים שנרשמו או אושרו, במלוא הסכום, לפי תאריך התשלום. החזר נספר בנפרד, בחודש שבו הוחזר הכסף, ומקטין את הנטו של אותו חודש. תשלומים שנכשלו, בוטלו או סומנו כהוחזרו בלי רישום החזר לא נספרים.",
         },
         {
           title: "לפי אמצעי תשלום",
@@ -1528,12 +1532,22 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             { key: "amount", label: "נגבה", kind: "money" },
             { key: "payments", label: "תשלומים", kind: "number" },
             { key: "percent", label: "חלק מהגבייה", kind: "percent" },
+            { key: "refunds", label: "החזרים", kind: "money" },
+            { key: "net", label: "נטו", kind: "money" },
           ],
           rows: data.by_method.map(
-            (r): ReportRow => ({ method: PAYMENT_METHOD_LABELS[r.method], amount: r.amount, payments: r.payments, percent: partial ? null : pct(r.amount, shown) }),
+            (r): ReportRow => ({
+              method: PAYMENT_METHOD_LABELS[r.method],
+              amount: r.amount,
+              payments: r.payments,
+              percent: partial ? null : pct(r.amount, shown),
+              refunds: r.refunds,
+              net: r.net,
+            }),
           ),
           bar: "amount",
           empty: "לא נגבו תשלומים בתקופה הזו.",
+          note: "החזר נספר לפי האמצעי שבו הוחזר הכסף.",
         },
         {
           title: "לפי נציג",
@@ -1541,11 +1555,13 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
             { key: "owner", label: "נציג", kind: "text" },
             { key: "amount", label: "נגבה", kind: "money" },
             { key: "payments", label: "תשלומים", kind: "number" },
+            { key: "refunds", label: "החזרים", kind: "money" },
+            { key: "net", label: "נטו", kind: "money" },
           ],
-          rows: data.by_rep.map((r): ReportRow => ({ owner: name(r.owner_id), amount: r.amount, payments: r.payments })),
+          rows: data.by_rep.map((r): ReportRow => ({ owner: name(r.owner_id), amount: r.amount, payments: r.payments, refunds: r.refunds, net: r.net })),
           bar: "amount",
           empty: "לא נגבו תשלומים בתקופה הזו.",
-          note: "הנציג הוא האחראי על העסקה של התשלום, ואם אין, על איש הקשר.",
+          note: "הנציג הוא האחראי על העסקה של התשלום, ואם אין, על איש הקשר. החזר נספר אצל הנציג של התשלום שממנו הוחזר.",
         },
         {
           title: "ימי גבייה",
@@ -1589,6 +1605,13 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
           data.totals
             ? { label: "נגבה בתקופה", value: formatMoney(data.totals.amount), hint: paymentsCount(data.totals.payments) }
             : { label: "נגבה בתקופה", value: "—", hint: "דוח חלקי: אין סכום כולל" },
+          data.totals
+            ? {
+                label: "החזרים בתקופה",
+                value: formatMoney(data.totals.refunds),
+                hint: `נטו אחרי החזרים: ${formatMoney(data.totals.net)}`,
+              }
+            : { label: "החזרים בתקופה", value: "—", hint: "דוח חלקי: אין סכום כולל" },
           {
             label: "ימי גבייה בממוצע",
             value: dayFigure(days.average_days),

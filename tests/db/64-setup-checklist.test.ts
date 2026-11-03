@@ -699,6 +699,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // LIB-01 redefines app.files_before_insert() of _payment_files.sql last, and alters the files policies after
       // _quote_signed_pdf.sql (a library item's file)
       "_content_library.sql",
+      // the PAY-08 answer (81) ב redefines public.report_collection() and public.report_goal_progress() of
+      // _payment_refunds.sql last (a payment in full in its month, each refund negative in its own month)
+      "_refunds_by_month.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

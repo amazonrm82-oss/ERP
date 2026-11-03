@@ -118,16 +118,16 @@ describe("collection report (COL-06)", () => {
   it("counts recorded and confirmed payments by month (the last day of a month in it), method and rep", async () => {
     const r = await full(owner, "2026-08-01", "2026-09-30");
     expect(r.partial).toBe(false);
-    expect(r.totals).toEqual({ amount: 62000, payments: 5 });
+    expect(r.totals).toEqual({ amount: 62000, payments: 5, refunds: 0, refund_count: 0, net: 62000 });
     expect(r.by_month).toEqual([
-      { month: "2026-08-01", amount: 2000, payments: 1 },
-      { month: "2026-09-01", amount: 60000, payments: 4 },
+      { month: "2026-08-01", amount: 2000, payments: 1, refunds: 0, refund_count: 0, net: 2000 },
+      { month: "2026-09-01", amount: 60000, payments: 4, refunds: 0, refund_count: 0, net: 60000 },
     ]);
     expect(r.by_method).toEqual([
-      { method: "transfer", amount: 36000, payments: 2 },
-      { method: "bit_paybox", amount: 16000, payments: 1 },
-      { method: "credit", amount: 8000, payments: 1 },
-      { method: "cash", amount: 2000, payments: 1 },
+      { method: "transfer", amount: 36000, payments: 2, refunds: 0, refund_count: 0, net: 36000 },
+      { method: "bit_paybox", amount: 16000, payments: 1, refunds: 0, refund_count: 0, net: 16000 },
+      { method: "credit", amount: 8000, payments: 1, refunds: 0, refund_count: 0, net: 8000 },
+      { method: "cash", amount: 2000, payments: 1, refunds: 0, refund_count: 0, net: 2000 },
     ]);
     const reps = new Map(r.by_rep.map((x) => [x.owner_id, x.amount]));
     expect(Object.fromEntries(reps)).toEqual({ [manager.id]: 4000, [keyHolder.id]: 8000, [owner.id]: 2000, null: 48000 });
@@ -140,7 +140,7 @@ describe("collection report (COL-06)", () => {
     ]);
     // the rep filter
     const mine = await full(owner, "2026-08-01", "2026-09-30", manager.id);
-    expect(mine.totals).toEqual({ amount: 4000, payments: 1 });
+    expect(mine.totals).toEqual({ amount: 4000, payments: 1, refunds: 0, refund_count: 0, net: 4000 });
     expect(mine.by_rep.map((x) => x.owner_id)).toEqual([manager.id]);
   });
 
@@ -265,7 +265,7 @@ describe("collection report (COL-06)", () => {
   it("rights: the PRM-01 key opens it, a member without it and a viewer get nothing; the keys; partial has no totals", async () => {
     expect(await report(member, "2026-08-01", "2026-09-30")).toEqual({ allowed: false });
     expect(await report(viewer, "2026-08-01", "2026-09-30")).toEqual({ allowed: false });
-    expect((await full(keyHolder, "2026-08-01", "2026-09-30")).totals).toEqual({ amount: 62000, payments: 5 });
+    expect((await full(keyHolder, "2026-08-01", "2026-09-30")).totals).toEqual({ amount: 62000, payments: 5, refunds: 0, refund_count: 0, net: 62000 });
     expect((await full(manager, "2026-08-01", "2026-09-30")).partial).toBe(false);
 
     await asAdmin((q) => q("update public.organizations set record_visibility = 'own' where id = $1", [org]));
@@ -274,8 +274,8 @@ describe("collection report (COL-06)", () => {
       expect(k.partial).toBe(true);
       expect(k.totals).toBeNull();
       // only the payments of the contact the key holder owns
-      expect(k.by_method).toEqual([{ method: "credit", amount: 8000, payments: 1 }]);
-      expect(k.by_rep).toEqual([{ owner_id: keyHolder.id, amount: 8000, payments: 1 }]);
+      expect(k.by_method).toEqual([{ method: "credit", amount: 8000, payments: 1, refunds: 0, refund_count: 0, net: 8000 }]);
+      expect(k.by_rep).toEqual([{ owner_id: keyHolder.id, amount: 8000, payments: 1, refunds: 0, refund_count: 0, net: 8000 }]);
       // no collection days in a partial view: an allocation the caller cannot read could hold the real last date
       expect(k.collection_days).toEqual({ min_documents: 5, documents: null, average_days: null, median_days: null, with_due_date: null, average_days_late: null, late_documents: null });
       const m = await full(manager, "2026-08-01", "2026-09-30");
@@ -310,7 +310,7 @@ describe("collection report (COL-06)", () => {
       const c = (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name) values ($1, 'זר') returning id", [other])).id;
       await q("insert into public.payments (organization_id, contact_id, amount_agorot, paid_on, method) values ($1, $2, 99999, '2026-09-05', 'cash')", [other, c]);
     });
-    expect((await full(owner, "2026-08-01", "2026-09-30")).totals).toEqual({ amount: 62000, payments: 5 });
+    expect((await full(owner, "2026-08-01", "2026-09-30")).totals).toEqual({ amount: 62000, payments: 5, refunds: 0, refund_count: 0, net: 62000 });
     expect(await run(stranger, async (q) => (await one<{ r: unknown }>(q, "select public.report_collection($1, '2026-08-01', '2026-09-30') as r", [org])).r)).toEqual({ allowed: false });
     // the owner asking about the other business gets nothing either
     expect(await run(owner, async (q) => (await one<{ r: unknown }>(q, "select public.report_collection($1, '2026-08-01', '2026-09-30') as r", [other])).r)).toEqual({ allowed: false });
