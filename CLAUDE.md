@@ -1719,7 +1719,9 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `report_collection` adds `refunds`, `refund_count`, `net` to totals, by_month, by_method (the refund's own method) and by_rep
   (the payment's rep, also for the owner filter); a goal's actual nets the period's refunds under the payment's rep/team and
   cheque rule, and `app.goal_payments_counted` counts the refund rows too (keep in step; an actual may be below 0). The two
-  reports and `app.goal_payments_counted` were last redefined in 021156; test 64's list ends with `_refunds_by_month.sql`.
+  reports and `app.goal_payments_counted` were last redefined in 021156. Since 021157 (owner (83) א) `report_goal_progress`
+  (last redefined there) answers `refunds` per collection goal (positive agorot, the actual's rules; null for other metrics) and
+  `goalRefundsText()` writes "מתוכם החזרים: X" under any collection goal with refunds; test 64's list ends with `_goal_refunds.sql`.
   Refunded in full = status `refunded` through `app.payment_server = 'refund'`
   (`app.payment_refunds_apply`; cancelling puts back the cheque's status, else `payment_status_before`); a partial refund releases
   counted allocations above what remains, newest first, and writes a `system` entry kind `payment_refunded` without an amount.
