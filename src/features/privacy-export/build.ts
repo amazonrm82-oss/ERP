@@ -85,6 +85,11 @@ export const PERSON_EXPORT_README = `ייצוא כל המידע על אדם אח
 - customer_holds: סימוני "לא למכור עד הסדרת חוב" על איש הקשר
 - order_decisions: אישור או דחייה של הזמנה בקישור: שם החותם, מספר זהות, החתימה, כתובת IP, הדפדפן וסיבת הדחייה
 - accounting_documents: מסמכים חשבונאיים (חשבוניות וקבלות) שהופקו מחוץ למערכת ונרשמו על איש הקשר או העסקאות
+- accounting_document_lines: השורות של המסמכים החשבונאיים
+- payment_promises: הבטחות תשלום שנרשמו על איש הקשר או על המסמכים שלו, עם הערת הגבייה
+- privacy_requests: בקשות פרטיות שקשורות לליד או לאיש הקשר
+- deal_lines: השורות (מוצרים ושירותים) של העסקאות
+- task_checklist_items: השלבים של המשימות
 - segment_members: הסגמנטים (רשימות ידניות) שהאדם הוכנס אליהם
 - consents: הסכמות לדיוור והסרות
 - form_submissions: פניות מטפסים
@@ -92,6 +97,54 @@ export const PERSON_EXPORT_README = `ייצוא כל המידע על אדם אח
 
 הערות פרטיות של אחרים והקבצים שלהן, ורשומות שאין לך הרשאה לראות, לא נכללות.
 `;
+
+/**
+ * The tables of the full export (EXPORT_TABLES) a person's export carries, each as its own section of person.json
+ * (leads and contacts under `people`). A table of the full export that reaches a person (a lead, contact or deal id,
+ * or a document, payment, quote, order, task, meeting or promise of theirs) is either here or in
+ * PERSON_EXPORT_LEFT_OUT with the reason (unit test person-export-tables).
+ */
+export const PERSON_EXPORT_TABLES = [
+  "leads",
+  "contacts",
+  "deals",
+  "deal_contacts",
+  "deal_lines",
+  "contact_channels",
+  "contact_companies",
+  "contact_relations",
+  "activities",
+  "tasks",
+  "task_checklist_items",
+  "meetings",
+  "files",
+  "quotes",
+  "quote_lines",
+  "quote_decisions",
+  "quote_views",
+  "quote_payment_steps",
+  "orders",
+  "order_lines",
+  "order_payment_steps",
+  "order_decisions",
+  "payments",
+  "customer_holds",
+  "payment_promises",
+  "accounting_documents",
+  "accounting_document_lines",
+  "privacy_requests",
+  "segment_members",
+  "consents",
+  "form_submissions",
+] as const;
+
+/** Tables of the full export that reach a person but stay out of the person's export, and why. */
+export const PERSON_EXPORT_LEFT_OUT: Readonly<Record<string, string>> = {
+  meeting_participants: "the staff members invited to a meeting (user ids), not the person",
+  payment_promise_documents: "ids only: which open documents a customer promise covered; the promises and documents are in",
+  payment_allocations: "ids and amounts between payments and documents; the payments and documents are in",
+  opening_credit_allocations: "ids and amounts of credit offsets against documents; the documents are in",
+};
 
 /** README.txt, with the files that were left out (over the size cap, or not readable). */
 export function personExportReadme(skipped: string[]): string {

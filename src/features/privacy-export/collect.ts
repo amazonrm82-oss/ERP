@@ -7,12 +7,15 @@ import { createClient } from "@/lib/supabase/server";
 
 import { countRows, personLinkFilter, uniqueIds, withoutOthersPrivate, type PersonIds, type PersonKind, type Row, type StoredFile } from "./build";
 
+// privacy requests: the current link only; the records they were once linked to (former_*_ids) may be someone else's
+const PRIVACY_REQUEST_COLUMNS =
+  "id, request_type, requester_name, contact_kind, contact_value, details, status, received_at, target_date, verify_method, verify_note, verified_at, verified_by, refusal_reason, lead_id, contact_id, closed_at, closed_by, erased_at, updated_by, created_at, updated_at";
 // consents: the address hash is never selectable; form inquiries: no IP hash or browser
 const CONSENT_COLUMNS =
   "id, seq, lead_id, contact_id, subject_type, subject_id, channel, state, source, wording, method, copied_from, lift_method, lift_note, recorded_by, created_at";
 const SUBMISSION_COLUMNS = "id, form_id, form_name, status, lead_id, payload, created_at";
 const FILE_COLUMNS =
-  "id, name, mime_type, size_bytes, lead_id, contact_id, deal_id, activity_id, previous_id, accounting_document_id, payment_id, uploaded_by, created_at, storage_path";
+  "id, name, mime_type, size_bytes, lead_id, contact_id, deal_id, activity_id, previous_id, accounting_document_id, payment_id, quote_id, order_id, uploaded_by, created_at, storage_path";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -162,7 +165,27 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
   // COL-05: the "do not sell" holds set on the person's contacts
   const customerHolds = await readByIds(supabase, orgId, "customer_holds", "*", "contact_id", contactIds);
   // and their files (the copy of the paper that was issued), listed and stored like the records' files
-  files.push(...(await readByIds(supabase, orgId, "files", FILE_COLUMNS, "accounting_document_id", uniqueIds(accountingDocuments.map((d) => d.id)))));
+  const documentIds = uniqueIds(accountingDocuments.map((d) => d.id));
+  files.push(...(await readByIds(supabase, orgId, "files", FILE_COLUMNS, "accounting_document_id", documentIds)));
+  // QUO-06 / QUO-09 / ORD-05: the PDFs of the person's quotes and orders (the signed quote PDF is read by owners and admins, RLS)
+  files.push(...(await readByIds(supabase, orgId, "files", FILE_COLUMNS, "quote_id", quoteIds)));
+  files.push(...(await readByIds(supabase, orgId, "files", FILE_COLUMNS, "order_id", orderIds)));
+  // the documents that are the person's own: on one of their contacts, or with no contact (a document on their deal
+  // recorded on another contact is that contact's, and its lines and promises stay out)
+  const ownDocumentIds = uniqueIds(accountingDocuments.filter((d) => d.contact_id == null || contactIds.includes(String(d.contact_id))).map((d) => d.id));
+  // RVW-62: the lines of those documents (DOC-02, free text staff may have typed), the payment promises on the person
+  // (COL-03, a contact's own) and on those documents, with their collection note, the person's privacy requests
+  // (PRK-02, the record they are linked to now), the lines of the person's deals (DLI-01) and the steps of their tasks
+  const promiseFilter = [contactIds.length ? `contact_id.in.(${contactIds.join(",")})` : null, ownDocumentIds.length ? `document_id.in.(${ownDocumentIds.join(",")})` : null]
+    .filter(Boolean)
+    .join(",");
+  const [accountingDocumentLines, paymentPromises, privacyRequests, dealLines, taskChecklistItems] = await Promise.all([
+    readByIds(supabase, orgId, "accounting_document_lines", "*", "document_id", ownDocumentIds),
+    readLinked(supabase, orgId, "payment_promises", "*", promiseFilter || null),
+    readLinked(supabase, orgId, "privacy_requests", PRIVACY_REQUEST_COLUMNS, personOnly),
+    readByIds(supabase, orgId, "deal_lines", "*", "deal_id", ids.deal),
+    readByIds(supabase, orgId, "task_checklist_items", "*", "task_id", uniqueIds(tasks.map((t) => t.id))),
+  ]);
 
   // 4. names for the ids, so the file can be read without the system
   const companyIds = uniqueIds([...contacts.map((c) => c.company_id), ...contactCompanies.map((c) => c.company_id), ...deals.map((d) => d.company_id)]);
@@ -176,9 +199,17 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     relations.length ? readLinked(supabase, orgId, "contact_relation_types", "id, name, reverse_name", "id.not.is.null") : Promise.resolve([]),
     readByIds(supabase, orgId, "segments", "id, name", "id", uniqueIds(segmentMembers.map((m) => m.segment_id))),
   ]);
-  const userIds = [...leads, ...contacts, ...deals, ...activities, ...tasks, ...meetings, ...quotes, ...orders].flatMap((r) => [r.owner_id, r.created_by, r.updated_by]);
+  const userIds = [...leads, ...contacts, ...deals, ...activities, ...tasks, ...meetings, ...quotes, ...orders, ...paymentPromises].flatMap((r) => [r.owner_id, r.created_by, r.updated_by]);
   const userNames = await getUserNames(
-    uniqueIds([...userIds, ...files.map((f) => f.uploaded_by), ...consents.map((c) => c.recorded_by), ...segmentMembers.map((m) => m.added_by)]).filter((u): u is string => typeof u === "string"),
+    uniqueIds([
+      ...userIds,
+      ...files.map((f) => f.uploaded_by),
+      ...consents.map((c) => c.recorded_by),
+      ...segmentMembers.map((m) => m.added_by),
+      ...privacyRequests.flatMap((r) => [r.verified_by, r.closed_by, r.updated_by]),
+      ...taskChecklistItems.flatMap((i) => [i.done_by, i.created_by]),
+      ...accountingDocumentLines.map((l) => l.created_by),
+    ]).filter((u): u is string => typeof u === "string"),
   );
 
   const sections = {
@@ -209,6 +240,11 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     customer_holds: customerHolds,
     order_decisions: orderDecisions,
     accounting_documents: accountingDocuments,
+    accounting_document_lines: accountingDocumentLines,
+    payment_promises: paymentPromises,
+    privacy_requests: privacyRequests,
+    deal_lines: dealLines,
+    task_checklist_items: taskChecklistItems,
     segment_members: segmentMembers,
     consents,
     form_submissions: submissions,
