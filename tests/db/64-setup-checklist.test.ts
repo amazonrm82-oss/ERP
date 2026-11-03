@@ -685,6 +685,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_dormant_activation.sql",
       // SEG-03 redefines public.log_export() of _report_pdf_export.sql last (the campaign_roi report key)
       "_campaign_costs.sql",
+      // RVW-64 redefines app.import_record_worked() of _collection_reminder_import_undo.sql and app.sample_untouched() of
+      // _task_subtasks.sql last (a payment promise is work)
+      "_payment_promise_work.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

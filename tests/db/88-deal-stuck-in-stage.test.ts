@@ -39,6 +39,8 @@ const RERUN = [
   migrationFile("_dormant_customers.sql"),
   // RET-01 (64) ג redefines app.scheduled_customer_dormant() of _dormant_customers.sql last (the rule's start point)
   migrationFile("_dormant_activation.sql"),
+  // RVW-64 redefines app.import_record_worked() of _collection_reminder_import_undo.sql last (a payment promise is work)
+  migrationFile("_payment_promise_work.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its
