@@ -726,6 +726,9 @@ export type OrganizationRow = {
   industry_templates: string[];
   // USR-04: when an owner or admin closed the setup checklist on the home page; null = shown
   setup_checklist_hidden_at: string | null;
+  // MSG-02 (104) (migration service_message_send_rules): the business's website; its registered domain may appear in a
+  // service message (owners/admins, column grant)
+  website: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -2895,6 +2898,8 @@ export type Database = {
           industry?: string | null;
           team_size?: string | null;
           phone?: string | null;
+          // MSG-02 (104): checked by organizations_website_check (hint org:website)
+          website?: string | null;
           locale?: string;
           timezone?: string;
           currency?: string;

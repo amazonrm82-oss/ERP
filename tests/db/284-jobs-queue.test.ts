@@ -27,7 +27,10 @@ const REVIEWED_MD5 = {
 };
 
 // MSG-03: the trigger function that writes public.messages from the worker's path (see its test below)
-const REVIEWED_RECORD_MESSAGE_MD5 = "9e2c594aad5a24e99e78474ab780d6fe";
+// MSG-02 (103) (021160): plus one call of app.message_send_refused(org, payload template_id, 'too_long') when the outcome is
+// 'failed' with code 'too_long' and no provider, in its own exception block (the finish never fails); NEEDS A FRESH
+// INDEPENDENT REVIEW (the lead runs it) before merge
+const REVIEWED_RECORD_MESSAGE_MD5 = "c9b18ee53d49a9ea1dfff777f633c306";
 
 type Claimed = { id: string; lease: string; kind: string; organization_id: string; payload: Record<string, unknown>; attempt: number };
 type Job = { status: string; attempts: number; last_error: string | null; next_run_at: Date; lease_id: string | null; locked_until: Date | null };

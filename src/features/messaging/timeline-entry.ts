@@ -13,7 +13,17 @@ const STATUS: Record<string, string> = {
   received: "התקבלה.",
 };
 
-export type MessageEntryInput = { channel: string; direction: string; status: string };
+export type MessageEntryInput = {
+  channel: string;
+  direction: string;
+  status: string;
+  provider?: string | null;
+  provider_error_code?: string | null;
+};
+
+// Owner (96): a message whose filled text passed the channel's cap is not sent and is logged with this code and NO
+// provider (the system's own refusal; a provider's error code that happens to read the same is a provider failure)
+const REFUSED: Record<string, string> = { too_long: "לא נשלחה: ארוכה מדי." };
 
 /** The entry's label: channel and direction ("SMS יוצא"); an unknown channel reads "הודעה". */
 export function messageEntryLabel(message: MessageEntryInput): string {
@@ -23,6 +33,9 @@ export function messageEntryLabel(message: MessageEntryInput): string {
 
 /** The entry's line: the delivery status only (the text itself is not kept in the system). */
 export function messageEntryText(message: MessageEntryInput): string {
+  if (message.status === "failed" && !message.provider && message.provider_error_code && REFUSED[message.provider_error_code]) {
+    return REFUSED[message.provider_error_code];
+  }
   return STATUS[message.status] ?? "";
 }
 

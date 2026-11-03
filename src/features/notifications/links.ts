@@ -1,5 +1,6 @@
 import { calendarPath } from "@/features/calendar/range";
 import { cleanupPath } from "@/features/data-quality/paths";
+import { messageTemplatesPath } from "@/features/message-templates/paths";
 import { retentionListPath } from "@/features/lead-retention/paths";
 import { orderPath } from "@/features/orders/paths";
 import { privacyRequestPath, privacyRequestsPath } from "@/features/privacy-requests/paths";
@@ -63,6 +64,9 @@ export function notificationHref(orgId: string, entityType: string | null, entit
     // PRK-02: the day's further requests, counted in one notice (the id is the business)
     case "privacy_requests":
       return privacyRequestsPath(orgId);
+    // MSG-02 (96): a message from this template was not sent (too long after filling, and the like); the templates page
+    case "message_template":
+      return messageTemplatesPath(orgId);
     default:
       return null;
   }

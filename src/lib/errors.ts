@@ -498,6 +498,7 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "profile:locale": "השפה שנבחרה אינה נתמכת.",
   "profile:timezone": "אזור הזמן הזה אינו נתמך. בחרו עיר אחרת באותו אזור זמן.",
   "org:timezone": "אזור הזמן שנבחר לעסק אינו מוכר.",
+  "org:website": "אי אפשר להשתמש בכתובת הזו כאתר העסק. צריך כתובת של אתר שלכם (למשל biz.co.il או החנות שלכם ב-wixsite.com), לא סיומת כללית, אתר משותף או קיצור קישורים.",
   "profile:avatar": "התמונה לא נשמרה. העלו אותה שוב.",
   "branding:logo": "הלוגו לא נשמר. העלו אותו שוב.",
   // PRK-06 (trigger org_privacy_settings_check)

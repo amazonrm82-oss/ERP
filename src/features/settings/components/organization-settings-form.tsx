@@ -66,6 +66,18 @@ export function OrganizationSettingsForm({ orgId, settings }: Props) {
             defaultValue={values?.phone ?? settings.phone ?? ""}
             error={errors.phone}
           />
+          <TextField
+            label="אתר העסק"
+            name="website"
+            type="url"
+            dir="ltr"
+            autoComplete="url"
+            maxLength={300}
+            placeholder="biz.co.il"
+            hint="בהודעות שירות ללקוחות מותר לכתוב רק כתובות של האתר הזה."
+            defaultValue={values?.website ?? settings.website ?? ""}
+            error={errors.website}
+          />
         </CardBody>
       </Card>
 

@@ -16,6 +16,13 @@ describe("MSG-03: messages on the timeline", () => {
     expect(messageEntryText({ channel: "sms", direction: "outbound", status: "failed" })).toBe("השליחה נכשלה.");
     expect(messageEntryText({ channel: "sms", direction: "outbound", status: "delivered" })).toBe("נמסרה.");
     expect(messageEntryText({ channel: "sms", direction: "outbound", status: "unknown" })).toBe("");
+    // owner (96): a message refused for its filled length reads "ארוכה מדי"
+    expect(messageEntryText({ channel: "sms", direction: "outbound", status: "failed", provider_error_code: "too_long" })).toBe("לא נשלחה: ארוכה מדי.");
+    expect(messageEntryText({ channel: "sms", direction: "outbound", status: "failed", provider_error_code: "E42" })).toBe("השליחה נכשלה.");
+    // review item 7: a provider's own code that reads too_long is a provider failure
+    expect(messageEntryText({ channel: "sms", direction: "outbound", status: "failed", provider: "fake", provider_error_code: "too_long" })).toBe(
+      "השליחה נכשלה.",
+    );
   });
 
   it("keeps pinned entries on top and puts messages among the rest by time", () => {

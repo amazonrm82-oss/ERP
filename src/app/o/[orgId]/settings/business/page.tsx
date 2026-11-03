@@ -60,6 +60,7 @@ export default async function OrganizationSettingsPage({ params }: Props) {
             <Detail label="ענף" value={INDUSTRIES.find((o) => o.value === settings.industry)?.label} />
             <Detail label="גודל צוות" value={TEAM_SIZES.find((o) => o.value === settings.teamSize)?.label} />
             <Detail label="טלפון" value={settings.phone} ltr />
+            <Detail label="אתר" value={settings.website} ltr />
             <Detail label="מי רואה רשומות" value={VISIBILITY_OPTIONS.find((o) => o.value === settings.recordVisibility)?.label} />
           </DetailList>
           {isAdminRole(role) ? null : <p className="mt-4 text-sm text-ink-soft">רק בעלים ומנהלי מערכת יכולים לשנות את הפרטים.</p>}

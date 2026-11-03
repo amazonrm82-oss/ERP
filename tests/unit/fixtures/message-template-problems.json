@@ -120,12 +120,12 @@
     "problem": "external_link"
   },
   {
-    "note": "a bare domain is not judged",
+    "note": "owner (97) ב: a bare domain is a link",
     "channel": "sms",
     "messageType": "collection",
     "subject": null,
     "body": "שלמו באתר שלנו example.com",
-    "problem": null
+    "problem": "external_link"
   },
   {
     "note": "field before link: fields judged first",
@@ -198,5 +198,765 @@
     "subject": null,
     "body": "מבצע! https://shop.example.com {תוכן העדכון} {סכום} אאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאאא",
     "problem": null
+  },
+  {
+    "note": "bare sub-domain",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "פרטים ב sub.example.com",
+    "problem": "external_link"
+  },
+  {
+    "note": "bare Israeli domain with a maqaf",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "ראו ב-example.co.il",
+    "problem": "external_link"
+  },
+  {
+    "note": "domain glued to Hebrew",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "באתרexample.com היום",
+    "problem": "external_link"
+  },
+  {
+    "note": "upper-case bare domain",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "Example.COM",
+    "problem": "external_link"
+  },
+  {
+    "note": "domain at the end of a sentence",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "שלמו ב x.com.",
+    "problem": "external_link"
+  },
+  {
+    "note": "domain followed by a path",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "ב example.com/pay",
+    "problem": "external_link"
+  },
+  {
+    "note": "decimal number",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "הנחה של 3.5 אחוז",
+    "problem": null
+  },
+  {
+    "note": "time with a dot",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "בשעה 10.30",
+    "problem": null
+  },
+  {
+    "note": "date with dots",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "עד 1.12.2026",
+    "problem": null
+  },
+  {
+    "note": "abbreviation e.g.",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "e.g. מסמך",
+    "problem": null
+  },
+  {
+    "note": "version number",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "גרסה v2.0",
+    "problem": null
+  },
+  {
+    "note": "one-letter TLD",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "a.b",
+    "problem": null
+  },
+  {
+    "note": "TLD with a digit",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x.c0m",
+    "problem": null
+  },
+  {
+    "note": "Hebrew file name",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "ההצעה.pdf",
+    "problem": null
+  },
+  {
+    "note": "email address is not a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "לשאלות: info@example.co.il",
+    "problem": null
+  },
+  {
+    "note": "email address with a dotted name",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "dana.cohen@example.com",
+    "problem": null
+  },
+  {
+    "note": "a lone \"www.\" with nothing after it is a word",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "ראו www.",
+    "problem": null
+  },
+  {
+    "note": "own domain bare",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "פרטים באתר biz.co.il",
+    "problem": null,
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "own domain with www",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "www.biz.co.il",
+    "problem": null,
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "own sub-domain",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "shop.biz.co.il",
+    "problem": null,
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "own domain with https and a path",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "לתשלום: https://www.biz.co.il/pay",
+    "problem": null,
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "own domain upper case",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "BIZ.CO.IL",
+    "problem": null,
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "a domain that only ends like the own one",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "notbiz.co.il",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "the own domain as a prefix of another",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "biz.co.il.evil.com",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "userinfo trick on the own domain",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "https://biz.co.il@evil.com",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "another domain next to the own one",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "biz.co.il או other.com",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "https without a host",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "https://",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "own domain allowed in the subject",
+    "channel": "email",
+    "messageType": "requested_document",
+    "subject": "ההצעה מ-biz.co.il",
+    "body": "שלום",
+    "problem": null,
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "owner (98) א: the business phone is not on a verification code",
+    "channel": "sms",
+    "messageType": "verification_code",
+    "subject": null,
+    "body": "קוד {קוד אימות}, טלפון {טלפון העסק}",
+    "problem": "field_not_allowed"
+  },
+  {
+    "note": "owner (98) א: the document is not on a verification code",
+    "channel": "sms",
+    "messageType": "verification_code",
+    "subject": null,
+    "body": "{קוד אימות} {מסמך}",
+    "problem": "field_not_allowed"
+  },
+  {
+    "note": "verification code, name of the business only",
+    "channel": "sms",
+    "messageType": "verification_code",
+    "subject": null,
+    "body": "{שם העסק}: {קוד אימות}",
+    "problem": null
+  },
+  {
+    "note": "marketing with a bare domain is not judged",
+    "channel": "sms",
+    "messageType": "marketing",
+    "subject": null,
+    "body": "מבצע ב shop.example.com",
+    "problem": null
+  },
+  {
+    "note": "www. before Hebrew",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "ראו www.אתר",
+    "problem": "external_link"
+  },
+  {
+    "note": "review 1: userinfo with a colon",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "https://biz.co.il:x@evil.com/pay",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "review 1: userinfo with a port-like part",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "https://biz.co.il:443@evil.com",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "review 1: own domain with a port",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "https://biz.co.il:443/pay",
+    "problem": null,
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "review 1: a port that is not digits",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "https://biz.co.il:abc",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "review 1: an IPv6 host",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "https://[::1]/pay",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "review 1: a backslash before @",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "https://biz.co.il\\@evil.com",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "review 2: glued with an underscore",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x_evil.com",
+    "problem": "external_link"
+  },
+  {
+    "note": "review 2: a domain before @",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "evil.com@",
+    "problem": "external_link"
+  },
+  {
+    "note": "review 2: a domain after @",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "@evil.com",
+    "problem": "external_link"
+  },
+  {
+    "note": "review 2: two @",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "a@b@evil.com",
+    "problem": "external_link"
+  },
+  {
+    "note": "review 2: a long run ending in a domain",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.evil.com",
+    "problem": "external_link"
+  },
+  {
+    "note": "review 2: an empty label before a domain",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "a..evil.com",
+    "problem": "external_link"
+  },
+  {
+    "note": "review 3: a public suffix is never own",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "biz.co.il",
+    "problem": "external_link",
+    "ownDomain": "co.il"
+  },
+  {
+    "note": "review 3: a shortener is never own",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "bit.ly/abc",
+    "problem": "external_link",
+    "ownDomain": "bit.ly"
+  },
+  {
+    "note": "review 3: a shared host itself is never own",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "other.wixsite.com",
+    "problem": "external_link",
+    "ownDomain": "wixsite.com"
+  },
+  {
+    "note": "review 3: free mail is never own",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "gmail.com",
+    "problem": "external_link",
+    "ownDomain": "gmail.com"
+  },
+  {
+    "note": "(105): a site under a shared host, exact",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "mybiz.wixsite.com",
+    "problem": null,
+    "ownDomain": "mybiz.wixsite.com"
+  },
+  {
+    "note": "(105): a site under a shared host, with www",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "https://www.mybiz.wixsite.com/shop",
+    "problem": null,
+    "ownDomain": "mybiz.wixsite.com"
+  },
+  {
+    "note": "(105): another site on the shared host",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "other.wixsite.com",
+    "problem": "external_link",
+    "ownDomain": "mybiz.wixsite.com"
+  },
+  {
+    "note": "(105): below the site on the shared host",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "a.mybiz.wixsite.com",
+    "problem": "external_link",
+    "ownDomain": "mybiz.wixsite.com"
+  },
+  {
+    "note": "(105): a GitHub site, exact",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x.github.io",
+    "problem": null,
+    "ownDomain": "x.github.io"
+  },
+  {
+    "note": "(105): another GitHub site",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "y.github.io",
+    "problem": "external_link",
+    "ownDomain": "x.github.io"
+  },
+  {
+    "note": "(105): the registered domain of a sub-domain website",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "biz.co.il",
+    "problem": null,
+    "ownDomain": "shop.biz.co.il"
+  },
+  {
+    "note": "(105): a sibling of a sub-domain website",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "other.biz.co.il",
+    "problem": null,
+    "ownDomain": "shop.biz.co.il"
+  },
+  {
+    "note": "(105): another business on the same suffix",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "notbiz.co.il",
+    "problem": "external_link",
+    "ownDomain": "shop.biz.co.il"
+  },
+  {
+    "note": "review 4: an IPv4 address",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "שלמו ב 1.2.3.4",
+    "problem": "external_link"
+  },
+  {
+    "note": "review 4: an IPv4 address with scheme and port",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "http://1.2.3.4:8080/x",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "review 4: not an IPv4 (256)",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "10.0.0.256",
+    "problem": null
+  },
+  {
+    "note": "review 4: a Hebrew label with a Latin TLD",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "דוגמה.com",
+    "problem": "external_link"
+  },
+  {
+    "note": "review 4: ideographic dot",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "example。com",
+    "problem": "external_link"
+  },
+  {
+    "note": "review 4: fullwidth dots",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "example．co．il",
+    "problem": "external_link"
+  },
+  {
+    "note": "review 4 accepted: a Hebrew top-level label is not seen",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "דוגמה.קום",
+    "problem": null
+  },
+  {
+    "note": "review 5: a file name is not a link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "invoice.pdf",
+    "problem": null
+  },
+  {
+    "note": "review 5: a file name after www is",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "www.x.pdf",
+    "problem": "external_link"
+  },
+  {
+    "note": "review 5: zip is a real TLD",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "file.zip",
+    "problem": "external_link"
+  },
+  {
+    "note": "review 5 accepted: Mr.Cohen reads as a domain",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "Mr.Cohen",
+    "problem": "external_link"
+  },
+  {
+    "note": "own domain after a Hebrew prefix with a maqaf",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "פרטים ב-biz.co.il ול-www.biz.co.il",
+    "problem": null,
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "a hyphenated domain is not cut",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "evil-biz.co.il",
+    "problem": "external_link",
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "review 2.1: a soft hyphen in the authority",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "https://mybiz.com­.ar/x",
+    "problem": "external_link",
+    "ownDomain": "mybiz.com"
+  },
+  {
+    "note": "review 2.1: a fullwidth letter in the authority",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "https://mybiz.comＸ.com",
+    "problem": "external_link",
+    "ownDomain": "mybiz.com"
+  },
+  {
+    "note": "review 2.1: the Kelvin sign in the authority",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "https://mybiz.comK.com",
+    "problem": "external_link",
+    "ownDomain": "mybiz.com"
+  },
+  {
+    "note": "review 2.1: a zero-width space in the authority",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "https://mybiz.com​.evil.com",
+    "problem": "external_link",
+    "ownDomain": "mybiz.com"
+  },
+  {
+    "note": "review 2.1: an underscore in the authority",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "https://my_biz.com",
+    "problem": "external_link",
+    "ownDomain": "mybiz.com"
+  },
+  {
+    "note": "review 2.1: Hebrew glued to the authority",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "https://mybiz.comשלום",
+    "problem": "external_link",
+    "ownDomain": "mybiz.com"
+  },
+  {
+    "note": "review 2.1: the own link, then a comma",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "לתשלום https://mybiz.com, תודה",
+    "problem": null,
+    "ownDomain": "mybiz.com"
+  },
+  {
+    "note": "review 2.1: the own link in brackets",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "(https://mybiz.com)",
+    "problem": null,
+    "ownDomain": "mybiz.com"
+  },
+  {
+    "note": "review 2.1: a direction mark before the own link",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "‏https://mybiz.com/pay",
+    "problem": null,
+    "ownDomain": "mybiz.com"
+  },
+  {
+    "note": "review 2.2: a bare domain glued to Hebrew",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "evil.comשלום",
+    "problem": "external_link"
+  },
+  {
+    "note": "review 2.2: the own domain glued to Hebrew",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "biz.co.ilשלום",
+    "problem": null,
+    "ownDomain": "biz.co.il"
+  },
+  {
+    "note": "review 2.2: a punycode top-level label",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "evil.xn--p1ai",
+    "problem": "external_link"
+  },
+  {
+    "note": "review 2.2: fullwidth Latin without a scheme",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "ｅｖｉｌ．ｃｏｍ",
+    "problem": "external_link"
+  },
+  {
+    "note": "review 2.2: a soft hyphen in a bare domain",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "mybiz.com­.ar",
+    "problem": "external_link",
+    "ownDomain": "mybiz.com"
+  },
+  {
+    "note": "review 2.3: a platform is never own",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "facebook.com/mybiz",
+    "problem": "external_link",
+    "ownDomain": "facebook.com"
+  },
+  {
+    "note": "review 2.3: a host under a platform is never own",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "business.facebook.com",
+    "problem": "external_link",
+    "ownDomain": "business.facebook.com"
+  },
+  {
+    "note": "review 2.3: a site on a cloud host, exact",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "x.amazonaws.com",
+    "problem": null,
+    "ownDomain": "x.amazonaws.com"
+  },
+  {
+    "note": "review 2.3: another site on the cloud host",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "y.amazonaws.com",
+    "problem": "external_link",
+    "ownDomain": "x.amazonaws.com"
   }
 ]

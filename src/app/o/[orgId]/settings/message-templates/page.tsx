@@ -3,11 +3,12 @@ import type { Metadata } from "next";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
 import { ChatIcon } from "@/components/ui/icons";
+import { websiteDomain } from "@/features/company-domain/domains";
 import { AddMessageTemplateForm, MessageTemplateList } from "@/features/message-templates/components/templates-editor";
 import { TemplatePreview } from "@/features/message-templates/components/template-preview";
 import { MESSAGE_MERGE_FIELDS } from "@/features/message-templates/fields";
 import { listMessageTemplates } from "@/features/message-templates/queries";
-import { SERVICE_BODY_MAX } from "@/features/message-templates/service-rule";
+import { MARKETING_BODY_MAX, ownDomainOk, SERVICE_BODY_MAX } from "@/features/message-templates/service-rule";
 import { MESSAGE_TEMPLATES_PER_ORG, MESSAGE_TYPE_LABELS } from "@/features/message-templates/templates";
 import { SERVICE_MESSAGE_TYPES } from "@/features/messaging/providers/types";
 import { isAdminRole } from "@/features/settings/permissions";
@@ -31,10 +32,14 @@ export default async function MessageTemplatesPage({ params }: Props) {
   const [templates, details, org] = await Promise.all([
     listMessageTemplates(orgId),
     getDocumentDetails(orgId),
-    supabase.from("organizations").select("phone").eq("id", orgId).maybeSingle(),
+    supabase.from("organizations").select("phone, website").eq("id", orgId).maybeSingle(),
   ]);
-  const orgPhone = must(org, "organization phone")?.phone ?? null;
+  const orgRow = must(org, "organization phone");
+  const orgPhone = orgRow?.phone ?? null;
   const businessPhone = details.phone?.trim() || orgPhone?.trim() || null;
+  // owner (97): the business's own domain is the one address a service message may hold
+  const site = websiteDomain(orgRow?.website ?? null);
+  const ownDomain = ownDomainOk(site) ? site : null;
 
   return (
     <div className="space-y-4">
@@ -48,9 +53,13 @@ export default async function MessageTemplatesPage({ params }: Props) {
             הודעות בערוץ הזה.
           </p>
           <p>
-            בתבנית של הודעת שירות אפשר להשתמש רק בשדות שמתאימים לסוג שלה, אי אפשר לכתוב בה קישור (המערכת מוסיפה את הקישורים שלה דרך השדות), והאורך
+            בתבנית של הודעת שירות אפשר להשתמש רק בשדות שמתאימים לסוג שלה, אי אפשר לכתוב בה קישור או כתובת אתר (המערכת מוסיפה את הקישורים שלה דרך
+            השדות; {ownDomain ? `הכתובת של האתר של העסק, ${ownDomain}, מותרת` : "כתובת האתר של העסק מותרת אחרי שממלאים אותה בפרטי העסק"}), והאורך
             מוגבל: עד {SERVICE_BODY_MAX.sms} תווים ב-SMS, עד {SERVICE_BODY_MAX.whatsapp.toLocaleString("he-IL")} ב-WhatsApp ועד{" "}
             {SERVICE_BODY_MAX.email.toLocaleString("he-IL")} באימייל. תבנית כזאת נשמרת גם כשהיא לא עומדת בכללים, אבל לא תישלח, וליד התבנית כתוב למה.
+            האורך נבדק שוב בזמן השליחה, אחרי שהשדות מולאו: הודעה ארוכה מדי לא נשלחת ולא מקוצרת, ובעלים ומנהלי מערכת מקבלים התראה. גם הודעה
+            שיווקית נבדקת כך, יחד עם מה שהמערכת מוסיפה לה: עד {MARKETING_BODY_MAX.sms} תווים ב-SMS, עד{" "}
+            {MARKETING_BODY_MAX.whatsapp.toLocaleString("he-IL")} ב-WhatsApp ועד {MARKETING_BODY_MAX.email.toLocaleString("he-IL")} באימייל.
           </p>
           <p>בנוסח ובנושא אפשר לכתוב את השדות האלה, והם יוחלפו לבד:</p>
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
@@ -73,7 +82,7 @@ export default async function MessageTemplatesPage({ params }: Props) {
         </CardBody>
         {templates.length > 0 ? (
           <div className="mt-3 border-t border-line">
-            <MessageTemplateList orgId={orgId} templates={templates} editable={editable} />
+            <MessageTemplateList orgId={orgId} templates={templates} editable={editable} ownDomain={ownDomain} />
           </div>
         ) : (
           <EmptyState
@@ -86,7 +95,7 @@ export default async function MessageTemplatesPage({ params }: Props) {
         )}
         {editable && templates.length < MESSAGE_TEMPLATES_PER_ORG ? (
           <CardBody className="border-t border-line">
-            <AddMessageTemplateForm orgId={orgId} />
+            <AddMessageTemplateForm orgId={orgId} ownDomain={ownDomain} />
           </CardBody>
         ) : null}
       </Card>

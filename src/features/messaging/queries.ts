@@ -21,7 +21,7 @@ export async function messageTimelineItems(orgId: string, subject: TimelineSubje
   const rows = must(
     await supabase
       .from("messages")
-      .select("id, channel, direction, status, occurred_at, created_at")
+      .select("id, channel, direction, status, provider, provider_error_code, occurred_at, created_at")
       .eq("organization_id", orgId)
       .eq(subject.kind === "lead" ? "lead_id" : "contact_id", subject.id)
       .order("occurred_at", { ascending: false })

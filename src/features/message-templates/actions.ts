@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import type { SearchPickerResult } from "@/components/ui/search-picker";
 import { pickerQuery } from "@/components/ui/search-picker-logic";
+import { websiteDomain } from "@/features/company-domain/domains";
 import { isGender, type Gender } from "@/features/gender/gender";
 import { getOrgModules } from "@/features/modules/queries";
 import { shareSearchHits, subjectFromPick, type SearchRecordsAnswer } from "@/features/share/records";
@@ -13,6 +14,7 @@ import { optionalTextArg, validArg } from "@/lib/action-args";
 import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
+import { createClient } from "@/lib/supabase/server";
 import { pick } from "@/lib/validation";
 
 import { messageTemplatesPath } from "./paths";
@@ -25,8 +27,18 @@ const DUPLICATE_NAME = "כבר יש תבנית בשם הזה.";
 const FIELDS = ["name", "channel", "message_type", "subject", "body", "locale", "is_active"] as const;
 
 /** Owner (90) ג: a service template that will not be sent is still saved; the answer says why (null when it may be sent). */
-function sendProblem(input: MessageTemplateInput): string | null {
-  return templateProblemText({ channel: input.channel, messageType: input.message_type, subject: input.subject, body: input.body });
+async function sendProblem(orgId: string, input: MessageTemplateInput): Promise<string | null> {
+  // owners (97), (104): the business's own domain is allowed; a failed read judges without it (the stricter answer)
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("organizations").select("website").eq("id", orgId).maybeSingle();
+  const website = error ? null : (data?.website ?? null);
+  return templateProblemText({
+    channel: input.channel,
+    messageType: input.message_type,
+    subject: input.subject,
+    body: input.body,
+    ownDomain: websiteDomain(website),
+  });
 }
 
 function parse(formData: FormData) {
@@ -45,7 +57,7 @@ export async function addMessageTemplateAction(orgId: string, _prev: FormState, 
     });
   }
   revalidatePath(messageTemplatesPath(orgId));
-  const problem = sendProblem(parsed.data);
+  const problem = await sendProblem(orgId, parsed.data);
   return problem ? { ok: true, message: `התבנית נשמרה. ${problem}` } : ok();
 }
 
@@ -65,7 +77,7 @@ export async function updateMessageTemplateAction(orgId: string, templateId: str
   }
   if (data.length === 0) return fail(NOT_FOUND_OR_FORBIDDEN);
   revalidatePath(messageTemplatesPath(orgId));
-  const problem = sendProblem(parsed.data);
+  const problem = await sendProblem(orgId, parsed.data);
   return { ok: true, message: problem ? `התבנית נשמרה. ${problem}` : "התבנית נשמרה." };
 }
 

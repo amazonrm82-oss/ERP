@@ -3,7 +3,18 @@ import { describe, expect, it } from "vitest";
 import { MESSAGE_MERGE_FIELDS } from "@/features/message-templates/fields";
 import {
   assertTemplateSendable,
+  envelopedFilledProblem,
+  FILE_EXTENSIONS,
+  MARKETING_BODY_MAX,
+  messageExternalLink,
+  messageFilledProblem,
+  ownDomainOk,
+  PLATFORM_DOMAINS,
+  SHARED_SITE_HOSTS,
+  URL_SHORTENERS,
+  websiteOk,
   messageTemplateProblem,
+  SEND_REFUSAL_LABELS,
   SERVICE_BODY_MAX,
   SERVICE_TYPE_FIELDS,
   templateProblemText,
@@ -13,10 +24,12 @@ import {
 import { DEFAULT_MESSAGE_TEMPLATES } from "@/features/message-templates/templates";
 import { SERVICE_MESSAGE_TYPES } from "@/features/messaging/providers/types";
 
+import filledCases from "./fixtures/message-filled-problems.json";
 import cases from "./fixtures/message-template-problems.json";
 import { latestMigration } from "./helpers/migrations";
 
-const sql = latestMigration("create or replace function app.message_template_problem(")?.sql ?? "";
+const sql = latestMigration("create or replace function app.message_type_fields(")?.sql ?? "";
+const sendSql = latestMigration("create or replace function app.message_filled_problem(")?.sql ?? "";
 
 describe("service template rule (MSG-02, owner (90) ג)", () => {
   it.each(cases.map((c) => [c.note, c]))("%s", (_note, c) => {
@@ -53,5 +66,82 @@ describe("service template rule (MSG-02, owner (90) ג)", () => {
     expect(() => assertTemplateSendable({ ...base, body: "שלום", isActive: true })).not.toThrow();
     expect(() => assertTemplateSendable({ ...base, body: "שלום", isActive: false })).toThrow(TemplateNotSendableError);
     expect(() => assertTemplateSendable({ ...base, body: "https://x.com", isActive: true })).toThrow(/external_link/);
+  });
+
+  it.each(filledCases.map((c) => [c.note, c]))("filled text: %s", (_note, c) => {
+    expect(messageFilledProblem(c as TemplateText)).toBe(c.problem);
+  });
+
+  it("the filled-text rule and the refusal helper live in the same migration as the link rule", () => {
+    expect(sendSql).toContain("create or replace function app.message_send_refused(");
+    expect(sendSql).toContain("create or replace function app.message_external_link(");
+    // owner (96): the log says "ארוכה מדי"
+    expect(SEND_REFUSAL_LABELS.too_long).toBe("ארוכה מדי");
+    expect(sendSql).toContain("when 'too_long' then 'ארוכה מדי");
+  });
+
+  it("the closed lists and the marketing caps equal the migration's", () => {
+    const list = (marker: string) => {
+      const block = sendSql.split(`-- ${marker}:start`)[1]?.split(`-- ${marker}:end`)[0] ?? "";
+      return [...block.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+    };
+    expect(list("shared-site-hosts")).toEqual([...SHARED_SITE_HOSTS]);
+    expect(list("url-shorteners")).toEqual([...URL_SHORTENERS]);
+    expect(list("file-extensions")).toEqual([...FILE_EXTENSIONS]);
+    expect(list("platform-domains")).toEqual([...PLATFORM_DOMAINS]);
+    expect(sendSql).toContain(
+      `case p_channel when 'sms' then ${MARKETING_BODY_MAX.sms} when 'whatsapp' then ${MARKETING_BODY_MAX.whatsapp} when 'email' then ${MARKETING_BODY_MAX.email} end`,
+    );
+  });
+
+  it("(102): a marketing message is counted with what the system adds", () => {
+    const fill = (text: string) => text.replaceAll("{שם העסק}", "עסק").replaceAll("{טלפון העסק}", "03-0000000").replaceAll("{כתובת העסק}", "רחוב 1").replaceAll("{קישור הסרה}", "https://x.example/u/abc");
+    const marketing = { channel: "sms" as const, messageType: "marketing" as const, subject: null };
+    // 560 characters fit the cap alone, but not with the prefix and the two lines
+    expect(messageFilledProblem({ ...marketing, body: "א".repeat(560) })).toBeNull();
+    expect(envelopedFilledProblem({ ...marketing, body: "א".repeat(560) }, fill)).toBe("too_long");
+    expect(envelopedFilledProblem({ ...marketing, body: "שלום" }, fill)).toBeNull();
+    // a service message is not enveloped
+    expect(envelopedFilledProblem({ channel: "sms", messageType: "collection", subject: null, body: "א".repeat(300) }, fill)).toBeNull();
+  });
+
+  it("(104) review 3: only a domain that can be the business's own", () => {
+    expect(ownDomainOk("biz.co.il")).toBe(true);
+    expect(ownDomainOk("mybiz.wixsite.com")).toBe(true);
+    for (const bad of ["co.il", "com", "bit.ly", "wixsite.com", "gmail.com", "sites.google.com", "x.bit.ly", "facebook.com", "business.facebook.com", "amazonaws.com", null])
+      expect(ownDomainOk(bad), String(bad)).toBe(false);
+  });
+
+  it("review 2, item 4: a website is http(s) or a bare host", () => {
+    for (const good of ["biz.co.il", "http://biz.co.il", "HTTPS://www.Biz.co.il/about", " biz.co.il "]) expect(websiteOk(good), good).toBe(true);
+    for (const bad of ["javascript:alert(1)", "ftp://biz.co.il", "data:text/html,x", "mailto:a@biz.co.il", "biz.co.il:8080", "facebook.com/mybiz", "x".repeat(301)])
+      expect(websiteOk(bad), bad).toBe(false);
+  });
+
+  it("the own domain is allowed only with its subdomains, and the text says so", () => {
+    expect(messageExternalLink("biz.co.il", "biz.co.il")).toBe(false);
+    expect(messageExternalLink("biz.co.il", null)).toBe(true);
+    const base = { channel: "sms" as const, messageType: "collection" as const, subject: null };
+    expect(templateProblemText({ ...base, body: "other.com", ownDomain: "biz.co.il" })).toContain("biz.co.il");
+    expect(templateProblemText({ ...base, body: "other.com" })).toContain("פרטי העסק");
+  });
+
+  it("the link rule is linear on long hostile text", () => {
+    const hostile = [
+      "a.".repeat(100_000) + "1",
+      "-".repeat(200_000) + "x",
+      "http://".repeat(30_000),
+      "https://a:".repeat(20_000),
+      "www.".repeat(50_000),
+      "a@".repeat(100_000),
+      "a".repeat(200_000) + ".com",
+      "1.".repeat(100_000),
+      "א.".repeat(100_000) + "com",
+    ];
+    for (const text of hostile) {
+      const started = performance.now();
+      messageExternalLink(text, "biz.co.il");
+      expect(performance.now() - started).toBeLessThan(500);
+    }
   });
 });

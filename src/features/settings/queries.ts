@@ -15,6 +15,8 @@ export type OrganizationSettings = {
   industry: string | null;
   teamSize: string | null;
   phone: string | null;
+  /** MSG-02 (104): the business's website; its registered domain may appear in a service message */
+  website: string | null;
   recordVisibility: RecordVisibility;
   requireMfa: boolean;
 };
@@ -23,7 +25,7 @@ export async function getOrganizationSettings(orgId: string): Promise<Organizati
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("organizations")
-    .select("name, industry, team_size, phone, record_visibility, require_mfa")
+    .select("name, industry, team_size, phone, website, record_visibility, require_mfa")
     .eq("id", orgId)
     .maybeSingle();
   if (error) {
@@ -37,6 +39,7 @@ export async function getOrganizationSettings(orgId: string): Promise<Organizati
     industry: data.industry,
     teamSize: data.team_size,
     phone: data.phone,
+    website: data.website,
     recordVisibility: data.record_visibility,
     requireMfa: data.require_mfa,
   };

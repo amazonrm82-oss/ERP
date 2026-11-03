@@ -45,6 +45,7 @@ export async function updateOrganizationAction(orgId: string, _prev: FormState, 
       industry: parsed.data.industry || null,
       team_size: parsed.data.team_size || null,
       phone: parsed.data.phone,
+      website: parsed.data.website,
       record_visibility: parsed.data.record_visibility,
     })
     .eq("id", orgId)
