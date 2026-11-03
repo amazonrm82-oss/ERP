@@ -219,6 +219,20 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
     refusal: TEXT_429,
     sender: "first",
   },
+  "/f/privacy/[token]": {
+    guard: "database",
+    functions: ["privacy_request_page"],
+    limit: "60 per sender (keyed IP hash, scope privacy, IPv6 by its /64, re-scoped per business, 1,024 buckets, no hash kept), then 300 per link, in 10 min, after the lookup",
+    refusal: PAGE_TEXT,
+    sender: { leftOut: "PRK-02: published by the business in its privacy notice for anyone to use (like the lead form, (42) ד), so only its own limits apply" },
+  },
+  "/api/forms/privacy/[token]": {
+    guard: "database",
+    functions: ["privacy_request_submit"],
+    limit: "3 tries per sender in 10 min and 10 a day (honeypot hits included, never stored), then 50 stored requests per link a day, after the lookup",
+    refusal: JSON_429,
+    sender: { leftOut: "PRK-02: published by the business in its privacy notice for anyone to use (like the lead form, (42) ד), so only its own limits apply" },
+  },
   "/f/q/[token]": {
     guard: "database",
     functions: ["qr_scan"],

@@ -154,6 +154,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "org_sending_pauses", file: "sending_pause.csv" },
   // PRK-06
   { table: "org_privacy_settings", file: "privacy_settings.csv" },
+  // PRK-02: the request log (owners/admins read it; the full export is the owner's)
+  { table: "privacy_requests", file: "privacy_requests.csv" },
   { table: "org_calendar_settings", file: "calendar_settings.csv" },
   // CAP-09
   { table: "member_leaves", file: "member_leaves.csv" },

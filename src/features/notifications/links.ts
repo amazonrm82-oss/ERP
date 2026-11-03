@@ -2,6 +2,7 @@ import { calendarPath } from "@/features/calendar/range";
 import { cleanupPath } from "@/features/data-quality/paths";
 import { retentionListPath } from "@/features/lead-retention/paths";
 import { orderPath } from "@/features/orders/paths";
+import { privacyRequestPath, privacyRequestsPath } from "@/features/privacy-requests/paths";
 import { quotePath } from "@/features/quotes/paths";
 import { documentSettingsPath } from "@/features/tax/paths";
 import { paths } from "@/lib/paths";
@@ -56,6 +57,12 @@ export function notificationHref(orgId: string, entityType: string | null, entit
     // DQL-03: the weekly cleanup suggestions (the id is the business)
     case "cleanup_suggestions":
       return cleanupPath(orgId);
+    // PRK-02: a new privacy request (its id); owners and admins open it, the privacy officer is told to turn to them
+    case "privacy_request":
+      return privacyRequestPath(orgId, entityId);
+    // PRK-02: the day's further requests, counted in one notice (the id is the business)
+    case "privacy_requests":
+      return privacyRequestsPath(orgId);
     default:
       return null;
   }

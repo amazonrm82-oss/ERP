@@ -13,6 +13,7 @@ import { PrintButton } from "@/features/print/components/print-button";
 import { PrintHeader } from "@/features/print/components/print-header";
 import { PRIVACY_CLASS_LABELS } from "@/features/privacy-center/classes";
 import { privacyWordingsPath } from "@/features/privacy-center/paths";
+import { privacyRequestsPath } from "@/features/privacy-requests/paths";
 import { BUILT_IN_PERSONAL_FIELDS, OTHER_PERSONAL_DATA, type BuiltInPersonalField } from "@/features/privacy-center/personal-fields";
 import { activeRoleCounts, markedFields, personalDataGrants, withoutSecondStep } from "@/features/privacy-center/summary";
 import { NO_OFFICER, officerName, PRIVACY_OFFICER_EXPLAIN } from "@/features/privacy-officer/officer";
@@ -212,6 +213,14 @@ export default async function PrivacyCenterPage({ params }: Props) {
           <p className="text-sm print:hidden">
             <TextLink href={retentionSettingsPath(orgId)}>הגדרת מדיניות השמירה</TextLink>
           </p>
+        </CardBody>
+      </Card>
+
+      {/* PRK-02 */}
+      <Card aria-labelledby="privacy-requests" className="print:hidden">
+        <CardHeader id="privacy-requests" title="בקשות פרטיות" />
+        <CardBody className="text-md">
+          <TextLink href={privacyRequestsPath(orgId)}>בקשות לעיון, תיקון ומחיקה של מידע, והקישור שאנשים שולחים ממנו בקשה</TextLink>
         </CardBody>
       </Card>
 

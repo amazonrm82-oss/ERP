@@ -86,6 +86,9 @@ const eslintConfig = defineConfig([
       // OPS-04 (owner, 26 October 2026, wave 3 use (1)): the background job worker woken by the database with the shared
       // secret (public.claim_jobs, public.finish_job, public.job_message_may_send)
       "src/features/jobs/run-server.ts",
+      // PRK-02 (owner, 26 October 2026, wave 3 use (3)): the public privacy-request page (public.privacy_request_page) and its
+      // form (public.privacy_request_submit)
+      "src/features/privacy-requests/public-server.ts",
     ],
     rules: {
       "no-restricted-imports": [

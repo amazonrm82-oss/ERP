@@ -1,7 +1,8 @@
 // OPS-02 review (medium): the shared per-sender limit of the secret-link pages (scope "public") counts a visitor by address. An
 // IPv6 user usually holds a whole /64 and can rotate inside it at will, which would both dodge the limit and spray misses over
 // other customers' buckets. So, for that scope only, an IPv6 address is reduced to its /64 prefix; an IPv4 address (and an
-// IPv4-mapped IPv6 one) stays the whole IPv4 address. Every other scope keeps hashing the full address, unchanged. Pure.
+// IPv4-mapped IPv6 one) stays the whole IPv4 address. PRK-02's privacy page (scope "privacy") does the same. Every other scope
+// keeps hashing the full address, unchanged. Pure.
 
 function ipv4(text: string): string | null {
   const parts = text.split(".");

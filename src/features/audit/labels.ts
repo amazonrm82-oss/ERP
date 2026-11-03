@@ -119,6 +119,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   org_sending_pauses: "עצירת שליחה ללקוחות",
   // PRK-06
   org_privacy_settings: "אחראי פרטיות",
+  // PRK-02
+  privacy_requests: "בקשת פרטיות",
   // DQL-01
   completeness_settings: "שדות חשובים",
   // FLD-08
@@ -174,6 +176,8 @@ export const ACTION_LABELS: Record<string, string> = {
   order_link: "קישור ללקוח להזמנה",
   // BAL-04: the customer's statement link on a contact or company (created / revoked; never the token)
   statement_link: "קישור לדף חשבון",
+  // PRK-02: the business's public privacy-request link (created / revoked; never the token)
+  privacy_request_link: "קישור לבקשות פרטיות",
   // PRV-01: turning the retention policy on, off or changing its months; "keep" on one lead; the count the policy erased
   retention_policy: "מדיניות שמירה",
   retention_keep: "השארה ברשימת מדיניות השמירה",

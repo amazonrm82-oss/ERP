@@ -790,6 +790,45 @@ export type OrgPrivacySettingsRow = {
   updated_at: string;
 };
 
+export type PrivacyRequestType = "access" | "correction" | "erasure";
+export type PrivacyRequestStatus = "new" | "verifying" | "in_progress" | "done" | "refused";
+export type PrivacyVerifyMethod = "id_document" | "known_details" | "signed_form" | "other";
+
+// PRK-02: a data-subject request from the business's public privacy page (owners/admins only; server-written)
+export type PrivacyRequestRow = {
+  id: string;
+  organization_id: string;
+  // PrivacyRequestType (text with a check constraint)
+  request_type: string;
+  // null once a privacy erasure of the linked record emptied it
+  requester_name: string | null;
+  // email | phone
+  contact_kind: string;
+  contact_value: string | null;
+  details: string | null;
+  // PrivacyRequestStatus
+  status: string;
+  received_at: string;
+  target_date: string;
+  // PrivacyVerifyMethod
+  verify_method: string | null;
+  verify_note: string | null;
+  verified_at: string | null;
+  verified_by: string | null;
+  refusal_reason: string | null;
+  lead_id: string | null;
+  contact_id: string | null;
+  // every lead / contact the request was ever linked to (kept for a later privacy erasure)
+  former_lead_ids: string[];
+  former_contact_ids: string[];
+  closed_at: string | null;
+  closed_by: string | null;
+  erased_at: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type MembershipRow = {
   id: string;
   organization_id: string;
@@ -3148,6 +3187,19 @@ export type Database = {
         { organization_id: string; privacy_officer_id?: string | null },
         { privacy_officer_id?: string | null }
       >;
+      // PRK-02: server-written (no insert or delete grant); owners/admins update these columns only
+      privacy_requests: Table<
+        PrivacyRequestRow,
+        never,
+        {
+          status?: PrivacyRequestStatus;
+          verify_method?: PrivacyVerifyMethod | null;
+          verify_note?: string | null;
+          refusal_reason?: string | null;
+          lead_id?: string | null;
+          contact_id?: string | null;
+        }
+      >;
       // ORD-01: column grants; a person inserts a manual draft; status is the only state column a person writes
       orders: Table<OrderRow, OrderWrite & { organization_id: string; deal_id?: string | null; currency?: string }, OrderWrite & { status?: OrderStatus }>;
       // ORD-01: column grants; the order, the kind and the product are fixed once inserted; a draft's lines only
@@ -3963,6 +4015,12 @@ export type Database = {
       statement_link_revoke: { Args: { p_org: string; p_contact?: string | null; p_company?: string | null }; Returns: boolean };
       statement_link_status: { Args: { p_org: string; p_contact?: string | null; p_company?: string | null }; Returns: Json };
       statement_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
+      // PRK-02: the business's privacy-request link (owners/admins) and the public page (service_role only)
+      privacy_request_link_create: { Args: { p_org: string }; Returns: string };
+      privacy_request_link_revoke: { Args: { p_org: string }; Returns: boolean };
+      privacy_request_link_status: { Args: { p_org: string }; Returns: Json };
+      privacy_request_page: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
+      privacy_request_submit: { Args: { p_token: string; p_payload: Json; p_ip_hash?: string | null; p_is_spam?: boolean }; Returns: Json };
       statement_staff_view: { Args: { p_org: string; p_contact: string | null; p_company: string | null }; Returns: Json };
       order_public_decide: {
         Args: {

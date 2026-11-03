@@ -1076,6 +1076,32 @@ describe("roles and record visibility", () => {
     await asUser(owner.id, (q) => q("update public.org_privacy_settings set privacy_officer_id = null where organization_id = $1", [org]));
   });
 
+  it("privacy requests: owners and admins only, the privacy officer mark adds nothing (PRK-02)", async () => {
+    const id = await asAdmin(async (q) =>
+      (await q<{ id: string }>(
+        "insert into public.privacy_requests (organization_id, request_type, requester_name, contact_kind, contact_value, target_date) values ($1, 'access', 'פונה', 'email', 'p@example.com', current_date + 30) returning id",
+        [org],
+      )).rows[0].id,
+    );
+    await asUser(owner.id, (q) => q("insert into public.org_privacy_settings (organization_id, privacy_officer_id) values ($1, $2) on conflict (organization_id) do update set privacy_officer_id = excluded.privacy_officer_id", [org, m1.id]));
+    try {
+      for (const u of [owner, admin]) {
+        expect(await asUser(u.id, (q) => count(q, "select 1 from public.privacy_requests where id = $1", [id])), u.email).toBe(1);
+      }
+      for (const u of [manager, m1, viewer]) {
+        expect(await asUser(u.id, (q) => count(q, "select 1 from public.privacy_requests where id = $1", [id])), u.email).toBe(0);
+        expect(await asUser(u.id, async (q) => (await q("update public.privacy_requests set status = 'verifying' where id = $1", [id])).rowCount), u.email).toBe(0);
+        expect((await pgError(asUser(u.id, (q) => q("select public.privacy_request_link_create($1)", [org])))).code, u.email).toBe("42501");
+      }
+      expect(await asUser(admin.id, async (q) => (await q("update public.privacy_requests set status = 'verifying' where id = $1", [id])).rowCount)).toBe(1);
+      for (const u of [owner, admin, manager, m1, viewer]) {
+        expect((await pgError(asUser(u.id, (q) => q("delete from public.privacy_requests where id = $1", [id])))).code, u.email).toBe("42501");
+      }
+    } finally {
+      await asUser(owner.id, (q) => q("update public.org_privacy_settings set privacy_officer_id = null where organization_id = $1", [org]));
+    }
+  });
+
   it("only admins change settings", async () => {
     await asUser(m1.id, async (q) => {
       expect((await q("update public.organizations set name = 'x' where id = $1", [org])).rowCount).toBe(0);

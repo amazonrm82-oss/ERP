@@ -487,6 +487,14 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "branding:logo": "הלוגו לא נשמר. העלו אותו שוב.",
   // PRK-06 (trigger org_privacy_settings_check)
   "privacy_officer:member": "אחראי הפרטיות צריך להיות משתמש פעיל בעסק. בחרו משתמש אחר.",
+  // PRK-02 (trigger privacy_requests_check; privacy_request_submit)
+  "privacy_request:closed": "הבקשה כבר נסגרה, ואי אפשר לשנות אותה.",
+  "privacy_request:verified": "אימות הזהות כבר סומן, ואי אפשר לשנות אותו.",
+  "privacy_request:verify_method": "יש לבחור איך אומתה הזהות.",
+  "privacy_request:not_verified": "קודם מסמנים שהזהות אומתה, ואז מטפלים בבקשה.",
+  "privacy_request:refusal_reason": "לדחיית בקשה צריך לכתוב סיבה, וסיבה נכתבת רק בדחייה.",
+  "privacy_request:link": "אפשר לקשר רק רשומה פעילה של העסק.",
+  "privacy_request:invalid": "יש לתקן את הפרטים ולשלוח שוב.",
   // FLD-05 (apply_industry_template)
   "template:unknown": "התבנית הזו לא קיימת. רעננו את הדף ובחרו תבנית מהרשימה.",
   // REC-02 (trigger activities_notify_mentions)

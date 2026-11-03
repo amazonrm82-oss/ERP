@@ -251,6 +251,10 @@ describe("tenant isolation", () => {
     );
     // QUO-10: the customer opened A's quote (written by the server only)
     await asAdmin((q) => q("insert into public.quote_views (organization_id, quote_id) values ($1, $2)", [orgA, ids.quoteA]));
+    // PRK-02: a privacy request to A (written only by public.privacy_request_submit; no client insert grant)
+    await asAdmin((q) =>
+      q("insert into public.privacy_requests (organization_id, request_type, requester_name, contact_kind, contact_value, target_date) values ($1, 'access', 'פונה', 'email', 'p@example.com', current_date + 30)", [orgA]),
+    );
     // CNS-06: a blocklist entry of A (written only by consent_blocklist_add; no client write grant)
     await asAdmin((q) =>
       q("insert into public.consent_blocklist (organization_id, kind, channel, address_hash, reason) values ($1, 'phone', 'sms', repeat('a', 64), 'other')", [orgA]),
@@ -493,6 +497,8 @@ describe("tenant isolation", () => {
     "quote_decisions",
     // QUO-10
     "quote_views",
+    // PRK-02
+    "privacy_requests",
     // CNS-06
     "consent_blocklist",
     // QUO-04
@@ -711,6 +717,8 @@ describe("tenant isolation", () => {
       quote_decisions: "ip = ip",
       // no client write grant at all: a permission error is the expected outcome
       quote_views: "view_count = view_count",
+      // no delete grant at all: a permission error is the expected outcome for the delete
+      privacy_requests: "status = status",
       // no client write grant at all (consent_blocklist_add/remove write): a permission error is the expected outcome
       consent_blocklist: "reason = reason",
       quote_templates: "name = name",
@@ -863,6 +871,7 @@ describe("tenant isolation", () => {
       ["insert into public.opening_credit_allocations (organization_id, credit_document_id, document_id, amount_agorot) values ($1, $2, $3, 1)", [orgA, ids.openingCreditA, ids.contactInvoiceA]],
       ["insert into public.quote_decisions (organization_id, quote_id, decision, content_sha256) values ($1, $2, 'rejected', repeat('1', 64))", [orgA, ids.quoteA]],
       ["insert into public.quote_views (organization_id, quote_id) values ($1, $2)", [orgA, ids.quoteA]],
+      ["insert into public.privacy_requests (organization_id, request_type, requester_name, contact_kind, contact_value, target_date) values ($1, 'access', 'x', 'email', 'x@example.com', current_date)", [orgA]],
       ["insert into public.consent_blocklist (organization_id, kind, channel, reason) values ($1, 'phone', 'sms', 'other')", [orgA]],
       ["insert into public.quote_templates (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.quote_template_lines (organization_id, template_id, name, unit_price_agorot) values ($1, $2, 'x', 1)", [orgA, ids.templateA]],
@@ -1000,6 +1009,7 @@ describe("tenant isolation", () => {
       ["customer_debt_totals", "open_agorot = 777", "open_agorot = 777"],
       ["quote_decisions", "ip = 'HACKED'", "ip = 'HACKED'"],
       ["quote_views", "view_count = 777", "view_count = 777"],
+      ["privacy_requests", "status = 'refused'", "status = 'refused'"],
       ["consent_blocklist", "removed_at = now(), removed_reason = 'other'", "removed_at is not null"],
       ["quote_templates", "name = 'HACKED'", "name = 'HACKED'"],
       ["quote_template_lines", "name = 'HACKED'", "name = 'HACKED'"],
