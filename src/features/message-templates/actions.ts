@@ -16,12 +16,18 @@ import { dbErrorMessage, NOT_FOUND, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors"
 import { pick } from "@/lib/validation";
 
 import { messageTemplatesPath } from "./paths";
-import { messageTemplateSchema } from "./schema";
+import { messageTemplateSchema, type MessageTemplateInput } from "./schema";
+import { templateProblemText } from "./service-rule";
 
 // MSG-02: owners and admins of a writable business manage the list; RLS refuses everyone else (0 rows / 42501).
 
 const DUPLICATE_NAME = "כבר יש תבנית בשם הזה.";
 const FIELDS = ["name", "channel", "message_type", "subject", "body", "locale", "is_active"] as const;
+
+/** Owner (90) ג: a service template that will not be sent is still saved; the answer says why (null when it may be sent). */
+function sendProblem(input: MessageTemplateInput): string | null {
+  return templateProblemText({ channel: input.channel, messageType: input.message_type, subject: input.subject, body: input.body });
+}
 
 function parse(formData: FormData) {
   return messageTemplateSchema.safeParse(pick(formData, [...FIELDS]));
@@ -39,7 +45,8 @@ export async function addMessageTemplateAction(orgId: string, _prev: FormState, 
     });
   }
   revalidatePath(messageTemplatesPath(orgId));
-  return ok();
+  const problem = sendProblem(parsed.data);
+  return problem ? { ok: true, message: `התבנית נשמרה. ${problem}` } : ok();
 }
 
 export async function updateMessageTemplateAction(orgId: string, templateId: string, _prev: FormState, formData: FormData): Promise<FormState> {
@@ -58,7 +65,8 @@ export async function updateMessageTemplateAction(orgId: string, templateId: str
   }
   if (data.length === 0) return fail(NOT_FOUND_OR_FORBIDDEN);
   revalidatePath(messageTemplatesPath(orgId));
-  return { ok: true, message: "התבנית נשמרה." };
+  const problem = sendProblem(parsed.data);
+  return { ok: true, message: problem ? `התבנית נשמרה. ${problem}` : "התבנית נשמרה." };
 }
 
 export async function deleteMessageTemplateAction(orgId: string, templateId: string): Promise<ActionResult> {

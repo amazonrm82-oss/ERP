@@ -3,7 +3,8 @@ import { pickVariants } from "@/features/whatsapp/variants";
 
 // MSG-02: the merge fields a shared message template may hold, a CLOSED list. The database refuses any other
 // {text} (without ":" or "|") in a template's subject or body (app.message_unknown_field over app.message_merge_fields(),
-// migration message_templates, hint message_template:field); tests/unit/message-templates.test.ts reads the migration
+// migration message_templates, the list last redefined in service_template_rule; hint message_template:field);
+// tests/unit/message-templates.test.ts reads the latest migration
 // and keeps the two lists and the pattern equal. The first nine are WA-01's placeholders (src/features/whatsapp/templates.ts);
 // {קישור להצעה} is the customer's quote link (QUO-08), filled only by a sender that made the link; the last five came with
 // the owner's answer (88).
@@ -25,6 +26,8 @@ export const MESSAGE_MERGE_FIELDS = {
   validUntil: { token: "{תוקף}", label: "עד מתי הצעת המחיר בתוקף" },
   updateContent: { token: "{תוכן העדכון}", label: "תוכן העדכון, בהודעה שיווקית" },
   unsubscribeLink: { token: "{קישור הסרה}", label: "קישור להסרה מרשימת התפוצה (המערכת מוסיפה אותו לכל הודעה שיווקית)" },
+  // owner (90) ג, 3 November 2026 (migration service_template_rule): the code a verification code message carries
+  verificationCode: { token: "{קוד אימות}", label: "קוד האימות, בהודעת קוד אימות" },
 } as const;
 
 export type MergeFieldKey = keyof typeof MESSAGE_MERGE_FIELDS;

@@ -1,6 +1,7 @@
 // Hebrew names for what the audit log records.
 
 import { GOAL_METRICS, GOAL_PERIOD_LABELS, GOAL_SCOPE_LABELS } from "@/features/goals/metrics";
+import { MESSAGE_TYPE_LABELS, TEMPLATE_CHANNEL_LABELS } from "@/features/message-templates/templates";
 
 export const ENTITY_LABELS: Record<string, string> = {
   leads: "ליד",
@@ -214,6 +215,10 @@ export const HIDDEN_FIELDS = new Set(["id", "organization_id", "created_at", "cr
   "last_utm", "last_source_at"]);
 
 export const FIELD_LABELS: Record<string, string> = {
+  // MSG-02 (owner (90) ג: a template's type change is recorded and shown)
+  message_type: "סוג ההודעה",
+  channel: "ערוץ",
+  subject: "נושא",
   // COL-03
   promised_date: "התאריך שהלקוח התחייב אליו",
   // QUO-06 follow-up (pdf_remake)
@@ -432,4 +437,7 @@ export const VALUE_LABELS: Record<string, Record<string, string>> = {
   // DEAL-07 (null = one-time shows as empty)
   billing_kind: { monthly: "חודשית", yearly: "שנתית" },
   amount_source: { lines: "שורות המוצר", first_year: "שנה ראשונה" },
+  // MSG-02 message templates
+  message_type: MESSAGE_TYPE_LABELS,
+  channel: TEMPLATE_CHANNEL_LABELS,
 };

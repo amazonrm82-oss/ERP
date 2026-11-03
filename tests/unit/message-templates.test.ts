@@ -19,7 +19,8 @@ function seedTexts(text: string): string {
 describe("message templates (MSG-02)", () => {
   it("the merge fields equal app.message_merge_fields() and keep WA-01's placeholders", () => {
     expect(migration).toBeDefined();
-    const list = sql.match(/app\.message_merge_fields\(\) returns text\[\][\s\S]*?select array\[([^\]]*)\]/);
+    const fieldsSql = latestMigration("create or replace function app.message_merge_fields()")?.sql ?? "";
+    const list = fieldsSql.match(/app\.message_merge_fields\(\) returns text\[\][\s\S]*?select array\[([^\]]*)\]/);
     expect(list).not.toBeNull();
     const names = [...(list?.[1] ?? "").matchAll(/'([^']*)'/g)].map((m) => m[1]);
     expect(names).toEqual([...MERGE_FIELD_NAMES]);

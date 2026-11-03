@@ -7,6 +7,7 @@ import { AddMessageTemplateForm, MessageTemplateList } from "@/features/message-
 import { TemplatePreview } from "@/features/message-templates/components/template-preview";
 import { MESSAGE_MERGE_FIELDS } from "@/features/message-templates/fields";
 import { listMessageTemplates } from "@/features/message-templates/queries";
+import { SERVICE_BODY_MAX } from "@/features/message-templates/service-rule";
 import { MESSAGE_TEMPLATES_PER_ORG, MESSAGE_TYPE_LABELS } from "@/features/message-templates/templates";
 import { SERVICE_MESSAGE_TYPES } from "@/features/messaging/providers/types";
 import { isAdminRole } from "@/features/settings/permissions";
@@ -45,6 +46,11 @@ export default async function MessageTemplatesPage({ params }: Props) {
             לכל תבנית יש סוג. הודעות שירות הן רק {SERVICE_MESSAGE_TYPES.map((type) => MESSAGE_TYPE_LABELS[type]).join(", ")}. הן נשלחות גם למי שביקש
             להפסיק לקבל דיוור, אבל אף פעם לא לכתובת שברשימת החסימה ולא למי שפרטיו נמחקו. כל סוג אחר הוא הודעה שיווקית, והיא נשלחת רק למי שהסכים לקבל
             הודעות בערוץ הזה.
+          </p>
+          <p>
+            בתבנית של הודעת שירות אפשר להשתמש רק בשדות שמתאימים לסוג שלה, אי אפשר לכתוב בה קישור (המערכת מוסיפה את הקישורים שלה דרך השדות), והאורך
+            מוגבל: עד {SERVICE_BODY_MAX.sms} תווים ב-SMS, עד {SERVICE_BODY_MAX.whatsapp.toLocaleString("he-IL")} ב-WhatsApp ועד{" "}
+            {SERVICE_BODY_MAX.email.toLocaleString("he-IL")} באימייל. תבנית כזאת נשמרת גם כשהיא לא עומדת בכללים, אבל לא תישלח, וליד התבנית כתוב למה.
           </p>
           <p>בנוסח ובנושא אפשר לכתוב את השדות האלה, והם יוחלפו לבד:</p>
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">

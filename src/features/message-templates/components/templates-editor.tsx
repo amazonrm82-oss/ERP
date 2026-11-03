@@ -12,6 +12,7 @@ import type { FormState } from "@/lib/action-result";
 
 import { addMessageTemplateAction, deleteMessageTemplateAction, updateMessageTemplateAction } from "../actions";
 import type { MessageTemplate } from "../queries";
+import { templateProblemText } from "../service-rule";
 import {
   isServiceType,
   MESSAGE_TEMPLATE_BODY_MAX,
@@ -26,6 +27,16 @@ import {
   TEMPLATE_LOCALES,
   type TemplateLocale,
 } from "../templates";
+
+/** Owner (90) ג: why a service template will not be sent; nothing when it may be. */
+export function SendProblem({ message, live = false }: { message: string | null; live?: boolean }) {
+  if (!message) return null;
+  return (
+    <p role={live ? undefined : "status"} className="rounded-md bg-warning-soft px-3 py-2.5 text-sm break-words text-warning">
+      {message}
+    </p>
+  );
+}
 
 /** The type's badge: service or marketing, with the type's name. */
 export function TypeBadge({ type }: { type: MessageType }) {
@@ -64,9 +75,22 @@ function TemplateFields({ initial, failure }: { initial: Values; failure: Extrac
   const [channel, setChannel] = useState<string>(values?.channel ?? initial.channel);
   const [body, setBody] = useState<string>(values?.body ?? initial.body);
   const [type, setType] = useState<string>(values?.message_type ?? initial.messageType);
+  const [subject, setSubject] = useState<string>(values?.subject ?? initial.subject);
   const errors = failure?.fieldErrors;
   const smsWarning = channel === "sms" ? smsLengthWarning(body.trim()) : null;
-  const typeIsService = MESSAGE_TYPE_OPTIONS.some((option) => option.value === type && isServiceType(option.value));
+  const picked = MESSAGE_TYPE_OPTIONS.find((option) => option.value === type)?.value;
+  const typeIsService = picked !== undefined && isServiceType(picked);
+  const pickedChannel = TEMPLATE_CHANNELS.find((value) => value === channel);
+  // shown while typing; saving is never refused (owner (90) ג: checked before every send)
+  const problem =
+    picked && pickedChannel
+      ? templateProblemText({
+          channel: pickedChannel,
+          messageType: picked,
+          subject: pickedChannel === "email" ? subject.trim() : null,
+          body: body.replace(/\r\n?/g, "\n").trim(),
+        })
+      : null;
   return (
     <div className="space-y-3">
       <TextField
@@ -123,7 +147,8 @@ function TemplateFields({ initial, failure }: { initial: Values; failure: Extrac
           required
           maxLength={MESSAGE_TEMPLATE_SUBJECT_MAX}
           autoComplete="off"
-          defaultValue={values?.subject ?? initial.subject}
+          value={subject}
+          onChange={(event) => setSubject(event.target.value)}
           error={errors?.subject}
         />
       ) : null}
@@ -139,6 +164,7 @@ function TemplateFields({ initial, failure }: { initial: Values; failure: Extrac
         error={errors?.body}
         hint={smsWarning ?? undefined}
       />
+      <SendProblem message={problem} live />
       <Checkbox
         label="פעילה"
         name="is_active"
@@ -155,7 +181,7 @@ export function MessageTemplateList({ orgId, templates, editable }: { orgId: str
     <ol className="divide-y divide-line">
       {templates.map((template) =>
         editable ? (
-          <EditableRow key={`${template.id}-${template.name}-${template.body}-${template.subject}`} orgId={orgId} template={template} />
+          <EditableRow key={`${template.id}-${template.name}-${template.body}-${template.subject}-${template.messageType}-${template.channel}`} orgId={orgId} template={template} />
         ) : (
           <ReadRow key={template.id} template={template} />
         ),
@@ -176,10 +202,15 @@ function RowHeading({ template }: { template: MessageTemplate }) {
   );
 }
 
+function storedProblem(template: MessageTemplate): string | null {
+  return templateProblemText(template);
+}
+
 function ReadRow({ template }: { template: MessageTemplate }) {
   return (
     <li className="space-y-1 px-4 py-3 sm:px-5">
       <RowHeading template={template} />
+      <SendProblem message={storedProblem(template)} />
       {template.subject ? <p className="text-md text-ink">נושא: {template.subject}</p> : null}
       <p className="break-words whitespace-pre-wrap text-md text-ink-soft">{template.body}</p>
     </li>
@@ -192,6 +223,7 @@ function EditableRow({ orgId, template }: { orgId: string; template: MessageTemp
   return (
     <li className="space-y-3 px-4 py-4 sm:px-5">
       <RowHeading template={template} />
+      <SendProblem message={storedProblem(template)} />
       <form action={formAction} className="space-y-3" noValidate>
         <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
         <TemplateFields
@@ -211,7 +243,9 @@ function EditableRow({ orgId, template }: { orgId: string; template: MessageTemp
             שמירה
             <span className="sr-only">: {template.name}</span>
           </SubmitButton>
-          {state?.ok && state.message ? <FormNotice message={state.message} /> : null}
+          {state?.ok && state.message ? (
+            state.message === "התבנית נשמרה." ? <FormNotice message={state.message} /> : <SendProblem message={state.message} />
+          ) : null}
         </div>
       </form>
       <ActionButton
@@ -233,6 +267,7 @@ export function AddMessageTemplateForm({ orgId }: { orgId: string }) {
   return (
     <form action={formAction} className="space-y-3" noValidate key={state?.ok ? "saved" : "editing"}>
       <h3 className="font-semibold">תבנית חדשה</h3>
+      {state?.ok && state.message ? <SendProblem message={state.message} /> : null}
       <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
       <TemplateFields initial={EMPTY} failure={failure} />
       <SubmitButton size="sm" pendingText="מוסיפים…">

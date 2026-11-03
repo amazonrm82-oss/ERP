@@ -71,6 +71,20 @@ export function smsLengthWarning(text: string): string | null {
   return `ההודעה ארוכה מ-${limit} תווים (${length.toLocaleString("he-IL")}), ולכן תישלח כ-${parts} הודעות SMS מחוברות. אחרי מילוי השדות היא עשויה להיות ארוכה יותר.`;
 }
 
+// Owner 3 November 2026, answer (89) א: a quote email ("הצעת מחיר", type requested_document) is a SERVICE message only on
+// these conditions, which every future quote sender must hold (nothing sends yet):
+// * it is sent from the quote's own screen, or by an automation on the quote's deal;
+// * only to the customer address on that quote (the quote's contact), one recipient;
+// * never to a group or a segment (a campaign of quotes is marketing, and needs consent);
+// * the blocklist and a privacy erasure stop it (app.consent_service_blocked through job_message_may_send), like every
+//   service message; an ordinary opt-out does not.
+// The service template rule (owner (90) ג, service-rule.ts) holds for it as for every service template.
+export const QUOTE_SERVICE_CONDITIONS = {
+  origins: ["quote_screen", "deal_automation"],
+  recipient: "quote_customer",
+  groupSend: false,
+} as const;
+
 // Every business starts with these and renames, changes or deletes them freely. The database seeds them
 // (app.seed_message_templates); tests/unit/message-templates.test.ts keeps the two equal.
 // Owner 3 November 2026, answer (88). DRAFT wording until the lawyer approves it (the settings page says "טיוטה").
