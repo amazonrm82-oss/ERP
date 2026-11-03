@@ -62,6 +62,7 @@ export async function getGoalProgress(orgId: string, options: Options = {}): Pro
     metric: r.metric,
     target: r.target,
     actual: r.actual,
+    refunds: r.refunds,
     elapsed: r.elapsed,
     today,
   }));

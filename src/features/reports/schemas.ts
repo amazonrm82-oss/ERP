@@ -394,6 +394,9 @@ export const REPORT_SCHEMAS = {
       target: count,
       // a collection goal's actual nets the refunds made in its period (PAY-08 (81) ב), so it may be below 0
       actual: z.number().int(),
+      // a collection goal's refunds counted in its actual (positive agorot, 0 when none; owner's answer (83) א); null for
+      // every other metric
+      refunds: count.nullable(),
       elapsed: z.number().min(0).max(1),
     }),
   ),

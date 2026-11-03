@@ -8,6 +8,7 @@ import { goalMetric } from "../metrics";
 import {
   countsDeals,
   goalDealsHref,
+  goalRefundsText,
   metricValue,
   paceFromText,
   periodEndLabel,
@@ -32,6 +33,7 @@ export function GoalProgressList({ items, showSubject = true, orgId }: { items: 
         const figures = progressFigures(item, item.today);
         const metric = goalMetric(item.metric);
         const standing = figures.standing ? STANDING_LABELS[figures.standing] : null;
+        const refunds = goalRefundsText(item);
         return (
           <li key={item.goalId} className="py-3 first:pt-0 last:pb-0">
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -48,14 +50,18 @@ export function GoalProgressList({ items, showSubject = true, orgId }: { items: 
             </div>
             <div className="mt-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
               <span className="tabular-nums">
-                {metricValue(item.metric, item.actual)} <span className="text-ink-soft">מתוך</span> {metricValue(item.metric, item.target)}
+                <bdi>{metricValue(item.metric, item.actual)}</bdi> <span className="text-ink-soft">מתוך</span> {metricValue(item.metric, item.target)}
               </span>
               <span className="flex items-center gap-2">
                 {standing ? <Badge tone={standing.tone}>{standing.label}</Badge> : null}
-                <span className="text-lg font-semibold tabular-nums">{figures.percent === null ? "—" : `${formatNumber(figures.percent)}%`}</span>
+                <span className="text-lg font-semibold tabular-nums">
+                  <bdi>{figures.percent === null ? "—" : `${formatNumber(figures.percent)}%`}</bdi>
+                </span>
               </span>
             </div>
+            {/* a negative actual (refunds above the period's payments) gives a negative percent and an empty bar */}
             <Meter decorative value={figures.percent ?? 0} max={100} tone={figures.standing === "reached" ? "done" : "bar"} className="mt-2" />
+            {refunds ? <p className="mt-1.5 text-sm text-ink-soft tabular-nums">{refunds}</p> : null}
             {figures.phase === "pace" && figures.projected !== null ? (
               <p className="mt-1.5 text-sm text-ink-soft">
                 קצב צפוי {periodEndLabel(item.period)}: {metricValue(item.metric, figures.projected)}

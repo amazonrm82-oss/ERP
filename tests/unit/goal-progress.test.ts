@@ -5,6 +5,7 @@ import {
   countsDeals,
   goalDealsHref,
   goalPeriodOf,
+  goalRefundsText,
   paceFromText,
   paceStartDay,
   periodEndLabel,
@@ -15,6 +16,8 @@ import {
   requiredPerDayValue,
   teamSubtree,
 } from "@/features/goals/progress";
+import { meterPercent } from "@/components/ui/chart-logic";
+import { formatMoney } from "@/lib/format";
 
 // GOL-03: percent, linear pace and what is needed per day. Owner, 13 October 2026: the pace shows
 // only from a quarter of the period's calendar days (rounded up); before that, the amount needed per
@@ -180,5 +183,28 @@ describe("team goals count by the team on the record (option A)", () => {
     expect(countsDeals("won_deals")).toBe(true);
     expect(countsDeals("leads_handled")).toBe(false);
     expect(goalDealsHref("o", "none", "month", "2026-10-01")).toBe("/o/o/reports/goals/deals?team=none&period=month&start=2026-10-01");
+  });
+});
+
+// Owner's answer (83) א, 3 November 2026: a collection goal whose refunds pass its payments is shown as it is: a negative
+// actual, a negative percent, an empty bar, and the line "מתוכם החזרים: X" (shown whenever refunds are above 0).
+describe("collection goal with refunds", () => {
+  it("a negative actual gives a negative percent, never 'reached', and an empty bar", () => {
+    const figures = progressFigures(goal({ target: 100000, actual: -25000, elapsed: 0.5 }), "2026-10-16");
+    expect(figures.percent).toBe(-25);
+    expect(figures.standing).toBe("behind");
+    expect(figures.projected).toBe(-50000);
+    // what is still needed counts from the negative actual: (100,000 + 25,000) / 16 days
+    expect(figures.requiredPerDay).toBeCloseTo(125000 / 16);
+    expect(meterPercent(figures.percent ?? 0, 100)).toBe(0);
+    // an ended period keeps the negative percent
+    expect(progressFigures(goal({ target: 100000, actual: -25000 }), "2026-11-02")).toMatchObject({ phase: "over", percent: -25 });
+  });
+
+  it("the refunds line shows for a collection goal with refunds above 0, also when the actual stays positive", () => {
+    expect(goalRefundsText({ metric: "collected", refunds: 30000 })).toBe(`מתוכם החזרים: ${formatMoney(30000)}`);
+    expect(goalRefundsText({ metric: "collected", refunds: 0 })).toBeNull();
+    expect(goalRefundsText({ metric: "collected", refunds: null })).toBeNull();
+    expect(goalRefundsText({ metric: "won_amount", refunds: 30000 })).toBeNull();
   });
 });

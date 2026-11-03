@@ -9,6 +9,7 @@
     "goal_id": "00000000-0000-4000-8000-000000000012",
     "team_id": null,
     "user_id": null,
-    "period_start": "2026-10-01"
+    "period_start": "2026-10-01",
+    "refunds": null
   }
 ]

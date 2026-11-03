@@ -702,6 +702,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       // the PAY-08 answer (81) ב redefines public.report_collection() and public.report_goal_progress() of
       // _payment_refunds.sql last (a payment in full in its month, each refund negative in its own month)
       "_refunds_by_month.sql",
+      // GOL-01 answer (83) א redefines public.report_goal_progress() of _refunds_by_month.sql last (a collection goal's refunds)
+      "_goal_refunds.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

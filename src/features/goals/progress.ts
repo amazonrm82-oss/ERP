@@ -17,6 +17,8 @@ export type GoalProgress = {
   metric: GoalMetric;
   target: number;
   actual: number;
+  // a collection goal's refunds counted in its actual (positive agorot); null for every other metric
+  refunds: number | null;
   // share of the period's time already gone, 0..1, in the organization's time zone
   elapsed: number;
 };
@@ -169,6 +171,15 @@ export function periodEndLabel(period: GoalPeriod): string {
 /** A value of the metric as text: shekels for money, a whole number otherwise. */
 export function metricValue(metric: GoalMetric, value: number): string {
   return goalMetric(metric).kind === "money" ? formatMoney(value) : formatNumber(value);
+}
+
+/**
+ * The line under a collection goal with refunds in its actual (owner's answer (83) א, 3 November 2026): "מתוכם החזרים: X".
+ * Shown whenever the goal counted refunds (above 0), not only when the actual fell below 0; null otherwise.
+ */
+export function goalRefundsText(goal: { metric: GoalMetric; refunds: number | null }): string | null {
+  if (goal.metric !== "collected" || goal.refunds === null || goal.refunds <= 0) return null;
+  return `מתוכם החזרים: ${formatMoney(goal.refunds)}`;
 }
 
 /**

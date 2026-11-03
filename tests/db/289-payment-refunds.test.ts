@@ -318,8 +318,9 @@ describe("refunds of payments (PAY-08)", () => {
     );
     expect(report.totals).toMatchObject({ amount: 10000, refunds: 0 });
     await run(owner, (q) => q("insert into public.goals (organization_id, scope, period, period_start, metric, target) values ($1, 'org', 'month', '2026-08-01', 'collected', 1)", [org]));
-    const goals = await run(owner, async (q) => (await one<{ r: { metric: string; actual: number }[] }>(q, "select public.report_goal_progress($1, 'month', '2026-08-01') as r", [org])).r);
-    expect(goals.find((g) => g.metric === "collected")!.actual).toBe(10000);
+    const goals = await run(owner, async (q) => (await one<{ r: { metric: string; actual: number; refunds: number | null }[] }>(q, "select public.report_goal_progress($1, 'month', '2026-08-01') as r", [org])).r);
+    // owner's answer (83) א: `refunds` = the refunds counted in the actual; the October refund is not in August
+    expect(goals.find((g) => g.metric === "collected")).toMatchObject({ actual: 10000, refunds: 0 });
     // BAL-04: the staff's statement view (the customer's page's own selection) lists the payment at what counts
     await run(owner, (q) => q("update public.payments set paid_on = current_date - 1 where id = $1", [p]));
     const view = await run(owner, async (q) =>
@@ -430,6 +431,17 @@ describe("refunds of payments (PAY-08)", () => {
     expect(await actual("month", "2025-11-01")).toBe(-7000);
     expect(await actual("month", "2025-11-01", "user")).toBe(-7000);
     expect(await actual("quarter", "2025-10-01")).toBe(9000);
+    // owner's answer (83) א: each collection goal names the refunds counted in its actual (positive agorot)
+    const refunds = async (period: string, start: string, scope = "org") =>
+      (
+        await run(owner, async (q) =>
+          (await one<{ r: { metric: string; scope: string; refunds: number | null }[] }>(q, "select public.report_goal_progress($1, $2, $3) as r", [o2, period, start])).r,
+        )
+      ).find((g) => g.metric === "collected" && g.scope === scope)?.refunds;
+    expect(await refunds("month", "2025-10-01")).toBe(0);
+    expect(await refunds("month", "2025-11-01")).toBe(7000);
+    expect(await refunds("month", "2025-11-01", "user")).toBe(7000);
+    expect(await refunds("quarter", "2025-10-01")).toBe(7000);
     // the refunds are counted rows: the definer count agrees with what the owner reads (the goal is shown)
     const counted = await run(owner, async (q) =>
       (
@@ -507,16 +519,20 @@ describe("refunds of payments (PAY-08)", () => {
     );
     const goals = (u: U, start: string) =>
       run(u, async (q) =>
-        (await one<{ r: { metric: string; scope: string; actual: number }[] }>(q, "select public.report_goal_progress($1, 'month', $2) as r", [o3, start])).r.filter(
+        (await one<{ r: { metric: string; scope: string; actual: number; refunds: number | null }[] }>(q, "select public.report_goal_progress($1, 'month', $2) as r", [o3, start])).r.filter(
           (g) => g.metric === "collected",
         ),
       );
     const byScope = (rows: { scope: string; actual: number }[]) => Object.fromEntries(rows.map((g) => [g.scope, g.actual]));
+    // owner's answer (83) א: the refunds counted in each goal's actual, under the same rep, team and cheque rules
+    const refundsByScope = (rows: { scope: string; refunds: number | null }[]) => Object.fromEntries(rows.map((g) => [g.scope, g.refunds]));
 
     // the team goal nets its people's refunds in the refund's month; the cheque not yet due is out of every goal, with its
     // refund (the payment's cheque rule)
     expect(byScope(await goals(owner, "2025-10-01"))).toEqual({ org: 8000, team: 8000 });
     expect(byScope(await goals(owner, "2025-11-01"))).toEqual({ org: -1500, team: -1500, user: -1000 });
+    expect(refundsByScope(await goals(owner, "2025-10-01"))).toEqual({ org: 0, team: 0 });
+    expect(refundsByScope(await goals(owner, "2025-11-01"))).toEqual({ org: 1500, team: 1500, user: 1000 });
     // the collection report counts the cheque and its refund (it has no cheque rule)
     const r = await run(owner, async (q) =>
       (await one<{ r: { by_month: { month: string; amount: number; refunds: number }[] } }>(q, "select public.report_collection($1, '2025-10-01', '2025-11-30') as r", [o3])).r,
@@ -532,12 +548,14 @@ describe("refunds of payments (PAY-08)", () => {
     });
     expect(byScope(await goals(owner, "2025-10-01"))).toEqual({ org: 10000, team: 8000 });
     expect(byScope(await goals(owner, "2025-11-01"))).toEqual({ org: -2200, team: -1500, user: -1000 });
+    expect(refundsByScope(await goals(owner, "2025-11-01"))).toEqual({ org: 2200, team: 1500, user: 1000 });
 
     // rep 1 records payments and reads only their own records: their own goal shows (with its refund); the business's and
     // the team's goals hold rows they cannot read (rep 2's and the owner's payments and refunds), so they stay hidden
     await run(owner, (q) => q("select public.set_member_permissions($1, $2, '{record_payments}')", [o3, rep1.id]));
     await asAdmin((q) => q("update public.organizations set record_visibility = 'own' where id = $1", [o3]));
     expect(byScope(await goals(rep1, "2025-11-01"))).toEqual({ user: -1000 });
+    expect(refundsByScope(await goals(rep1, "2025-11-01"))).toEqual({ user: 1000 });
     expect(byScope(await goals(rep1, "2025-10-01"))).toEqual({});
   });
 
