@@ -41,6 +41,10 @@ const RERUN = [
   migrationFile("_dormant_activation.sql"),
   // RVW-64 redefines app.import_record_worked() of _collection_reminder_import_undo.sql last (a payment promise is work)
   migrationFile("_payment_promise_work.sql"),
+  // MSG-03 redefines app.sample_untouched() of _payment_promise_work.sql last (a message keeps a sample lead or contact)
+  migrationFile("_messages.sql"),
+  // CNS-07 redefines public.job_message_may_send() of _messages.sql last
+  migrationFile("_message_types.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

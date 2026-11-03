@@ -20,14 +20,20 @@ export type ClaimedJob = {
 };
 
 /**
+ * MSG-03: what the provider answered, kept on the job by finish_job (codes and ids only): its code with its message id
+ * (sent) or its short error code (failed).
+ */
+export type ProviderReceipt = { provider: string; providerMessageId?: string; errorCode?: string };
+
+/**
  * What a handler reports:
- * - done: the work is done;
+ * - done: the work is done (a sent message carries the provider's receipt);
  * - failed: try again later (backoff), or never again when `final`;
  * - ended: the database already ended the job itself (a refused send); nothing more to report.
  */
 export type JobOutcome =
-  | { status: "done" }
-  | { status: "failed"; error: string; final?: boolean }
+  | { status: "done"; receipt?: ProviderReceipt }
+  | { status: "failed"; error: string; final?: boolean; receipt?: ProviderReceipt }
   | { status: "ended"; reason: string };
 
 export type JobHandler = (job: ClaimedJob) => Promise<JobOutcome>;

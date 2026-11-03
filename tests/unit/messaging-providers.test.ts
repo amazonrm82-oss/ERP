@@ -96,3 +96,59 @@ describe("MSG-01: the worker asks only for channels with a provider", () => {
     expect(code).toMatch(/rpc\("claim_jobs", \{[^}]*p_channels: Object\.keys\(providers\)/);
   });
 });
+
+describe("MSG-03: the provider's receipt reaches the queue", () => {
+  const lead = "44444444-4444-4444-8444-444444444444";
+
+  it("a sent message carries the provider's code and its id; a failure its code and error code; never a cost", async () => {
+    const provider = { ...createFakeProvider({ channel: "sms" }), send: async () => ({ ok: true as const, providerId: "p-1" }) };
+    const handler = createSendHandler({ maySend: async () => ({ may_send: true }), providerFor: () => provider });
+    expect(await handler(job({ channel: "sms", lead_id: lead }))).toEqual({ status: "done", receipt: { provider: "fake", providerMessageId: "p-1" } });
+    const failing = { ...provider, send: async () => ({ ok: false as const, error: "rejected", final: true, code: "E.21" }) };
+    const h = createSendHandler({ maySend: async () => ({ may_send: true }), providerFor: () => failing });
+    expect(await h(job({ channel: "sms", lead_id: lead }))).toEqual({
+      status: "failed",
+      error: "rejected",
+      final: true,
+      receipt: { provider: "fake", errorCode: "E.21" },
+    });
+    const bare = { ...provider, send: async () => ({ ok: false as const, error: "down" }) };
+    const hb = createSendHandler({ maySend: async () => ({ may_send: true }), providerFor: () => bare });
+    expect(await hb(job({ channel: "sms", lead_id: lead }))).toEqual({ status: "failed", error: "down", final: undefined, receipt: { provider: "fake" } });
+  });
+
+  it("the runner passes the receipt to finish_job, on success and on failure", async () => {
+    const { runJobs } = await import("@/features/jobs/runner");
+    const { createRegistry } = await import("@/features/jobs/registry");
+    const reports: unknown[] = [];
+    const sent = { provider: "fake", providerMessageId: "p-9" };
+    const failed = { provider: "fake", errorCode: "E1" };
+    const outcomes = [
+      { status: "done" as const, receipt: sent },
+      { status: "failed" as const, error: "x", final: true, receipt: failed },
+    ];
+    let n = 0;
+    await runJobs(
+      {
+        claim: async () => (n++ === 0 ? [job({ channel: "sms", lead_id: lead }), { ...job({ channel: "sms", lead_id: lead }), id: "j2" }] : []),
+        finish: async (_job, report) => {
+          reports.push(report);
+          return report.ok ? "done" : "dead";
+        },
+      },
+      createRegistry({ "message.send": async () => outcomes.shift() ?? { status: "done" } }),
+      { log: () => {} },
+    );
+    expect(reports).toEqual([
+      { ok: true, error: null, final: false, started: true, receipt: sent },
+      { ok: false, error: "x", final: true, started: true, receipt: failed },
+    ]);
+  });
+
+  it("the worker passes the provider's code, message id and error code, and no cost", () => {
+    const code = readFileSync(join(root, "src/features/jobs/run-server.ts"), "utf8");
+    expect(code).toContain("p_provider_error_code: report.receipt?.errorCode");
+    expect(code).not.toMatch(/cost/i);
+  });
+});
+

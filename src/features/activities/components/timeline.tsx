@@ -9,6 +9,7 @@ import { listNoteFiles } from "@/features/files/queries";
 import { formatBytes, opensInBrowser } from "@/features/files/types";
 import { getMentionCandidates } from "@/features/mentions/queries";
 import { mentionIds } from "@/features/mentions/token";
+import { MESSAGES_ON_TIMELINE, mergeTimeline, messageTimelineItems } from "@/features/messaging/queries";
 import { printsTimelineEntry } from "@/features/print/print";
 import { getOrgContext, getUserNames } from "@/features/shell/queries";
 import { getOrgTerms } from "@/features/terminology/queries";
@@ -19,7 +20,7 @@ import { recordPage } from "@/lib/record-types";
 
 import { ChatImportButton } from "@/features/whatsapp/components/chat-import-button";
 
-import { getTimeline, managesRecordTeam } from "../queries";
+import { getTimeline, managesRecordTeam, TIMELINE_LIMIT } from "../queries";
 import { canEditNoteHint, canPinHint, canRemoveImportNoteHint, isPinnableType, parseTimelineFilter, TIMELINE_FILTERS, timelineFilterHref, type TimelineSubject } from "../schema";
 import { ImportNoteRemove, NoteActions } from "./note-actions";
 import { NoteForm } from "./note-form";
@@ -47,11 +48,18 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam, 
   const typesRead = listActivityTypes(orgId);
   // FLD-10 part three: the entries the app draws (a conversion, a stage move, a lead passed on) in the business's words
   const termsRead = getOrgTerms(orgId);
-  const [items, context, types] = await Promise.all([
+  const [entries, messages, context, types] = await Promise.all([
     Promise.all([typesRead, termsRead]).then(([list, terms]) => getTimeline(orgId, subject, filter, list, terms)),
+    // MSG-03: messages sent to or received from a lead or contact, read-only entries
+    messageTimelineItems(orgId, subject, filter.key),
     getOrgContext(orgId),
     typesRead,
   ]);
+  // one time window: a list that came back full bounds the other (no older item above a gap)
+  const items = mergeTimeline(entries, messages, {
+    entries: entries.length >= TIMELINE_LIMIT,
+    messages: messages.length >= MESSAGES_ON_TIMELINE,
+  });
   const writable = canWrite && context.canWrite;
   // REC-02: who may be mentioned here, and the current names of those mentioned in the entries shown
   const [mentions, mentionedNames, noteFiles] = await Promise.all([

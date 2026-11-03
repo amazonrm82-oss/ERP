@@ -246,8 +246,8 @@ describe("OPS-04: the send handler", () => {
 
   it("sends through the provider with ids and codes only once the database says yes", async () => {
     const handler = createSendHandler({ maySend: async () => ({ may_send: true }), providerFor: (channel) => createFakeProvider({ channel }) });
-    expect(await handler(job())).toEqual({ status: "done" });
-    expect(await handler(job({ id: "c2", payload: { channel: "sms", contact_id: "55555555-5555-4555-8555-555555555555" } }))).toEqual({ status: "done" });
+    expect(await handler(job())).toMatchObject({ status: "done", receipt: { provider: "fake" } });
+    expect(await handler(job({ id: "c2", payload: { channel: "sms", contact_id: "55555555-5555-4555-8555-555555555555" } }))).toMatchObject({ status: "done" });
     expect(fakeSentMessages()).toEqual([
       { jobId: job().id, organizationId: job().organization_id, channel: "email", recordType: "lead", recordId: "44444444-4444-4444-8444-444444444444" },
       { jobId: "c2", organizationId: job().organization_id, channel: "sms", recordType: "contact", recordId: "55555555-5555-4555-8555-555555555555" },
@@ -267,7 +267,7 @@ describe("OPS-04: the send handler", () => {
     expect(fakeSentMessages()).toEqual([]);
     const failing = createFakeProvider({ fail: () => ({ ok: false, error: "quota" }) });
     const handler = createSendHandler({ maySend: async () => ({ may_send: true }), providerFor: () => failing });
-    expect(await handler(job())).toEqual({ status: "failed", error: "quota", final: undefined });
+    expect(await handler(job())).toEqual({ status: "failed", error: "quota", final: undefined, receipt: { provider: "fake" } });
   });
 
   it("uses the fake provider only when asked, and never on production", () => {

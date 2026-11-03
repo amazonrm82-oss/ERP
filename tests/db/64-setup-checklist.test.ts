@@ -688,6 +688,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       // RVW-64 redefines app.import_record_worked() of _collection_reminder_import_undo.sql and app.sample_untouched() of
       // _task_subtasks.sql last (a payment promise is work)
       "_payment_promise_work.sql",
+      // MSG-03 redefines app.sample_untouched() of _task_subtasks.sql last (a message keeps a sample lead or contact)
+      "_messages.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

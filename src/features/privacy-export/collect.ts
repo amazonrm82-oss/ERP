@@ -179,12 +179,14 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
   const promiseFilter = [contactIds.length ? `contact_id.in.(${contactIds.join(",")})` : null, ownDocumentIds.length ? `document_id.in.(${ownDocumentIds.join(",")})` : null]
     .filter(Boolean)
     .join(",");
-  const [accountingDocumentLines, paymentPromises, privacyRequests, dealLines, taskChecklistItems] = await Promise.all([
+  const [accountingDocumentLines, paymentPromises, privacyRequests, dealLines, taskChecklistItems, messages] = await Promise.all([
     readByIds(supabase, orgId, "accounting_document_lines", "*", "document_id", ownDocumentIds),
     readLinked(supabase, orgId, "payment_promises", "*", promiseFilter || null),
     readLinked(supabase, orgId, "privacy_requests", PRIVACY_REQUEST_COLUMNS, personOnly),
     readByIds(supabase, orgId, "deal_lines", "*", "deal_id", ids.deal),
     readByIds(supabase, orgId, "task_checklist_items", "*", "task_id", uniqueIds(tasks.map((t) => t.id))),
+    // MSG-03: the log of messages sent to or received from the person (codes, ids and times; no content is kept)
+    readLinked(supabase, orgId, "messages", "*", personOnly),
   ]);
 
   // 4. names for the ids, so the file can be read without the system
@@ -245,6 +247,7 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     privacy_requests: privacyRequests,
     deal_lines: dealLines,
     task_checklist_items: taskChecklistItems,
+    messages,
     segment_members: segmentMembers,
     consents,
     form_submissions: submissions,

@@ -57,6 +57,10 @@ export async function runJobsRoute(request: Request): Promise<Response> {
             p_error: report.error ?? undefined,
             p_final: report.final,
             p_started: report.started,
+            // MSG-03: the provider's receipt, kept on the job; the database records the message when the job ends
+            p_provider: report.receipt?.provider,
+            p_provider_message_id: report.receipt?.providerMessageId,
+            p_provider_error_code: report.receipt?.errorCode,
           });
           if (error) return null;
           return data === "done" || data === "failed" || data === "dead" || data === "released" || data === "stale" ? data : null;

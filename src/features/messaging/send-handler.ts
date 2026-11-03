@@ -50,7 +50,14 @@ export function createSendHandler(deps: {
     if (!answer) return { status: "failed", error: "send check answered nothing" };
     if (!answer.may_send) return { status: "ended", reason: answer.reason };
     const result = await provider.send({ jobId: job.id, organizationId: job.organization_id, ...to });
-    if (result.ok) return { status: "done" };
-    return { status: "failed", error: result.error, final: result.final };
+    // MSG-03: the provider's code with its message id (sent) or its error code (failed) go back to the queue, which
+    // records the message; the database drops a value of the wrong shape
+    if (result.ok) return { status: "done", receipt: { provider: provider.name, providerMessageId: result.providerId } };
+    return {
+      status: "failed",
+      error: result.error,
+      final: result.final,
+      receipt: { provider: provider.name, ...(typeof result.code === "string" ? { errorCode: result.code } : {}) },
+    };
   };
 }

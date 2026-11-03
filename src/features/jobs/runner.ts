@@ -1,4 +1,4 @@
-import { redactJobError, type ClaimedJob, type JobRegistry, parseClaimed } from "./registry";
+import { redactJobError, type ClaimedJob, type JobRegistry, parseClaimed, type ProviderReceipt } from "./registry";
 
 /** What public.finish_job answered; null when the call itself failed. */
 export type FinishAnswer = "done" | "failed" | "dead" | "released" | "stale" | null;
@@ -8,7 +8,7 @@ export type QueueCalls = {
   claim(kinds: string[], limit: number): Promise<unknown>;
   finish(
     job: { id: string; lease: string },
-    report: { ok: boolean; error: string | null; final: boolean; started: boolean },
+    report: { ok: boolean; error: string | null; final: boolean; started: boolean; receipt?: ProviderReceipt },
   ): Promise<FinishAnswer>;
 };
 
@@ -41,10 +41,18 @@ export async function runJobs(
   const deadline = now() + (options.budgetMs ?? 40_000);
   const batch = options.batch ?? 20;
 
-  const report = async (job: ClaimedJob, ok: boolean, error: string | null, final: boolean, expected: FinishAnswer[], what: string) => {
+  const report = async (
+    job: ClaimedJob,
+    ok: boolean,
+    error: string | null,
+    final: boolean,
+    expected: FinishAnswer[],
+    what: string,
+    receipt?: ProviderReceipt,
+  ) => {
     let answer: FinishAnswer;
     try {
-      answer = await calls.finish(job, { ok, error, final, started: true });
+      answer = await calls.finish(job, receipt ? { ok, error, final, started: true, receipt } : { ok, error, final, started: true });
     } catch {
       answer = null;
     }
@@ -83,10 +91,10 @@ export async function runJobs(
         const outcome = await handler(job);
         if (outcome.status === "done") {
           summary.done += 1;
-          await report(job, true, null, false, ["done"], "success after the work was done");
+          await report(job, true, null, false, ["done"], "success after the work was done", outcome.receipt);
         } else if (outcome.status === "failed") {
           summary.failed += 1;
-          await report(job, false, redactJobError(outcome.error), outcome.final === true, ["failed", "dead"], "failure");
+          await report(job, false, redactJobError(outcome.error), outcome.final === true, ["failed", "dead"], "failure", outcome.receipt);
         } else {
           summary.ended += 1;
         }

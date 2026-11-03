@@ -90,6 +90,7 @@ export const PERSON_EXPORT_README = `ייצוא כל המידע על אדם אח
 - privacy_requests: בקשות פרטיות שקשורות לליד או לאיש הקשר
 - deal_lines: השורות (מוצרים ושירותים) של העסקאות
 - task_checklist_items: השלבים של המשימות
+- messages: יומן ההודעות שנשלחו לליד או לאיש הקשר או התקבלו מהם (ערוץ, סטטוס וזמנים, בלי תוכן)
 - segment_members: הסגמנטים (רשימות ידניות) שהאדם הוכנס אליהם
 - consents: הסכמות לדיוור והסרות
 - form_submissions: פניות מטפסים
@@ -133,6 +134,7 @@ export const PERSON_EXPORT_TABLES = [
   "accounting_documents",
   "accounting_document_lines",
   "privacy_requests",
+  "messages",
   "segment_members",
   "consents",
   "form_submissions",

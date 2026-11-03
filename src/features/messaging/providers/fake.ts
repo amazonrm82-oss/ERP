@@ -30,7 +30,7 @@ export function createFakeProvider(
       sent.push({ ...message });
       if (sent.length > FAKE_SENT_KEPT) sent.splice(0, sent.length - FAKE_SENT_KEPT);
       count += 1;
-      return { ok: true, providerId: `fake-${count}`, costAgorot: 0 };
+      return { ok: true, providerId: `fake-${count}` };
     },
   };
 }

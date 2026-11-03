@@ -18,9 +18,15 @@ const setKey = (value: string | null) =>
 const REVIEWED_MD5 = {
   // MSG-01 (021145): p_channels, a channel without a provider is not claimed; needs a fresh review
   claim_jobs: "3f6b474aca13963df4616cfd19e20010",
-  finish_job: "50078fb665234f8655dd361ef51ceefb",
-  job_message_may_send: "6af4771a06c407b475af238f2756552d",
+  // MSG-03 (021146): three optional arguments, the provider's receipt and the message outcome kept on the job; needs a
+  // fresh review
+  finish_job: "058e58191682d7520d64729e26adbd91",
+  // MSG-03 (021146): stamps the lease that passed the check (send_checked_lease); needs a fresh review
+  job_message_may_send: "05faf072c56d3474c8bd4d13b1cf47fc",
 };
+
+// MSG-03: the trigger function that writes public.messages from the worker's path (see its test below)
+const REVIEWED_RECORD_MESSAGE_MD5 = "9e2c594aad5a24e99e78474ab780d6fe";
 
 type Claimed = { id: string; lease: string; kind: string; organization_id: string; payload: Record<string, unknown>; attempt: number };
 type Job = { status: string; attempts: number; last_error: string | null; next_run_at: Date; lease_id: string | null; locked_until: Date | null };
@@ -94,7 +100,7 @@ describe("background job queue (OPS-04)", () => {
           (
             await q<{ c: boolean; f: boolean; m: boolean }>(
               `select has_function_privilege($1, 'public.claim_jobs(text[],integer,integer,text[])', 'execute') as c,
-                      has_function_privilege($1, 'public.finish_job(uuid,uuid,boolean,text,boolean,boolean)', 'execute') as f,
+                      has_function_privilege($1, 'public.finish_job(uuid,uuid,boolean,text,boolean,boolean,text,text,text)', 'execute') as f,
                       has_function_privilege($1, 'public.job_message_may_send(uuid,uuid)', 'execute') as m`,
               [role],
             )
@@ -592,7 +598,7 @@ describe("background job queue (OPS-04)", () => {
           await q<{ name: string; result: string; src: string }>(
             `select p.proname as name, pg_get_function_result(p.oid) as result, p.prosrc as src from pg_proc p
               where p.oid in ('public.claim_jobs(text[],integer,integer,text[])'::regprocedure,
-                              'public.finish_job(uuid,uuid,boolean,text,boolean,boolean)'::regprocedure,
+                              'public.finish_job(uuid,uuid,boolean,text,boolean,boolean,text,text,text)'::regprocedure,
                               'public.job_message_may_send(uuid,uuid)'::regprocedure)
               order by 1`,
           )
@@ -658,6 +664,30 @@ describe("background job queue (OPS-04)", () => {
         ).rows,
     );
     expect(Object.fromEntries(rows.map((r) => [r.name, r.md5]))).toEqual(REVIEWED_MD5);
+  });
+
+  // MSG-03: claim_jobs and finish_job name no public table; the ONE approved writer of a public table on the worker's path
+  // is the trigger jobs_record_message on app.jobs (owner's approval pending, question 75), which writes public.messages
+  // when finish_job sets message_outcome. Every trigger on app.jobs is in this closed list, and the trigger function's
+  // body is pinned: a new trigger, or a change of this one, needs a fresh review (and the owner's approval of the path).
+  it("MSG-03: the only trigger on app.jobs is jobs_record_message, with the reviewed body", async () => {
+    const triggers = await asAdmin(
+      async (q) =>
+        (await q<{ name: string }>("select tgname as name from pg_trigger where tgrelid = 'app.jobs'::regclass and not tgisinternal order by 1")).rows,
+    );
+    expect(triggers.map((t) => t.name)).toEqual(["jobs_record_message"]);
+    const fn = await asAdmin(
+      async (q) =>
+        (
+          await q<{ md5: string; func: string }>(
+            `select md5(p.prosrc || '|' || p.prosecdef::text || '|' || coalesce(p.proconfig::text, '') || '|' || pg_get_function_identity_arguments(p.oid)) as md5,
+                    t.tgfoid::regproc::text as func
+               from pg_trigger t join pg_proc p on p.oid = t.tgfoid
+              where t.tgrelid = 'app.jobs'::regclass and t.tgname = 'jobs_record_message'`,
+          )
+        ).rows[0],
+    );
+    expect(fn).toEqual({ md5: REVIEWED_RECORD_MESSAGE_MD5, func: "app.jobs_record_message" });
   });
 
   // (55) א 3: every job kind needs the owner's own approval and its own "In use" line in CLAUDE.md (hard rule 5).

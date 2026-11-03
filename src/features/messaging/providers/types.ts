@@ -25,11 +25,12 @@ export type OutgoingMessage = {
 
 /**
  * A provider's answer. providerId is the provider's own message id (MSG-03 keeps it, one per provider and business, so a
- * delivery report or a repeated callback is never counted twice); costAgorot is what the provider charged, when it says.
+ * delivery report or a repeated callback is never counted twice); code is the provider's short error code of a failure
+ * (kept on the message when the send failed for good; owner (75) א: ids and codes only, no content, no cost).
  */
 export type ProviderResult =
-  | { ok: true; providerId: string; costAgorot?: number | null }
-  | { ok: false; error: string; final?: boolean };
+  | { ok: true; providerId: string }
+  | { ok: false; error: string; final?: boolean; code?: string };
 
 /** An adapter for one provider on one channel. `name` is the provider's code, kept on every message it sent. */
 export type MessagingProvider = {

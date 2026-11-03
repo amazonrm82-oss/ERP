@@ -850,6 +850,37 @@ describe("roles and record visibility", () => {
     }
   });
 
+  it("a lead's or contact's messages follow the record: whoever reads it reads them, nobody writes them (MSG-03)", async () => {
+    await setVisibility("own");
+    const lead = await insertLead(m1.id, org, { full_name: "ליד עם הודעות" });
+    const contact = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'איש קשר עם הודעות') returning id", [org])).rows[0].id,
+    );
+    const ids = await asAdmin(async (q) =>
+      (
+        await q<{ id: string }>(
+          `insert into public.messages (organization_id, lead_id, contact_id, channel, direction, status)
+           values ($1, $2, null, 'email', 'outbound', 'sent'), ($1, null, $3, 'sms', 'inbound', 'received') returning id`,
+          [org, lead, contact],
+        )
+      ).rows.map((r) => r.id),
+    );
+    const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.messages where id = any($1)", [ids]));
+    for (const u of [owner, admin, m1]) expect(await seen(u), u.email).toBe(2);
+    for (const u of [m2, viewer]) expect(await seen(u), u.email).toBe(0);
+    await setVisibility("org");
+    for (const u of [m2, viewer]) expect(await seen(u), u.email).toBe(2);
+    // only the server writes messages: not the record's owner, not the business owner
+    for (const u of [owner, admin, m1, viewer]) {
+      expect((await pgError(asUser(u.id, (q) => q("update public.messages set status = 'failed' where id = $1", [ids[0]])))).code, u.email).toBe("42501");
+      expect((await pgError(asUser(u.id, (q) => q("delete from public.messages where id = $1", [ids[0]])))).code, u.email).toBe("42501");
+      expect(
+        (await pgError(asUser(u.id, (q) => q("insert into public.messages (organization_id, lead_id, channel, direction, status) values ($1, $2, 'sms', 'outbound', 'sent')", [org, lead])))).code,
+        u.email,
+      ).toBe("42501");
+    }
+  });
+
   it("the blocklist: owners and admins read it, nobody writes it directly (CNS-06)", async () => {
     const entry = await asAdmin(async (q) =>
       (

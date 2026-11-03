@@ -2372,6 +2372,31 @@ export type QuoteViewRow = {
   created_at: string;
 };
 
+// MSG-03: a message sent to or received from a lead or contact (migration messages). Written by the server only (the
+// OPS-04 queue when a message.send job ends); read by whoever reads the record.
+export type MessageRow = {
+  id: string;
+  organization_id: string;
+  lead_id: string | null;
+  contact_id: string | null;
+  // email | sms | whatsapp
+  channel: string;
+  // outbound | inbound
+  direction: string;
+  // sent | delivered | read | failed (outbound), received (inbound)
+  status: string;
+  provider: string | null;
+  provider_message_id: string | null;
+  provider_error_code: string | null;
+  job_id: string | null;
+  template_code: string | null;
+  occurred_at: string;
+  sent_at: string | null;
+  delivered_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // QUO-02: a line of a quote (migration quotes). kind item | group; unit_name, total_agorot and a product line's
 // vat_exempt and billing are set by trigger quote_lines_check.
 export type QuoteLineRow = {
@@ -3369,6 +3394,8 @@ export type Database = {
       // ORD-05: no client writes
       order_decisions: ReadOnlyTable<OrderDecisionRow>;
       quote_views: ReadOnlyTable<QuoteViewRow>;
+      // MSG-03: no client writes
+      messages: ReadOnlyTable<MessageRow>;
       // CNS-06: written through functions only
       consent_blocklist: ReadOnlyTable<ConsentBlocklistRow>;
       quote_payment_steps: Table<
@@ -4196,7 +4223,18 @@ export type Database = {
       // MSG-01: p_channels = the channels with a provider (null = all)
       claim_jobs: { Args: { p_kinds: string[]; p_limit?: number; p_lease_seconds?: number; p_channels?: string[] }; Returns: Json };
       finish_job: {
-        Args: { p_job: string; p_lease: string; p_ok: boolean; p_error?: string; p_final?: boolean; p_started?: boolean };
+        Args: {
+          p_job: string;
+          p_lease: string;
+          p_ok: boolean;
+          p_error?: string;
+          p_final?: boolean;
+          p_started?: boolean;
+          // MSG-03: the provider's receipt of a sent message
+          p_provider?: string;
+          p_provider_message_id?: string;
+          p_provider_error_code?: string;
+        };
         Returns: string;
       };
       job_message_may_send: { Args: { p_job: string; p_lease: string }; Returns: Json };

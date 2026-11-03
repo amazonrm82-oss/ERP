@@ -82,7 +82,7 @@ function metaNumber(metadata: Json, key: string): number | null {
 const isResponsePass = (activity: { type: string; metadata: Json }) =>
   activity.type === "system" && metaString(activity.metadata, "kind") === "response_pass";
 
-const TIMELINE_LIMIT = 100;
+export const TIMELINE_LIMIT = 100;
 
 /**
  * Timeline of a record: pinned entries first, then newest first (100 entries at most).
