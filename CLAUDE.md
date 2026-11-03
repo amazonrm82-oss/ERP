@@ -1691,6 +1691,20 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   recorder else owners/admins, once per cheque and day in `app.cheque_reminders_sent`, from 08:00). `app.audit_erase_core` was last
   redefined in 020815 (cheque number, foreign bank name, unbounce reason and the reminders' number). DOC-04 follow-up (020810):
   timeline kinds `payment_failed`, `payment_refunded`, and `payment_received` again on failed -> recorded/confirmed.
+- Content library (LIB-01, migration 021155; owner (69) א: every plan, no key, inside `storage_gb`): `public.library_categories`
+  (managed list, five seeded defaults mirrored by `DEFAULT_LIBRARY_CATEGORIES`; members read, owners/admins of a writable business
+  write; 50, hint `library_categories:max`; audited) and `public.library_items` (kind link|file, insert-only; title 1..120,
+  description ≤500, category FK set null, url only on a link by `app.qr_target_url_ok`, valid_from/valid_until, is_active; members
+  read; `app.library_writable` = owner/admin/manager by role in a writable business; 1,000, hint `library_items:max`; audited). A
+  file item's file is a `files` row with `library_item_id` (composite FK cascade; `files_one_subject` counts nine columns;
+  `files_library_shape`; definer trigger `files_library_check`, hint `library:file_kind`), through the one upload path (quota,
+  waiting mark, confirmation). The current file is the item's newest confirmed row: a replacement waits beside it, and only after
+  `confirm_file_upload` is ok does the app remove the confirmed rows made before it (one file per item is kept by the app, not the
+  database, because a database delete needs a hand-pasted migration). Reading follows the item; any library writer removes a library
+  file (`files_delete`); `record_files_delete` lets only a library writer remove its object; a removed row's object goes to the
+  orphan cleanup. The files_select/insert/delete policies, `record_files_delete` and `app.files_before_insert` were last redefined in
+  021155. No public page and no service-key use. App: `src/features/library/`, page `/o/[org]/library` (reached from the products
+  page until the nav entry lands).
 - Refunds (PAY-08, migration 021154; owner (71) ב, 3 November 2026; part of `payments`, no new key): `public.payment_refunds` (a
   refund of one payment: amount 1..1e12 ILS, `refunded_on` not before `paid_on`, method from the payments' list, reference, note,
   optional active `credit_invoice` of the same customer; owners/admins of a writable business on a recorded/confirmed payment they
