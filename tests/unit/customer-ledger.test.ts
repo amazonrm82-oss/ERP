@@ -83,6 +83,8 @@ describe("customer ledger (BAL-01)", () => {
     expect(lineNote(line({ type: "receipt", debit: 0 }))).toContain("בלי סכום");
     expect(lineNote(line({ kind: "payment", type: "transfer", status: "failed", debit: 0 }))).toBe("נכשל, לא נספר");
     expect(lineNote(line({ kind: "payment", type: "transfer", status: "confirmed", debit: 0, credit: 1000 }))).toBeNull();
+    // PAY-08: a partly refunded payment credits less than its amount
+    expect(lineNote(line({ kind: "payment", type: "transfer", status: "confirmed", debit: 0, amount: 1000, credit: 700 }))).toBe("הוחזר חלקית, נספר רק מה שנשאר");
     expect(lineMuted(line({ debit: 0 }))).toBe(true);
     expect(lineMuted(line({}))).toBe(false);
   });

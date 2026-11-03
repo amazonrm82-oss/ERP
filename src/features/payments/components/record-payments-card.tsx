@@ -14,13 +14,15 @@ import { formatDate, formatMoney, zoneDate } from "@/lib/format";
 
 import { paymentsPath } from "../paths";
 import type { MoneySubject } from "../money-subject";
-import { getPaymentsAccess, listRecordPayments } from "../queries";
+import { getPaymentsAccess, listRecordPayments, listRefundCreditDocuments } from "../queries";
+import { refundable, refundedLine } from "../refunds";
 import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, receivedTotal, type PaymentStatus } from "../schema";
 import { bankLabel, CHEQUE_STATUS_LABELS } from "../cheques";
 import { ChequeSeriesButton, ChequeStatusSelect } from "./cheque-forms";
 import { advanceLine } from "../advance";
 import { advanceLinkNumbers, listAdvanceTargets } from "../advance-queries";
 import { CancelPaymentButton, CorrectPaymentButton, PaymentStatusSelect, RecordPaymentButton } from "./payment-forms";
+import { CancelRefundButton, RefundPaymentButton } from "./refund-forms";
 
 type Props = {
   orgId: string;
@@ -69,6 +71,13 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
       payments.flatMap((p) => (p.advance ? [p.advance] : [])),
     ),
   ]);
+  // PAY-08: the recorded credit invoices a refund may name (owners and admins refund)
+  const creditDocuments = access.canCorrect
+    ? (await listRefundCreditDocuments(orgId, subject)).map((doc) => ({
+        id: doc.id,
+        label: `חשבונית זיכוי${doc.number ? ` ${doc.number}` : ""} מ-${formatDate(`${doc.docDate}T12:00:00Z`)}`,
+      }))
+    : [];
   const today = zoneDate(new Date(), context.org.timeZone);
   const titleId = `payments-${subject.id}`;
   const total = receivedTotal(payments);
@@ -94,7 +103,7 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
           <>
             <p className="border-b border-line px-4 py-2 text-sm text-ink-soft">
               התקבלו <span className="font-medium text-ink tabular-nums">{formatMoney(total)}</span> (תשלומים במצב נרשם או אושר; לא נספרים תשלומים שבוטלו, נכשלו
-              או הוחזרו)
+              או הוחזרו; החזר חלקי מופחת)
             </p>
             <ul className="divide-y divide-line">
               {payments.map((payment) => {
@@ -102,6 +111,9 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
                 const recorder = payment.createdBy ? names.get(payment.createdBy) : undefined;
                 const cancelled = payment.status === "cancelled";
                 const muted = payment.status !== "recorded" && payment.status !== "confirmed";
+                // PAY-08: what may still be refunded, and the refunds' line
+                const remaining = refundable(payment, payment.refundedAgorot);
+                const refundText = refundedLine(payment, payment.refundedAgorot);
                 return (
                   <li key={payment.id} className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 px-4 py-3">
                     <div className="min-w-0 flex-1">
@@ -146,6 +158,53 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
                         </p>
                       ) : null}
                       {payment.note ? <p className="text-sm break-words whitespace-pre-line">{payment.note}</p> : null}
+                      {refundText ? (
+                        <p className="text-sm font-medium">
+                          {refundText}: <span className="tabular-nums">{formatMoney(payment.refundedAgorot)}</span>
+                          {remaining > 0 ? (
+                            <>
+                              {" · נספר "}
+                              <span className="tabular-nums">{formatMoney(remaining)}</span>
+                            </>
+                          ) : null}
+                        </p>
+                      ) : null}
+                      {payment.refunds.length > 0 ? (
+                        <ul className="mt-1 space-y-1 border-s-2 border-line ps-3" aria-label={`ההחזרים של התשלום ${label}`}>
+                          {payment.refunds.map((refund) => {
+                            const refundLabel = `${formatMoney(refund.amountAgorot)} מ-${formatDate(`${refund.refundedOn}T12:00:00Z`)}`;
+                            const refundCancelled = refund.status === "cancelled";
+                            const by = refund.createdBy ? names.get(refund.createdBy) : undefined;
+                            return (
+                              <li key={refund.id} className="flex flex-wrap items-start justify-between gap-2 text-sm">
+                                <div className="min-w-0 flex-1">
+                                  <p className="break-words">
+                                    {"החזר "}
+                                    <span className={`tabular-nums ${refundCancelled ? "text-ink-soft line-through" : ""}`}>{formatMoney(refund.amountAgorot)}</span>
+                                    {` · ${PAYMENT_METHOD_LABELS[refund.method]} · ${formatDate(`${refund.refundedOn}T12:00:00Z`)}`}
+                                    {refund.reference ? (
+                                      <>
+                                        {" · אסמכתא "}
+                                        <bdi dir="ltr">{refund.reference}</bdi>
+                                      </>
+                                    ) : null}
+                                    {refund.creditDocumentId ? ` · ${creditDocuments.find((d) => d.id === refund.creditDocumentId)?.label ?? "חשבונית זיכוי"}` : ""}
+                                    {by ? ` · נרשם על ידי ${by}` : ""}{" "}
+                                    {refundCancelled ? <Badge tone="warning">בוטל</Badge> : null}
+                                  </p>
+                                  {refund.note ? <p className="break-words whitespace-pre-line text-ink-soft">{refund.note}</p> : null}
+                                  {refundCancelled && refund.cancelReason ? (
+                                    <p className="break-words text-ink-soft">
+                                      בוטל{refund.cancelledAt ? ` ב-${formatDate(refund.cancelledAt)}` : ""}: <bdi>{refund.cancelReason}</bdi>
+                                    </p>
+                                  ) : null}
+                                </div>
+                                {access.canCorrect && !refundCancelled ? <CancelRefundButton orgId={orgId} subject={subject} refundId={refund.id} label={refundLabel} /> : null}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : null}
                       {money && !muted ? (
                         <p className="text-sm text-ink-soft">
                           שויך למסמכים <span className="tabular-nums">{formatMoney(money.payments.get(payment.id)?.allocated ?? 0)}</span>
@@ -206,9 +265,22 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
                             paymentId={payment.id}
                             status={payment.status}
                             canCorrect={access.canCorrect}
+                            hasRefunds={payment.refundedAgorot > 0}
                             label={label}
                           />
                         )}
+                        {access.canCorrect && remaining > 0 ? (
+                          <RefundPaymentButton
+                            orgId={orgId}
+                            subject={subject}
+                            paymentId={payment.id}
+                            label={label}
+                            method={payment.method}
+                            remaining={remaining}
+                            today={today}
+                            creditDocuments={creditDocuments}
+                          />
+                        ) : null}
                         {access.canCorrect ? (
                           <>
                             <CorrectPaymentButton

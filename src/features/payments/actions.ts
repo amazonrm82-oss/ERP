@@ -23,6 +23,7 @@ import {
   type ChequeFields,
   unbounceReasonSchema,
 } from "./cheques";
+import { REFUND_FIELD_NAMES, refundCancelSchema, refundSchema } from "./refunds";
 import { cancelReasonSchema, newPaymentStatusSchema, PAYMENT_FIELD_NAMES, paymentSchema, paymentStatusSchema } from "./schema";
 
 // PAY-01, PAY-06: recording, moving the status of, correcting and cancelling a payment, with the user's session. RLS and the
@@ -234,4 +235,51 @@ export async function recordChequeSeriesAction(orgId: string, subject: Subject, 
   if (error) return fail(writeError(error), { values: formValues(formData) });
   revalidatePath(pageOf(orgId, subject));
   return { ok: true, message: `נרשמו ${cheques.length} צ'קים.` };
+}
+
+// ----------------------------------------------------------------------------
+// PAY-08: refunds (owners and admins; a refund is a correction)
+// ----------------------------------------------------------------------------
+
+const CANNOT_REFUND = "החזר של תשלום רק לבעלים ולמנהלי מערכת.";
+
+/** Records a refund of part or all of a payment; the database caps it at what the payment still holds. */
+export async function recordRefundAction(orgId: string, subject: Subject, paymentId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  if (!validArg(subjectSchema, subject)) return fail(INVALID_ARGS);
+  const context = await actionContext(orgId, subject.id, paymentId);
+  if (!context.ok) return context;
+  const parsed = refundSchema.safeParse(pick(formData, REFUND_FIELD_NAMES));
+  if (!parsed.success) return invalid(parsed.error, formData);
+  const { error } = await context.supabase.from("payment_refunds").insert({
+    organization_id: orgId,
+    payment_id: paymentId,
+    amount_agorot: parsed.data.amount,
+    refunded_on: parsed.data.refunded_on,
+    method: parsed.data.method,
+    reference: parsed.data.reference,
+    note: parsed.data.note,
+    credit_document_id: parsed.data.credit_document_id,
+  });
+  if (error) return fail(writeError(error, CANNOT_REFUND), { values: formValues(formData) });
+  revalidatePath(pageOf(orgId, subject));
+  return { ok: true, message: "ההחזר נרשם." };
+}
+
+/** Cancels a refund with a reason; a refund is never deleted. */
+export async function cancelRefundAction(orgId: string, subject: Subject, refundId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  if (!validArg(subjectSchema, subject)) return fail(INVALID_ARGS);
+  const context = await actionContext(orgId, subject.id, refundId);
+  if (!context.ok) return context;
+  const reason = refundCancelSchema.safeParse({ reason: formData.get("reason") ?? "" });
+  if (!reason.success) return invalid(reason.error, formData);
+  const { data, error } = await context.supabase
+    .from("payment_refunds")
+    .update({ status: "cancelled", cancel_reason: reason.data.reason })
+    .eq("organization_id", orgId)
+    .eq("id", refundId)
+    .select("id");
+  if (error) return fail(writeError(error, CANNOT_REFUND), { values: formValues(formData) });
+  if (data.length === 0) return fail(CANNOT_REFUND, { values: formValues(formData) });
+  revalidatePath(pageOf(orgId, subject));
+  return ok();
 }

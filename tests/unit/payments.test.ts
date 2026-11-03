@@ -59,9 +59,15 @@ describe("payments (PAY-01)", () => {
     expect(canRecordPayments("viewer", ["record_payments"])).toBe(false);
     expect(canRecordPayments(null, ["record_payments"])).toBe(false);
     expect(statusChoices("recorded", false)).toEqual(["confirmed", "failed"]);
-    expect(statusChoices("recorded", true)).toEqual(["confirmed", "failed", "refunded"]);
+    // PAY-08: a refund goes through its own window (a refund record), never through the status choice
+    expect(statusChoices("recorded", true)).toEqual(["confirmed", "failed"]);
     expect(statusChoices("refunded", false)).toEqual([]);
+    // a payment marked refunded by hand before PAY-08 may still be moved back by owners and admins
     expect(statusChoices("refunded", true)).toEqual(["recorded", "confirmed", "failed"]);
+    // while refunds stand: recorded and confirmed only; refunded in full by its refunds moves nowhere
+    expect(statusChoices("recorded", true, true)).toEqual(["confirmed"]);
+    expect(statusChoices("confirmed", false, true)).toEqual(["recorded"]);
+    expect(statusChoices("refunded", true, true)).toEqual([]);
     // a cancelled payment moves nowhere, and cancelling is its own window with a reason
     expect(statusChoices("cancelled", true)).toEqual([]);
     expect(statusChoices("confirmed", true)).not.toContain("cancelled");
@@ -77,5 +83,12 @@ describe("payments (PAY-01)", () => {
         { amountAgorot: 1600, status: "cancelled" },
       ]),
     ).toBe(300);
+    // PAY-08: a partly refunded payment counts its amount less its active refunds
+    expect(
+      receivedTotal([
+        { amountAgorot: 1000, status: "recorded", refundedAgorot: 300 },
+        { amountAgorot: 500, status: "refunded", refundedAgorot: 500 },
+      ]),
+    ).toBe(700);
   });
 });

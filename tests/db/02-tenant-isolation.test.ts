@@ -303,6 +303,8 @@ describe("tenant isolation", () => {
         ])
       ).rows[0].id;
       await q("insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, 500)", [orgA, ids.paymentA, ids.invoiceA]);
+      // PAY-08: part of the payment refunded
+      await q("insert into public.payment_refunds (organization_id, payment_id, amount_agorot, method) values ($1, $2, 100, 'cash')", [orgA, ids.paymentA]);
       // GAP-12: a negative opening balance of A's contact, offset against a tax invoice of the contact
       ids.openingCreditA = (
         await q<{ id: string }>("select public.opening_balance_set($1, $2, null, -800, '2026-01-01') as id", [orgA, ids.contactA])
@@ -489,6 +491,8 @@ describe("tenant isolation", () => {
     "accounting_document_lines",
     // PAY-02
     "payment_allocations",
+    // PAY-08
+    "payment_refunds",
     // GAP-12
     "opening_credit_allocations",
     // PAY-03
@@ -717,6 +721,8 @@ describe("tenant isolation", () => {
       accounting_document_lines: "description = description",
       // no delete grant at all (undone, never deleted): a permission error is the expected outcome for the delete
       payment_allocations: "amount_agorot = amount_agorot",
+      // no delete grant at all (cancelled, never deleted): a permission error is the expected outcome for the delete
+      payment_refunds: "status = status",
       // no delete grant at all (undone, never deleted): a permission error is the expected outcome for the delete
       opening_credit_allocations: "amount_agorot = amount_agorot",
       // no write grant at all (quote_public_decide() writes): a permission error is the expected outcome
@@ -876,6 +882,7 @@ describe("tenant isolation", () => {
       ["insert into public.accounting_documents (organization_id, contact_id, doc_type, number, amount_agorot) values ($1, $2, 'receipt', 'X-9', 1)", [orgA, ids.contactA]],
       ["insert into public.accounting_document_lines (organization_id, document_id, description) values ($1, $2, 'x')", [orgA, ids.documentA]],
       ["insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, 1)", [orgA, ids.paymentA, ids.invoiceA]],
+      ["insert into public.payment_refunds (organization_id, payment_id, amount_agorot, method) values ($1, $2, 1, 'cash')", [orgA, ids.paymentA]],
       ["insert into public.opening_credit_allocations (organization_id, credit_document_id, document_id, amount_agorot) values ($1, $2, $3, 1)", [orgA, ids.openingCreditA, ids.contactInvoiceA]],
       ["insert into public.quote_decisions (organization_id, quote_id, decision, content_sha256) values ($1, $2, 'rejected', repeat('1', 64))", [orgA, ids.quoteA]],
       ["insert into public.quote_views (organization_id, quote_id) values ($1, $2)", [orgA, ids.quoteA]],
@@ -1011,6 +1018,7 @@ describe("tenant isolation", () => {
       ["accounting_documents", "status = 'cancelled', cancel_reason = 'HACKED'", "cancel_reason = 'HACKED'"],
       ["accounting_document_lines", "description = 'HACKED'", "description = 'HACKED'"],
       ["payment_allocations", "amount_agorot = 777", "amount_agorot = 777"],
+      ["payment_refunds", "status = 'cancelled', cancel_reason = 'HACKED'", "cancel_reason = 'HACKED'"],
       ["opening_credit_allocations", "amount_agorot = 777", "amount_agorot = 777"],
       ["payment_credit_companies", "credit_agorot = 777", "credit_agorot = 777"],
       ["customer_credit_totals", "credit_agorot = 777", "credit_agorot = 777"],
@@ -1327,6 +1335,11 @@ describe("tenant isolation", () => {
     );
     // RLS, the composite FK or the trigger's "same business" refusal (which answers the same whether the row exists or not)
     expect(["42501", "23503", "P0001"]).toContain(viaAllocation.code);
+    // PAY-08: B's refund cannot name A's payment
+    const viaRefund = await pgError(
+      asUser(b.id, (q) => q("insert into public.payment_refunds (organization_id, payment_id, amount_agorot, method) values ($1, $2, 1, 'cash')", [orgB, ids.paymentA])),
+    );
+    expect(["42501", "23503", "P0001"]).toContain(viaRefund.code);
     // GAP-12: B's offset cannot name A's opening credit or A's invoice
     const viaOffset = await pgError(
       asUser(b.id, (q) =>

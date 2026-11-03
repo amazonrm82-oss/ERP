@@ -544,6 +544,39 @@ describe("roles and record visibility", () => {
     expect((await pgError(asUser(admin.id, (q) => q("delete from public.payments where id = $1", [byManager])))).code).toBe("42501");
   });
 
+  it("refunds follow their payment; only owners and admins refund and cancel a refund, nobody deletes (PAY-08)", async () => {
+    await setVisibility("own");
+    const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;
+    const stage = (await asAdmin((q) => q<{ id: string }>("select id from public.stages where pipeline_id = $1 order by position limit 1", [pipe]))).rows[0].id;
+    const deal = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id) values ($1, 'עסקה להחזר', $2, $3) returning id", [org, pipe, stage])).rows[0].id,
+    );
+    const pay = await asUser(owner.id, async (q) =>
+      (await q<{ id: string }>("insert into public.payments (organization_id, deal_id, amount_agorot, method) values ($1, $2, 1000, 'cash') returning id", [org, deal])).rows[0].id,
+    );
+    const refund = (u: U, amount: number) =>
+      asUser(u.id, async (q) =>
+        (await q<{ id: string }>("insert into public.payment_refunds (organization_id, payment_id, amount_agorot, method) values ($1, $2, $3, 'cash') returning id", [org, pay, amount])).rows[0].id,
+      );
+    const r1 = await refund(admin, 100);
+    const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.payment_refunds where id = $1", [r1]));
+    for (const u of [owner, admin, manager, m1]) expect(await seen(u), u.email).toBe(1);
+    for (const u of [m2, viewer]) expect(await seen(u), u.email).toBe(0);
+    // a manager records payments but does not refund (a correction); a member without the key neither
+    for (const u of [manager, m1]) {
+      expect((await pgError(refund(u, 1))).code, u.email).toBe("42501");
+      expect(await asUser(u.id, async (q) => (await q("update public.payment_refunds set status = 'cancelled', cancel_reason = 'x' where id = $1", [r1])).rowCount), u.email).toBe(0);
+    }
+    await setVisibility("org");
+    expect(await seen(viewer)).toBe(1);
+    expect(await asUser(viewer.id, async (q) => (await q("update public.payment_refunds set status = 'cancelled', cancel_reason = 'x' where id = $1", [r1])).rowCount)).toBe(0);
+    // nobody deletes a refund, owners included
+    for (const u of [owner, viewer]) expect((await pgError(asUser(u.id, (q) => q("delete from public.payment_refunds where id = $1", [r1])))).code, u.email).toBe("42501");
+    // an owner refunds too, and an admin cancels with a reason
+    await refund(owner, 50);
+    expect(await asUser(admin.id, async (q) => (await q("update public.payment_refunds set status = 'cancelled', cancel_reason = 'טעות' where id = $1", [r1])).rowCount)).toBe(1);
+  });
+
   it("allocations follow their document or payment; recorders allocate, only owners and admins change or undo, nobody deletes (PAY-02)", async () => {
     await setVisibility("own");
     const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;

@@ -384,6 +384,7 @@ export function PaymentStatusSelect({
   paymentId,
   status,
   canCorrect,
+  hasRefunds = false,
   label,
 }: {
   orgId: string;
@@ -391,11 +392,13 @@ export function PaymentStatusSelect({
   paymentId: string;
   status: PaymentStatus;
   canCorrect: boolean;
+  // PAY-08: a payment with active refunds moves only between recorded and confirmed
+  hasRefunds?: boolean;
   label: string;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const choices = statusChoices(status, canCorrect);
+  const choices = statusChoices(status, canCorrect, hasRefunds);
   return (
     <span className="inline-flex flex-col items-end gap-1">
       <Select

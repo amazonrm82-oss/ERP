@@ -2249,6 +2249,29 @@ export type PaymentAllocationRow = {
   updated_at: string;
 };
 
+// PAY-08: a refund of a payment (migration payment_refunds). Never deleted: cancelled with a reason, then frozen.
+export type PaymentRefundRow = {
+  id: string;
+  organization_id: string;
+  payment_id: string;
+  amount_agorot: number;
+  currency: string;
+  refunded_on: string;
+  method: string;
+  reference: string | null;
+  note: string | null;
+  credit_document_id: string | null;
+  status: string;
+  cancel_reason: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  payment_status_before: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // GAP-12: a share of a negative opening balance (a customer's credit) offset against a document of the same customer
 // (migration opening_credit). Never deleted: undone by an owner or admin (removed_at), released by the server (released_at).
 export type OpeningCreditAllocationRow = {
@@ -3356,6 +3379,22 @@ export type Database = {
         { organization_id: string; payment_id: string; document_id: string; amount_agorot: number; currency?: string },
         { amount_agorot?: number; removed_at?: string | null }
       >;
+      // PAY-08: column grants; owners and admins refund and cancel a refund (no delete)
+      payment_refunds: Table<
+        PaymentRefundRow,
+        {
+          organization_id: string;
+          payment_id: string;
+          amount_agorot: number;
+          currency?: string;
+          refunded_on?: string;
+          method: string;
+          reference?: string | null;
+          note?: string | null;
+          credit_document_id?: string | null;
+        },
+        { status?: string; cancel_reason?: string | null }
+      >;
       // GAP-12: column grants; recorders offset, owners and admins change the amount or undo (no delete)
       opening_credit_allocations: Table<
         OpeningCreditAllocationRow,
@@ -3732,6 +3771,9 @@ export type Database = {
       };
       // PAY-03: a payment's credit (computed field, one rule)
       payment_credit: { Args: Record<string, never>; Returns: number };
+      // PAY-08: computed fields on payments: the sum of the active refunds, and the amount that counts (0 unless recorded or confirmed)
+      payment_refunded: { Args: Record<string, never>; Returns: number };
+      payment_counted: { Args: Record<string, never>; Returns: number };
       // PAY-03: computed fields on contacts and companies for the "יתרת זכות" column and filter (owners and admins; null / false for others)
       credit_balance: { Args: Record<string, never>; Returns: number | null };
       has_credit: { Args: Record<string, never>; Returns: boolean };

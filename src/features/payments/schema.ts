@@ -40,13 +40,16 @@ export function isPaymentStatus(value: unknown): value is PaymentStatus {
 }
 
 /**
- * PAY-06: the statuses a user may move a payment to. A recorder moves between recorded, confirmed and failed; marking it
- * refunded, or moving it back from refunded, is for owners and admins (the table's trigger, hint payment:correction).
- * Cancelling has its own window with a reason; a cancelled payment moves nowhere.
+ * PAY-06: the statuses a user may move a payment to. A recorder moves between recorded, confirmed and failed; moving it back
+ * from refunded is for owners and admins (the table's trigger, hint payment:correction). Cancelling has its own window with a
+ * reason; a cancelled payment moves nowhere. PAY-08: a refund is recorded through its own window (a refund record), never by
+ * picking "הוחזר" here; while a payment has active refunds it moves only between recorded and confirmed (hint
+ * payment:has_refunds), and a payment refunded in full by its refunds gets its status back only by cancelling a refund.
  */
-export function statusChoices(current: PaymentStatus, isAdmin: boolean): PaymentStatus[] {
-  if (current === "cancelled" || (current === "refunded" && !isAdmin)) return [];
-  return PAYMENT_STATUSES.filter((status) => status !== current && status !== "cancelled" && (isAdmin || status !== "refunded"));
+export function statusChoices(current: PaymentStatus, isAdmin: boolean, hasRefunds = false): PaymentStatus[] {
+  if (current === "cancelled" || (current === "refunded" && (!isAdmin || hasRefunds))) return [];
+  if (hasRefunds) return (["recorded", "confirmed"] as const).filter((status) => status !== current);
+  return PAYMENT_STATUSES.filter((status) => status !== current && status !== "cancelled" && status !== "refunded");
 }
 
 export const CANCEL_REASON_MAX = 500;
@@ -123,7 +126,13 @@ export const newPaymentStatusSchema = z.enum(NEW_PAYMENT_STATUSES);
 /** The statuses the status choice may send (cancelling goes through its own action, with a reason). */
 export const paymentStatusSchema = z.enum(["recorded", "confirmed", "failed", "refunded"]);
 
-/** The total of the payments that count as received (recorded or confirmed; never failed, refunded or cancelled), in agorot. */
-export function receivedTotal(payments: readonly { amountAgorot: number; status: PaymentStatus }[]): number {
-  return payments.reduce((sum, p) => (p.status === "recorded" || p.status === "confirmed" ? sum + p.amountAgorot : sum), 0);
+/**
+ * The total of the payments that count as received (recorded or confirmed; never failed, refunded or cancelled), in agorot.
+ * PAY-08: a partly refunded payment counts its amount less its active refunds (`refundedAgorot`, public.payment_counted).
+ */
+export function receivedTotal(payments: readonly { amountAgorot: number; status: PaymentStatus; refundedAgorot?: number }[]): number {
+  return payments.reduce(
+    (sum, p) => (p.status === "recorded" || p.status === "confirmed" ? sum + Math.max(p.amountAgorot - (p.refundedAgorot ?? 0), 0) : sum),
+    0,
+  );
 }

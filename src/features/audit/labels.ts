@@ -99,6 +99,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   payments: "תשלום",
   // PAY-02
   payment_allocations: "שיוך תשלום למסמך",
+  // PAY-08
+  payment_refunds: "החזר תשלום",
   // GAP-12
   opening_credit_allocations: "קיזוז יתרת פתיחה",
   customer_holds: "סימון לא למכור עד הסדרת חוב",

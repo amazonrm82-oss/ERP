@@ -302,7 +302,10 @@ describe("the staff's statement view (BAL-04)", () => {
   // statement_staff_view copies public.statement_public's selection (keep in step). The customer's page function's body as it
   // was compared with the staff view (the pattern of test 253): a redefinition of statement_public changes its md5 and fails
   // here. Then check statement_staff_view against it again (and the comparison tests above), and update the value.
-  const REVIEWED_STATEMENT_PUBLIC_MD5 = "744feb1c44509fea6e4960ffcf7cec2f";
+  // PAY-08 (rechecked): both functions list a payment at its amount less its active refunds, the same refunds subquery written
+  // out in each (not through public.payment_counted), and both leave out a payment whose counted amount is 0; rechecked with
+  // the comparison tests above and test 289.
+  const REVIEWED_STATEMENT_PUBLIC_MD5 = "9f0df6c32bae071f49bb90c362fdd540";
 
   it("statement_public is the body the staff view was checked against", async () => {
     const h = await asAdmin((q) => one<{ h: string }>(q, "select md5(p.prosrc) as h from pg_proc p where p.oid = 'public.statement_public(text,text)'::regprocedure"));

@@ -692,6 +692,10 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_messages.sql",
       // CNS-07 redefines public.job_message_may_send() of _messages.sql last (message types: marketing needs a grant)
       "_message_types.sql",
+      // PAY-08 redefines public.payment_credit() of _credit_advances_list.sql, public.money_allocation_state() of
+      // _money_allocation_state_speed.sql, app.payment_allocations_check() and public.customer_ledger() of _opening_credit.sql and
+      // public.report_collection() of _collection_report_answers.sql last (a payment counts less its active refunds)
+      "_payment_refunds.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

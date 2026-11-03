@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import { isChequeStatus, type ChequeStatus } from "./cheques";
 import { PAYMENT_DEFAULT_SORT, PAYMENT_SORT_COLUMNS, type PaymentListFilters } from "./list";
+import { refundedTotal, type Refund } from "./refunds";
 import { isPaymentMethod, isPaymentStatus, receivedTotal, type PaymentMethod, type PaymentStatus } from "./schema";
 
 // PAY-01: the payments recorded on a deal or a contact, read with the user's session (RLS: whoever reads the deal, else
@@ -49,6 +50,9 @@ export type Payment = {
   } | null;
   // PAY-03: the "מקדמה" mark and its optional link (a quote or an order of the same customer)
   advance: { quoteId: string | null; orderId: string | null } | null;
+  // PAY-08: the refunds recorded on it (active and cancelled, oldest first) and the sum of the active ones
+  refunds: Refund[];
+  refundedAgorot: number;
 };
 
 export type PaymentsSubject = MoneySubject;
@@ -120,12 +124,79 @@ export async function listRecordPayments(orgId: string, subject: PaymentsSubject
                 }
               : null,
             advance: row.is_advance ? { quoteId: row.advance_quote_id, orderId: row.advance_order_id } : null,
+            refunds: [],
+            refundedAgorot: 0,
           },
         ]
       : [],
   );
-  const names = await getUserNames(payments.flatMap((p) => [p.createdBy, p.updatedBy, p.cancelledBy]));
+  // PAY-08: the refunds of these payments (read follows the payment)
+  const refunds = await listRefunds(
+    orgId,
+    payments.map((p) => p.id),
+  );
+  for (const payment of payments) {
+    payment.refunds = refunds.filter((r) => r.paymentId === payment.id);
+    payment.refundedAgorot = refundedTotal(payment.refunds);
+  }
+  const names = await getUserNames(payments.flatMap((p) => [p.createdBy, p.updatedBy, p.cancelledBy, ...p.refunds.flatMap((r) => [r.createdBy])]));
   return { payments, names };
+}
+
+/** PAY-08: the refunds of these payments, oldest first. */
+export async function listRefunds(orgId: string, paymentIds: string[]): Promise<Refund[]> {
+  if (paymentIds.length === 0) return [];
+  const supabase = await createClient();
+  const out: Refund[] = [];
+  for (let i = 0; i < paymentIds.length; i += 200) {
+    const rows = must(
+      await supabase
+        .from("payment_refunds")
+        .select("id, payment_id, amount_agorot, refunded_on, method, reference, note, credit_document_id, status, cancel_reason, cancelled_at, created_by, created_at")
+        .eq("organization_id", orgId)
+        .in("payment_id", paymentIds.slice(i, i + 200))
+        .order("created_at")
+        .order("id"),
+      "payment refunds",
+    );
+    for (const row of rows) {
+      if (!isPaymentMethod(row.method) || (row.status !== "active" && row.status !== "cancelled")) continue;
+      out.push({
+        id: row.id,
+        paymentId: row.payment_id,
+        amountAgorot: Number(row.amount_agorot),
+        refundedOn: row.refunded_on,
+        method: row.method,
+        reference: row.reference,
+        note: row.note,
+        creditDocumentId: row.credit_document_id,
+        status: row.status,
+        cancelReason: row.cancel_reason,
+        cancelledAt: row.cancelled_at,
+        createdBy: row.created_by,
+      });
+    }
+  }
+  return out;
+}
+
+/** PAY-08: the active credit invoices a refund on this record may name (DOC-14 waits for the provider), newest first. */
+export async function listRefundCreditDocuments(orgId: string, subject: PaymentsSubject): Promise<{ id: string; number: string | null; docDate: string }[]> {
+  const supabase = await createClient();
+  const rows = must(
+    await supabase
+      .from("accounting_documents")
+      .select("id, number, doc_date")
+      .eq("organization_id", orgId)
+      .eq(MONEY_SUBJECT_COLUMN[subject.kind], subject.id)
+      .eq("doc_type", "credit_invoice")
+      .eq("status", "active")
+      .order("doc_date", { ascending: false })
+      .order("id")
+      .limit(100),
+    "credit invoices",
+  );
+  return rows.map((row) => ({ id: row.id, number: row.number, docDate: row.doc_date }));
 }
 
 // ----------------------------------------------------------------------------
@@ -211,13 +282,20 @@ export const PAYMENT_TOTALS_LIMIT = 20_000;
 
 /**
  * LST-09 (owner, 21 October 2026): the list's total received, over every payment the filters find (not only the page):
- * recorded and confirmed payments only, as everywhere (receivedTotal). Read with the user's session, like the list.
+ * recorded and confirmed payments only, less their active refunds (PAY-08), as everywhere (receivedTotal). Read with the
+ * user's session, like the list.
  */
 export async function listPaymentTotal(orgId: string, filters: PaymentListFilters): Promise<{ count: number; agorot: number; complete: boolean }> {
   const supabase = await createClient();
   const { rows, complete } = await readAllPages(
     async (from, to) => {
-      let query = supabase.from("payments").select("id, amount_agorot, status").eq("organization_id", orgId).in("status", ["recorded", "confirmed"]);
+      let query = supabase
+        .from("payments")
+        // PAY-08: a partly refunded payment counts its amount less its active refunds
+        // (a computed field: typed by hand, as the generated row has no such column)
+        .select<string, { id: string; amount_agorot: number; status: string; payment_refunded: number | null }>("id, amount_agorot, status, payment_refunded")
+        .eq("organization_id", orgId)
+        .in("status", ["recorded", "confirmed"]);
       if (filters.status) query = query.eq("status", filters.status);
       if (filters.method) query = query.eq("method", filters.method);
       if (filters.from) query = query.gte("paid_on", filters.from);
@@ -227,7 +305,9 @@ export async function listPaymentTotal(orgId: string, filters: PaymentListFilter
     },
     { limit: PAYMENT_TOTALS_LIMIT },
   );
-  const counted = rows.flatMap((row) => (isPaymentStatus(row.status) ? [{ amountAgorot: Number(row.amount_agorot), status: row.status }] : []));
+  const counted = rows.flatMap((row) =>
+    isPaymentStatus(row.status) ? [{ amountAgorot: Number(row.amount_agorot), status: row.status, refundedAgorot: Number(row.payment_refunded ?? 0) }] : [],
+  );
   return { count: counted.length, agorot: receivedTotal(counted), complete };
 }
 

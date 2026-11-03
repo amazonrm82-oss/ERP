@@ -108,7 +108,8 @@ export function lineNote(line: LedgerLine): string | null {
     if (line.type === "receipt") return "אישור תשלום, בלי סכום ביתרה";
     return null;
   }
-  if (line.status === "recorded" || line.status === "confirmed") return null;
+  // PAY-08: a partly refunded payment credits its amount less its active refunds
+  if (line.status === "recorded" || line.status === "confirmed") return line.credit < line.amount ? "הוחזר חלקית, נספר רק מה שנשאר" : null;
   return isPaymentStatus(line.status) ? `${PAYMENT_STATUS_LABELS[line.status]}, לא נספר` : "לא נספר";
 }
 
