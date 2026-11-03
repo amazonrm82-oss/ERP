@@ -344,7 +344,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   that belonged to the deleted record alone, plus its notifications. pg_cron `crm-purge-trash`
   (`app.purge_trash()`) deletes what has been in the recycle bin for 30 days; since 020355 (FXD-06, pasted by hand) in batches of
   1,000 per table, every 15 minutes 01:00-04:45 UTC, beside `crm-purge-notifications` (`app.purge_old_notifications()`: read
-  notifications after 90 days, unread after 180). Until the owner pastes 020355 the old once-a-night job runs.
+  notifications after 90 days, unread after 180). 020355 runs on hosted (checked 3 November 2026).
 - Form inquiry retention (CAP-04, migrations 0091 and 009110): `form_submissions.form_deleted_at` is stamped when the
   form is deleted (`app.keep_form_submissions()`); pg_cron `crm-purge-submissions` (02:45 UTC) calls
   `app.purge_old_form_submissions()` (009110, pasted by hand because it deletes), which removes kept inquiries older than
@@ -2274,7 +2274,23 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   and every host under it, or under a shared site host only exactly (and its www). Closed lists `app.message_shared_site_host` /
   `message_url_shortener` / `message_platform_domain` / `message_file_extension` are mirrored in `service-rule.ts` between markers.
   `app.message_template_problem` takes `p_own_domain` (last redefined in 021160; the 4-argument version retired, idempotently);
-  re-running 021159 needs 021160 re-run after it. Tests 64 and 88 end with `_service_message_send_rules.sql`.
+  re-running 021159 needs 021160 re-run after it.
+  Endings and business email (migration 021161; owner (110) ב, (111) ב; two reviews): a bare domain is a link only when its last
+  label is on the closed list `app.message_link_tld` (= `LINK_TLDS` between the `link-tlds` markers in `service-rule.ts`; 192
+  generic, country and high-abuse endings, Israel's second levels through `il`; English-word endings wait for owner question 112)
+  or is punycode `xn--`; `www.` and `http(s)://` are links whatever the ending. A token that is exactly local@domain
+  (`app.message_token_link(token, own, business_email)` = `tokenLink()`) is a link when its local part looks like a host
+  (`app.message_local_host` = `localPartHost()`: `www.`, IPv4, or a label after a dot starting with a listed ending or `xn--`);
+  otherwise it is allowed on the own domain (`app.message_host_own`) or when it equals, ASCII letters folded
+  (`app.message_ascii_lower`), the business's email from `org_document_settings.email`, only while that email is plain
+  (`app.message_plain_email` = `plainBusinessEmail()`: local `[a-z0-9.-]`, no `..`, not host-like, domain on the list; an
+  address with `_ % +` is not recognized). The scheme scan runs first and never sees the business email. The full rules take
+  the business email as a new last argument with no default: `app.message_external_link(text, own, email)`,
+  `app.message_token_link(token, own, email)`, `app.message_template_problem(…, own_domain, business_email)`; 021160's forms
+  stay as wrappers, an ACCEPTED EXCEPTION to "never two overloads" (schema app, outside test 07's public check): a rename would
+  add a retired copy on every `rerunClosure` re-run of 021160. `app.message_template_sendable` passes both. Re-running 021159
+  or 021160 requires re-running 021161 after it. Tests 64 and 88 end with `_service_message_send_rules.sql`,
+  `_message_link_tlds.sql`.
 - Customer sending pause (HEB-09, migrations 021134, 021135; owner (44) א (45) א (46) א): `public.org_sending_pauses` (one row per org; owners/
   admins of a business that is not closed write `paused` + `reason` 1..500; stamps server-kept by `app.org_sending_pauses_stamp`; members
   read; no delete; audited). THE rule is `app.customer_sending_paused(org)` (definer, no grants; no row = not paused): EVERY automatic
