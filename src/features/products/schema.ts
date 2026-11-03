@@ -5,7 +5,7 @@ import { checkbox, moneyField, optionalId, optionalText, requiredText } from "@/
 // PRD-01, PRD-02: a product or service in the organization's catalog (SPEC-ADDITIONS 4.2).
 // The value lists mirror the check constraints of public.products (migration products).
 
-export const PRODUCT_KINDS = ["product", "service", "subscription", "bundle"] as const;
+export const PRODUCT_KINDS = ["product", "service", "subscription", "bundle", "punch_card"] as const;
 export type ProductKind = (typeof PRODUCT_KINDS)[number];
 export const PRODUCT_KIND_LABELS: Record<ProductKind, string> = {
   product: "מוצר",
@@ -13,6 +13,8 @@ export const PRODUCT_KIND_LABELS: Record<ProductKind, string> = {
   subscription: "מנוי",
   // PRD-09: a bundle is made of other products (public.product_bundle_items, the product page)
   bundle: "חבילה",
+  // PKG-01: a number of entries for meetings of chosen types (its settings are on the product's page)
+  punch_card: "כרטיסייה",
 };
 
 // exempt and zero rate are calculated alike (no VAT) but kept apart (owner's default, TAX-05/06)

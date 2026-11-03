@@ -100,6 +100,7 @@ function SaleForm({ orgId, today, customerLabel, dealCardLabel, contactCardLabel
             המכירה נרשמה: {formatMoney(done.totalAgorot)}
           </p>
           <p className="text-ink-soft">{done.documentId ? "נרשמו התשלום והמסמך." : "נרשם התשלום."}</p>
+          {done.punchText ? <p>{done.punchText}</p> : null}
           <div className="flex flex-wrap gap-2">
             <Link href={paths.deal(orgId, done.dealId)} className="inline-flex min-h-11 items-center rounded-md border border-line px-4 hover:bg-canvas">
               {dealCardLabel}

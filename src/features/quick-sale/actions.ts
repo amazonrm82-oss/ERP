@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { openPunchCardsForSale, punchProductIdsOf, punchSaleQuantityProblem, punchSaleText } from "@/features/punch-cards/sale-server";
 import { findPersonDuplicate, duplicateMessage, type Existing } from "@/features/data-quality/duplicates";
 import { chequeSchema } from "@/features/payments/cheques";
 import { paymentsPath } from "@/features/payments/paths";
@@ -91,7 +92,8 @@ export async function previewQuickSaleAction(orgId: string, contactId: unknown, 
   });
 }
 
-export type QuickSaleDone = { dealId: string; contactId: string; documentId: string | null; totalAgorot: number };
+// punchText (PKG-01): the punch cards the sale opened, or did not
+export type QuickSaleDone = { dealId: string; contactId: string; documentId: string | null; totalAgorot: number; punchText: string | null };
 
 const raw = z.preprocess((value) => (typeof value === "string" ? value.trim() : ""), z.string());
 
@@ -248,13 +250,35 @@ export async function quickSaleAction(orgId: string, _prev: FormState<QuickSaleD
   }
   if (!priced.ok) return fail(pricedFailure(priced), { values });
 
+  // PKG-01 (review finding 3): a punch card is sold in whole units, at most 20 a line, checked before the sale
+  let punchIds: Set<string>;
+  try {
+    punchIds = await punchProductIdsOf(context.supabase, orgId, priced.lines.map((line) => line.productId));
+  } catch {
+    return fail("לא הצלחנו לבדוק את הפריטים. נסו שוב.", { values });
+  }
+  const punchProblem = punchSaleQuantityProblem(priced.lines, punchIds);
+  if (punchProblem) return fail(punchProblem, { fieldErrors: { items: punchProblem }, values });
+
   const body = quickSaleBody(who, priced.lines, { ...payment.data, cheques }, document, expected, quickSaleDealName(terms.deal.singular, day));
   const { data, error } = await context.supabase.rpc("quick_sale", { p_org: orgId, p_sale: body });
   if (error) return fail(error.code === "42501" ? CANNOT : dbErrorMessage(error), { values });
   const result = data as { deal_id: string; contact_id: string; document_id: string | null; total_agorot: number };
+  // PKG-01: a punch card sold here opens with the sale's payment
+  const punch = await openPunchCardsForSale(context.supabase, orgId, { dealId: result.deal_id }, priced.lines, punchIds);
   revalidatePath(paymentsPath(orgId));
   revalidatePath(paths.deals(orgId));
-  return ok({ dealId: result.deal_id, contactId: result.contact_id, documentId: result.document_id, totalAgorot: Number(result.total_agorot) }, "המכירה נרשמה.");
+  if (punch.opened > 0 || punch.failed > 0) revalidatePath(paths.contact(orgId, result.contact_id));
+  return ok(
+    {
+      dealId: result.deal_id,
+      contactId: result.contact_id,
+      documentId: result.document_id,
+      totalAgorot: Number(result.total_agorot),
+      punchText: punchSaleText(punch) || null,
+    },
+    "המכירה נרשמה.",
+  );
 }
 
 /**

@@ -270,6 +270,18 @@ describe("tenant isolation", () => {
     await asAdmin((q) =>
       q("insert into public.messages (organization_id, contact_id, channel, direction, status) values ($1, $2, 'sms', 'outbound', 'sent')", [orgA, ids.contactA]),
     );
+    // PKG-01: a punch card of A's contact (written only by the punch_card_* functions; no client write grant)
+    await asAdmin(async (q) => {
+      const product = (
+        await q<{ id: string }>("insert into public.products (organization_id, name, kind, punch_entries) values ($1, 'כרטיסייה של א', 'punch_card', 10) returning id", [orgA])
+      ).rows[0].id;
+      ids.punchCardA = (
+        await q<{ id: string }>(
+          "insert into public.punch_cards (organization_id, contact_id, product_id, name, entries_total, status, activated_at) values ($1, $2, $3, 'כרטיסייה של א', 10, 'active', now()) returning id",
+          [orgA, ids.contactA, product],
+        )
+      ).rows[0].id;
+    });
     // CNS-06: a blocklist entry of A (written only by consent_blocklist_add; no client write grant)
     await asAdmin((q) =>
       q("insert into public.consent_blocklist (organization_id, kind, channel, address_hash, reason) values ($1, 'phone', 'sms', repeat('a', 64), 'other')", [orgA]),
@@ -525,6 +537,8 @@ describe("tenant isolation", () => {
     "privacy_requests",
     // MSG-03
     "messages",
+    // PKG-01
+    "punch_cards",
     // CNS-06
     "consent_blocklist",
     // QUO-04
@@ -752,6 +766,8 @@ describe("tenant isolation", () => {
       privacy_requests: "status = status",
       // no client write grant at all (the job queue writes): a permission error is the expected outcome
       messages: "status = status",
+      // no client write grant at all (the punch_card_* functions write): a permission error is expected
+      punch_cards: "name = name",
       // no client write grant at all (consent_blocklist_add/remove write): a permission error is the expected outcome
       consent_blocklist: "reason = reason",
       quote_templates: "name = name",
@@ -912,6 +928,7 @@ describe("tenant isolation", () => {
       ["insert into public.quote_views (organization_id, quote_id) values ($1, $2)", [orgA, ids.quoteA]],
       ["insert into public.privacy_requests (organization_id, request_type, requester_name, contact_kind, contact_value, target_date) values ($1, 'access', 'x', 'email', 'x@example.com', current_date)", [orgA]],
       ["insert into public.messages (organization_id, contact_id, channel, direction, status) values ($1, $2, 'sms', 'outbound', 'sent')", [orgA, ids.contactA]],
+      ["insert into public.punch_cards (organization_id, contact_id, product_id, name, entries_total) values ($1, $2, (select id from public.products where organization_id = $1 and kind = 'punch_card' limit 1), 'x', 5)", [orgA, ids.contactA]],
       ["insert into public.consent_blocklist (organization_id, kind, channel, reason) values ($1, 'phone', 'sms', 'other')", [orgA]],
       ["insert into public.quote_templates (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.quote_template_lines (organization_id, template_id, name, unit_price_agorot) values ($1, $2, 'x', 1)", [orgA, ids.templateA]],
@@ -1055,6 +1072,7 @@ describe("tenant isolation", () => {
       ["quote_views", "view_count = 777", "view_count = 777"],
       ["privacy_requests", "status = 'refused'", "status = 'refused'"],
       ["messages", "status = 'failed'", "status = 'failed'"],
+      ["punch_cards", "entries_total = 777", "entries_total = 777"],
       ["consent_blocklist", "removed_at = now(), removed_reason = 'other'", "removed_at is not null"],
       ["quote_templates", "name = 'HACKED'", "name = 'HACKED'"],
       ["quote_template_lines", "name = 'HACKED'", "name = 'HACKED'"],

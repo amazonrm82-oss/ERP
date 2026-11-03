@@ -66,6 +66,7 @@ import { RecordOrdersCard } from "@/features/orders/components/record-orders-car
 import { RecordDocumentsCard } from "@/features/documents/components/record-documents-card";
 import { RecordPaymentsCard } from "@/features/payments/components/record-payments-card";
 import { CustomerHoldCard } from "@/features/customer-holds/components/customer-hold-card";
+import { PunchCardsCard } from "@/features/punch-cards/components/punch-cards-card";
 import { CustomerPromiseCard } from "@/features/collection/components/customer-promise-card";
 import { DebtSummary } from "@/features/balances/components/debt-summary";
 import { CustomerStatusSummary } from "@/features/customer-status/components/customer-status-summary";
@@ -273,6 +274,8 @@ export default async function ContactPage({ params, searchParams }: Props) {
           <RecordDocumentsCard orgId={orgId} subject={{ kind: "contact", id: contact.id }} />
           {/* PAY-01: payments received and recorded here */}
           <RecordPaymentsCard orgId={orgId} subject={{ kind: "contact", id: contact.id }} />
+          {/* PKG-01, PKG-02: the contact's punch cards and their balance */}
+          <PunchCardsCard orgId={orgId} contactId={contact.id} timeZone={context.org.timeZone} />
           {/* COL-05: "לא למכור עד הסדרת חוב" */}
           <CustomerHoldCard orgId={orgId} subject={{ kind: "contact", id: contact.id }} />
           {/* COL-03 answer (8) ב: the customer's payment promise (a contact of a company: on the company's card) */}

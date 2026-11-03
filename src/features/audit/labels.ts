@@ -110,6 +110,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   // GAP-12
   opening_credit_allocations: "קיזוז יתרת פתיחה",
   customer_holds: "סימון לא למכור עד הסדרת חוב",
+  // PKG-01
+  punch_cards: "כרטיסייה",
   // COL-03
   payment_promises: "הבטחת תשלום",
   // QUO-04
@@ -412,6 +414,16 @@ export const FIELD_LABELS: Record<string, string> = {
   price_includes_vat: 'המחיר כולל מע"מ',
   duration_minutes: "משך בדקות",
   is_active: "פעיל",
+  // PKG-01: a punch card product's settings and a customer's card
+  punch_entries: "מספר כניסות",
+  punch_validity_count: "תוקף",
+  punch_validity_unit: "יחידת תוקף",
+  punch_meeting_type_ids: "סוגי פגישה בכרטיסייה",
+  entries_total: "מספר כניסות",
+  expires_on: "בתוקף עד",
+  activated_at: "הופעלה",
+  payment_void_at: "התשלום בוטל",
+  former_contact_ids: "בעלים קודמים",
   // CAL-10: a booking page
   token: "קישור",
   intro: "הסבר",

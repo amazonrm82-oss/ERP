@@ -195,6 +195,12 @@ describe("currency next to every amount", () => {
         const payment = (await q<{ id: string }>("insert into public.payments (organization_id, contact_id, amount_agorot, method) values ($1, $2, 1000, 'transfer') returning id", [org, contact])).rows[0].id;
         await q("insert into public.payment_refunds (organization_id, payment_id, amount_agorot, method) values ($1, $2, 100, 'transfer')", [org, payment]);
       },
+      // PKG-01 (triggers are off here: the row is the server's)
+      punch_cards: async (q) => {
+        const contact = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח לכרטיסייה') returning id", [org])).rows[0].id;
+        const product = (await q<{ id: string }>("insert into public.products (organization_id, name, kind, punch_entries) values ($1, 'כרטיסייה למטבע', 'punch_card', 5) returning id", [org])).rows[0].id;
+        await q("insert into public.punch_cards (organization_id, contact_id, product_id, name, entries_total, price_agorot) values ($1, $2, $3, 'כרטיסייה', 5, 1000)", [org, contact, product]);
+      },
       // GAP-12 (triggers are off here: the row is the server's)
       opening_credit_allocations: async (q) => {
         const contact = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח לקיזוז') returning id", [org])).rows[0].id;

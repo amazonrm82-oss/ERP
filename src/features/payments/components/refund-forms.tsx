@@ -70,13 +70,15 @@ export function RefundPaymentButton({
   );
 }
 
-function RefundForm({
+/** The refund form itself; PKG-01's card cancel opens it with the unused part filled in (owner (84) ב). */
+export function RefundForm({
   orgId,
   subject,
   paymentId,
   method,
   today,
   creditDocuments,
+  defaultAmount,
   onDone,
   onCancel,
 }: {
@@ -86,6 +88,8 @@ function RefundForm({
   method: PaymentMethod;
   today: string;
   creditDocuments: RefundCreditDocument[];
+  // "120.50": the amount the form starts with
+  defaultAmount?: string;
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -108,7 +112,7 @@ function RefundForm({
         required
         dir="ltr"
         inputMode="decimal"
-        defaultValue={values?.amount ?? ""}
+        defaultValue={values?.amount ?? defaultAmount ?? ""}
         hint="החזר של כל הסכום מסמן את התשלום כ״הוחזר״. שיוכים למסמכים מעבר למה שנשאר משתחררים, מהחדש לישן."
         error={errors.amount}
       />

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { FILES_BUCKET } from "@/features/files/types";
+import { cardForExport } from "@/features/punch-cards/export";
 import { getUserNames } from "@/features/shell/queries";
 import { readAllPages } from "@/lib/paged-read";
 import { createClient } from "@/lib/supabase/server";
@@ -164,6 +165,18 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
   files.push(...(await readByIds(supabase, orgId, "files", FILE_COLUMNS, "payment_id", uniqueIds(payments.map((p) => p.id)))));
   // PAY-08: the refunds of those payments
   const paymentRefunds = await readByIds(supabase, orgId, "payment_refunds", "*", "payment_id", uniqueIds(payments.map((p) => p.id)));
+  // PKG-01: the person's punch cards with only what is theirs, and the cards they held before (src/features/punch-cards/export.ts)
+  const zone = check(await supabase.from("organizations").select("timezone").eq("id", orgId).maybeSingle(), "organization") as { timezone?: string } | null;
+  const timeZone = zone?.timezone ?? "Asia/Jerusalem";
+  const ownCards = await readByIds(supabase, orgId, "punch_cards", "*", "contact_id", contactIds);
+  const heldBefore = contactIds.length
+    ? await readLinked(supabase, orgId, "punch_cards", "*", `former_contact_ids.ov.{${contactIds.join(",")}}`)
+    : [];
+  // PKG-02 adds the entries used on them
+  const cardUses: Row[] = [];
+  const punchCards = ownCards.map((card) => cardForExport(card, cardUses, contactIds, timeZone));
+  // a card the person holds now and held before too (A to B to A) is listed once, as theirs now
+  const formerPunchCards = heldBefore.filter((card) => !ownCards.some((own) => own.id === card.id)).map((card) => cardForExport(card, cardUses, contactIds, timeZone));
   // COL-05: the "do not sell" holds set on the person's contacts
   const customerHolds = await readByIds(supabase, orgId, "customer_holds", "*", "contact_id", contactIds);
   // and their files (the copy of the paper that was issued), listed and stored like the records' files
@@ -242,6 +255,8 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     order_payment_steps: orderPaymentSteps,
     payments,
     payment_refunds: paymentRefunds,
+    punch_cards: punchCards,
+    punch_cards_held_before: formerPunchCards,
     customer_holds: customerHolds,
     order_decisions: orderDecisions,
     accounting_documents: accountingDocuments,

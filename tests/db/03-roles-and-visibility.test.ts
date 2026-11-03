@@ -914,6 +914,33 @@ describe("roles and record visibility", () => {
     }
   });
 
+  it("a contact's punch cards follow the contact; nobody writes them directly (PKG-01)", async () => {
+    await setVisibility("own");
+    const contact = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח עם כרטיסייה') returning id", [org])).rows[0].id,
+    );
+    const cardId = await asAdmin(async (q) => {
+      const product = (
+        await q<{ id: string }>("insert into public.products (organization_id, name, kind, punch_entries) values ($1, 'כרטיסייה לבדיקת הרשאות', 'punch_card', 5) returning id", [org])
+      ).rows[0].id;
+      return (
+        await q<{ id: string }>(
+          "insert into public.punch_cards (organization_id, contact_id, product_id, name, entries_total, status, activated_at) values ($1, $2, $3, 'כרטיסייה', 5, 'active', now()) returning id",
+          [org, contact, product],
+        )
+      ).rows[0].id;
+    });
+    const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.punch_cards where id = $1", [cardId]));
+    for (const u of [owner, admin, m1]) expect(await seen(u), u.email).toBe(1);
+    for (const u of [m2, viewer]) expect(await seen(u), u.email).toBe(0);
+    await setVisibility("org");
+    for (const u of [m2, viewer]) expect(await seen(u), u.email).toBe(1);
+    for (const u of [owner, admin, m1, viewer]) {
+      expect((await pgError(asUser(u.id, (q) => q("update public.punch_cards set entries_total = 9 where id = $1", [cardId])))).code, u.email).toBe("42501");
+      expect((await pgError(asUser(u.id, (q) => q("delete from public.punch_cards where id = $1", [cardId])))).code, u.email).toBe("42501");
+    }
+  });
+
   it("the blocklist: owners and admins read it, nobody writes it directly (CNS-06)", async () => {
     const entry = await asAdmin(async (q) =>
       (

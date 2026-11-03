@@ -84,7 +84,7 @@ export function ProductForm({ orgId, product, categories, units, orgPricesInclud
           required
           defaultValue={value("kind", product?.kind ?? "product")}
           // PRD-09: what a bundle is made of is set on the product's page
-          hint="חבילה: מחיר משלה, ואת הרכיבים מוסיפים בעמוד המוצר."
+          hint="חבילה: מחיר משלה, ואת הרכיבים מוסיפים בעמוד המוצר. כרטיסייה: את מספר הכניסות, התוקף וסוגי הפגישה מגדירים בעמוד המוצר."
           error={errors.kind}
         >
           {PRODUCT_KINDS.map((kind) => (

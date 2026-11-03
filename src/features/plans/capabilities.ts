@@ -51,6 +51,8 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "goals", label: "יעד לעסק", built: true },
   // SEG-03 (owner, 2 November 2026, answer (61) ב): the plans that hold lead_distribution
   { feature: "campaign_costs", label: "עלויות קמפיינים, עלות לליד והחזר על ההשקעה", built: true },
+  // PKG-01, PKG-02 (owner, 3 November 2026, answer (66) ג): basic and up
+  { feature: "punch_cards", label: "כרטיסיות: מספר כניסות, תוקף ויתרה ללקוח", built: true },
   // SEG-01
   { feature: "segments", label: "סגמנטים של לידים ואנשי קשר", built: true },
   { feature: "auto_reassign", label: "העברה אוטומטית של ליד לנציג הבא", built: true },

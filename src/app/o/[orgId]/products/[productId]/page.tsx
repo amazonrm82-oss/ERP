@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { partsReferenceSum, partsSkippedNotice } from "@/features/products/bundle";
 import { readBundleParts } from "@/features/products/bundle-server";
 import { BundlePartsCard } from "@/features/products/components/bundle-parts-card";
+import { PunchSettingsCard } from "@/features/punch-cards/components/punch-settings-card";
 import { ProductActions } from "@/features/products/components/product-actions";
 import { ProductDetails } from "@/features/products/components/product-details";
 import { PriceHistory } from "@/features/products/components/price-history";
@@ -105,6 +106,8 @@ export default async function ProductPage({ params, searchParams }: Props) {
           canEdit={canEdit}
         />
       ) : null}
+      {/* PKG-01: entries, validity and the meeting types of a punch card */}
+      {product.kind === "punch_card" ? <PunchSettingsCard orgId={orgId} productId={product.id} canEdit={canEdit} /> : null}
       {costs && costBasis ? (
         <ProductCostCard
           orgId={orgId}

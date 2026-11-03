@@ -711,6 +711,11 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_refunds_by_month.sql",
       // GOL-01 answer (83) א redefines public.report_goal_progress() of _refunds_by_month.sql last (a collection goal's refunds)
       "_goal_refunds.sql",
+      // PKG-01 redefines app.sample_untouched() of _messages.sql, app.export_choice_values() of _customer_status.sql and
+      // app.import_record_worked() of _payment_promise_work.sql last (a punch card keeps a sample or imported contact; the kind)
+      "_punch_card_work.sql",
+      // PKG-01 (owner (87) ב) redefines app.audit_erase_core() of _order_pdfs.sql last (punch cards in the erasure)
+      "_punch_card_erase.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

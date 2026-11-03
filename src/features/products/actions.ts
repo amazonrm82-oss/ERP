@@ -96,7 +96,10 @@ export async function duplicateProductAction(orgId: string, productId: string): 
   if (!context.ok) return context;
   const { data: source, error: readError } = await context.supabase
     .from("products")
-    .select("name, description, category_id, unit_id, kind, vat_kind, billing, price_agorot, price_includes_vat, currency, duration_minutes")
+    // PKG-01 (review finding 8): a punch card's copy keeps its entries, validity and meeting types
+    .select(
+      "name, description, category_id, unit_id, kind, vat_kind, billing, price_agorot, price_includes_vat, currency, duration_minutes, punch_entries, punch_validity_count, punch_validity_unit, punch_meeting_type_ids",
+    )
     .eq("organization_id", orgId)
     .eq("id", productId)
     .maybeSingle();

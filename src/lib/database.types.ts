@@ -2463,6 +2463,46 @@ export type QuoteViewRow = {
   created_at: string;
 };
 
+// PKG-01: a customer's punch card (migration punch_cards). Written only by the punch_card_* functions; never deleted by a
+// person (cancelled with a reason). Status pending | active | cancelled; expires_on is the last day it may be used.
+export type PunchCardRow = {
+  id: string;
+  organization_id: string;
+  contact_id: string;
+  product_id: string;
+  name: string;
+  entries_total: number;
+  validity_count: number | null;
+  validity_unit: string | null;
+  status: string;
+  payment_id: string | null;
+  activated_at: string | null;
+  activated_by: string | null;
+  activated_manually: boolean;
+  expires_on: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  cancel_reason: string | null;
+  transferred_at: string | null;
+  transferred_by: string | null;
+  // server only: what it was sold for, the order/quote line and unit an automatic opening came from (owner (85) ב), when
+  // its payment stopped counting (review finding 1), every earlier holder (owner (87) ב)
+  price_agorot: number;
+  currency: string;
+  order_line_id: string | null;
+  quote_line_id: string | null;
+  unit_no: number | null;
+  payment_void_at: string | null;
+  former_contact_ids: string[];
+  // [{contact, until}]: every earlier holder and until when (second review, finding 5)
+  holder_history: Json;
+  // the quick-sale deal line it was opened from
+  deal_line_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // MSG-03: a message sent to or received from a lead or contact (migration messages). Written by the server only (the
 // OPS-04 queue when a message.send job ends); read by whoever reads the record.
 export type MessageRow = {
@@ -2619,6 +2659,11 @@ export type ProductRow = {
   archived_at: string | null;
   // PRD-05: the import that created the product (set on insert only)
   import_job_id: string | null;
+  // PKG-01: a punch card's settings (kind 'punch_card' only; empty on every other kind)
+  punch_entries: number | null;
+  punch_validity_count: number | null;
+  punch_validity_unit: string | null;
+  punch_meeting_type_ids: string[] | null;
   created_at: string;
   updated_at: string;
 };
@@ -2661,6 +2706,11 @@ type ProductWrite = {
   duration_minutes?: number | null;
   barcode?: string | null;
   is_active?: boolean;
+  // PKG-01
+  punch_entries?: number | null;
+  punch_validity_count?: number | null;
+  punch_validity_unit?: string | null;
+  punch_meeting_type_ids?: string[] | null;
 };
 
 // GOL-01: a target per person, team or organization, period and metric (migration goals).
@@ -2731,6 +2781,8 @@ export type DealRow = {
   updated_by: string | null;
   created_at: string;
   updated_at: string;
+  // PKG-01 (owner (107) ב): server only, stamped on the deal public.quick_sale created
+  quick_sale_at: string | null;
   deleted_at: string | null;
 };
 
@@ -3529,6 +3581,8 @@ export type Database = {
       quote_views: ReadOnlyTable<QuoteViewRow>;
       // MSG-03: no client writes
       messages: ReadOnlyTable<MessageRow>;
+      // PKG-01: written only by the punch_card_* functions
+      punch_cards: ReadOnlyTable<PunchCardRow>;
       // CNS-06: written through functions only
       consent_blocklist: ReadOnlyTable<ConsentBlocklistRow>;
       quote_payment_steps: Table<
@@ -4112,6 +4166,15 @@ export type Database = {
       };
       // GAP-08: a quick sale in one call (invoker): customer, won deal with lines, payment, optional recorded document
       quick_sale: { Args: { p_org: string; p_sale: Json }; Returns: Json };
+      // PKG-01
+      punch_card_open: {
+        Args: { p_org: string; p_contact: string; p_product: string; p_payment?: string | null; p_activate?: boolean };
+        Returns: string;
+      };
+      punch_card_activate: { Args: { p_org: string; p_card: string; p_payment?: string | null }; Returns: undefined };
+      punch_card_cancel: { Args: { p_org: string; p_card: string; p_reason: string }; Returns: undefined };
+      punch_card_transfer: { Args: { p_org: string; p_card: string; p_contact: string }; Returns: undefined };
+      punch_card_open_for_sale: { Args: { p_org: string; p_deal: string }; Returns: Json };
       // GAP-10: an empty draft that adds to an accepted quote
       quote_new_addendum: { Args: { p_org: string; p_quote: string }; Returns: string };
       // ORD-01 / ORD-03: confirm a manual draft ({number}); make a numbered order from an accepted quote or a won deal (its id)
