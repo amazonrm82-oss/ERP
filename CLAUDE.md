@@ -2100,6 +2100,22 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   every lead and won deal that `app.campaign_roi_counts` (definer, counts only, members) counts. Accepted: a full answer can
   attribute a deal by its own source when its contact is hidden from the caller. Report key `campaign_roi`;
   `public.log_export` was last redefined in 021142. SEG-02's revenue by source stays in every plan.
+- Privacy officer (PRK-06, migration 021145; privacy, every plan): `public.org_privacy_settings` (one row per org; `privacy_officer_id`
+  composite FK to memberships (organization_id, user_id), on delete set null of the column; members read; owners/admins of a writable org
+  write through column grants; no delete; audited). Invoker trigger `org_privacy_settings_check` (outsider guard first) requires an active
+  member (hint `privacy_officer:member`); `memberships_privacy_officer_off` (definer, after update of status) clears it on suspension.
+  `app.privacy_officer(org)` (definer, no grants) answers only an ACTIVE officer and is for server routing only (PRK-02, PRK-05), never an
+  access rule; the mark adds no rights. One per business (lead's choice). Accepted (review): the check reads memberships without a lock,
+  so a suspension racing the naming can leave a suspended officer stored; every reader filters on active. App: `src/features/privacy-officer/`,
+  card on `/settings/users`.
+- Privacy center (PRK-01, migration 021146; every plan): `field_definitions.privacy_class` (null|personal|sensitive, check
+  `field_definitions_privacy_class_check`, mirrored by `PRIVACY_CLASSES` in `src/features/privacy-center/classes.ts`; information only,
+  written like the other field settings). Built-in personal fields are a fixed list in `src/features/privacy-center/personal-fields.ts`: a
+  new built-in column that holds personal data is added there. `/settings/privacy` (owners/admins, checked on the server) reads everything
+  with the user's session and links to `/legal/subprocessors` (no new service-key use); printable through GAP-11.
+  Wordings (PRK-04, no migration): `/settings/privacy/wordings` shows CAP-07's consent wording and version unchanged, and a privacy-notice
+  paragraph versioned in code (`PRIVACY_NOTICE_VERSION`, text pinned by `tests/unit/privacy-wordings.test.ts`; a text change needs a new
+  version); both DRAFT until the lawyer edits them. The paragraph names no employee (owner question 74).
 - Customer sending pause (HEB-09, migrations 021134, 021135; owner (44) א (45) א (46) א): `public.org_sending_pauses` (one row per org; owners/
   admins of a business that is not closed write `paused` + `reason` 1..500; stamps server-kept by `app.org_sending_pauses_stamp`; members
   read; no delete; audited). THE rule is `app.customer_sending_paused(org)` (definer, no grants; no row = not paused): EVERY automatic
