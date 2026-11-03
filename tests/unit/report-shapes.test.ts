@@ -323,6 +323,44 @@ describe("report shaping from the saved samples", () => {
     expect(view.sections[0].note).toContain("חודש, רבעון או שנה");
   });
 
+  it("GOL-01 (91) ב: the collection goal table shows a refunds column, left out when it is zero for every row", async () => {
+    const row = (sample("report_goal_progress") as Record<string, unknown>[])[0];
+    const goal = (n: number, refunds: number | null, metric = "collected") => ({
+      ...row,
+      goal_id: `00000000-0000-4000-8000-00000000009${n}`,
+      scope: "user",
+      user_id: `00000000-0000-4000-8000-00000000000${n}`,
+      metric,
+      target: 200000,
+      actual: 50000,
+      refunds,
+      elapsed: 0.5,
+    });
+    const tables = async () =>
+      (await buildReport("00000000-0000-4000-8000-000000000099", "reps", filters)).sections.filter((s) => s.title.startsWith("עמידה ביעד"));
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(new Date("2026-10-16T09:00:00Z"));
+      results.report_goal_progress = [goal(1, 3000), goal(2, 0), goal(3, null, "won_amount")];
+      const sections = await tables();
+      const collected = sections.find((s) => s.title.includes("גבייה"))!;
+      const won = sections.find((s) => !s.title.includes("גבייה"))!;
+      expect(sections).toHaveLength(2);
+      expect(collected.columns.map((c) => c.key)).toEqual(["owner", "actual", "refunds", "target", "percent", "projected", "projected_percent", "required_per_day"]);
+      expect(collected.columns.find((c) => c.key === "refunds")).toEqual({ key: "refunds", label: "החזרים", kind: "money" });
+      expect(collected.rows.map((r) => r.refunds).sort()).toEqual([0, 3000]);
+      // another metric never gets the column
+      expect(won.columns.map((c) => c.key)).not.toContain("refunds");
+      // every collection row without refunds: no column, no value
+      results.report_goal_progress = [goal(1, 0), goal(2, 0)];
+      const [quiet] = await tables();
+      expect(quiet.columns.map((c) => c.key)).not.toContain("refunds");
+      expect(quiet.rows.every((r) => !("refunds" in r))).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("GOL-04: the forecast keeps overdue deals in a line of their own, marks them, and compares months with the goal", async () => {
     const view = await buildReport("00000000-0000-4000-8000-000000000099", "forecast", filters);
     const months = view.sections[0];

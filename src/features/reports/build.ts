@@ -182,12 +182,16 @@ async function repGoalSections(orgId: string, filters: ReportFilters): Promise<{
       today < paceFrom ? `${paceFromText(paceFrom)}.` : null,
       pipelineId ? "היעדים נמדדים בכל תהליכי המכירה, בלי קשר לסינון." : null,
     ];
+    // GOL-01, owner's answer (91) ב (3 November 2026): the collection table shows the refunds counted in each actual
+    // (report_goal_progress's `refunds`), and leaves the column out when it is zero for every row
+    const showRefunds = metric === "collected" && rows.some((r) => (r.refunds ?? 0) > 0);
     return [
       {
         title: `עמידה ביעד: ${definition.label}, ${periodLabel(goalPeriod.period, goalPeriod.periodStart)}`,
         columns: [
           { key: "owner", label: "חבר צוות", kind: "text" },
           { key: "actual", label: "בפועל", kind },
+          ...(showRefunds ? [{ key: "refunds", label: "החזרים", kind: "money" as const }] : []),
           { key: "target", label: "יעד", kind },
           { key: "percent", label: "אחוז מהיעד", kind: "percent" },
           { key: "projected", label: `קצב צפוי ${periodEndLabel(goalPeriod.period)}`, kind },
@@ -200,6 +204,7 @@ async function repGoalSections(orgId: string, filters: ReportFilters): Promise<{
             return {
               owner: r.subject,
               actual: r.actual,
+              ...(showRefunds ? { refunds: r.refunds ?? 0 } : {}),
               target: r.target,
               percent: figures.percent,
               projected: figures.projected,
