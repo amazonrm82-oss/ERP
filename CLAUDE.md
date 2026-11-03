@@ -125,6 +125,23 @@ and build this CRM here instead. The old code is preserved on the branch
    registered, through the provider layer (`src/features/messaging/providers/`), whose only provider is the fake
    (`MESSAGING_PROVIDER=fake`, refused on a Vercel production or preview deployment; it keeps the last 100 in memory and sends
    nothing). In the eslint allow-list.
+   In use (MSG-01, MSG-03, CNS-07; owner 3 November 2026, answers (73) א, (75) א, (79) א; migrations 021151-021153): the OPS-04
+   worker (same route, same secret, same three service_role functions; no new service-key use) claims only messages of channels
+   that have a provider (`public.claim_jobs(…, p_channels)`; `MESSAGING_PROVIDER_EMAIL|_SMS|_WHATSAPP`, else `MESSAGING_PROVIDER`;
+   only the fake adapter), and `public.finish_job(…, p_provider, p_provider_message_id, p_provider_error_code)` keeps the provider's
+   code, message id or short error code (`^[A-Za-z0-9_.:-]{1,64}$`; a code, never an address; dropped when malformed) on
+   `app.jobs` and sets `message_outcome` ('sent' when done, 'failed' when it ends dead after reaching the provider) only for the
+   lease `job_message_may_send` stamped in `send_checked_lease`. The one write to a public table on this path is the AFTER
+   trigger `jobs_record_message` on `app.jobs` (`app.jobs_record_message`, definer, no grants, the only trigger on `app.jobs`),
+   which writes `public.messages` (owner (75) א + (79) א: message id, lead/contact, channel, direction, template code, status,
+   times, the provider's code, message id and error code, the job id; no content, cost or type; no client writes) and never fails
+   the finish (any error caught; one warning with the job id). `job_message_may_send` judges the payload's `message_type`
+   (closed list `app.message_types()`): a service type (`app.service_message_types()`: meeting_reminder, requested_document,
+   collection, verification_code; owner (80) א adds SPD-04's instant reply when it is built) is refused only when the address
+   is on the blocklist or erasure-blocked (`app.consent_service_blocked`); every other type, or none, needs no opt-out
+   (`app.consent_suppressed`) and a recorded grant (`app.consent_granted`); both by the address across the business, fail closed.
+   `claim_jobs`, `finish_job`, `job_message_may_send` and `app.jobs_record_message` are pinned by md5 in test 284, with the
+   trigger list of `app.jobs`; a change needs a fresh review.
    In use (OPS-02, owner 2 November 2026, answers (40) ב, (42) ד, (43) א, migration 021128): the shared per-sender limit of the
    secret-link pages (`src/lib/public-sender-server.ts`, `guardPublicPage` / `guardPublicRoute`), used by the customer's quote, order
    and statement pages, their decide/question/pdf routes and the booking-manage link with its route. It calls only
@@ -2158,6 +2175,20 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   no error text. The function is sql, stable, invoker, `search_path ''`, body `select true`, and is the ONLY function anon may execute
   (test 01 names it; test 289-health-check pins body, settings and grants; a change needs a fresh review). OPS-02 lists it as guard
   `constant` (the route may call only that function, no `.from(`/`.auth.`). Cron runs and queue sizes belong to the platform screen.
+- Messages (MSG-01/MSG-03, migrations 021151, 021152): one provider per channel (`src/features/messaging/providers/select.ts`, only
+  `fake`, refused on Vercel production/preview); a message of a channel without a provider waits unclaimed and uncounted
+  (`app.job_channel_asked`). `public.messages` (one lead or contact, composite FKs cascade, so purge/erasure/retention take them;
+  channel, direction, status, provider + `provider_message_id` unique per business and provider, `provider_error_code`, `job_id`
+  unique, `template_code`, times; no content) is read by the activities rule (`app.can_read_activity_subject`), written only by
+  `app.jobs_record_message` (hard rule 5). Merge moves them through the `merged` entry (`app.merge_messages`); `app.sample_untouched`
+  was last redefined in 021152 (021148's body plus the message lines); full export and person export carry them; read-only
+  timeline entries (`src/features/messaging/queries.ts`, `timeline-entry.ts`), bounded to the page's window. Retired
+  `app.claim_jobs_021145_retired` / `app.finish_job_021146_retired` (names kept from the branch's first numbers). Tests 64 and 88 end
+  with `_messages.sql`, `_message_types.sql`.
+- Message types (CNS-07/MSG-04, migration 021153; owner (73) א): see hard rule 5. `app.enqueue_job` requires `message_type` (hint
+  `job:message_type`); a job without one (queued before) is marketing. Mirrored by `MESSAGE_TYPES` / `SERVICE_MESSAGE_TYPES` in
+  `src/features/messaging/providers/types.ts`. Follow-ups: conversion leaves a lead's messages on the lead; inbound needs the
+  per-provider webhook (wave 3 use (2)).
 - Customer sending pause (HEB-09, migrations 021134, 021135; owner (44) א (45) א (46) א): `public.org_sending_pauses` (one row per org; owners/
   admins of a business that is not closed write `paused` + `reason` 1..500; stamps server-kept by `app.org_sending_pauses_stamp`; members
   read; no delete; audited). THE rule is `app.customer_sending_paused(org)` (definer, no grants; no row = not paused): EVERY automatic
