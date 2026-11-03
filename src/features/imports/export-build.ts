@@ -69,6 +69,9 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "segment_members", file: "segment_members.csv" },
   // SEG-03: the campaign costs entered by hand
   { table: "campaign_costs", file: "campaign_costs.csv" },
+  // LIB-01: the content library (its files are rows of files.csv)
+  { table: "library_categories", file: "library_categories.csv" },
+  { table: "library_items", file: "library_items.csv" },
   // BIZ-02: the business cards (token = the card's link: /f/card/<token>)
   { table: "business_cards", file: "business_cards.csv" },
   // BIZ-03: the QR codes (token = the code's link: /f/q/<token>); the daily scan counts are in schema app, not exported

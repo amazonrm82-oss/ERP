@@ -43,6 +43,9 @@ export const ENTITY_LABELS: Record<string, string> = {
   segments: "סגמנט",
   // SEG-03
   campaign_costs: "עלות קמפיין",
+  // LIB-01
+  library_categories: "קטגוריה בספריית התוכן",
+  library_items: "פריט בספריית התוכן",
   business_cards: "כרטיס ביקור",
   // BIZ-03
   qr_codes: "קוד QR",

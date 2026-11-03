@@ -470,6 +470,53 @@ export type CampaignCostWrite = {
   note?: string | null;
 };
 
+// LIB-01 (migration content_library): the content library's managed list of categories (seeded; owners/admins write)
+export type LibraryCategoryRow = {
+  id: string;
+  organization_id: string;
+  name: string;
+  position: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LibraryCategoryWrite = {
+  name?: string;
+  position?: number;
+  is_active?: boolean;
+};
+
+export type LibraryItemKind = "link" | "file";
+
+// LIB-01: an item of the content library: a https link or a file (its file is a files row with library_item_id)
+export type LibraryItemRow = {
+  id: string;
+  organization_id: string;
+  category_id: string | null;
+  // "link" | "file" (LibraryItemKind; a check constraint in the database)
+  kind: string;
+  title: string;
+  description: string | null;
+  url: string | null;
+  valid_from: string | null;
+  valid_until: string | null;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LibraryItemWrite = {
+  category_id?: string | null;
+  title?: string;
+  description?: string | null;
+  url?: string | null;
+  valid_from?: string | null;
+  valid_until?: string | null;
+  is_active?: boolean;
+};
+
 export type SegmentMemberRow = {
   id: string;
   organization_id: string;
@@ -1237,6 +1284,8 @@ export type FileRow = {
   // QUO-09 signed PDF (migration quote_signed_pdf): true on the accepted quote's signed PDF (a newer version after the PDF as
   // sent, or the quote's first file); null on every other file. Server only
   quote_signed: boolean | null;
+  // LIB-01 (migration content_library): the content library's file item this file is (one per item); null on every other file
+  library_item_id: string | null;
 };
 
 // REC-03 (migration 0104): one row per user and followed record; user_id comes from the session
@@ -3058,6 +3107,7 @@ export type Database = {
           accounting_document_id?: string | null;
           payment_id?: string | null;
           custom_field_key?: string | null;
+          library_item_id?: string | null;
         },
         Record<string, never>
       >;
@@ -3502,6 +3552,9 @@ export type Database = {
       segments: Table<SegmentRow, SegmentInsert, { name?: string; filter?: Json | null }>;
       segment_members: Table<SegmentMemberRow, SegmentMemberInsert, Record<string, never>>;
       // SEG-03: owners, admins and managers write; everyone in the business reads; column grants
+      // LIB-01: the content library (kind is set on insert only)
+      library_categories: Table<LibraryCategoryRow, LibraryCategoryWrite & { organization_id: string; name: string }, LibraryCategoryWrite>;
+      library_items: Table<LibraryItemRow, LibraryItemWrite & { organization_id: string; kind: LibraryItemKind; title: string }, LibraryItemWrite>;
       campaign_costs: Table<CampaignCostRow, CampaignCostWrite & { organization_id: string; month: string; amount_agorot: number; currency?: string }, CampaignCostWrite>;
       // BIZ-02: column grants (token is made by the database; the form by the card's trigger)
       business_cards: Table<BusinessCardRow, BusinessCardWrite & { organization_id: string; user_id: string }, BusinessCardWrite>;

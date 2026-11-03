@@ -14,6 +14,7 @@ import { getListColumns } from "@/features/list-columns/queries";
 import { ExportMenu, exportHref } from "@/features/list-export/components/export-menu";
 import { AdvancedFilter } from "@/features/list-filters/components/advanced-filter";
 import { prepareListFilter, startListFilterLookups } from "@/features/list-filters/prepare";
+import { libraryPath } from "@/features/library/paths";
 import { priceListsPath } from "@/features/price-lists/paths";
 import { ProductsTable, ProductStatusBadge } from "@/features/products/components/products-table";
 import { billingSuffix, productPriceText } from "@/features/products/display";
@@ -140,6 +141,10 @@ export default async function ProductsPage({ params, searchParams }: Props) {
         description="המוצרים והשירותים שהעסק מוכר, עם המחיר, היחידה והמע״מ של כל אחד."
         actions={
           <>
+            {/* LIB-01: the content library (catalogs, price lists, presentations), in every plan */}
+            <ButtonLink href={libraryPath(orgId)} variant="ghost">
+              ספריית תוכן
+            </ButtonLink>
             {/* PL-01: the further price lists, readable by everyone, when the plan holds them */}
             {hasPriceLists ? (
               <ButtonLink href={priceListsPath(orgId)} variant="ghost">

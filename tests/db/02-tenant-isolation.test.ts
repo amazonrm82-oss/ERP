@@ -177,6 +177,17 @@ describe("tenant isolation", () => {
         await q<{ id: string }>("insert into public.segments (organization_id, object_type, kind, name) values ($1, 'lead', 'static', 'סגמנט של א') returning id", [orgA])
       ).rows[0].id;
       await q("insert into public.segment_members (organization_id, segment_id, lead_id) values ($1, $2, $3)", [orgA, ids.segmentA, ids.leadA]);
+      // LIB-01: a link item and a file item of A, with the file item's file (the categories are seeded)
+      ids.libraryCategoryA = (await q<{ id: string }>("select id from public.library_categories where organization_id = $1 order by position limit 1", [orgA])).rows[0].id;
+      await q("insert into public.library_items (organization_id, category_id, kind, title, url) values ($1, $2, 'link', 'קטלוג של א', 'https://a.example.com/catalog')", [
+        orgA,
+        ids.libraryCategoryA,
+      ]);
+      ids.libraryFileA = (await q<{ id: string }>("insert into public.library_items (organization_id, kind, title) values ($1, 'file', 'מצגת של א') returning id", [orgA])).rows[0].id;
+      await q("insert into public.files (organization_id, library_item_id, name, mime_type, size_bytes) values ($1, $2, 'מצגת.pdf', 'application/pdf', 1000)", [
+        orgA,
+        ids.libraryFileA,
+      ]);
       // SEG-03: a campaign cost of A
       await q("insert into public.campaign_costs (organization_id, campaign, month, amount_agorot) values ($1, 'קמפיין של א', '2026-10-01', 50000)", [orgA]);
       // BIZ-02: a's business card (its form is made by the card's trigger)
@@ -439,6 +450,9 @@ describe("tenant isolation", () => {
     "segment_members",
     // SEG-03
     "campaign_costs",
+    // LIB-01, the categories seeded
+    "library_categories",
+    "library_items",
     // BIZ-02
     "business_cards",
     // BIZ-03
@@ -681,6 +695,8 @@ describe("tenant isolation", () => {
       // no update grant at all: a permission error is the expected outcome
       segment_members: "lead_id = lead_id",
       campaign_costs: "note = note",
+      library_categories: "name = name",
+      library_items: "title = title",
       business_cards: "job_title = job_title",
       qr_codes: "name = name",
       site_widgets: "name = name",
@@ -852,6 +868,10 @@ describe("tenant isolation", () => {
       ["insert into public.segments (organization_id, object_type, kind, name) values ($1, 'lead', 'static', 'x')", [orgA]],
       ["insert into public.segment_members (organization_id, segment_id, contact_id) values ($1, $2, $3)", [orgA, ids.segmentA, ids.contactA]],
       ["insert into public.campaign_costs (organization_id, campaign, month, amount_agorot) values ($1, 'x', '2026-10-01', 100)", [orgA]],
+      ["insert into public.library_categories (organization_id, name) values ($1, 'x')", [orgA]],
+      ["insert into public.library_items (organization_id, kind, title, url) values ($1, 'link', 'x', 'https://example.com/')", [orgA]],
+      // LIB-01: a file on A's library item
+      ["insert into public.files (organization_id, library_item_id, name, mime_type, size_bytes) values ($1, $2, 'x.pdf', 'application/pdf', 1)", [orgA, ids.libraryFileA]],
       ["insert into public.business_cards (organization_id, user_id) values ($1, $2)", [orgA, a.id]],
       ["insert into public.qr_codes (organization_id, name, target_kind, form_id) values ($1, 'x', 'form', $2)", [orgA, ids.formA]],
       ["insert into public.qr_codes (organization_id, name, target_kind, target_url) values ($1, 'x', 'url', 'https://a.example.com/')", [orgA]],
@@ -989,6 +1009,8 @@ describe("tenant isolation", () => {
       ["segments", "name = 'HACKED'", "name = 'HACKED'"],
       ["segment_members", "created_at = '2001-01-01'", "created_at = '2001-01-01'"],
       ["campaign_costs", "amount_agorot = 777", "amount_agorot = 777"],
+      ["library_categories", "position = 777", "position = 777"],
+      ["library_items", "description = 'HACKED'", "description = 'HACKED'"],
       ["business_cards", "job_title = 'HACKED'", "job_title = 'HACKED'"],
       ["qr_codes", "name = 'HACKED'", "name = 'HACKED'"],
       ["site_widgets", "name = 'HACKED'", "name = 'HACKED'"],
@@ -1183,6 +1205,20 @@ describe("tenant isolation", () => {
       ),
     );
     expect(["42501", "23503"]).toContain(viaQuoteFile.code);
+
+    // LIB-01: a file in org B hung on org A's library item, and an item of B in A's category
+    const viaLibraryFile = await pgError(
+      asUser(b.id, (q) =>
+        q("insert into public.files (organization_id, library_item_id, name, mime_type, size_bytes) values ($1, $2, 'x.pdf', 'application/pdf', 1)", [orgB, ids.libraryFileA]),
+      ),
+    );
+    expect(["42501", "23503", "P0001"]).toContain(viaLibraryFile.code);
+    const viaLibraryCategory = await pgError(
+      asUser(b.id, (q) =>
+        q("insert into public.library_items (organization_id, category_id, kind, title, url) values ($1, $2, 'link', 'x', 'https://example.com/')", [orgB, ids.libraryCategoryA]),
+      ),
+    );
+    expect(["42501", "23503"]).toContain(viaLibraryCategory.code);
 
     // a consent in org B recorded on org A's lead (CNS-01)
     const viaConsent = await pgError(

@@ -696,6 +696,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // _money_allocation_state_speed.sql, app.payment_allocations_check() and public.customer_ledger() of _opening_credit.sql and
       // public.report_collection() of _collection_report_answers.sql last (a payment counts less its active refunds)
       "_payment_refunds.sql",
+      // LIB-01 redefines app.files_before_insert() of _payment_files.sql last, and alters the files policies after
+      // _quote_signed_pdf.sql (a library item's file)
+      "_content_library.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

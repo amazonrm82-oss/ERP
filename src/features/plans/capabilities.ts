@@ -16,6 +16,8 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "recurring_revenue", label: "הכנסה חוזרת בעסקאות", built: true, core: true },
   // LEAD-05 (owner, 14 October 2026): core, open in every plan
   { feature: "lead_scoring", label: "ציון ליד לפי כללים", built: true, core: true },
+  // LIB-01 (owner, 3 November 2026, answer (69) א): core, open in every plan, inside the storage quota
+  { feature: "content_library", label: "ספריית תוכן: קבצים וקישורים לשליחה ללקוחות", built: true, core: true },
   // DQL-03 (owner, 2 November 2026, answer (60) א): core, open in every plan
   { feature: "cleanup_suggestions", label: "הצעות ניקוי שבועיות: כפילויות, רשומות בלי אחראי ובלי דרך קשר", built: true, core: true },
   // CAL-08: a managed list of the calendar, no plan key (owner, 15 October 2026)

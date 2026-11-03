@@ -519,6 +519,10 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // TASK-06 (migration task_checklists)
   "task_checklist:max": "אפשר עד 100 שלבים במשימה אחת.",
   "checklist_templates:max": "אפשר לשמור עד 50 תבניות של רשימת תיוג. מחקו תבנית שלא בשימוש כדי להוסיף חדשה.",
+  // LIB-01: the content library
+  "library_categories:max": "אפשר לשמור עד 50 קטגוריות בספריית התוכן. מחקו קטגוריה שלא בשימוש כדי להוסיף חדשה.",
+  "library_items:max": "אפשר לשמור עד 1,000 פריטים בספריית התוכן. מחקו פריטים ישנים כדי להוסיף חדשים.",
+  "library:file_kind": "אפשר לצרף קובץ רק לפריט מסוג קובץ בספריית התוכן.",
   // CON-06 (trigger contact_relations_check, contact_relation_types_cap)
   "contact_relation:exists": "הקשר הזה כבר רשום בין שני אנשי הקשר.",
   "contact_relation:type": "סוג הקשר הזה כבר לא ברשימה. בחרו סוג אחר.",

@@ -2749,3 +2749,61 @@ describe("checklists by role", () => {
     }
   });
 });
+
+// LIB-01: the content library. Every member reads it; owners, admins and managers write items (and their files);
+// owners and admins manage the categories (the managed-list rule); a member and a viewer write nothing (the rest is in
+// 290-content-library)
+describe("content library by role", () => {
+  let org: string;
+  const people: Record<string, { id: string; email: string }> = {};
+
+  beforeAll(async () => {
+    const owner = await createUser("librole-owner");
+    org = await createOrg(owner.id);
+    people.owner = owner;
+    for (const role of ["admin", "manager", "member", "viewer"] as const) {
+      people[role] = await addMember(org, owner.id, role, `librole-${role}`);
+    }
+  });
+
+  it("owners, admins and managers write items and files; categories are for owners and admins; everyone reads", async () => {
+    const writers = ["owner", "admin", "manager"];
+    for (const [role, user] of Object.entries(people)) {
+      const insert = asUser(user.id, (q) =>
+        q("insert into public.library_items (organization_id, kind, title, url) values ($1, 'link', $2, 'https://example.com/')", [org, `של ${role}`]),
+      );
+      if (writers.includes(role)) await insert;
+      else expect((await pgError(insert)).code, role).toBe("42501");
+      const category = asUser(user.id, (q) => q("insert into public.library_categories (organization_id, name) values ($1, $2)", [org, `של ${role}`]));
+      if (role === "owner" || role === "admin") await category;
+      else expect((await pgError(category)).code, role).toBe("42501");
+    }
+    const fileItem = await asUser(people.owner.id, async (q) =>
+      (await q<{ id: string }>("insert into public.library_items (organization_id, kind, title) values ($1, 'file', 'קובץ') returning id", [org])).rows[0].id,
+    );
+    for (const role of ["member", "viewer"]) {
+      const attach = asUser(people[role].id, (q) =>
+        q("insert into public.files (organization_id, library_item_id, name, mime_type, size_bytes) values ($1, $2, 'x.pdf', 'application/pdf', 1)", [org, fileItem]),
+      );
+      expect((await pgError(attach)).code, role).toBe("42501");
+    }
+    await asUser(people.manager.id, (q) =>
+      q("insert into public.files (organization_id, library_item_id, name, mime_type, size_bytes) values ($1, $2, 'x.pdf', 'application/pdf', 1)", [org, fileItem]),
+    );
+    for (const [role, user] of Object.entries(people)) {
+      expect(await asUser(user.id, (q) => count(q, "select 1 from public.library_items where organization_id = $1", [org])), role).toBe(4);
+      expect(await asUser(user.id, (q) => count(q, "select 1 from public.files where library_item_id = $1", [fileItem])), role).toBe(1);
+      expect(await asUser(user.id, (q) => count(q, "select 1 from public.library_categories where organization_id = $1", [org])), role).toBe(7);
+      const changed = await asUser(user.id, async (q) => (await q("update public.library_items set title = title where organization_id = $1", [org])).rowCount);
+      expect(changed, role).toBe(writers.includes(role) ? 4 : 0);
+      const renamed = await asUser(user.id, async (q) => (await q("update public.library_categories set name = name where organization_id = $1", [org])).rowCount);
+      expect(renamed, role).toBe(role === "owner" || role === "admin" ? 7 : 0);
+    }
+    for (const role of ["member", "viewer"]) {
+      expect(await asUser(people[role].id, async (q) => (await q("delete from public.library_items where organization_id = $1", [org])).rowCount), role).toBe(0);
+      expect(await asUser(people[role].id, async (q) => (await q("delete from public.library_categories where organization_id = $1", [org])).rowCount), role).toBe(0);
+      expect(await asUser(people[role].id, async (q) => (await q("delete from public.files where library_item_id = $1", [fileItem])).rowCount), role).toBe(0);
+    }
+    expect(await asUser(people.manager.id, async (q) => (await q("delete from public.library_items where organization_id = $1 and title = 'של owner'", [org])).rowCount)).toBe(1);
+  });
+});
