@@ -690,6 +690,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_payment_promise_work.sql",
       // MSG-03 redefines app.sample_untouched() of _task_subtasks.sql last (a message keeps a sample lead or contact)
       "_messages.sql",
+      // CNS-07 redefines public.job_message_may_send() of _messages.sql last (message types: marketing needs a grant)
+      "_message_types.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

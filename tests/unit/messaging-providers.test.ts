@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ClaimedJob } from "@/features/jobs/registry";
 import { clearFakeSentMessages, createFakeProvider, fakeSentMessages } from "@/features/messaging/providers/fake";
 import { messagingProviderFor, messagingProviders, providerEnvKey } from "@/features/messaging/providers/select";
-import { MESSAGE_CHANNELS } from "@/features/messaging/providers/types";
+import { MESSAGE_CHANNELS, MESSAGE_TYPES, messagePurpose, SERVICE_MESSAGE_TYPES } from "@/features/messaging/providers/types";
 import { createSendHandler } from "@/features/messaging/send-handler";
 
 const root = join(__dirname, "..", "..");
@@ -152,3 +152,42 @@ describe("MSG-03: the provider's receipt reaches the queue", () => {
   });
 });
 
+
+describe("CNS-07: a closed list of message types; service is a closed list too", () => {
+  beforeEach(() => clearFakeSentMessages());
+  const lead = "44444444-4444-4444-8444-444444444444";
+
+  it("hands the type and its purpose to the provider; none = marketing; an unknown type is never sent", async () => {
+    const maySend = vi.fn(async () => ({ may_send: true }));
+    const handler = createSendHandler({ maySend, providerFor: (channel) => createFakeProvider({ channel }) });
+    for (const type of [...MESSAGE_TYPES]) await handler(job({ channel: "sms", lead_id: lead, message_type: type }));
+    await handler(job({ channel: "sms", lead_id: lead }));
+    expect(fakeSentMessages().map((m) => [m.messageType, m.purpose])).toEqual([
+      ["meeting_reminder", "service"],
+      ["requested_document", "service"],
+      ["collection", "service"],
+      ["verification_code", "service"],
+      ["marketing", "marketing"],
+      [null, "marketing"],
+    ]);
+    for (const bad of ["service", "promo", 1]) {
+      expect(await handler(job({ channel: "sms", lead_id: lead, message_type: bad }))).toEqual({ status: "failed", error: "payload", final: true });
+    }
+    expect(maySend).toHaveBeenCalledTimes(6);
+  });
+
+  it("the types and the service list mirror the migration", () => {
+    const dir = join(root, "supabase/migrations");
+    const sql = readFileSync(join(dir, readdirSync(dir).find((f) => f.endsWith("_message_types.sql")) as string), "utf8");
+    const list = (name: string) => {
+      const m = sql.match(new RegExp(`function app\\.${name}\\(\\)[\\s\\S]*?array\\[([^\\]]*)\\]`));
+      expect(m, name).not.toBeNull();
+      return [...(m as RegExpMatchArray)[1].matchAll(/'([a-z_]+)'/g)].map((x) => x[1]);
+    };
+    expect(list("message_types")).toEqual([...MESSAGE_TYPES]);
+    expect(list("service_message_types")).toEqual([...SERVICE_MESSAGE_TYPES]);
+    expect(SERVICE_MESSAGE_TYPES.every((t) => (MESSAGE_TYPES as readonly string[]).includes(t))).toBe(true);
+    for (const t of MESSAGE_TYPES) expect(messagePurpose(t), t).toBe((SERVICE_MESSAGE_TYPES as readonly string[]).includes(t) ? "service" : "marketing");
+    expect(messagePurpose(null)).toBe("marketing");
+  });
+});

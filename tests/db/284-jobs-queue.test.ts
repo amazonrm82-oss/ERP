@@ -21,8 +21,9 @@ const REVIEWED_MD5 = {
   // MSG-03 (021146): three optional arguments, the provider's receipt and the message outcome kept on the job; needs a
   // fresh review
   finish_job: "058e58191682d7520d64729e26adbd91",
-  // MSG-03 (021146): stamps the lease that passed the check (send_checked_lease); needs a fresh review
-  job_message_may_send: "05faf072c56d3474c8bd4d13b1cf47fc",
+  // MSG-03 (021146): stamps the lease that passed the check (send_checked_lease); CNS-07 (021147, owner (73) א): a service
+  // type stops only at the blocklist or an erasure, marketing needs no opt-out and a recorded grant; needs a fresh review
+  job_message_may_send: "42ee51eb745d8b2ef7f2c0bda25f35bb",
 };
 
 // MSG-03: the trigger function that writes public.messages from the worker's path (see its test below)
@@ -31,8 +32,14 @@ const REVIEWED_RECORD_MESSAGE_MD5 = "9e2c594aad5a24e99e78474ab780d6fe";
 type Claimed = { id: string; lease: string; kind: string; organization_id: string; payload: Record<string, unknown>; attempt: number };
 type Job = { status: string; attempts: number; last_error: string | null; next_run_at: Date; lease_id: string | null; locked_until: Date | null };
 
+// CNS-07: every queued message has a type; these tests are about the queue, so their messages are of a service type
+// unless a test names one (test 287 covers the consent rules of each kind)
+const withType = (payload: unknown) =>
+  payload && typeof payload === "object" && !Array.isArray(payload) && !("message_type" in payload) ? { ...payload, message_type: "collection" } : payload;
 const enqueue = (org: string, payload: Record<string, unknown>, runAt: string | null = null) =>
-  asAdmin(async (q) => (await q<{ id: string }>("select app.enqueue_job($1, 'message.send', $2, $3) as id", [org, JSON.stringify(payload), runAt])).rows[0].id);
+  asAdmin(
+    async (q) => (await q<{ id: string }>("select app.enqueue_job($1, 'message.send', $2, $3) as id", [org, JSON.stringify(withType(payload)), runAt])).rows[0].id,
+  );
 const claim = (limit = 20, kinds = ["message.send"]) =>
   asService(async (q) => (await q<{ r: Claimed[] }>("select public.claim_jobs($1, $2) as r", [kinds, limit])).rows[0].r);
 const finish = (job: Claimed | { id: string; lease: string }, ok: boolean, error: string | null = null, final = false, started = true) =>
@@ -412,8 +419,9 @@ describe("background job queue (OPS-04)", () => {
     const blocked = await enqueue(org, send(listed));
     const [b] = await claim();
     expect(b.id).toBe(blocked);
-    expect(await maySend(b)).toEqual({ may_send: false, reason: "consent_suppressed" });
-    expect((await jobOf(blocked)).last_error).toBe("refused:consent_suppressed");
+    // a service message (the default here) stops at the blocklist; CNS-07 (test 287) covers marketing
+    expect(await maySend(b)).toEqual({ may_send: false, reason: "consent_blocked" });
+    expect((await jobOf(blocked)).last_error).toBe("refused:consent_blocked");
 
     const ok = await enqueue(org, { channel: "sms", lead_id: clean });
     const [c] = await claim();
@@ -591,7 +599,8 @@ describe("background job queue (OPS-04)", () => {
     await enqueue(org, { ...send(randomUUID()), event_at: "2030-01-01T09:00:00Z" });
     const [job] = await claim();
     expect(Object.keys(job).sort()).toEqual(["attempt", "id", "kind", "lease", "organization_id", "payload"]);
-    expect(Object.keys(job.payload).sort()).toEqual(["channel", "event_at", "lead_id"]);
+    // CNS-07: plus the message type, a code
+    expect(Object.keys(job.payload).sort()).toEqual(["channel", "event_at", "lead_id", "message_type"]);
     const types = await asAdmin(
       async (q) =>
         (

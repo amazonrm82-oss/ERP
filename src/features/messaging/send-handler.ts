@@ -1,6 +1,6 @@
 import type { ClaimedJob, JobHandler } from "@/features/jobs/registry";
 
-import { isMessageChannel, type MessageChannel, type MessagingProvider } from "./providers/types";
+import { isMessageChannel, isMessageType, messagePurpose, type MessageChannel, type MessagingProvider } from "./providers/types";
 
 /** The answer of public.job_message_may_send: never an address or a name. */
 export type MaySendAnswer = { may_send: true } | { may_send: false; reason: string };
@@ -19,16 +19,22 @@ function target(job: ClaimedJob) {
   const channel = job.payload.channel;
   const lead = job.payload.lead_id;
   const contact = job.payload.contact_id;
+  const given = job.payload.message_type;
   if (!isMessageChannel(channel)) return null;
-  if (typeof lead === "string" && contact === undefined) return { channel, recordType: "lead" as const, recordId: lead };
-  if (typeof contact === "string" && lead === undefined) return { channel, recordType: "contact" as const, recordId: contact };
+  // CNS-07: a job queued before types existed has none and counts as marketing, as in the database's send check
+  if (given !== undefined && !isMessageType(given)) return null;
+  const messageType = given ?? null;
+  const kind = { channel, messageType, purpose: messagePurpose(messageType) };
+  if (typeof lead === "string" && contact === undefined) return { ...kind, recordType: "lead" as const, recordId: lead };
+  if (typeof contact === "string" && lead === undefined) return { ...kind, recordType: "contact" as const, recordId: contact };
   return null;
 }
 
 /**
  * The message.send handler (OPS-04). Before every send it asks the database ONE question, public.job_message_may_send,
  * which checks the business's pause (HEB-09, app.customer_sending_paused) and the address's consent
- * (app.consent_suppressed; cannot check = no), a business that cannot write, an event time that passed, a gone record
+ * (CNS-07: a marketing message needs a recorded grant and no opt-out; a service message type is refused only on the
+ * blocklist or an erasure block; cannot check = no), a business that cannot write, an event time that passed, a gone record
  * and a missing address. On "no" the database has already ended the job as refused with its reason, or, during a pause
  * of under 24 hours (owner (52) ג, answer `retry: true`), queued it again uncounted; either way nothing is sent now. A
  * malformed answer is a failed try, never a send.

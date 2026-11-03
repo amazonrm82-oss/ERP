@@ -74,7 +74,7 @@ describe("messages (MSG-03)", () => {
 
   it("a sent job records one outbound message with the provider's id; a dead one records a failure with its error code", async () => {
     const lead = await insertLead(owner.id, org, { email: "sent@example.test", phone: "0509900001" });
-    const id = await enqueue(org, { channel: "email", lead_id: lead });
+    const id = await enqueue(org, { channel: "email", lead_id: lead, message_type: "collection" });
     const job = await claimOne(id);
     expect(await finish(job, true, { provider: "fake", id: "fake-1", code: "ignored-on-success" })).toBe("done");
     expect(await messageOf(id)).toMatchObject({
@@ -89,16 +89,16 @@ describe("messages (MSG-03)", () => {
     });
     expect((await messageOf(id))?.sent_at).not.toBeNull();
 
-    const dead = await enqueue(org, { channel: "sms", lead_id: lead });
+    const dead = await enqueue(org, { channel: "sms", lead_id: lead, message_type: "collection" });
     expect(await finish(await claimOne(dead), false, { final: true, provider: "fake", code: " E.550:rejected " })).toBe("dead");
     expect(await messageOf(dead)).toMatchObject({ channel: "sms", status: "failed", provider: "fake", provider_error_code: "E.550:rejected", sent_at: null });
     // a malformed error code is dropped, the failure still recorded
-    const badCode = await enqueue(org, { channel: "sms", lead_id: lead });
+    const badCode = await enqueue(org, { channel: "sms", lead_id: lead, message_type: "collection" });
     expect(await finish(await claimOne(badCode), false, { final: true, provider: "fake", code: "has space; drop table" })).toBe("dead");
     expect(await messageOf(badCode)).toMatchObject({ status: "failed", provider_error_code: null });
 
     // a try that failed and will be tried again records nothing yet
-    const retry = await enqueue(org, { channel: "sms", lead_id: lead });
+    const retry = await enqueue(org, { channel: "sms", lead_id: lead, message_type: "collection" });
     expect(await finish(await claimOne(retry), false)).toBe("failed");
     expect(await messageOf(retry)).toBeNull();
   });
@@ -106,29 +106,29 @@ describe("messages (MSG-03)", () => {
   it("only an attempt that passed the send check records: no check, the last try, a lease that ran out on the last try", async () => {
     const lead = await insertLead(owner.id, org, { email: "unknown@example.test", phone: "0509911111" });
     // done without the check (a handler that skipped it): nothing
-    const unchecked = await enqueue(org, { channel: "email", lead_id: lead });
+    const unchecked = await enqueue(org, { channel: "email", lead_id: lead, message_type: "collection" });
     expect(await finish(await claimOne(unchecked, false), true, { provider: "fake", id: "u-1" })).toBe("done");
     expect(await messageOf(unchecked)).toBeNull();
     // final without the check (a malformed payload, no provider): nothing
-    const finalUnchecked = await enqueue(org, { channel: "email", lead_id: lead });
+    const finalUnchecked = await enqueue(org, { channel: "email", lead_id: lead, message_type: "collection" });
     expect(await finish(await claimOne(finalUnchecked, false), false, { final: true })).toBe("dead");
     expect(await messageOf(finalUnchecked)).toBeNull();
     // a provider failure (not final) on the last allowed try, after the check: the repeated failure is recorded
-    const outOfTries = await enqueue(org, { channel: "email", lead_id: lead });
+    const outOfTries = await enqueue(org, { channel: "email", lead_id: lead, message_type: "collection" });
     await asAdmin((q) => q("update app.jobs set attempts = 4 where id = $1", [outOfTries]));
     expect(await finish(await claimOne(outOfTries), false)).toBe("dead");
     expect(await messageOf(outOfTries)).toMatchObject({ status: "failed", sent_at: null });
     // the same on the last try without the check (the attempt never reached the provider): nothing
-    const lastUnchecked = await enqueue(org, { channel: "email", lead_id: lead });
+    const lastUnchecked = await enqueue(org, { channel: "email", lead_id: lead, message_type: "collection" });
     await asAdmin((q) => q("update app.jobs set attempts = 4 where id = $1", [lastUnchecked]));
     expect(await finish(await claimOne(lastUnchecked, false), false)).toBe("dead");
     expect(await messageOf(lastUnchecked)).toBeNull();
     // an earlier failed try (not the last) records nothing yet
-    const early = await enqueue(org, { channel: "email", lead_id: lead });
+    const early = await enqueue(org, { channel: "email", lead_id: lead, message_type: "collection" });
     expect(await finish(await claimOne(early), false)).toBe("failed");
     expect(await messageOf(early)).toBeNull();
     // a lease that ran out on the last try after passing the check: claim_jobs ends it dead, outcome unknown, nothing
-    const expired = await enqueue(org, { channel: "email", lead_id: lead });
+    const expired = await enqueue(org, { channel: "email", lead_id: lead, message_type: "collection" });
     await asAdmin((q) => q("update app.jobs set attempts = 4 where id = $1", [expired]));
     await claimOne(expired);
     await asAdmin((q) => q("update app.jobs set locked_until = now() - interval '1 second' where id = $1", [expired]));
@@ -136,7 +136,7 @@ describe("messages (MSG-03)", () => {
     expect((await asAdmin((q) => q<{ status: string }>("select status from app.jobs where id = $1", [expired]))).rows[0].status).toBe("dead");
     expect(await messageOf(expired)).toBeNull();
     // a check passed under an earlier lease does not count for a later one
-    const reclaimed = await enqueue(org, { channel: "email", lead_id: lead });
+    const reclaimed = await enqueue(org, { channel: "email", lead_id: lead, message_type: "collection" });
     await claimOne(reclaimed);
     await asAdmin((q) => q("update app.jobs set locked_until = now() - interval '1 second' where id = $1", [reclaimed]));
     expect(await finish(await claimOne(reclaimed, false), true, { provider: "fake", id: "r-1" })).toBe("done");
@@ -146,11 +146,11 @@ describe("messages (MSG-03)", () => {
   it("a provider id is printable ASCII only; anything else is dropped, never refused", async () => {
     const lead = await insertLead(owner.id, org, { email: "ascii@example.test", phone: "0509922222" });
     for (const bad of ["has space", "tab\there", "new\nline", "שלום", "x".repeat(201)]) {
-      const id = await enqueue(org, { channel: "email", lead_id: lead });
+      const id = await enqueue(org, { channel: "email", lead_id: lead, message_type: "collection" });
       expect(await finish(await claimOne(id), true, { provider: "fake", id: bad })).toBe("done");
       expect(await messageOf(id), JSON.stringify(bad)).toMatchObject({ status: "sent", provider: "fake", provider_message_id: null });
     }
-    const ok = await enqueue(org, { channel: "email", lead_id: lead });
+    const ok = await enqueue(org, { channel: "email", lead_id: lead, message_type: "collection" });
     expect(await finish(await claimOne(ok), true, { provider: "fake", id: "  <abc-1@mail.example>  " })).toBe("done");
     expect(await messageOf(ok)).toMatchObject({ provider_message_id: "<abc-1@mail.example>" });
     const direct = await pgError(
@@ -163,15 +163,15 @@ describe("messages (MSG-03)", () => {
 
   it("a provider answer of the wrong shape is left out, never refused (the message went out)", async () => {
     const lead = await insertLead(owner.id, org, { email: "shape@example.test", phone: "0509900002" });
-    const id = await enqueue(org, { channel: "email", lead_id: lead });
+    const id = await enqueue(org, { channel: "email", lead_id: lead, message_type: "collection" });
     expect(await finish(await claimOne(id), true, { provider: "Bad Name!", id: "x" })).toBe("done");
     expect(await messageOf(id)).toMatchObject({ status: "sent", provider: null, provider_message_id: null });
   });
 
   it("a provider id is kept once per business and provider: a repeat is recorded without it", async () => {
     const lead = await insertLead(owner.id, org, { email: "dup@example.test", phone: "0509900003" });
-    const a = await enqueue(org, { channel: "email", lead_id: lead });
-    const b = await enqueue(org, { channel: "email", lead_id: lead });
+    const a = await enqueue(org, { channel: "email", lead_id: lead, message_type: "collection" });
+    const b = await enqueue(org, { channel: "email", lead_id: lead, message_type: "collection" });
     const rows = await asService(async (q) => (await q<{ r: Array<Claimed> }>("select public.claim_jobs(array['message.send'], 100) as r")).rows[0].r);
     const [ja, jb] = [a, b].map((x) => rows.find((r) => r.id === x) as Claimed);
     await passCheck(ja);
@@ -193,7 +193,7 @@ describe("messages (MSG-03)", () => {
 
   it("a record purged before the job ends records nothing, and the job still finishes", async () => {
     const lead = await insertLead(owner.id, org, { email: "gone@example.test", phone: "0509900004" });
-    const id = await enqueue(org, { channel: "email", lead_id: lead });
+    const id = await enqueue(org, { channel: "email", lead_id: lead, message_type: "collection" });
     const job = await claimOne(id);
     await asAdmin((q) => q("delete from public.leads where id = $1", [lead]));
     expect(await finish(job, true, { provider: "fake", id: "gone-1" })).toBe("done");
@@ -202,14 +202,14 @@ describe("messages (MSG-03)", () => {
 
   it("purging the record takes its messages; a merge moves the duplicate's to the kept record", { timeout: 30_000 }, async () => {
     const lead = await insertLead(owner.id, org, { email: "purge@example.test", phone: "0509900005" });
-    const id = await enqueue(org, { channel: "email", lead_id: lead });
+    const id = await enqueue(org, { channel: "email", lead_id: lead, message_type: "collection" });
     await finish(await claimOne(id), true, { provider: "fake", id: "purge-1" });
     await asAdmin((q) => q("delete from public.leads where id = $1", [lead]));
     expect(await messageOf(id)).toBeNull();
 
     const keep = await insertLead(owner.id, org, { full_name: "נשאר", email: "keep@example.test", phone: "0509900006" });
     const dupLead = await insertLead(owner.id, org, { full_name: "כפול", email: "keep2@example.test", phone: "0509900007" });
-    const sent = await enqueue(org, { channel: "email", lead_id: dupLead });
+    const sent = await enqueue(org, { channel: "email", lead_id: dupLead, message_type: "collection" });
     await finish(await claimOne(sent), true, { provider: "fake", id: "merge-1" });
     await asUser(owner.id, (q) => q("select public.merge_records($1, 'lead', $2, $3, '{}')", [org, keep, dupLead]));
     expect(await messageOf(sent)).toMatchObject({ lead_id: keep });
@@ -220,7 +220,7 @@ describe("messages (MSG-03)", () => {
     const dupContact = await asUser(owner.id, async (q) =>
       (await q<{ id: string }>("insert into public.contacts (organization_id, first_name, email) values ($1, 'ב', 'c2@example.test') returning id", [org])).rows[0].id,
     );
-    const toContact = await enqueue(org, { channel: "email", contact_id: dupContact });
+    const toContact = await enqueue(org, { channel: "email", contact_id: dupContact, message_type: "collection" });
     await finish(await claimOne(toContact), true, { provider: "fake", id: "merge-2" });
     await asUser(owner.id, (q) => q("select public.merge_records($1, 'contact', $2, $3, '{}')", [org, contact, dupContact]));
     expect(await messageOf(toContact)).toMatchObject({ contact_id: contact });

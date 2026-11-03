@@ -247,10 +247,29 @@ describe("OPS-04: the send handler", () => {
   it("sends through the provider with ids and codes only once the database says yes", async () => {
     const handler = createSendHandler({ maySend: async () => ({ may_send: true }), providerFor: (channel) => createFakeProvider({ channel }) });
     expect(await handler(job())).toMatchObject({ status: "done", receipt: { provider: "fake" } });
-    expect(await handler(job({ id: "c2", payload: { channel: "sms", contact_id: "55555555-5555-4555-8555-555555555555" } }))).toMatchObject({ status: "done" });
+    expect(
+      await handler(job({ id: "c2", payload: { channel: "sms", contact_id: "55555555-5555-4555-8555-555555555555", message_type: "collection" } })),
+    ).toMatchObject({ status: "done" });
     expect(fakeSentMessages()).toEqual([
-      { jobId: job().id, organizationId: job().organization_id, channel: "email", recordType: "lead", recordId: "44444444-4444-4444-8444-444444444444" },
-      { jobId: "c2", organizationId: job().organization_id, channel: "sms", recordType: "contact", recordId: "55555555-5555-4555-8555-555555555555" },
+      // CNS-07: a payload without a type counts as marketing
+      {
+        jobId: job().id,
+        organizationId: job().organization_id,
+        channel: "email",
+        messageType: null,
+        purpose: "marketing",
+        recordType: "lead",
+        recordId: "44444444-4444-4444-8444-444444444444",
+      },
+      {
+        jobId: "c2",
+        organizationId: job().organization_id,
+        channel: "sms",
+        messageType: "collection",
+        purpose: "service",
+        recordType: "contact",
+        recordId: "55555555-5555-4555-8555-555555555555",
+      },
     ]);
   });
 
@@ -282,7 +301,7 @@ describe("OPS-04: the send handler", () => {
   it("the fake keeps only the last 100 messages", async () => {
     const fake = createFakeProvider();
     for (let i = 0; i < FAKE_SENT_KEPT + 5; i++) {
-      await fake.send({ jobId: `j${i}`, organizationId: "o", channel: "sms", recordType: "lead", recordId: "r" });
+      await fake.send({ jobId: `j${i}`, organizationId: "o", channel: "sms", messageType: "collection", purpose: "service", recordType: "lead", recordId: "r" });
     }
     expect(fakeSentMessages()).toHaveLength(FAKE_SENT_KEPT);
     expect(fakeSentMessages()[0].jobId).toBe("j5");

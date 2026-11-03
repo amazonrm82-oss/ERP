@@ -14,11 +14,37 @@ export function isMessageChannel(value: unknown): value is MessageChannel {
   return typeof value === "string" && (MESSAGE_CHANNELS as readonly string[]).includes(value);
 }
 
+/**
+ * CNS-07 (owner 3 November 2026, answer (73) א): every queued message has a type from a closed list (the payload's
+ * `message_type`, app.job_payload_ok). Service is a CLOSED list of types, never a flag a business sets: a meeting
+ * reminder, a document the customer asked for, collection, a verification code (SERVICE_MESSAGE_TYPES =
+ * app.service_message_types()). Every other type, and a job queued without one, is marketing: sent only with a recorded
+ * grant for the channel. A service message goes after an ordinary opt-out from marketing, never to an address on the
+ * blocklist or blocked by a privacy erasure. The database's send check judges; an adapter adds what the law asks of an
+ * advertisement ("פרסומת", sender, opt-out) to a marketing message only.
+ */
+export const MESSAGE_TYPES = ["meeting_reminder", "requested_document", "collection", "verification_code", "marketing"] as const;
+export type MessageType = (typeof MESSAGE_TYPES)[number];
+export const SERVICE_MESSAGE_TYPES = ["meeting_reminder", "requested_document", "collection", "verification_code"] as const;
+export type MessagePurpose = "marketing" | "service";
+
+export function isMessageType(value: unknown): value is MessageType {
+  return typeof value === "string" && (MESSAGE_TYPES as readonly string[]).includes(value);
+}
+
+/** service for the closed service list only; any other type, or none, is marketing */
+export function messagePurpose(type: MessageType | null): MessagePurpose {
+  return type !== null && (SERVICE_MESSAGE_TYPES as readonly string[]).includes(type) ? "service" : "marketing";
+}
+
 /** What the send handler hands a provider: the job and the record it is for, never an address or text. */
 export type OutgoingMessage = {
   jobId: string;
   organizationId: string;
   channel: MessageChannel;
+  // null = queued before types existed (judged as marketing)
+  messageType: MessageType | null;
+  purpose: MessagePurpose;
   recordType: "lead" | "contact";
   recordId: string;
 };
