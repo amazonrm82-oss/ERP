@@ -13,8 +13,10 @@ import {
 // * The privacy-notice paragraph is for the business's own site or forms. It is not stored with anything, so its
 //   version lives here; any change to the text below is a new PRIVACY_NOTICE_VERSION (tests/unit/privacy-wordings.test.ts
 //   pins the text of this version).
+// * notice-draft-2 (owner, 3 November 2026, answer (74) ג): the contact line names the role "אחראי/ת הפרטיות" with the
+//   business's own contact details, never a person's name (the privacy officer's name is not an input of the paragraph).
 
-export const PRIVACY_NOTICE_VERSION = "notice-draft-1";
+export const PRIVACY_NOTICE_VERSION = "notice-draft-2";
 
 export const WORDINGS_DRAFT_NOTE = "נוסח טיוטה, עד שעורך דין יאשר אותו. כדאי שעורך הדין של העסק יעבור עליו לפני שמפרסמים.";
 
@@ -40,7 +42,6 @@ export type NoticeDetails = {
   address: string | null;
   email: string | null;
   phone: string | null;
-  officerName: string | null;
 };
 
 const clean = (value: string | null | undefined): string | null => {
@@ -72,6 +73,6 @@ export function privacyNoticeParagraph(details: NoticeDetails): string {
     "המידע נשמר במערכת לניהול לקוחות של ספק חיצוני, שמעבד אותו בשבילנו בלבד.",
     "לא נשלח לכם פרסומות בלי הסכמה מפורשת, ואפשר לבטל הסכמה כזו בכל עת.",
     "אתם רשאים לבקש לעיין במידע שלכם, לתקן אותו או למחוק אותו.",
-    `לפניות בנושא פרטיות: ${contact}, ${address}.`,
+    `לפניות בנושא פרטיות אפשר לפנות לאחראי/ת הפרטיות של העסק: ${contact}, ${address}.`,
   ].join(" ");
 }

@@ -13,10 +13,8 @@ import {
   privacyNoticeParagraph,
   WORDINGS_DRAFT_NOTE,
 } from "@/features/privacy-center/wordings";
-import { officerName } from "@/features/privacy-officer/officer";
-import { getPrivacyOfficerId } from "@/features/privacy-officer/queries";
 import { isAdminRole } from "@/features/settings/permissions";
-import { getOrganizationSettings, listMembers } from "@/features/settings/queries";
+import { getOrganizationSettings } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { documentSettingsPath } from "@/features/tax/paths";
 import { getDocumentDetails } from "@/features/tax/queries";
@@ -27,19 +25,14 @@ export const metadata: Metadata = { title: "נוסחים לפרטיות" };
 type Props = { params: Promise<{ orgId: string }> };
 
 // PRK-04: the form consent wording (CAP-07, with the version saved with every consent) and a privacy-notice paragraph
-// filled with the business's details, each with a copy button. DRAFTS until the lawyer edits them. Owners and admins.
+// filled with the business's details (it names the role "אחראי/ת הפרטיות", never a person: owner (74) ג), each with a copy button. DRAFTS until the lawyer edits them. Owners and admins.
 export default async function PrivacyWordingsPage({ params }: Props) {
   const { orgId } = await params;
   const context = await getOrgContext(orgId);
   if (!isAdminRole(context.role)) {
     return <p className="text-sm text-ink-soft">רק בעלים ומנהלי מערכת רואים את הנוסחים.</p>;
   }
-  const [details, settings, officerId, members] = await Promise.all([
-    getDocumentDetails(orgId),
-    getOrganizationSettings(orgId),
-    getPrivacyOfficerId(orgId),
-    listMembers(orgId),
-  ]);
+  const [details, settings] = await Promise.all([getDocumentDetails(orgId), getOrganizationSettings(orgId)]);
   const consent = consentWordings(context.org.name);
   const address = [details.addressLine, details.city, details.postalCode].filter((part) => part && part.trim() !== "").join(", ");
   const noticeDetails = {
@@ -49,7 +42,6 @@ export default async function PrivacyWordingsPage({ params }: Props) {
     address: address || null,
     email: details.email,
     phone: details.phone ?? settings?.phone ?? null,
-    officerName: officerName(officerId, members),
   };
   const notice = privacyNoticeParagraph(noticeDetails);
   const missingDetails = noticeMissing(noticeDetails);
