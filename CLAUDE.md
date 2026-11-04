@@ -96,6 +96,13 @@ and build this CRM here instead. The old code is preserved on the branch
    channel and text, never shows or confirms that data exists, honeypot and rate limit as LND-13, reaches the owner as a
    `system` notice with a 30-day count. Provider secrets (INT-02) are encrypted with a key the owner sets as a Vercel env var;
    the database keeps ciphertext only; the key is replaced only with a process that re-encrypts every stored secret.
+   Owner, 4 November 2026, answer (126) א (approved, not built yet): the Meta Lead Ads webhook (CAP-11), under the same conditions
+   (one definer function granted to `service_role` only, which creates the lead through `intake_submit`'s path; rate limits; database
+   tests; an independent review before merge), plus: the GET verification answers only the challenge, against a verify token that is a
+   secret; the POST is refused before the database, without logging the body, when the signature (App Secret) is not valid; the webhook
+   carries a lead id only and the details are fetched from the Graph API with the page token, stored encrypted (INT-02); `meta_lead_id`
+   unique per business, a repeated lead is taken once; leads that arrived during a failure are fetched by a later sweep; a fake provider
+   until the owner sets the App ID and App Secret in Vercel. Its own "In use" line here once built.
    In use (PRK-02, owner 26 October 2026, wave 3 use (3), migration 021147): the public privacy-request page
    (`src/features/privacy-requests/public-server.ts`, page `/f/privacy/<token>`, route `POST /api/forms/privacy/<token>`), which calls
    only `public.privacy_request_page()` (the business's display name `organizations.name`, logo and colour only) and
