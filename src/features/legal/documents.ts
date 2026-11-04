@@ -19,10 +19,13 @@ export type LegalDocument = {
   sections: LegalSection[];
 };
 
-/** Things only the owner can fill in. Shown highlighted wherever they appear. */
+/**
+ * Things only the owner can fill in. A value still in [brackets] is shown highlighted wherever it appears. Company and
+ * address filled by the owner on 4 November 2026 (docs/DECISIONS.md); the key stays here so the wording keeps its version.
+ */
 export const BLANK = {
-  company: "[שם הישות העסקית ומספר החברה]",
-  address: "[כתובת למשלוח דואר]",
+  company: "MEXUZ",
+  address: "הלילך 9, ירושלים, ישראל",
   region: "[אזור אחסון הנתונים]",
   court: "[העיר של בית המשפט המוסמך]",
 } as const;
