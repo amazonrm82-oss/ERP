@@ -31,9 +31,9 @@ export const BLANK = {
 export const DETAILS = {
   phone: SUPPORT_PHONE,
   coordinator: "מתן זזון",
-  email: "zazonmatan@gmail.com",
+  email: "mexuzsystem@gmail.com",
   // the same address for privacy requests, until the owner gives another
-  privacyEmail: "zazonmatan@gmail.com",
+  privacyEmail: "mexuzsystem@gmail.com",
 } as const;
 
 export const LEGAL_VERSION = "2026-10-13";
