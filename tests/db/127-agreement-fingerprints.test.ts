@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { AGREEMENT_SLUGS, AGREEMENT_VERSION, agreementSnapshot } from "@/features/legal/agreement";
+import { BLANK } from "@/features/legal/documents";
 import { fingerprintParts } from "@/features/legal/fingerprint";
 
 import { asAdmin, asAnon, asUser, closePool, count, createUser, pgError } from "./helpers";
@@ -93,7 +94,7 @@ describe("the agreement is signed only on its own text (FXS-09)", () => {
   it("a filled-in draft registered under the same version is signed, and the earlier text of that version still is", async () => {
     const user = await createUser("fp-filled");
     const docs = agreementSnapshot();
-    const filled = { ...docs[0], text: docs[0].text.replace("[שם הישות העסקית ומספר החברה]", "חברה לדוגמה בע\"מ") };
+    const filled = { ...docs[0], text: docs[0].text.split(BLANK.company).join("חברה לדוגמה בע\"מ") };
     expect(filled.text).not.toBe(docs[0].text);
     expect((await pgError(sign(user.id, [filled, ...docs.slice(1)]))).hint).toBe("agreement:changed");
     await asAdmin((q) => q("insert into app.agreement_texts (version, slug, text_hash) values ($1, $2, $3)", [AGREEMENT_VERSION, filled.slug, fingerprint(filled)]));
@@ -111,7 +112,7 @@ describe("the agreement is signed only on its own text (FXS-09)", () => {
     const user = await createUser("fp-cross");
     const docs = agreementSnapshot();
     const other = "2099-12-31";
-    const filled = { ...docs[0], text: docs[0].text.replace("[שם הישות העסקית ומספר החברה]", "חברה לדוגמה בע\"מ") };
+    const filled = { ...docs[0], text: docs[0].text.split(BLANK.company).join("חברה לדוגמה בע\"מ") };
     const otherDocs = [filled, ...docs.slice(1)].map((d) => ({ ...d, version: other }));
     // version B: the filled terms and today's other two texts
     await asAdmin(async (q) => {
