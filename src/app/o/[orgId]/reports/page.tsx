@@ -10,7 +10,7 @@ import { documentsPath } from "@/features/documents/paths";
 import { paymentsPath } from "@/features/payments/paths";
 import { ManagerDashboard } from "@/features/reports/components/manager-dashboard";
 import { getDashboard } from "@/features/reports/dashboard";
-import { REPORTS, reportTexts } from "@/features/reports/definitions";
+import { REPORTS, reportRoleAllows, reportTexts } from "@/features/reports/definitions";
 import { getOrgTerms } from "@/features/terminology/queries";
 import { withReportShape } from "@/features/reports/schemas";
 import { canViewCosts } from "@/features/permissions/keys";
@@ -43,7 +43,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ orgId:
   // FLD-10: report titles in the business's words
   const terms = await getOrgTerms(orgId);
   const reports = REPORTS.filter(
-    (report) => (!report.costs || seesCosts) && (!report.balances || balances) && (!report.collection || collection) && (!report.feature || hasFeature.get(report.feature) === true) && (report.module !== "leads" || modules.leads),
+    (report) => (!report.costs || seesCosts) && reportRoleAllows(report, role) && (!report.balances || balances) && (!report.collection || collection) && (!report.feature || hasFeature.get(report.feature) === true) && (report.module !== "leads" || modules.leads),
   );
   // the dashboard is for people who manage others; reps get the reports list
   const dashboard = role === "owner" || role === "admin" || role === "manager" ? await withReportShape(() => getDashboard(orgId, role === "owner" || role === "admin" ? { unteamed: { timeZone: org.timeZone } } : {})) : null;

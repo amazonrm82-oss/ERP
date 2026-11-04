@@ -253,6 +253,29 @@ describe("report result shapes (FXC-12)", () => {
       ),
     );
 
+    // PKG-07: a paid punch card that ends within the report's window (report_punch_cards' products and expiring lists)
+    await asUser(owner.id, async (q) => {
+      const card = (
+        await q<{ id: string }>(
+          "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'מנויה', $2) returning id",
+          [org, owner.id],
+        )
+      ).rows[0].id;
+      const punch = (
+        await q<{ id: string }>(
+          "insert into public.products (organization_id, name, kind, price_agorot, punch_entries, punch_validity_count, punch_validity_unit) values ($1, 'כרטיסייה 5', 'punch_card', 20000, 5, 10, 'days') returning id",
+          [org],
+        )
+      ).rows[0].id;
+      const paid = (
+        await q<{ id: string }>(
+          "insert into public.payments (organization_id, contact_id, amount_agorot, paid_on, method) values ($1, $2, 100000, (now() at time zone 'Asia/Jerusalem')::date, 'cash') returning id",
+          [org, card],
+        )
+      ).rows[0].id;
+      await q("select public.punch_card_open($1, $2, $3, $4)", [org, card, punch, paid]);
+    });
+
     const range = [org, from(), to()];
     const calls: Record<ReportFunction, [string, unknown[]]> = {
       report_leads_by_source: ["public.report_leads_by_source($1, $2, $3)", range],
@@ -291,6 +314,7 @@ describe("report result shapes (FXC-12)", () => {
         "public.report_collection($1, ((now() at time zone 'Asia/Jerusalem')::date - 1), ((now() at time zone 'Asia/Jerusalem')::date + 1))",
         [org],
       ],
+      report_punch_cards: ["public.report_punch_cards($1)", [org]],
     };
     for (const name of REPORT_FUNCTIONS) {
       const [sql, params] = calls[name];

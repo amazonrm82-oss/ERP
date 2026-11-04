@@ -1,6 +1,6 @@
 import { byGender, DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
 
-// The built-in reports (SPEC 11.1; source_revenue: SEG-02; campaign_roi: SEG-03; meetings: CAL-11; referrals: CON-06; products, recurring: RPT-01; categories, profit: DLI-06; quotes: QUO-17; debt_aging: BAL-03; collection: COL-06). Shared by the index, the report page and the export.
+// The built-in reports (SPEC 11.1; source_revenue: SEG-02; campaign_roi: SEG-03; meetings: CAL-11; referrals: CON-06; products, recurring: RPT-01; categories, profit: DLI-06; quotes: QUO-17; debt_aging: BAL-03; collection: COL-06; punch_cards: PKG-07). Shared by the index, the report page and the export.
 
 export type ReportFilter = "period" | "owner" | "pipeline";
 
@@ -13,14 +13,18 @@ export type ReportDefinition = {
   ownerLabel?: string;
   // DLI-06: shown, opened and exported only by those who may see costs (canViewCosts); the SQL answers nothing to others
   costs?: true;
-  // QUO-17: a report of a plan capability, shown, opened and exported only while the business has it (SEG-03: campaign_costs)
-  feature?: "quotes" | "campaign_costs";
+  // QUO-17: a report of a plan capability, shown, opened and exported only while the business has it (SEG-03: campaign_costs;
+  // PKG-07: punch_cards)
+  feature?: "quotes" | "campaign_costs" | "punch_cards";
   // BAL-03: shown, opened and exported only by those who open a customer's ledger (BAL-01: owners, admins, managers and
   // holders of record_payments) with the balances, documents and payments keys; the SQL answers {allowed: false} to others
   balances?: true;
   // COL-06: shown, opened and exported only by those who open the collection screen (COL-01: BAL-01's rule with the
   // collection, documents and payments keys); the SQL answers {allowed: false} to others
   collection?: true;
+  // PKG-07 (owner (118) ב): shown, opened and exported only by owners, admins and managers by role (reportForManagers);
+  // the SQL answers {allowed: false} and log_export refuses it for anyone else
+  managers?: true;
   // LEAD-08: a report about one module only, left out of the index while the business has that module switched off
   module?: "leads";
 };
@@ -99,6 +103,15 @@ export const REPORTS: ReportDefinition[] = [
     ownerLabel: "נציג",
     collection: true,
   },
+  // PKG-07: punch cards (owner (66) ג: the plans that hold punch_cards)
+  {
+    key: "punch_cards",
+    title: "כרטיסיות",
+    description: "כרטיסיות פעילות, ניצול הכניסות לפי מוצר, כרטיסיות שעומדות לפוג, וכסף שהתקבל על כניסות שעוד לא נוצלו.",
+    filters: [],
+    feature: "punch_cards",
+    managers: true,
+  },
 ];
 
 /**
@@ -155,6 +168,11 @@ export function reportTexts(report: ReportDefinition, terms: OrgTerms = DEFAULT_
     default:
       return { title: report.title, description: report.description };
   }
+}
+
+/** PKG-07: a report marked `managers` is for owners, admins and managers by role only (app.membership_role in the SQL). */
+export function reportRoleAllows(report: ReportDefinition, role: string | null | undefined): boolean {
+  return !report.managers || role === "owner" || role === "admin" || role === "manager";
 }
 
 export function findReport(key: string): ReportDefinition | undefined {

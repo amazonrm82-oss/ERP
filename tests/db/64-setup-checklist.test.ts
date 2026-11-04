@@ -718,6 +718,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_punch_card_erase.sql",
       // PKG-02 redefines app.punch_cards_erase() of _punch_card_erase.sql last (the used entries in the erasure)
       "_punch_card_uses.sql",
+      // PKG-07 redefines public.log_export() of _campaign_costs.sql last (the punch_cards report key)
+      "_punch_card_report.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

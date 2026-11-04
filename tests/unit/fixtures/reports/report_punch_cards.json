@@ -1,0 +1,49 @@
+{
+  "days": 30,
+  "today": "2026-11-04",
+  "totals": {
+    "active": 1,
+    "expired": 0,
+    "pending": 0,
+    "expiring": 1,
+    "unearned": 23600,
+    "active_paid": 1,
+    "entries_left": 5,
+    "entries_used": 0,
+    "active_manual": 0,
+    "active_unpaid": 0,
+    "entries_total": 5,
+    "expired_value": 0,
+    "expiring_entries": 5,
+    "expired_with_entries": 0,
+    "expired_paid_with_entries": 0
+  },
+  "allowed": true,
+  "partial": false,
+  "by_product": [
+    {
+      "name": "כרטיסייה 5",
+      "cards": 1,
+      "unearned": 23600,
+      "product_id": "00000000-0000-4000-8000-000000000025",
+      "utilisation": 0,
+      "entries_left": 5,
+      "entries_used": 0,
+      "current_cards": 1,
+      "entries_total": 5
+    }
+  ],
+  "expiring_cards": [
+    {
+      "kind": "paid",
+      "name": "כרטיסייה 5",
+      "card_id": "00000000-0000-4000-8000-000000000026",
+      "contact_id": "00000000-0000-4000-8000-000000000027",
+      "expires_on": "2026-11-14",
+      "contact_name": "מנויה",
+      "entries_left": 5,
+      "entries_total": 5,
+      "contact_binned": false
+    }
+  ]
+}

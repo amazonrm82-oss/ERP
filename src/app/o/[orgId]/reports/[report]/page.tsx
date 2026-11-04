@@ -10,7 +10,9 @@ import { ReportBody } from "@/features/reports/components/report-body";
 import { ForecastOverdueDeals } from "@/features/reports/components/forecast-overdue";
 import { getOverdueActionsSetup } from "@/features/reports/forecast-overdue-server";
 import { ReportFilters } from "@/features/reports/components/report-filters";
-import { findReport, reportTexts } from "@/features/reports/definitions";
+import { PunchDaysForm } from "@/features/reports/components/punch-days-form";
+import { getPunchReportDays } from "@/features/reports/punch-days-server";
+import { findReport, reportRoleAllows, reportTexts } from "@/features/reports/definitions";
 import { getOrgTerms } from "@/features/terminology/queries";
 import { canViewCosts } from "@/features/permissions/keys";
 import { seesBalances } from "@/features/balances/queries";
@@ -44,6 +46,10 @@ export default async function ReportPage({ params, searchParams }: Props) {
   const context = await getOrgContext(orgId);
   // PRM-01: extra permissions (export)
   const granted = await getMyPermissions(orgId);
+  // PKG-07 (owner (118) ב): a report for owners, admins and managers does not exist for anyone else
+  if (!reportRoleAllows(definition, context.role)) {
+    notFound();
+  }
   // DLI-06: a report about costs does not exist for someone who may not see costs
   if (definition.costs && !canViewCosts(context.role, granted)) {
     notFound();
@@ -61,6 +67,8 @@ export default async function ReportPage({ params, searchParams }: Props) {
     notFound();
   }
   const filters = reportFilters(definition, await searchParams);
+  // PKG-07 (owner (117) ב): the user's kept "expiring" window
+  const punchDays = definition.key === "punch_cards" ? await getPunchReportDays(orgId) : undefined;
 
   const [view, members, pipelines] = await Promise.all([
     // COL-06: the link to the debt aging report only for those who may open it
@@ -69,6 +77,7 @@ export default async function ReportPage({ params, searchParams }: Props) {
         balances: definition.collection ? await seesBalances(orgId) : false,
         // SEG-03, owner (65) ד: the link to the campaign costs page for those who may view costs
         costs: definition.key === "campaign_roi" ? canViewCosts(context.role, granted) : false,
+        punchDays,
       }),
     ),
     definition.filters.includes("owner") ? listMembers(orgId) : Promise.resolve([]),
@@ -112,6 +121,7 @@ export default async function ReportPage({ params, searchParams }: Props) {
           ) : null
         }
       />
+      {punchDays !== undefined ? <PunchDaysForm orgId={orgId} days={punchDays} /> : null}
       <ReportFilters
         filters={definition.filters}
         period={{ key: period.key, fromDate: period.fromDate, toDate: period.toDate }}

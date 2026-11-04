@@ -1,5 +1,6 @@
 import { buildReport } from "@/features/reports/build";
-import { findReport, reportTexts } from "@/features/reports/definitions";
+import { getPunchReportDays } from "@/features/reports/punch-days-server";
+import { findReport, reportRoleAllows, reportTexts } from "@/features/reports/definitions";
 import { getOrgTerms } from "@/features/terminology/queries";
 import { csvCell } from "@/features/reports/format";
 import { canViewCosts } from "@/features/permissions/keys";
@@ -38,6 +39,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ orgI
   const context = await getOrgContext(orgId);
   // PRM-01: extra permissions (export)
   const granted = await getMyPermissions(orgId);
+  // PKG-07 (owner (118) ב): a report for owners, admins and managers does not exist for anyone else
+  if (!reportRoleAllows(definition, context.role)) {
+    return new Response("not found", { status: 404 });
+  }
   // DLI-06: a report about costs does not exist for someone who may not see costs (log_export refuses it too)
   if (definition.costs && !canViewCosts(context.role, granted)) {
     return new Response("not found", { status: 404 });
@@ -63,7 +68,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ orgI
   // FLD-10: the title in the business's words
   const title = reportTexts(definition, await getOrgTerms(orgId)).title;
   const filters = reportFilters(definition, searchParams);
-  const built = await withReportShape(() => buildReport(orgId, definition.key, filters));
+  // PKG-07 (owner (117) ב): the file holds what the screen shows, by the user's kept window
+  const punchDays = definition.key === "punch_cards" ? await getPunchReportDays(orgId) : undefined;
+  const built = await withReportShape(() => buildReport(orgId, definition.key, filters, { punchDays }));
   if (!built.ok) {
     return new Response(built.message, { status: 500, headers: { "Content-Type": "text/plain; charset=utf-8" } });
   }

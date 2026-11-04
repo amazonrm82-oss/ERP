@@ -26,6 +26,8 @@ type Props = {
 /** A plain GET form: the filters live in the URL, so a report can be bookmarked or shared. */
 export function ReportFilters({ filters, period, ownerId, ownerLabel = "אחראי", owners, pipelineId, pipelines, pipelineEmptyLabel }: Props) {
   const [periodKey, setPeriodKey] = useState(period.key);
+  // PKG-07: a report of the present state with nothing to choose has no filter bar
+  if (filters.length === 0) return null;
   return (
     <form method="get" className="mb-5 flex flex-wrap items-end gap-3 rounded-lg border border-line bg-surface p-4" aria-label="סינון הדוח">
       {filters.includes("period") ? (

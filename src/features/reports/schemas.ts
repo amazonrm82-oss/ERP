@@ -544,6 +544,71 @@ export const REPORT_SCHEMAS = {
       .strict(),
     z.object({ allowed: z.literal(false) }).strict(),
   ]),
+  // PKG-07: active punch cards by kind, utilisation by product, cards expiring within `days` with entries left, and the
+  // money for entries not used yet (paid current cards only); a partial view has every amount null; {allowed: false}
+  // without the plan key or for an outsider
+  report_punch_cards: z.union([
+    z
+      .object({
+        allowed: z.literal(true),
+        partial: z.boolean(),
+        today: day,
+        days: count,
+        totals: z
+          .object({
+            active: count,
+            active_paid: count,
+            active_manual: count,
+            active_unpaid: count,
+            pending: count,
+            expired: count,
+            expired_with_entries: count,
+            // review finding 2: the paid ones among them, the cards expired_value sums
+            expired_paid_with_entries: count,
+            entries_total: count,
+            entries_used: count,
+            entries_left: count,
+            unearned: count.nullable(),
+            expired_value: count.nullable(),
+            expiring: count,
+            expiring_entries: count,
+          })
+          .strict(),
+        by_product: z.array(
+          z
+            .object({
+              product_id: uuid,
+              name: text,
+              cards: count,
+              current_cards: count,
+              entries_total: count,
+              entries_used: count,
+              entries_left: count,
+              utilisation: decimal,
+              unearned: count.nullable(),
+            })
+            .strict(),
+        ),
+        expiring_cards: z.array(
+          z
+            .object({
+              card_id: uuid,
+              contact_id: uuid,
+              contact_name: text,
+              name: z.string(),
+              expires_on: day,
+              entries_left: count,
+              entries_total: count,
+              kind: z.enum(["paid", "manual", "unpaid"]),
+              // the contact is in the recycle bin: counted, but the row links nowhere
+              contact_binned: z.boolean(),
+            })
+            .strict(),
+        ),
+      })
+      .strict(),
+    z.object({ allowed: z.literal(false) }).strict(),
+  ]),
   report_quotes: z.object({
     rate_min: count,
     totals: z.object({

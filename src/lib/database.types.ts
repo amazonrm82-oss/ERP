@@ -3827,6 +3827,8 @@ export type Database = {
       report_debt_aging: { Args: { p_org: string; p_owner?: string | null }; Returns: Json };
       // COL-06: collected by month, method and rep, and the average collection days (invoker; COL-01's rights and partial rule)
       report_collection: { Args: { p_org: string; p_from: string; p_to: string; p_owner?: string | null }; Returns: Json };
+      // PKG-07: active punch cards, utilisation, expiring cards and the money for entries not used yet (invoker; partial when a card is hidden)
+      report_punch_cards: { Args: { p_org: string; p_days?: number }; Returns: Json };
       // COL-01: the collection screen's open debt documents (invoker; BAL-01's rights, BAL-03's partial rule)
       collection_documents: {
         Args: {

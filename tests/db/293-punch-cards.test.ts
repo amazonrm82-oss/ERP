@@ -1143,18 +1143,28 @@ describe("punch cards (PKG-01)", () => {
       );
       expect(recipients).toEqual([owner.id, admin.id].sort());
       expect(await notices(EMPTY, c)).toBe(0);
-      // no API role executes any punch card helper of schema app
+      // no API role executes any punch card helper of schema app, but PKG-07's two count-only helpers, which the invoker
+      // report report_punch_cards runs as the caller (the pattern of app.business_money_rows): authenticated only, never anon
+      // or service_role; to members only, punch_card_report_facts answers the business's non-cancelled card count and today,
+      // punch_card_used_counts the used entries of the given cards whose contact the caller reads (tests 295, 296)
       const granted = await asAdmin(async (q) =>
         (
-          await q<{ name: string }>(
-            `select p.proname as name from pg_proc p
+          await q<{ name: string; anon: boolean; authenticated: boolean; service: boolean }>(
+            `select p.proname as name, has_function_privilege('anon', p.oid, 'execute') as anon,
+                    has_function_privilege('authenticated', p.oid, 'execute') as authenticated,
+                    has_function_privilege('service_role', p.oid, 'execute') as service
+               from pg_proc p
               where p.pronamespace = 'app'::regnamespace and p.proname like '%punch%'
                 and (has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('authenticated', p.oid, 'execute')
-                     or has_function_privilege('service_role', p.oid, 'execute'))`,
+                     or has_function_privilege('service_role', p.oid, 'execute'))
+              order by p.proname`,
           )
-        ).rows.map((r) => r.name),
+        ).rows,
       );
-      expect(granted).toEqual([]);
+      expect(granted).toEqual([
+        { name: "punch_card_report_facts", anon: false, authenticated: true, service: false },
+        { name: "punch_card_used_counts", anon: false, authenticated: true, service: false },
+      ]);
       const helpers = await asAdmin(async (q) =>
         (await q<{ name: string }>("select proname as name from pg_proc where pronamespace = 'app'::regnamespace and proname = any ($1)", [["punch_doc_has_lines", "punch_card_retry_event_end", "punch_card_retry_record", "retry_punch_card_openings"]])).rows.map((r) => r.name).sort(),
       );

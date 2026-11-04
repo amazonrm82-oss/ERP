@@ -29,6 +29,8 @@ import { PAYMENT_METHOD_LABELS } from "@/features/payments/schema";
 import type { ReportColumn, ReportRow, ReportSection, ReportView } from "./definitions";
 import { formatCell, hourLabel } from "./format";
 import type { Period } from "./period";
+import { punchCardsView } from "./punch-cards";
+import { PUNCH_DAYS_DEFAULT } from "./punch-days";
 import { responseTargetLabels } from "./response-target";
 import { parseReportData, type ReportFunction } from "./schemas";
 import { must } from "@/lib/db-read";
@@ -222,7 +224,7 @@ async function repGoalSections(orgId: string, filters: ReportFilters): Promise<{
   return { sections, note: null };
 }
 
-export async function buildReport(orgId: string, key: string, filters: ReportFilters, options: { goals?: boolean; balances?: boolean; costs?: boolean } = {}): Promise<ReportView> {
+export async function buildReport(orgId: string, key: string, filters: ReportFilters, options: { goals?: boolean; balances?: boolean; costs?: boolean; punchDays?: number } = {}): Promise<ReportView> {
   // FLD-10 part two: titles and column headers name leads and deals in the business's own words (notes and empty texts
   // keep today's words)
   const terms = await getOrgTerms(orgId);
@@ -1496,6 +1498,16 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
           },
         ],
       };
+    }
+
+    case "punch_cards": {
+      // PKG-07: the business's punch cards now; RLS decides which cards are counted, and a caller who does not read every
+      // card gets the counts without money (the partial rule in the database)
+      const data = parseReportData("report_punch_cards", await rpc("report_punch_cards", { p_org: orgId, p_days: options.punchDays ?? PUNCH_DAYS_DEFAULT }));
+      if (!data.allowed) {
+        return { kpis: [], sections: [], note: "כרטיסיות אינן כלולות בחבילה הנוכחית." };
+      }
+      return punchCardsView(orgId, data);
     }
 
     case "collection": {
