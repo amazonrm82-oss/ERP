@@ -2449,6 +2449,12 @@ that back.
   name). `public.log_export` now takes `p_format` csv|xlsx.
 - A file the owner pastes in the SQL Editor may arrive with Windows line endings: compare its functions with
   `md5(replace(pg_get_functiondef(oid), chr(13), ''))` against the local build (seen 19 October 2026: FXD-06, QUO-13).
+- Courier for a large migration (owner, 4 November 2026, answer (א) with conditions): an exception to "only the lead uses the
+  connector", ONLY when a file is too large for the lead to send itself, never by default, and asked of the owner before the first
+  time (not after). The courier is a subagent given only `get_project` and `apply_migration` (no `execute_sql`, no Git, no other
+  tool); it sends committed files of a named commit (the merge commit about to be pushed to `main`), each exactly as committed,
+  one call per file in name order, `get_project` before each, stops at the first error and never retries. After each file the
+  lead verifies itself: md5 of the functions against the local build, policies and grants, advisors; only then does the lead push.
 - If the connector is not available in a session, fall back to the old way: hand the migration over in
   parts (`node scripts/split-for-sql-editor.mjs <migration>`; a paste over ~4,000 chars was cut off)
   and push code only after the owner confirms it ran.
