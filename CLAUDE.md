@@ -467,7 +467,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
 - Meeting reports (CAL-11, migration 020050; owner 15 October 2026): `public.report_meetings(org, from, to, owner)` (invoker) by
   organizer; no-show rate = no_show / (held + no_show), null below 5; a held meeting "led to a deal" through one deal picked by its
   own deal, else its lead's conversion deal, else its contact's deal created after it (closed first), won within 90 days
-  (`led_window_days`), no fall-through. `public.log_export` (last redefined in 021097 (BAL-03 `debt_aging`); 020425, QUO-17 `quotes`; 020331 DLI-06 `categories`/`profit`; `report_meetings` in 020115) lists the report keys; keep them equal to
+  (`led_window_days`), no fall-through. `public.log_export` (last redefined in 021169 (PKG-07 `punch_cards`); 021097 (BAL-03 `debt_aging`); 020425, QUO-17 `quotes`; 020331 DLI-06 `categories`/`profit`; `report_meetings` in 020115) lists the report keys; keep them equal to
   `src/features/reports/definitions.ts` (test 117).
 - Booking page (CAL-10, migration 020080; owner 15 October 2026; plan flag `booking_page`, allowance `max_booking_pages` +
   `max_booking_pages_per_user` x paid seats, `app.paid_seat_count`, 020340): `public.booking_pages` (one rep and one meeting type, secret `token` server-only).
@@ -1762,6 +1762,19 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   entry (`app.merge_punch_cards`). `app.sample_untouched`, `app.import_record_worked`, `app.audit_erase_core` and
   `public.quick_sale` were last redefined in 021165-021167. The advisor's findings on the six definer RPCs and on
   `app.punch_card_retries` / `app.quick_sale_lines` are expected. Re-running 021166 needs 021168 after it.
+- Punch card report (PKG-07, migration 021169; owner (116) א, (117) ב, (118) ב; two reviews): `public.report_punch_cards(org, days)`
+  (invoker, `jit = off`, days 1..366 hint `report:days`) answers `{allowed:false}` to anyone but an owner, admin or manager by
+  `app.membership_role`, and without `punch_cards`. Active cards are paid (a payment that still counts) | manual (count only) |
+  unpaid (`payment_void_at` or no payment, count only); current = `expires_on` null or >= today (`app.punch_card_today`'s rule).
+  Unearned = sum of round_half_up(`price_agorot` x left / total) over current paid cards (with VAT, as stored); expired paid cards
+  with entries left are their own row "פג תוקף עם יתרה" (`expired_value`, `expired_paid_with_entries`); a binned contact's cards stay
+  counted (`contact_binned`, not linked). Partial (no money) when the caller reads fewer cards than `app.punch_card_report_facts`;
+  used entries from `app.punch_card_used_counts` (definer, one read check per card: `contacts_select`'s rule, keep in step); these
+  two are the only `app.*punch*` functions granted to authenticated (pinned in test 293); test 296 is the perf bound (3,000 cards,
+  9,000 uses, about 1.5 s). The expiring window (7/14/30/60, default 30) is kept per user and business in `list_preferences`
+  (object_type `punch_report`, constraint `list_preferences_punch_report_shape`). Report key `punch_cards`; `log_export` refuses it
+  with 42501 to other roles; `public.log_export` was last redefined in 021169 (test 64's list ends with `_punch_card_report.sql`).
+  A report definition with `managers: true` is filtered by `reportRoleAllows()`; one with `filters: []` has no filter bar.
 - Files on documents and payments (DOC-01/PAY-01 follow-ups, migrations 020640, 020645; owner 20 October 2026): `files.accounting_document_id`
   and `files.payment_id` (composite FKs cascade; `files_one_subject` counts six columns; never on a note). Read follows the document/payment;
   adding needs `app.can_record_documents` / `app.can_record_payments`, a writable business and the flag; PDF or image only
