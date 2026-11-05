@@ -142,7 +142,7 @@ jobs:
         run: node tests/visual/run.mjs "$VISUAL_MODE"
       - name: Upload the screenshots
         if: always() && steps.visual.outcome != 'skipped'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: screenshots-${{ github.run_id }}-${{ github.run_attempt }}
           path: e2e-artifacts/visual/
@@ -157,7 +157,7 @@ jobs:
           done
       - name: Upload screenshots and logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-${{ github.run_id }}-${{ github.run_attempt }}
           path: e2e-artifacts/
