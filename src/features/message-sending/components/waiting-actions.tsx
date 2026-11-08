@@ -15,7 +15,7 @@ export function WaitingActions({ orgId, channel, count }: Props) {
     <div className="flex flex-wrap items-center gap-3">
       <ConfirmButton
         title={`לבטל ${count === 1 ? "הודעת שיווק אחת" : `${count} הודעות שיווק`} ב${channel === "email" ? "אימייל" : `-${CHANNEL_LABELS[channel]}`}?`}
-        description="ההודעות שמחכות לתקרה לא יישלחו. אי אפשר לבטל את הפעולה."
+        description="ההודעות שמחכות לתקרה החודשית או למכסת האימייל היומית לא יישלחו. אי אפשר לבטל את הפעולה."
         confirmLabel="ביטול ההודעות"
         action={cancelWaitingMessagesAction.bind(null, orgId, channel)}
       >

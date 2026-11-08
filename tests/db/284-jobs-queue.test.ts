@@ -27,13 +27,16 @@ const REVIEWED_MD5 = {
   // a verification code always goes, a meeting reminder whose meeting is before the opening goes), then the channel's rate
   // row is locked and at 60/30/20 a minute it waits for the next minute; MSG-05 (021173, owner (122)-(125)): under that lock a
   // marketing job not counted yet waits uncounted over the month's cap (the business's, or the plan's email quota; 15 minutes)
-  // or the plan's daily email quota (next business day), with the channel's other due marketing jobs, and tells the owners and
+  // or the plan's daily email quota (the next calendar day in the business's zone), with the channel's other due marketing jobs, and tells the owners and
   // admins (app.message_cap_notify); on yes the message is counted once (app.message_usage_days, app.jobs.usage_counted) and
   // the 80% / 100% notices are judged; NEEDS A FRESH INDEPENDENT REVIEW before merge
   // MSG-05/06 answers (133)-(136) (021174): a full cap holds the channel across months until raised (app.message_cap_holds);
   // after the business rate, the system-wide rate (app.message_take_system_rate, 10 shards, waits 'system_rate'); a
   // verification code skips both rates; NEEDS A FRESH INDEPENDENT REVIEW before merge
-  job_message_may_send: "45f4736f4845ac5d3123ce066ac0690f",
+  // MSG-05/06 review (021175): every batch move goes through app.message_move_waiting (id order FOR UPDATE; never a job the
+  // latest long pause covers; rate and cap moves marketing only; window and rate moves never a cap waiter); a cap waiter
+  // carries app.jobs.cap_wait, cleared when its cap check passes; the 80% rule in bigint; NEEDS A FRESH INDEPENDENT REVIEW
+  job_message_may_send: "66c56e9f8bc6c5db9afb045a5e7db386",
 };
 
 // MSG-03: the trigger function that writes public.messages from the worker's path (see its test below)

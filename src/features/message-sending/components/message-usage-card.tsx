@@ -46,7 +46,7 @@ export function MessageUsageCard({ orgId, month, channels }: Props) {
               {usage.held ? <p className="text-sm text-ink-soft">התקרה התמלאה: הודעות שיווק מחכות עד שהתקרה תוגדל, גם בחודש חדש.</p> : null}
               {usage.waitingCap > 0 ? (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-danger">{formatNumber(usage.waitingCap)} הודעות שיווק מחכות לתקרה</p>
+                  <p className="text-sm font-medium text-danger">{formatNumber(usage.waitingCap)} הודעות שיווק מחכות לתקרה או למכסה היומית</p>
                   <WaitingActions orgId={orgId} channel={usage.channel} count={usage.waitingCap} />
                 </div>
               ) : null}

@@ -726,6 +726,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_message_usage_caps.sql",
       // MSG-05/06 (133)-(136) redefines public.job_message_may_send() and public.message_usage() of _message_usage_caps.sql last
       "_message_rate_holds.sql",
+      // the MSG-05/06 review redefines public.job_message_may_send(), public.message_usage(), public.message_cancel_waiting() of
+      // _message_rate_holds.sql and app.message_plan_cap() of _message_usage_caps.sql last
+      "_message_send_review_fixes.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
