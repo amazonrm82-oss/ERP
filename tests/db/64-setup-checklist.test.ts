@@ -722,6 +722,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_punch_card_report.sql",
       // MSG-06 redefines public.job_message_may_send() of _message_types.sql last (sending hours and the rate)
       "_message_sending_hours.sql",
+      // MSG-05 redefines public.job_message_may_send() of _message_sending_hours.sql last (the caps and the counter)
+      "_message_usage_caps.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

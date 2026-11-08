@@ -22,3 +22,22 @@ export const sendingHoursSchema = z
   .refine((v) => minutes(v.window_until) > minutes(v.window_from), { path: ["window_until"], error: "שעת הסיום צריכה להיות אחרי שעת ההתחלה." });
 
 export type SendingHoursInput = z.infer<typeof sendingHoursSchema>;
+
+export const MESSAGE_CAP_FIELD_NAMES = ["monthly_cap_email", "monthly_cap_sms", "monthly_cap_whatsapp"] as const;
+
+const CAP_RANGE = "בין 0 ל-10,000,000 הודעות.";
+
+// empty = no cap of the business; else a whole number 0..10,000,000
+const cap = z.preprocess(
+  (value) => (typeof value === "string" ? (value.trim() === "" ? null : Number(value.trim().replaceAll(",", ""))) : null),
+  z.number({ error: "מספר שלם של הודעות." }).int({ error: "מספר שלם של הודעות." }).min(0, { error: CAP_RANGE }).max(10_000_000, { error: CAP_RANGE }).nullable(),
+);
+
+/** MSG-05: the business's monthly cap of marketing messages per channel. */
+export const messageCapsSchema = z.object({
+  monthly_cap_email: cap,
+  monthly_cap_sms: cap,
+  monthly_cap_whatsapp: cap,
+});
+
+export type MessageCapsInput = z.infer<typeof messageCapsSchema>;

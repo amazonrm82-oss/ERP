@@ -8,11 +8,18 @@ import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { pick } from "@/lib/validation";
 
 import { messageSendingSettingsPath } from "./paths";
-import { SENDING_HOURS_FIELD_NAMES, sendingHoursSchema } from "./schema";
+import { MESSAGE_CAP_FIELD_NAMES, messageCapsSchema, SENDING_HOURS_FIELD_NAMES, sendingHoursSchema } from "./schema";
 
 const SAVE_FAILED = "לא הצלחנו לשמור. נסו שוב.";
 
-type Values = { window_from?: string; window_until?: string; skip_rest_days?: boolean };
+type Values = {
+  window_from?: string;
+  window_until?: string;
+  skip_rest_days?: boolean;
+  monthly_cap_email?: number | null;
+  monthly_cap_sms?: number | null;
+  monthly_cap_whatsapp?: number | null;
+};
 
 /**
  * One row per business (org_message_settings): update it, or insert it the first time; a first save racing another hits the
@@ -44,6 +51,13 @@ async function saveSettings(orgId: string, values: Values, formData: FormData): 
 /** MSG-06: the sending window of messages to customers. */
 export async function saveSendingHoursAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const parsed = sendingHoursSchema.safeParse(pick(formData, SENDING_HOURS_FIELD_NAMES));
+  if (!parsed.success) return invalid(parsed.error, formData);
+  return saveSettings(orgId, parsed.data, formData);
+}
+
+/** MSG-05: the monthly caps of marketing messages (empty = no cap of the business). */
+export async function saveMessageCapsAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const parsed = messageCapsSchema.safeParse(pick(formData, MESSAGE_CAP_FIELD_NAMES));
   if (!parsed.success) return invalid(parsed.error, formData);
   return saveSettings(orgId, parsed.data, formData);
 }

@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_WINDOW_FROM, DEFAULT_WINDOW_UNTIL, RATE_PER_MINUTE, shortTime, untilFromInput, untilInputValue, windowText } from "@/features/message-sending/hours";
-import { sendingHoursSchema } from "@/features/message-sending/schema";
+import { messageCapsSchema, sendingHoursSchema } from "@/features/message-sending/schema";
+import { CAP_MAX, effectiveCap, marketingLine, nearCap, parseMessageUsage, WARN_SHARE } from "@/features/message-sending/usage";
 
 const root = join(__dirname, "..", "..");
 const migration = (suffix: string) => {
@@ -49,5 +50,71 @@ describe("sending hours (MSG-06)", () => {
     expect(sendingHoursSchema.safeParse({ window_from: "20:00", window_until: "08:00", skip_rest_days: "on" }).success).toBe(false);
     expect(sendingHoursSchema.safeParse({ window_from: "8:00", window_until: "20:00", skip_rest_days: "on" }).success).toBe(false);
     expect(sendingHoursSchema.safeParse({ window_from: "08:00:30", window_until: "20:00", skip_rest_days: "on" }).success).toBe(false);
+  });
+});
+
+describe("usage and caps (MSG-05)", () => {
+  const raw = (over: Record<string, unknown> = {}) => ({
+    allowed: true,
+    month: "2026-11",
+    channels: [
+      {
+        channel: "email",
+        marketing: 800,
+        service: 12,
+        marketing_today: 40,
+        business_cap: 1000,
+        plan_month_cap: 2000,
+        plan_day_cap: 200,
+        waiting_cap: 0,
+        waiting_hours: 3,
+        ...over,
+      },
+    ],
+  });
+
+  it("the month's cap is the lower of the business's and the plan's; null is none", () => {
+    expect(effectiveCap(null, null)).toBeNull();
+    expect(effectiveCap(1000, null)).toBe(1000);
+    expect(effectiveCap(null, 2000)).toBe(2000);
+    expect(effectiveCap(3000, 2000)).toBe(2000);
+    const usage = parseMessageUsage(raw());
+    expect(usage.allowed && usage.channels[0]).toMatchObject({ cap: 1000, marketingToday: 40, waitingHours: 3 });
+  });
+
+  it("the 80% line matches the database's rule (used x 5 >= cap x 4)", () => {
+    expect(WARN_SHARE).toBe(0.8);
+    expect(nearCap({ marketing: 799, cap: 1000 })).toBe(false);
+    expect(nearCap({ marketing: 800, cap: 1000 })).toBe(true);
+    expect(nearCap({ marketing: 5, cap: null })).toBe(false);
+    expect(nearCap({ marketing: 0, cap: 0 })).toBe(false);
+    const f = (n: number) => String(n);
+    expect(marketingLine({ marketing: 800, cap: 1000 }, f)).toBe("800 מתוך 1000 הודעות שיווק · קרוב לתקרה");
+    expect(marketingLine({ marketing: 1000, cap: 1000 }, f)).toBe("1000 מתוך 1000 הודעות שיווק · התקרה מלאה");
+    expect(marketingLine({ marketing: 3, cap: null }, f)).toBe("3 הודעות שיווק · בלי תקרה");
+  });
+
+  it("a malformed answer is an error; allowed: false is passed on", () => {
+    expect(parseMessageUsage({ allowed: false })).toEqual({ allowed: false });
+    expect(() => parseMessageUsage(raw({ marketing: -1 }))).toThrow();
+    expect(() => parseMessageUsage(raw({ channel: "fax" }))).toThrow();
+    expect(() => parseMessageUsage(null)).toThrow();
+  });
+
+  it("the caps form: empty = no cap, whole numbers 0..10,000,000", () => {
+    expect(messageCapsSchema.parse({ monthly_cap_email: "", monthly_cap_sms: "1,500", monthly_cap_whatsapp: "0" })).toEqual({
+      monthly_cap_email: null,
+      monthly_cap_sms: 1500,
+      monthly_cap_whatsapp: 0,
+    });
+    for (const bad of ["1.5", "-1", "10000001", "abc"]) {
+      expect(messageCapsSchema.safeParse({ monthly_cap_email: bad, monthly_cap_sms: "", monthly_cap_whatsapp: "" }).success, bad).toBe(false);
+    }
+  });
+
+  it("the caps' range and the notice share mirror the migration", () => {
+    const sql = migration("_message_usage_caps.sql");
+    expect(sql).toContain(`monthly_cap_email is null or monthly_cap_email between 0 and ${CAP_MAX}`);
+    expect(sql).toContain("v_used_month * 5 >= v_cap * 4");
   });
 });

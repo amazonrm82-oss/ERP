@@ -821,6 +821,10 @@ export type OrgMessageSettingsRow = {
   window_until: string;
   // true: no sending on the business's rest days and holidays, and until 15:00 on a short working day
   skip_rest_days: boolean;
+  // MSG-05: the business's monthly cap of marketing messages per channel, 0..10,000,000 (null = none)
+  monthly_cap_email: number | null;
+  monthly_cap_sms: number | null;
+  monthly_cap_whatsapp: number | null;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
@@ -3401,11 +3405,26 @@ export type Database = {
         { organization_id: string; dormant_months?: number; former_months?: number },
         { dormant_months?: number; former_months?: number }
       >;
-      // MSG-06: column grants (the window); no delete
+      // MSG-06 / MSG-05: column grants (the window and the caps); no delete
       org_message_settings: Table<
         OrgMessageSettingsRow,
-        { organization_id: string; window_from?: string; window_until?: string; skip_rest_days?: boolean },
-        { window_from?: string; window_until?: string; skip_rest_days?: boolean }
+        {
+          organization_id: string;
+          window_from?: string;
+          window_until?: string;
+          skip_rest_days?: boolean;
+          monthly_cap_email?: number | null;
+          monthly_cap_sms?: number | null;
+          monthly_cap_whatsapp?: number | null;
+        },
+        {
+          window_from?: string;
+          window_until?: string;
+          skip_rest_days?: boolean;
+          monthly_cap_email?: number | null;
+          monthly_cap_sms?: number | null;
+          monthly_cap_whatsapp?: number | null;
+        }
       >;
       // HEB-09: column grants (paused, reason); the stamps are the server's; no delete
       org_sending_pauses: Table<
@@ -4087,6 +4106,8 @@ export type Database = {
       mention_candidates: { Args: { p_org: string; p_kind: string; p_id: string }; Returns: Array<{ user_id: string; name: string }> };
       // merging duplicates (migration 0020): picks = { column: "merge" }
       merge_records: { Args: { p_org: string; p_type: string; p_keep: string; p_merge: string; p_picks?: Json }; Returns: undefined };
+      // MSG-05: this month's messages per channel, the caps and the waiting counts (owners/admins; else {allowed: false})
+      message_usage: { Args: { p_org: string }; Returns: Json };
       my_sessions: { Args: Record<string, never>; Returns: Json };
       org_login_events: { Args: { p_org: string; p_limit?: number }; Returns: Json };
       // privacy erasure (migration 0027)

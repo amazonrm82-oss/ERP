@@ -25,8 +25,12 @@ const REVIEWED_MD5 = {
   // type stops only at the blocklist or an erasure, marketing needs no opt-out and a recorded grant; MSG-06 (021172, owner
   // (119)-(121)): after every check, outside the sending window the job waits uncounted (with the business's other due ones;
   // a verification code always goes, a meeting reminder whose meeting is before the opening goes), then the channel's rate
-  // row is locked and at 60/30/20 a minute it waits for the next minute; NEEDS A FRESH INDEPENDENT REVIEW before merge
-  job_message_may_send: "d80973d1aa3c842914fafea5e80eec0e",
+  // row is locked and at 60/30/20 a minute it waits for the next minute; MSG-05 (021173, owner (122)-(125)): under that lock a
+  // marketing job not counted yet waits uncounted over the month's cap (the business's, or the plan's email quota; 15 minutes)
+  // or the plan's daily email quota (next business day), with the channel's other due marketing jobs, and tells the owners and
+  // admins (app.message_cap_notify); on yes the message is counted once (app.message_usage_days, app.jobs.usage_counted) and
+  // the 80% / 100% notices are judged; NEEDS A FRESH INDEPENDENT REVIEW before merge
+  job_message_may_send: "b206409d92aa55677b6803009df40a19",
 };
 
 // MSG-03: the trigger function that writes public.messages from the worker's path (see its test below)
