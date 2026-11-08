@@ -1777,6 +1777,34 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   entry (`app.merge_punch_cards`). `app.sample_untouched`, `app.import_record_worked`, `app.audit_erase_core` and
   `public.quick_sale` were last redefined in 021165-021167. The advisor's findings on the six definer RPCs and on
   `app.punch_card_retries` / `app.quick_sale_lines` are expected. Re-running 021166 needs 021168 after it.
+- Punch card alerts (PKG-03, migrations 021176-021178; owner (127)-(132), (137)-(142), (148); three independent reviews):
+  `public.punch_card_alert_settings` (one row per business; `low_entries` 0..100 default 2, `expiry_days` 0..365 default 14, 0 = that
+  alert off; `customer_messages` default false; members read; owners/admins of a writable business write through column grants; no
+  delete; audited). pg_cron `crm-punch-card-alerts` (every 15 minutes, `app.send_punch_card_alerts`, from 08:00 in the business zone,
+  writable businesses with `punch_cards`; 200 per business, 2,000 per run, turns in `app.punch_card_alert_turns`, per-card exception
+  block, 3 failures then skipped) sends one notice of the mutable kind `punch_card` per card and kind (`app.punch_card_alerts_sent`):
+  few left = entries left at or under `low_entries` (zero included; a never-used card too); last day near = `expires_on` within
+  `expiry_days`, never for a card opened inside that window (owner (131)); to the contact's active full-seat non-viewer owner, else
+  owners/admins; card name and numbers only ({כניסות} = `app.punch_card_entries_text` = `punchEntriesText()`). No alerts about an
+  existing state: the job baselines a business the first time it sees it with the key and again when the key is regained
+  (`app.punch_card_alert_orgs`), and a settings change marks only what the new numbers reach and the old ones did not
+  (trigger `punch_card_alert_settings_baseline`, `app.punch_card_alert_baseline_change`; an insert is compared with 2/14). Customer
+  side, only while `customer_messages` is on (`app.punch_card_customer_notices`, rows made with the rep notice): a service message of
+  type `punch_card_notice` (fields of `app.message_type_fields`: first name, business name and phone, card name, entries, date; no
+  price, link or offer) from the active template marked by server-only `message_templates.notice_kind` (`punch_card_low` |
+  `punch_card_expiry`), on the contact's preferred channel, else SMS, WhatsApp, email, with an address (`phone_e164` for SMS and
+  WhatsApp; `app.punch_card_notice_template`); `app.message_template_sendable` first, else `app.message_send_refused`. The few-left
+  message goes only after the first use that leaves the card at or under the number (owner (148) ב); the expiry message covers a
+  few-left row only while that row is due; a given-up expiry lets it go. Every job carries `event_at` (expiry: end of the last day;
+  few left: end of least(last day, today + 7)); rows that can never be sent are closed with `closed_reason` (card_inactive,
+  card_expired, contact_gone, messages_off). THE FUTURE SENDER must re-read the card by the payload's `punch_card_id`, scoped to the
+  job's business and contact, and send nothing unless it is still active and held by that contact. Two DRAFT templates seeded only for
+  businesses with the key (`app.seed_punch_card_message_templates`, at insert and by the job on an upgrade, once a day per business,
+  `app.punch_card_template_seeds`; a deleted one is not brought back while the other exists) = `DEFAULT_PUNCH_CARD_TEMPLATES`.
+  `app.message_types`, `app.service_message_types`, `app.message_merge_fields`, `app.message_type_fields` and `app.job_payload_ok`
+  were last redefined in 021177; `app.send_punch_card_alerts` and `app.punch_card_notice_template` in 021178. The queue's four pinned
+  functions are unchanged; `job_message_may_send` treats the new type as a service type through `app.service_message_types()`. Tests
+  64 and 88 end with `_punch_card_alert_answers.sql`; `rerunClosure` (`tests/db/rerun.ts`) also closes over `add constraint <name>`.
 - Punch card report (PKG-07, migration 021169; owner (116) א, (117) ב, (118) ב; two reviews): `public.report_punch_cards(org, days)`
   (invoker, `jit = off`, days 1..366 hint `report:days`) answers `{allowed:false}` to anyone but an owner, admin or manager by
   `app.membership_role`, and without `punch_cards`. Active cards are paid (a payment that still counts) | manual (count only) |
