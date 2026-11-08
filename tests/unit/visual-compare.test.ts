@@ -179,6 +179,9 @@ describe("masking changing text", () => {
     ["screens-mf3k2@example.test", MASK],
     ["/o/0b7c1f2e-1d2c-4b5a-9f00-1234567890ab/leads", `/o/${MASK}/leads`],
     ["2026-11-02", MASK],
+    ["יום ראשון, 8 בנוב׳ 2026", MASK],
+    ["נוצר ב-8 בנוב' 2026", `נוצר ב-${MASK}`],
+    ["7 בינו׳", MASK],
   ])("%s", (input, output) => {
     expect(maskText(input)).toBe(output);
   });
