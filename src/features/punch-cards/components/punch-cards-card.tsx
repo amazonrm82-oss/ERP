@@ -4,7 +4,7 @@ import { Meter } from "@/components/ui/chart";
 import { formatDate, zoneDate } from "@/lib/format";
 
 import { PUNCH_STATE_LABELS, PUNCH_STATE_TONE, remainingText } from "../balance";
-import { getPunchAccess, listContactPayments, listContactPunchCards, listPunchProducts } from "../queries";
+import { getPunchAccess, listContactPayments, listContactPunchCards, listPunchProducts, type PunchCardItem } from "../queries";
 import {
   ActivatePunchCardButton,
   CancelPunchCardButton,
@@ -12,6 +12,11 @@ import {
   ReturnPunchUseButton,
   TransferPunchCardButton,
 } from "./punch-card-forms";
+
+/** PKG-03: a card worth renewing: few entries left, its last day near, used up or expired (never pending or cancelled). */
+function renewable(card: PunchCardItem): boolean {
+  return card.balance.low || card.expiryNear || card.balance.state === "used_up" || card.balance.state === "expired";
+}
 
 /**
  * PKG-01, PKG-02: the contact's punch cards with their balance. Shown to whoever reads the contact while the plan has
@@ -53,6 +58,7 @@ export async function PunchCardsCard({ orgId, contactId, timeZone }: { orgId: st
                   <span className="flex flex-wrap gap-1.5">
                     <Badge tone={PUNCH_STATE_TONE[card.balance.state]}>{PUNCH_STATE_LABELS[card.balance.state]}</Badge>
                     {card.balance.low ? <Badge tone="warning">נשארו מעט</Badge> : null}
+                    {card.expiryNear ? <Badge tone="warning">התוקף מתקרב</Badge> : null}
                   </span>
                 </div>
                 <Meter value={card.balance.remaining} max={card.balance.total} label={remainingText(card.balance)} />
@@ -73,6 +79,18 @@ export async function PunchCardsCard({ orgId, contactId, timeZone }: { orgId: st
                   </p>
                 ) : null}
                 <div className="flex flex-wrap gap-2">
+                  {access.canSell && renewable(card) && products.some((p) => p.id === card.productId) ? (
+                    <OpenPunchCardButton
+                      orgId={orgId}
+                      contactId={contactId}
+                      products={products}
+                      payments={payments}
+                      isAdmin={access.isAdmin}
+                      defaultProductId={card.productId}
+                      label="חידוש"
+                      title="חידוש כרטיסייה"
+                    />
+                  ) : null}
                   {card.status === "pending" && (access.canSell || access.isAdmin) && access.inPlan ? (
                     <ActivatePunchCardButton
                       orgId={orgId}

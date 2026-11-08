@@ -23,6 +23,8 @@ export const NOTIFICATION_KINDS = [
   { key: "quote", label: "הצעת מחיר אושרה, נדחתה או פג תוקפה", group: "money", shown: true },
   // PAY-07 (owner, 21 October 2026, answer 4): a payment was received
   { key: "payment", label: "תשלום התקבל", group: "money", shown: true },
+  // PKG-03 (owner, 4 November 2026, answer (132) ב): a punch card has few entries left or its last day is near
+  { key: "punch_card", label: "כרטיסייה: נשארו מעט כניסות או שהתוקף מתקרב", group: "money", shown: true },
   { key: "automation", label: "התראות מאוטומציות", group: "automations", shown: true },
   { key: "automation_failed", label: "אוטומציה נכשלה (למנהלים)", group: "automations", shown: true },
 ] as const;

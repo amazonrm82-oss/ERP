@@ -26,7 +26,7 @@ import {
   TemplateNotSendableError,
   type TemplateText,
 } from "@/features/message-templates/service-rule";
-import { DEFAULT_MESSAGE_TEMPLATES } from "@/features/message-templates/templates";
+import { DEFAULT_MESSAGE_TEMPLATES, DEFAULT_PUNCH_CARD_TEMPLATES } from "@/features/message-templates/templates";
 import { SERVICE_MESSAGE_TYPES } from "@/features/messaging/providers/types";
 
 import filledCases from "./fixtures/message-filled-problems.json";
@@ -55,13 +55,16 @@ describe("service template rule (MSG-02, owner (90) ג)", () => {
   });
 
   it("the caps equal app.message_service_body_max", () => {
-    expect(sql).toContain(
+    const capsSql = latestMigration("create or replace function app.message_service_body_max(")?.sql ?? "";
+    expect(capsSql).toContain(
       `case p_channel when 'sms' then ${SERVICE_BODY_MAX.sms} when 'whatsapp' then ${SERVICE_BODY_MAX.whatsapp} when 'email' then ${SERVICE_BODY_MAX.email} end`,
     );
   });
 
   it("every default service template may be sent", () => {
     for (const d of DEFAULT_MESSAGE_TEMPLATES) expect(messageTemplateProblem(d), d.name).toBeNull();
+    // PKG-03: the punch card notices use only their type's fields, hold no link and fit one SMS cap
+    for (const d of DEFAULT_PUNCH_CARD_TEMPLATES) expect(messageTemplateProblem(d), d.name).toBeNull();
   });
 
   it("says why in Hebrew, and the sender gate throws", () => {

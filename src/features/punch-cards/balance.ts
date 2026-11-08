@@ -22,7 +22,7 @@ export type PunchBalance = {
   state: PunchCardState;
   // an active card that is not expired and has entries left
   usable: boolean;
-  // usable, with PUNCH_LOW_ENTRIES or fewer left
+  // usable, with the business's few-left number (PKG-03; PUNCH_LOW_ENTRIES by default) or fewer left; never when it is 0
   low: boolean;
 };
 
@@ -35,6 +35,7 @@ export function punchBalance(
   card: { status: string; entriesTotal: number; expiresOn: string | null },
   liveUses: number,
   today: string,
+  lowEntries: number = PUNCH_LOW_ENTRIES,
 ): PunchBalance {
   const used = Math.max(0, liveUses);
   const remaining = Math.max(0, card.entriesTotal - used);
@@ -45,7 +46,7 @@ export function punchBalance(
   else if (remaining === 0) state = "used_up";
   else state = "active";
   const usable = state === "active";
-  return { total: card.entriesTotal, used, remaining, state, usable, low: usable && remaining <= PUNCH_LOW_ENTRIES };
+  return { total: card.entriesTotal, used, remaining, state, usable, low: usable && lowEntries > 0 && remaining <= lowEntries };
 }
 
 export const PUNCH_STATE_LABELS: Record<PunchCardState, string> = {

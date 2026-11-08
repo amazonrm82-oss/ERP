@@ -52,6 +52,16 @@ export function droppedIndexes(sql: string): Set<string> {
   return new Set([...sql.matchAll(INDEX_DROP)].map((m) => m[1].toLowerCase()));
 }
 
+// add constraint <name>: a constraint a migration (re)sets. A re-run of an older `drop constraint if exists … add constraint`
+// puts back its older check (PKG-03: re-running 020390 or 020100 put back the notification kinds without punch_card), so
+// every later migration that adds a constraint of the same name joins. Matched by name alone, which can only add files.
+const CONSTRAINT_ADD = /\badd\s+constraint\s+"?([a-z_][a-z0-9_]*)"?/gi;
+
+/** The constraints a migration adds, lower case. */
+export function addedConstraints(sql: string): Set<string> {
+  return new Set([...sql.matchAll(CONSTRAINT_ADD)].map((m) => m[1].toLowerCase()));
+}
+
 /** The migration file whose name ends with this suffix (the number changes when the lead renumbers it). */
 export function migrationFile(suffix: string): string {
   const file = readdirSync(MIGRATIONS_DIR).find((f) => f.endsWith(suffix));
@@ -69,6 +79,8 @@ export function migrationFile(suffix: string): string {
  * migration that creates or alters a policy a file already in the list sets joins.
  * Indexes too: a re-run `create index if not exists` brings back an index a later migration dropped, so every later
  * migration that drops an index a file already in the list creates joins.
+ * Constraints too: a re-run `drop constraint if exists … add constraint` puts back an older check, so every later
+ * migration that adds a constraint of a name a file already in the list adds joins.
  */
 export function rerunClosure(
   files: string[],
@@ -81,6 +93,7 @@ export function rerunClosure(
   const tables = new Set<string>();
   const policies = new Set<string>();
   const indexes = new Set<string>();
+  const constraints = new Set<string>();
   const picked: string[] = [];
   const texts: string[] = [];
   for (const file of readdirSync(dir).filter((f) => f.endsWith(".sql") && f >= first).sort()) {
@@ -89,12 +102,14 @@ export function rerunClosure(
     const grants = grantedTables(sql);
     const sets = definedPolicies(sql);
     const drops = droppedIndexes(sql);
+    const adds = addedConstraints(sql);
     if (
       start.has(file) ||
       [...defines].some((name) => names.has(name)) ||
       [...grants].some((t) => tables.has(t)) ||
       [...sets].some((p) => policies.has(p)) ||
       [...drops].some((i) => indexes.has(i)) ||
+      [...adds].some((c) => constraints.has(c)) ||
       also(sql)
     ) {
       picked.push(file);
@@ -103,6 +118,7 @@ export function rerunClosure(
       for (const t of grants) tables.add(t);
       for (const p of sets) policies.add(p);
       for (const i of createdIndexes(sql)) indexes.add(i);
+      for (const c of adds) constraints.add(c);
     }
   }
   const missing = files.filter((file) => !picked.includes(file));

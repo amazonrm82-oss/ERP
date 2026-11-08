@@ -167,18 +167,26 @@ describe("CNS-07: a closed list of message types; service is a closed list too",
       ["requested_document", "service"],
       ["collection", "service"],
       ["verification_code", "service"],
+      // PKG-03 (owner (127) ב)
+      ["punch_card_notice", "service"],
       ["marketing", "marketing"],
       [null, "marketing"],
     ]);
     for (const bad of ["service", "promo", 1]) {
       expect(await handler(job({ channel: "sms", lead_id: lead, message_type: bad }))).toEqual({ status: "failed", error: "payload", final: true });
     }
-    expect(maySend).toHaveBeenCalledTimes(6);
+    expect(maySend).toHaveBeenCalledTimes(7);
   });
 
   it("the types and the service list mirror the migration", () => {
     const dir = join(root, "supabase/migrations");
-    const sql = readFileSync(join(dir, readdirSync(dir).find((f) => f.endsWith("_message_types.sql")) as string), "utf8");
+    // the latest migration that redefines the lists (PKG-03 added punch_card_notice)
+    const file = readdirSync(dir)
+      .filter((f) => f.endsWith(".sql"))
+      .sort()
+      .filter((f) => readFileSync(join(dir, f), "utf8").includes("create or replace function app.service_message_types()"))
+      .pop() as string;
+    const sql = readFileSync(join(dir, file), "utf8");
     const list = (name: string) => {
       const m = sql.match(new RegExp(`function app\\.${name}\\(\\)[\\s\\S]*?array\\[([^\\]]*)\\]`));
       expect(m, name).not.toBeNull();

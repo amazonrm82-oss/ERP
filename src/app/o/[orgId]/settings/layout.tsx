@@ -16,12 +16,12 @@ export default async function SettingsLayout({ children, params }: Props) {
   if (closed) {
     return <>{children}</>;
   }
-  const [priceLists, granted] = await Promise.all([orgHasFeature(orgId, "price_lists"), getMyPermissions(orgId)]);
+  const [priceLists, punchCards, granted] = await Promise.all([orgHasFeature(orgId, "price_lists"), orgHasFeature(orgId, "punch_cards"), getMyPermissions(orgId)]);
   return (
     <SettingsFrame
       orgId={orgId}
       // the same rule as the settings page and the command palette (REC-09)
-      access={settingsAccessFor({ role, canWrite, canDelete, priceLists, granted })}
+      access={settingsAccessFor({ role, canWrite, canDelete, priceLists, punchCards, granted })}
     >
       {children}
     </SettingsFrame>

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { fillMessage, MERGE_FIELD_NAMES, MERGE_FIELD_PATTERN, unfilledMergeFields, unknownMergeFields } from "@/features/message-templates/fields";
 import { messageTemplateSchema } from "@/features/message-templates/schema";
-import { DEFAULT_MESSAGE_TEMPLATES, isServiceType, smsLengthWarning, smsLimit, TEMPLATE_LOCALES } from "@/features/message-templates/templates";
+import { DEFAULT_MESSAGE_TEMPLATES, DEFAULT_PUNCH_CARD_TEMPLATES, isServiceType, smsLengthWarning, smsLimit, TEMPLATE_LOCALES } from "@/features/message-templates/templates";
 import { PLACEHOLDERS } from "@/features/whatsapp/templates";
 import { MESSAGE_TYPES, SERVICE_MESSAGE_TYPES } from "@/features/messaging/providers/types";
 
@@ -32,7 +32,9 @@ describe("message templates (MSG-02)", () => {
   });
 
   it("the closed lists equal the table's checks", () => {
-    expect(sql).toContain(`message_type in (${MESSAGE_TYPES.map((t) => `'${t}'`).join(", ")})`);
+    // PKG-03 sets the type check again (punch_card_notice); the latest migration that sets it holds the list
+    const typeSql = latestMigration("add constraint message_templates_message_type_check")?.sql ?? sql;
+    expect(typeSql).toContain(`message_type in (${MESSAGE_TYPES.map((t) => `'${t}'`).join(", ")})`);
     expect(sql).toContain(`locale in (${TEMPLATE_LOCALES.map((t) => `'${t}'`).join(", ")})`);
     expect(MESSAGE_TYPES.filter(isServiceType)).toEqual([...SERVICE_MESSAGE_TYPES]);
   });
@@ -43,6 +45,17 @@ describe("message templates (MSG-02)", () => {
       expect(seed, d.name).toContain(`'${d.name}', '${d.channel}', '${d.messageType}', ${d.subject === null ? "null::text" : `'${d.subject}'`},`);
       expect(seed, d.name).toContain(`'${d.body}'`);
       expect(unknownMergeFields(`${d.subject ?? ""} ${d.body}`), d.name).toEqual([]);
+    }
+  });
+
+  it("the punch card notices equal their seed (PKG-03)", () => {
+    const punchSql = latestMigration("create or replace function app.seed_punch_card_message_templates")?.sql ?? "";
+    const seed = punchSql.slice(punchSql.indexOf("create or replace function app.seed_punch_card_message_templates"));
+    expect(DEFAULT_PUNCH_CARD_TEMPLATES.map((d) => d.noticeKind)).toEqual(["punch_card_low", "punch_card_expiry"]);
+    for (const d of DEFAULT_PUNCH_CARD_TEMPLATES) {
+      expect(seed, d.name).toContain(`'${d.name}', '${d.channel}', '${d.messageType}',`);
+      expect(seed, d.name).toContain(`'${d.body}', '${d.noticeKind}'`);
+      expect(unknownMergeFields(d.body), d.name).toEqual([]);
     }
   });
 

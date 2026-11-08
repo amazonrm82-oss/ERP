@@ -22,9 +22,9 @@ export default async function SettingsPage({ params }: Props) {
   const { orgId } = await params;
   const { canDelete, canWrite, role } = await getOrgContext(orgId);
   const admin = isAdminRole(role);
-  const [priceLists, granted] = await Promise.all([orgHasFeature(orgId, "price_lists"), getMyPermissions(orgId)]);
+  const [priceLists, punchCards, granted] = await Promise.all([orgHasFeature(orgId, "price_lists"), orgHasFeature(orgId, "punch_cards"), getMyPermissions(orgId)]);
   // the owner also reaches the full export while the business is read-only; PRM-01: extra permissions
-  const groups = settingsGroups(orgId, settingsAccessFor({ role, canWrite, canDelete, priceLists, granted }));
+  const groups = settingsGroups(orgId, settingsAccessFor({ role, canWrite, canDelete, priceLists, punchCards, granted }));
   // LEAD-06: a picked conversion target was deleted; owners and admins see it until someone chooses again
   const mappingNeedsFix = admin ? await conversionMapNeedsFix(orgId) : false;
 

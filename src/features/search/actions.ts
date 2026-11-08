@@ -70,10 +70,11 @@ export async function commandsAction(orgId: string): Promise<Command[]> {
   if (!(await sessionCheck()).ok) return [];
   try {
     const { role, canWrite, canDelete } = await getOrgContext(orgId);
-    const [terms, storedModules, priceLists, granted] = await Promise.all([
+    const [terms, storedModules, priceLists, punchCards, granted] = await Promise.all([
       getOrgTerms(orgId),
       getOrgModules(orgId),
       orgHasFeature(orgId, "price_lists"),
+      orgHasFeature(orgId, "punch_cards"),
       getMyPermissions(orgId),
     ]);
     // ORD-01: orders only while the plan holds them too, like the menu
@@ -81,7 +82,7 @@ export async function commandsAction(orgId: string): Promise<Command[]> {
     const modules = withOrdersPlan(storedModules, ordersInPlan);
     return buildCommands(orgId, terms, modules, {
       canWrite,
-      settings: settingsAccessFor({ role, canWrite, canDelete, priceLists, granted }),
+      settings: settingsAccessFor({ role, canWrite, canDelete, priceLists, punchCards, granted }),
     });
   } catch {
     return [];

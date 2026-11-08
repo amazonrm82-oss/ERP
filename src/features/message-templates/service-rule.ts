@@ -24,6 +24,8 @@ export const SERVICE_TYPE_FIELDS: Record<ServiceMessageType, readonly MergeField
   requested_document: [...NAMES, "document", "quoteLink", "validUntil"],
   collection: [...NAMES, "document", "amount", "dueDate"],
   verification_code: ["businessName", "verificationCode"],
+  // PKG-03 (owner (127) ב): no price, link or offer; the business's name signs it (the owner's wording)
+  punch_card_notice: ["firstName", "businessName", "businessPhone", "cardName", "entriesLeft", "date"],
 };
 
 /** A service message's body cap by channel, in characters, counted on the template as written (= app.message_service_body_max). */

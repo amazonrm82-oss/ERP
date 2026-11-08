@@ -830,6 +830,19 @@ export type OrgMessageSettingsRow = {
   updated_at: string;
 };
 
+// PKG-03: the business's punch card alert numbers (migration punch_card_alerts); no row = the defaults (2 entries, 14 days).
+export type PunchCardAlertSettingsRow = {
+  id: string;
+  organization_id: string;
+  low_entries: number;
+  expiry_days: number;
+  // PKG-03 (owner (127)-(129)): the customer's service message beside the rep's alert; off by default
+  customer_messages: boolean;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // HEB-09: the business's pause of automatic sending to customers (migration customer_sending_pause); no row = not paused.
 export type OrgSendingPausesRow = {
   id: string;
@@ -1050,6 +1063,8 @@ export type MessageTemplateRow = {
   body: string;
   locale: string;
   is_active: boolean;
+  // PKG-03: server only; marks the two seeded templates the punch card alert job sends from
+  notice_kind: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -3425,6 +3440,12 @@ export type Database = {
           monthly_cap_sms?: number | null;
           monthly_cap_whatsapp?: number | null;
         }
+      >;
+      // PKG-03: column grants (the two numbers); no delete
+      punch_card_alert_settings: Table<
+        PunchCardAlertSettingsRow,
+        { organization_id: string; low_entries?: number; expiry_days?: number; customer_messages?: boolean },
+        { low_entries?: number; expiry_days?: number; customer_messages?: boolean }
       >;
       // HEB-09: column grants (paused, reason); the stamps are the server's; no delete
       org_sending_pauses: Table<

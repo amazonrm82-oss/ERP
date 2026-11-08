@@ -14,7 +14,7 @@ export const MESSAGE_MERGE_FIELDS = {
   fullName: { token: "{שם מלא}", label: "השם המלא של הלקוח" },
   userName: { token: "{שם הנציג}", label: "השם של הנציג ששולח" },
   businessName: { token: "{שם העסק}", label: "שם העסק" },
-  date: { token: "{תאריך}", label: "תאריך הפגישה" },
+  date: { token: "{תאריך}", label: "תאריך הפגישה, או בכרטיסייה היום האחרון שלה" },
   time: { token: "{שעה}", label: "שעת הפגישה" },
   document: { token: "{מסמך}", label: "המסמך (סוג ומספר), בגבייה" },
   amount: { token: "{סכום}", label: "הסכום לתשלום, בגבייה" },
@@ -28,6 +28,9 @@ export const MESSAGE_MERGE_FIELDS = {
   unsubscribeLink: { token: "{קישור הסרה}", label: "קישור להסרה מרשימת התפוצה (המערכת מוסיפה אותו לכל הודעה שיווקית)" },
   // owner (90) ג, 3 November 2026 (migration service_template_rule): the code a verification code message carries
   verificationCode: { token: "{קוד אימות}", label: "קוד האימות, בהודעת קוד אימות" },
+  // PKG-03 (owner (127) ב, 4 November 2026; migration punch_card_notice_messages): a punch card notice
+  cardName: { token: "{שם הכרטיסייה}", label: "שם הכרטיסייה, בהודעת כרטיסייה" },
+  entriesLeft: { token: "{כניסות}", label: "הכניסות שנשארו, כמשפט (\"נשארו 3 כניסות\"), בהודעת כרטיסייה" },
 } as const;
 
 export type MergeFieldKey = keyof typeof MESSAGE_MERGE_FIELDS;

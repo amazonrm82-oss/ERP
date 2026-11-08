@@ -23,6 +23,7 @@ export const MESSAGE_TYPE_LABELS: Record<MessageType, string> = {
   requested_document: "מסמך שהלקוח ביקש",
   collection: "גבייה",
   verification_code: "קוד אימות",
+  punch_card_notice: "כרטיסייה",
   marketing: "שיווק",
 };
 
@@ -125,5 +126,36 @@ export const DEFAULT_MESSAGE_TEMPLATES: ReadonlyArray<{
     messageType: "marketing",
     subject: "פרסומת: חדש ב{שם העסק}",
     body: "שלום {שם פרטי}, {תוכן העדכון}",
+  },
+];
+
+// PKG-03 (owner 4 November 2026, answer (128) א): the two punch card notices the alert job sends from (server-only mark
+// notice_kind), seeded by app.seed_punch_card_message_templates; tests/unit/message-templates.test.ts keeps the two equal.
+// DRAFT wording until the lawyer edits it. The owner's one text "נשארו {כניסות} כניסות / התוקף עד {תאריך}" is split at the
+// "/": a card with few entries and no expiry has no date to fill.
+export const DEFAULT_PUNCH_CARD_TEMPLATES: ReadonlyArray<{
+  name: string;
+  channel: MessageChannel;
+  messageType: MessageType;
+  subject: null;
+  body: string;
+  noticeKind: "punch_card_low" | "punch_card_expiry";
+}> = [
+  {
+    name: "כרטיסייה: נשארו מעט כניסות",
+    channel: "sms",
+    messageType: "punch_card_notice",
+    subject: null,
+    // owner (138) ב: {כניסות} is the whole phrase, "נשארה כניסה אחת" / "נשארו 3 כניסות" (punchEntriesText)
+    body: "שלום {שם פרטי}, בכרטיסייה {שם הכרטיסייה} {כניסות}. לפרטים: {טלפון העסק}. {שם העסק}",
+    noticeKind: "punch_card_low",
+  },
+  {
+    name: "כרטיסייה: התוקף מתקרב",
+    channel: "sms",
+    messageType: "punch_card_notice",
+    subject: null,
+    body: "שלום {שם פרטי}, בכרטיסייה {שם הכרטיסייה} התוקף עד {תאריך}. לפרטים: {טלפון העסק}. {שם העסק}",
+    noticeKind: "punch_card_expiry",
   },
 ];

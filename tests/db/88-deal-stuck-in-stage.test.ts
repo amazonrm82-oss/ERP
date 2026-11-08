@@ -61,6 +61,12 @@ const RERUN = [
   migrationFile("_message_rate_holds.sql"),
   // the MSG-05/06 review redefines public.job_message_may_send() of _message_rate_holds.sql last
   migrationFile("_message_send_review_fixes.sql"),
+  // PKG-03 redefines app.message_types() / app.service_message_types() of _message_types.sql and app.job_payload_ok() of
+  // _service_message_send_rules.sql last (the punch_card_notice type)
+  migrationFile("_punch_card_notice_messages.sql"),
+  // PKG-03 (138)-(141) redefines app.seed_punch_card_message_templates() and app.send_punch_card_alerts() of
+  // _punch_card_notice_messages.sql last
+  migrationFile("_punch_card_alert_answers.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

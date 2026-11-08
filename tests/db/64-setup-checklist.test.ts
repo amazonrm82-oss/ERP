@@ -729,6 +729,14 @@ describe("setup checklist and sample data (USR-04)", () => {
       // the MSG-05/06 review redefines public.job_message_may_send(), public.message_usage(), public.message_cancel_waiting() of
       // _message_rate_holds.sql and app.message_plan_cap() of _message_usage_caps.sql last
       "_message_send_review_fixes.sql",
+      // PKG-03 sets the notification kind constraints of _quote_views.sql last (the punch_card kind)
+      "_punch_card_alerts.sql",
+      // PKG-03 redefines app.message_types() / app.service_message_types() of _message_types.sql, app.job_payload_ok() of
+      // _service_message_send_rules.sql and app.send_punch_card_alerts() of _punch_card_alerts.sql last (punch_card_notice)
+      "_punch_card_notice_messages.sql",
+      // PKG-03 (138)-(141) redefines app.seed_punch_card_message_templates(), app.punch_card_alert_title() and
+      // app.send_punch_card_alerts() of _punch_card_notice_messages.sql / _punch_card_alerts.sql last
+      "_punch_card_alert_answers.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

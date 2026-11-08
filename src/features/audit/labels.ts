@@ -126,6 +126,7 @@ export const ENTITY_LABELS: Record<string, string> = {
   org_modules: "מודולים",
   // CON-11
   customer_status_settings: "סטטוס לקוח",
+  punch_card_alert_settings: "התראות כרטיסייה",
   // HEB-09
   org_sending_pauses: "עצירת שליחה ללקוחות",
   org_message_settings: "שעות ותקרות שליחה",

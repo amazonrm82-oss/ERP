@@ -12,6 +12,7 @@ import { formatDate, formatMoney, zoneDate } from "@/lib/format";
 import { readAllPagesByIds } from "@/lib/paged-read";
 import { createClient } from "@/lib/supabase/server";
 
+import { expiryNear, PUNCH_ALERT_DEFAULTS, type PunchAlertSettings } from "./alerts";
 import { punchBalance, refundSuggestion, type PunchBalance } from "./balance";
 
 // PKG-01, PKG-02: a contact's punch cards and their entries, read with the user's session (RLS: whoever reads the contact).
@@ -38,6 +39,20 @@ export const getPunchAccess = cache(async (orgId: string): Promise<PunchAccess> 
   };
 });
 
+/** PKG-03: the business's alert numbers (no row = the defaults), read by every member. */
+export const getPunchAlertSettings = cache(async (orgId: string): Promise<PunchAlertSettings> => {
+  const supabase = await createClient();
+  const row = must(
+    await supabase.from("punch_card_alert_settings").select("low_entries, expiry_days, customer_messages").eq("organization_id", orgId).maybeSingle(),
+    "punch card alert settings",
+  );
+  return {
+    lowEntries: row?.low_entries ?? PUNCH_ALERT_DEFAULTS.lowEntries,
+    expiryDays: row?.expiry_days ?? PUNCH_ALERT_DEFAULTS.expiryDays,
+    customerMessages: row?.customer_messages ?? PUNCH_ALERT_DEFAULTS.customerMessages,
+  };
+});
+
 export type PunchCardUseItem = {
   id: string;
   usedOn: string;
@@ -50,8 +65,12 @@ export type PunchCardItem = {
   id: string;
   name: string;
   status: string;
+  // PKG-03: the product it was sold from ("חידוש" opens the same product)
+  productId: string;
   balance: PunchBalance;
   expiresOn: string | null;
+  // PKG-03: a usable card whose last day is within the business's number of days
+  expiryNear: boolean;
   activatedText: string | null;
   cancelReason: string | null;
   // review finding 1: the payment that opened it no longer counts (failed, cancelled, refunded in full)
@@ -67,7 +86,7 @@ export async function listContactPunchCards(orgId: string, contactId: string, ti
   const cards = must(
     await supabase
       .from("punch_cards")
-      .select("id, name, status, entries_total, expires_on, activated_at, activated_by, activated_manually, payment_id, cancel_reason, price_agorot, payment_void_at")
+      .select("id, name, status, product_id, entries_total, expires_on, activated_at, activated_by, activated_manually, payment_id, cancel_reason, price_agorot, payment_void_at")
       .eq("organization_id", orgId)
       .eq("contact_id", contactId)
       .order("created_at", { ascending: false })
@@ -102,18 +121,21 @@ export async function listContactPunchCards(orgId: string, contactId: string, ti
     : [];
   const methods = new Map(payments.map((p) => [p.id, p.method as PaymentMethod]));
   const today = zoneDate(new Date(), timeZone);
+  const alerts = await getPunchAlertSettings(orgId);
   return cards.map((card) => {
     const own = uses.filter((u) => u.card_id === card.id);
     const live = own.filter((u) => u.returned_at === null).length;
     const by = card.activated_by ? names.get(card.activated_by) : undefined;
-    const balance = punchBalance({ status: card.status, entriesTotal: card.entries_total, expiresOn: card.expires_on }, live, today);
+    const balance = punchBalance({ status: card.status, entriesTotal: card.entries_total, expiresOn: card.expires_on }, live, today, alerts.lowEntries);
     const method = card.payment_id ? methods.get(card.payment_id) : undefined;
     return {
       id: card.id,
       name: card.name,
       status: card.status,
+      productId: card.product_id,
       balance,
       expiresOn: card.expires_on,
+      expiryNear: expiryNear({ usable: balance.usable, expiresOn: card.expires_on }, today, alerts.expiryDays),
       activatedText: card.activated_at
         ? `הופעלה ב-${formatDate(card.activated_at)}${card.activated_manually ? " ידנית" : card.payment_id ? " עם תשלום" : ""}${by ? ` על ידי ${by}` : ""}`
         : null,

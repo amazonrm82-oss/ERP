@@ -108,29 +108,44 @@ function ReasonField({ failure, label = "נימוק" }: { failure: Failure | nul
   );
 }
 
-/** PKG-01: "פתיחת כרטיסייה" for the contact. */
+/**
+ * PKG-01: "פתיחת כרטיסייה" for the contact. PKG-03: the same window is the "חידוש" of a card, with its product picked
+ * (renewal sells a new card the usual way; there is no other selling path).
+ */
 export function OpenPunchCardButton({
   orgId,
   contactId,
   products,
   payments,
   isAdmin,
+  defaultProductId,
+  label = "פתיחת כרטיסייה",
+  title = "פתיחת כרטיסייה",
 }: {
   orgId: string;
   contactId: string;
   products: Choice[];
   payments: Choice[];
   isAdmin: boolean;
+  defaultProductId?: string;
+  label?: string;
+  title?: string;
 }) {
   const [payment, setPayment] = useState("");
   return (
-    <DialogForm label="פתיחת כרטיסייה" title="פתיחת כרטיסייה" action={openPunchCardAction.bind(null, orgId, contactId)} submit="פתיחה" pending="פותחים…">
+    <DialogForm label={label} title={title} action={openPunchCardAction.bind(null, orgId, contactId)} submit="פתיחה" pending="פותחים…">
       {(failure) => (
         <>
           <p className="text-md">
             כרטיסייה נפתחת כשנרשם עליה תשלום. בלי תשלום היא ממתינה, ואפשר לקשר אליה תשלום אחר כך.
           </p>
-          <SelectField label="כרטיסייה" name="product_id" required defaultValue={failure?.values?.product_id ?? ""} error={failure?.fieldErrors?.product_id}>
+          <SelectField
+            label="כרטיסייה"
+            name="product_id"
+            required
+            defaultValue={failure?.values?.product_id ?? defaultProductId ?? ""}
+            error={failure?.fieldErrors?.product_id}
+          >
             <option value="">בחרו כרטיסייה</option>
             {products.map((p) => (
               <option key={p.id} value={p.id}>

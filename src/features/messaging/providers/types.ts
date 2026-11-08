@@ -23,9 +23,10 @@ export function isMessageChannel(value: unknown): value is MessageChannel {
  * blocklist or blocked by a privacy erasure. The database's send check judges; an adapter adds what the law asks of an
  * advertisement ("פרסומת", sender, opt-out) to a marketing message only.
  */
-export const MESSAGE_TYPES = ["meeting_reminder", "requested_document", "collection", "verification_code", "marketing"] as const;
+export const MESSAGE_TYPES = ["meeting_reminder", "requested_document", "collection", "verification_code", "punch_card_notice", "marketing"] as const;
 export type MessageType = (typeof MESSAGE_TYPES)[number];
-export const SERVICE_MESSAGE_TYPES = ["meeting_reminder", "requested_document", "collection", "verification_code"] as const;
+// PKG-03 (owner (127) ב): punch_card_notice, a punch card's few entries left or last day near (no price, link or offer)
+export const SERVICE_MESSAGE_TYPES = ["meeting_reminder", "requested_document", "collection", "verification_code", "punch_card_notice"] as const;
 export type MessagePurpose = "marketing" | "service";
 
 export function isMessageType(value: unknown): value is MessageType {

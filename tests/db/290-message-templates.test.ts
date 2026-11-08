@@ -66,7 +66,8 @@ describe("message templates (MSG-02)", () => {
             locale: string;
             is_active: boolean;
           }>(
-            "select name, channel, message_type, subject, body, locale, is_active from public.message_templates where organization_id = $1 order by created_at, name",
+            // PKG-03's two punch card notices (notice_kind) are seeded beside these; test 298 covers them
+            "select name, channel, message_type, subject, body, locale, is_active from public.message_templates where organization_id = $1 and notice_kind is null order by created_at, name",
             [org],
           )
         ).rows,
@@ -90,7 +91,8 @@ describe("message templates (MSG-02)", () => {
   it("the seed adds the defaults only to an empty list", async () => {
     const other = await createOrg(owner.id, "עסק שני");
     await asAdmin((q) => q("select app.seed_message_templates($1)", [other]));
-    expect(await asAdmin((q) => count(q, "select 1 from public.message_templates where organization_id = $1", [other]))).toBe(
+    // PKG-03's two punch card notices are seeded beside them (their own seed, test 298)
+    expect(await asAdmin((q) => count(q, "select 1 from public.message_templates where organization_id = $1 and notice_kind is null", [other]))).toBe(
       DEFAULT_MESSAGE_TEMPLATES.length,
     );
     await asUser(owner.id, (q) => q("delete from public.message_templates where organization_id = $1", [other]));
