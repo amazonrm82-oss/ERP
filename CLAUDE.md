@@ -149,6 +149,14 @@ and build this CRM here instead. The old code is preserved on the branch
    (`app.consent_suppressed`) and a recorded grant (`app.consent_granted`); both by the address across the business, fail closed.
    `claim_jobs`, `finish_job`, `job_message_may_send` and `app.jobs_record_message` are pinned by md5 in test 284, with the
    trigger list of `app.jobs`; a change needs a fresh review.
+   Since MSG-06/MSG-05 (owner 4 and 8 November 2026, answers (119)-(125), (133)-(136); migrations 021172-021175, two independent
+   reviews) `job_message_may_send` (last redefined in 021175), after every earlier check, also applies the business's sending
+   hours, the per-minute rates and the marketing caps, and so it also writes: `app.message_send_rate`, `app.message_system_rate`,
+   `app.message_usage_days`, `app.message_cap_holds`, `app.message_cap_notices`, `app.jobs.usage_counted|cap_wait`, and through
+   `app.message_cap_notify` one more public table, `public.notifications` (`system` notices with counts only). It moves other due jobs
+   only through `app.message_move_waiting` (definer, no grants; the business's own `message.send` jobs, id-ordered FOR UPDATE; every
+   kind but HEB-09's own `pause` leaves out pause-marked jobs and jobs still covered by the latest long pause; rate and cap moves take
+   marketing only; the window move never takes verification_code, an always-send meeting reminder or a cap waiter).
    In use (OPS-02, owner 2 November 2026, answers (40) ב, (42) ד, (43) א, migration 021128): the shared per-sender limit of the
    secret-link pages (`src/lib/public-sender-server.ts`, `guardPublicPage` / `guardPublicRoute`), used by the customer's quote, order
    and statement pages, their decide/question/pdf routes and the booking-manage link with its route. It calls only
@@ -2359,6 +2367,27 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   above ASCII (P0001 `document_settings:email_latin`, `BUSINESS_EMAIL_LATIN`). Re-running 021159-021161 needs 021162 after
   them. Follow-ups: an IPv4 or `xn--` ending glued to Hebrew is not a link; SQL judges about 2 ms per paired-mark token
   (fine at the 2,000 cap).
+- Sending hours, rates and caps (MSG-06, MSG-05; migrations 021172-021175; owner (119)-(125), (133)-(136)): `public.org_message_settings`
+  (one row per business; `window_from`/`window_until`, `skip_rest_days`, `monthly_cap_email|sms|whatsapp` 0..10,000,000 or null;
+  members read; owners/admins of a writable business write through column grants; no delete; audited; no row = 08:00-20:00, rest days
+  and holidays off, short day until 15:00 by `app.org_rest_day` / `app.short_work_day`). `app.message_window_open_at(org, at)` (definer,
+  no grants) is the next opening, up to 31 days ahead. In `public.job_message_may_send`, after every earlier check: outside the window
+  a job waits uncounted until the opening (`waiting:sending_hours`), except `app.message_always_sends` (verification_code; SPD-04's
+  instant reply joins it) and a meeting_reminder whose `event_at` is before the opening. Rates: per business and channel 60/30/20 a
+  minute (`app.message_send_rate`, one row per business and channel), then system-wide 600/300/200 (`app.message_system_rate`, 10 shards
+  per channel, a tenth each, `app.message_take_system_rate`: skip-locked pick of any shard with room, else a wait for one); over either,
+  the job waits for the next minute uncounted; a verification code takes no rate. Usage: `app.message_usage_days` counts each job once
+  (`app.jobs.usage_counted`), marketing and service, on the business's day. Caps on MARKETING only: the month's cap = least(business
+  cap, plan `max_customer_emails_per_month` for email; `app.message_plan_cap` clamps to 0..2^31-1, null = none), plus the plan's
+  `max_customer_emails_per_day`; over the cap the job waits (`app.jobs.cap_wait` over_cap|day_quota) and a hold in
+  `app.message_cap_holds` keeps the channel's marketing waiting until the cap in force is above the held value, also across months
+  (owner (135) ב); the day quota waits until the next calendar day. Notices (`app.message_cap_notify`, `system`, counts only, to
+  active owners and admins, owner (134) ב): 80% once a month, 100% then once a calendar day while waiting, day quota once a day.
+  `public.message_usage(org)` and `public.message_cancel_waiting(org, channel)` (definer, owners/admins; the cancel ends the
+  channel's cap waiters as `refused:cap_cancelled`, counted in `app.job_cancel_counts`, audit `messages_cancelled`; allowed in a
+  read-only business on purpose, cancelling is the safe side) feed `/settings/message-sending`; the advisor's findings on both are
+  expected. Tests 64 and 88 end with `_message_send_review_fixes.sql`. Known (low): while a business is at its rate, a meeting
+  reminder still waits a minute per check and can lose the claim race behind a big backlog (follow-up: claim service types first).
 - Customer sending pause (HEB-09, migrations 021134, 021135; owner (44) א (45) א (46) א): `public.org_sending_pauses` (one row per org; owners/
   admins of a business that is not closed write `paused` + `reason` 1..500; stamps server-kept by `app.org_sending_pauses_stamp`; members
   read; no delete; audited). THE rule is `app.customer_sending_paused(org)` (definer, no grants; no row = not paused): EVERY automatic
