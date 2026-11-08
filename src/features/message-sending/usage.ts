@@ -32,6 +32,7 @@ const channelSchema = z.object({
   plan_day_cap: cap,
   waiting_cap: count,
   waiting_hours: count,
+  held: z.boolean(),
 });
 
 const usageSchema = z.union([
@@ -51,6 +52,8 @@ export type ChannelUsage = {
   cap: number | null;
   waitingCap: number;
   waitingHours: number;
+  /** (135) ב: the month's cap filled and holds marketing of the channel until it is raised, also across months */
+  held: boolean;
 };
 
 export type MessageUsage = { allowed: false } | { allowed: true; month: string; channels: ChannelUsage[] };
@@ -80,6 +83,7 @@ export function parseMessageUsage(raw: unknown): MessageUsage {
       cap: effectiveCap(c.business_cap, c.plan_month_cap),
       waitingCap: c.waiting_cap,
       waitingHours: c.waiting_hours,
+      held: c.held,
     })),
   };
 }

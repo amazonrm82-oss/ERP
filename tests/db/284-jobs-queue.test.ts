@@ -30,7 +30,10 @@ const REVIEWED_MD5 = {
   // or the plan's daily email quota (next business day), with the channel's other due marketing jobs, and tells the owners and
   // admins (app.message_cap_notify); on yes the message is counted once (app.message_usage_days, app.jobs.usage_counted) and
   // the 80% / 100% notices are judged; NEEDS A FRESH INDEPENDENT REVIEW before merge
-  job_message_may_send: "b206409d92aa55677b6803009df40a19",
+  // MSG-05/06 answers (133)-(136) (021174): a full cap holds the channel across months until raised (app.message_cap_holds);
+  // after the business rate, the system-wide rate (app.message_take_system_rate, 10 shards, waits 'system_rate'); a
+  // verification code skips both rates; NEEDS A FRESH INDEPENDENT REVIEW before merge
+  job_message_may_send: "45f4736f4845ac5d3123ce066ac0690f",
 };
 
 // MSG-03: the trigger function that writes public.messages from the worker's path (see its test below)
@@ -68,6 +71,7 @@ const anyHour = (job: string) =>
       [job],
     );
     await q("update app.message_send_rate r set sent = 0 from app.jobs j where j.id = $1 and r.organization_id = j.organization_id", [job]);
+    await q("update app.message_system_rate set sent = 0");
   });
 // (55) א 1: the send check answers may_send, reason and retry only, whatever the path
 const maySend = async (job: Claimed) => {

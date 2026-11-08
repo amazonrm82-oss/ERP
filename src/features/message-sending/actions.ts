@@ -1,14 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
+import { INVALID_ARGS, validArg } from "@/lib/action-args";
 import { actionContext } from "@/lib/action-context";
-import { fail, formValues, invalid, type FormState } from "@/lib/action-result";
+import { fail, formValues, invalid, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { pick } from "@/lib/validation";
 
 import { messageSendingSettingsPath } from "./paths";
 import { MESSAGE_CAP_FIELD_NAMES, messageCapsSchema, SENDING_HOURS_FIELD_NAMES, sendingHoursSchema } from "./schema";
+import { MESSAGE_CHANNELS } from "./usage";
 
 const SAVE_FAILED = "לא הצלחנו לשמור. נסו שוב.";
 
@@ -60,4 +63,19 @@ export async function saveMessageCapsAction(orgId: string, _prev: FormState, for
   const parsed = messageCapsSchema.safeParse(pick(formData, MESSAGE_CAP_FIELD_NAMES));
   if (!parsed.success) return invalid(parsed.error, formData);
   return saveSettings(orgId, parsed.data, formData);
+}
+
+/**
+ * MSG-05 (135) ב: cancels a channel's marketing messages waiting for the cap (public.message_cancel_waiting: owners and admins,
+ * the queue's own cancellation count, one audit entry). The user's session decides.
+ */
+export async function cancelWaitingMessagesAction(orgId: string, channel: unknown): Promise<ActionResult> {
+  if (!validArg(z.enum(MESSAGE_CHANNELS), channel)) return { ok: false, message: INVALID_ARGS };
+  const context = await actionContext(orgId);
+  if (!context.ok) return context;
+  const { data, error } = await context.supabase.rpc("message_cancel_waiting", { p_org: orgId, p_channel: channel });
+  if (error) return fail(dbErrorMessage(error, "לא הצלחנו לבטל. נסו שוב."));
+  revalidatePath(messageSendingSettingsPath(orgId));
+  const n = typeof data === "number" ? data : 0;
+  return { ok: true, message: n === 1 ? "הודעה אחת בוטלה." : `${n} הודעות בוטלו.` };
 }

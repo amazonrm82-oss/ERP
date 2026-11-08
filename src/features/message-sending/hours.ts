@@ -9,6 +9,8 @@ export const SHORT_DAY_UNTIL = "15:00";
 
 /** (121) א: a fixed system rate, messages a minute per business and channel (= app.message_rate_per_minute). */
 export const RATE_PER_MINUTE = { email: 60, sms: 30, whatsapp: 20 } as const;
+/** (133) ג: the system-wide rate across all businesses, 10x, until a provider sets one (= app.message_system_rate_per_minute). */
+export const SYSTEM_RATE_PER_MINUTE = { email: 600, sms: 300, whatsapp: 200 } as const;
 
 export type SendingHours = { from: string; until: string; skipRestDays: boolean };
 

@@ -57,6 +57,8 @@ const RERUN = [
   migrationFile("_message_sending_hours.sql"),
   // MSG-05 redefines public.job_message_may_send() of _message_sending_hours.sql last (the caps and the counter)
   migrationFile("_message_usage_caps.sql"),
+  // MSG-05/06 (133)-(136) redefines public.job_message_may_send() of _message_usage_caps.sql last
+  migrationFile("_message_rate_holds.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

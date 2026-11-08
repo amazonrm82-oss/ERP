@@ -88,6 +88,8 @@ describe("message usage and caps (MSG-05)", () => {
   beforeEach(async () => {
     await asAdmin((q) => q("update app.jobs set status = 'done', lease_id = null, locked_until = null where status in ('queued', 'failed', 'running')"));
     await asAdmin((q) => q("update app.message_send_rate set sent = 0"));
+    await asAdmin((q) => q("update app.message_system_rate set sent = 0"));
+    await asAdmin((q) => q("update app.message_cap_holds set cleared_at = now() where organization_id = $1 and cleared_at is null", [org]));
     await asAdmin((q) => q("update app.message_usage_days set marketing = 0, service = 0 where organization_id = $1", [org]));
     await asAdmin((q) => q("update app.message_cap_notices set warned_at = null, full_notice_on = null, day_notice_on = null where organization_id = $1", [org]));
     await setCaps(org, {});
@@ -220,7 +222,7 @@ describe("message usage and caps (MSG-05)", () => {
     const email = (answer.channels as Array<Record<string, unknown>>).find((c) => c.channel === "email");
     expect(email).toMatchObject({ marketing: 1, business_cap: 100, plan_month_cap: null, waiting_cap: 0 });
     expect(Object.keys(email ?? {}).sort()).toEqual(
-      ["business_cap", "channel", "marketing", "marketing_today", "plan_day_cap", "plan_month_cap", "service", "waiting_cap", "waiting_hours"].sort(),
+      ["business_cap", "channel", "held", "marketing", "marketing_today", "plan_day_cap", "plan_month_cap", "service", "waiting_cap", "waiting_hours"].sort(),
     );
     const outsider = await createUser("caps-outsider");
     for (const u of [member, outsider]) {

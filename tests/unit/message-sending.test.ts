@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_WINDOW_FROM, DEFAULT_WINDOW_UNTIL, RATE_PER_MINUTE, shortTime, untilFromInput, untilInputValue, windowText } from "@/features/message-sending/hours";
+import { DEFAULT_WINDOW_FROM, DEFAULT_WINDOW_UNTIL, RATE_PER_MINUTE, shortTime, SYSTEM_RATE_PER_MINUTE, untilFromInput, untilInputValue, windowText } from "@/features/message-sending/hours";
 import { messageCapsSchema, sendingHoursSchema } from "@/features/message-sending/schema";
 import { CAP_MAX, effectiveCap, marketingLine, nearCap, parseMessageUsage, WARN_SHARE } from "@/features/message-sending/usage";
 
@@ -68,6 +68,7 @@ describe("usage and caps (MSG-05)", () => {
         plan_day_cap: 200,
         waiting_cap: 0,
         waiting_hours: 3,
+        held: false,
         ...over,
       },
     ],
@@ -116,5 +117,13 @@ describe("usage and caps (MSG-05)", () => {
     const sql = migration("_message_usage_caps.sql");
     expect(sql).toContain(`monthly_cap_email is null or monthly_cap_email between 0 and ${CAP_MAX}`);
     expect(sql).toContain("v_used_month * 5 >= v_cap * 4");
+  });
+
+  it("(133) ג: the system-wide rate is 10x the business's and mirrors the migration", () => {
+    const sql = migration("_message_rate_holds.sql");
+    expect(sql).toContain(
+      `case p_channel when 'email' then ${SYSTEM_RATE_PER_MINUTE.email} when 'sms' then ${SYSTEM_RATE_PER_MINUTE.sms} when 'whatsapp' then ${SYSTEM_RATE_PER_MINUTE.whatsapp}`,
+    );
+    for (const channel of ["email", "sms", "whatsapp"] as const) expect(SYSTEM_RATE_PER_MINUTE[channel]).toBe(RATE_PER_MINUTE[channel] * 10);
   });
 });

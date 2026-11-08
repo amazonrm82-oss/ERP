@@ -31,6 +31,7 @@ const anyHour = (job: string) =>
       [job],
     );
     await q("update app.message_send_rate r set sent = 0 from app.jobs j where j.id = $1 and r.organization_id = j.organization_id", [job]);
+    await q("update app.message_system_rate set sent = 0");
   });
 const maySend = async (job: Claimed) => {
   await anyHour(job.id);

@@ -46,13 +46,13 @@ export default async function MessageSendingSettingsPage({ params }: Props) {
         </p>
         <p className="text-ink-soft">
           קצב קבוע לכל עסק: עד {RATE_PER_MINUTE.email} אימיילים, {RATE_PER_MINUTE.sms} הודעות SMS ו-{RATE_PER_MINUTE.whatsapp} הודעות WhatsApp בדקה. מה
-          שמעבר לכך יוצא בדקה הבאה.
+          שמעבר לכך יוצא בדקה הבאה. גם במערכת כולה יש קצב לכל ערוץ, ובעומס חריג הודעה יכולה לחכות דקה. קוד אימות יוצא תמיד מיד.
         </p>
       </CardBody>
     </Card>
   );
 
-  const usageCard = usage.allowed ? <MessageUsageCard month={usage.month} channels={usage.channels} /> : null;
+  const usageCard = usage.allowed ? <MessageUsageCard orgId={orgId} month={usage.month} channels={usage.channels} /> : null;
 
   if (editable) {
     return (

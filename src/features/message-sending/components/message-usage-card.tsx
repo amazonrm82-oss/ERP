@@ -4,8 +4,9 @@ import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
 import { CHANNEL_LABELS, marketingLine, nearCap, type ChannelUsage } from "../usage";
+import { WaitingActions } from "./waiting-actions";
 
-type Props = { month: string; channels: ChannelUsage[] };
+type Props = { orgId: string; month: string; channels: ChannelUsage[] };
 
 /** "2026-11" -> "11/2026" */
 function monthText(month: string): string {
@@ -14,7 +15,7 @@ function monthText(month: string): string {
 }
 
 /** MSG-05: this month's messages per channel, against the month's cap of marketing. Owners and admins. */
-export function MessageUsageCard({ month, channels }: Props) {
+export function MessageUsageCard({ orgId, month, channels }: Props) {
   return (
     <Card aria-labelledby="message-usage-title">
       <CardHeader id="message-usage-title" title={`שימוש החודש (${monthText(month)})`} />
@@ -42,7 +43,13 @@ export function MessageUsageCard({ month, channels }: Props) {
                 {usage.planMonthCap !== null ? ` · מכסת החבילה: ${formatNumber(usage.planMonthCap)} בחודש` : ""}
                 {usage.planDayCap !== null ? `, ${formatNumber(usage.planDayCap)} ביום (היום: ${formatNumber(usage.marketingToday)})` : ""}
               </p>
-              {usage.waitingCap > 0 ? <p className="text-sm font-medium text-danger">{formatNumber(usage.waitingCap)} הודעות שיווק מחכות לתקרה</p> : null}
+              {usage.held ? <p className="text-sm text-ink-soft">התקרה התמלאה: הודעות שיווק מחכות עד שהתקרה תוגדל, גם בחודש חדש.</p> : null}
+              {usage.waitingCap > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-danger">{formatNumber(usage.waitingCap)} הודעות שיווק מחכות לתקרה</p>
+                  <WaitingActions orgId={orgId} channel={usage.channel} count={usage.waitingCap} />
+                </div>
+              ) : null}
               {usage.waitingHours > 0 ? <p className="text-sm text-ink-soft">{formatNumber(usage.waitingHours)} הודעות מחכות לשעות השליחה</p> : null}
             </li>
           );

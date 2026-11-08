@@ -4108,6 +4108,8 @@ export type Database = {
       merge_records: { Args: { p_org: string; p_type: string; p_keep: string; p_merge: string; p_picks?: Json }; Returns: undefined };
       // MSG-05: this month's messages per channel, the caps and the waiting counts (owners/admins; else {allowed: false})
       message_usage: { Args: { p_org: string }; Returns: Json };
+      // MSG-05 (135) ב: owners/admins cancel a channel's marketing messages waiting for the cap; answers how many
+      message_cancel_waiting: { Args: { p_org: string; p_channel: string }; Returns: number };
       my_sessions: { Args: Record<string, never>; Returns: Json };
       org_login_events: { Args: { p_org: string; p_limit?: number }; Returns: Json };
       // privacy erasure (migration 0027)

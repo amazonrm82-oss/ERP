@@ -239,6 +239,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "automation:conditions": "התנאים של האוטומציה אינם תקינים. רעננו את הדף ונסו שוב.",
   // RET-01 (64) ג: the opt-in run over customers already dormant is for a dormant-customer rule only
   "dormant_backfill:rule": "אפשר להריץ על לקוחות רדומים קיימים רק אוטומציה של לקוח שהפך לרדום.",
+  // MSG-05 (135) ב
+  "message_cancel:channel": "הערוץ לא מוכר. רעננו את הדף ונסו שוב.",
   "custom_field:invalid": "אחד השדות המותאמים אינו תקין, או שהוסר בינתיים. רעננו את הדף ונסו שוב.",
   // LEAD-03 (migration disqualify_reasons)
   "lead:disqualify_reason": "יש לבחור סיבה מהרשימה. אם הרשימה השתנתה, רעננו את הדף.",
