@@ -812,6 +812,20 @@ export type CustomerStatusSettingsRow = {
   updated_at: string;
 };
 
+// MSG-06: the business's sending hours to customers (migration message_sending_hours); no row = 08:00-20:00, rest days off.
+export type OrgMessageSettingsRow = {
+  id: string;
+  organization_id: string;
+  // "HH:MM:SS", whole minutes; window_until after window_from ("24:00:00" = midnight)
+  window_from: string;
+  window_until: string;
+  // true: no sending on the business's rest days and holidays, and until 15:00 on a short working day
+  skip_rest_days: boolean;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // HEB-09: the business's pause of automatic sending to customers (migration customer_sending_pause); no row = not paused.
 export type OrgSendingPausesRow = {
   id: string;
@@ -3386,6 +3400,12 @@ export type Database = {
         CustomerStatusSettingsRow,
         { organization_id: string; dormant_months?: number; former_months?: number },
         { dormant_months?: number; former_months?: number }
+      >;
+      // MSG-06: column grants (the window); no delete
+      org_message_settings: Table<
+        OrgMessageSettingsRow,
+        { organization_id: string; window_from?: string; window_until?: string; skip_rest_days?: boolean },
+        { window_from?: string; window_until?: string; skip_rest_days?: boolean }
       >;
       // HEB-09: column grants (paused, reason); the stamps are the server's; no delete
       org_sending_pauses: Table<

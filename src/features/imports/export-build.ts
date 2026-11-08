@@ -164,6 +164,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "customer_status_settings", file: "customer-status-settings.csv" },
   // HEB-09
   { table: "org_sending_pauses", file: "sending_pause.csv" },
+  // MSG-05/MSG-06
+  { table: "org_message_settings", file: "message_settings.csv" },
   // PRK-06
   { table: "org_privacy_settings", file: "privacy_settings.csv" },
   // PRK-02: the request log (owners/admins read it; the full export is the owner's)

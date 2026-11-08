@@ -22,8 +22,11 @@ const REVIEWED_MD5 = {
   // fresh review
   finish_job: "058e58191682d7520d64729e26adbd91",
   // MSG-03 (021146): stamps the lease that passed the check (send_checked_lease); CNS-07 (021147, owner (73) א): a service
-  // type stops only at the blocklist or an erasure, marketing needs no opt-out and a recorded grant; needs a fresh review
-  job_message_may_send: "42ee51eb745d8b2ef7f2c0bda25f35bb",
+  // type stops only at the blocklist or an erasure, marketing needs no opt-out and a recorded grant; MSG-06 (021172, owner
+  // (119)-(121)): after every check, outside the sending window the job waits uncounted (with the business's other due ones;
+  // a verification code always goes, a meeting reminder whose meeting is before the opening goes), then the channel's rate
+  // row is locked and at 60/30/20 a minute it waits for the next minute; NEEDS A FRESH INDEPENDENT REVIEW before merge
+  job_message_may_send: "d80973d1aa3c842914fafea5e80eec0e",
 };
 
 // MSG-03: the trigger function that writes public.messages from the worker's path (see its test below)
@@ -50,8 +53,21 @@ const finish = (job: Claimed | { id: string; lease: string }, ok: boolean, error
     async (q) => (await q<{ r: string }>("select public.finish_job($1, $2, $3, $4, $5, $6) as r", [job.id, job.lease, ok, error, final, started])).rows[0].r,
   );
 const expire = (id: string) => asAdmin((q) => q("update app.jobs set locked_until = now() - interval '1 second' where id = $1", [id]));
+// MSG-06: these tests are not about sending hours or the rate; the job's business sends at any hour and its minute's
+// count starts again (test 297 covers the window and the rate)
+const anyHour = (job: string) =>
+  asAdmin(async (q) => {
+    await q(
+      `insert into public.org_message_settings (organization_id, window_from, window_until, skip_rest_days)
+       select j.organization_id, '00:00', '24:00', false from app.jobs j where j.id = $1
+       on conflict (organization_id) do update set window_from = excluded.window_from, window_until = excluded.window_until, skip_rest_days = false`,
+      [job],
+    );
+    await q("update app.message_send_rate r set sent = 0 from app.jobs j where j.id = $1 and r.organization_id = j.organization_id", [job]);
+  });
 // (55) א 1: the send check answers may_send, reason and retry only, whatever the path
 const maySend = async (job: Claimed) => {
+  await anyHour(job.id);
   const answer = await asService(
     async (q) => (await q<{ r: Record<string, unknown> }>("select public.job_message_may_send($1, $2) as r", [job.id, job.lease])).rows[0].r,
   );

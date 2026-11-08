@@ -53,6 +53,8 @@ const RERUN = [
   migrationFile("_glued_address.sql"),
   // PKG-01 redefines app.sample_untouched() of _messages.sql and app.import_record_worked() of _payment_promise_work.sql last
   migrationFile("_punch_card_work.sql"),
+  // MSG-06 redefines public.job_message_may_send() of _message_types.sql last (sending hours and the rate)
+  migrationFile("_message_sending_hours.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

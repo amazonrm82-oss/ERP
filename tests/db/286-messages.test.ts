@@ -22,7 +22,20 @@ type Message = {
 
 const enqueue = (org: string, payload: Record<string, unknown>) =>
   asAdmin(async (q) => (await q<{ id: string }>("select app.enqueue_job($1, 'message.send', $2) as id", [org, JSON.stringify(payload)])).rows[0].id);
+// MSG-06: these tests are not about sending hours or the rate; the job's business sends at any hour and its minute's
+// count starts again (test 297 covers the window and the rate)
+const anyHour = (job: string) =>
+  asAdmin(async (q) => {
+    await q(
+      `insert into public.org_message_settings (organization_id, window_from, window_until, skip_rest_days)
+       select j.organization_id, '00:00', '24:00', false from app.jobs j where j.id = $1
+       on conflict (organization_id) do update set window_from = excluded.window_from, window_until = excluded.window_until, skip_rest_days = false`,
+      [job],
+    );
+    await q("update app.message_send_rate r set sent = 0 from app.jobs j where j.id = $1 and r.organization_id = j.organization_id", [job]);
+  });
 const passCheck = async (job: Claimed) => {
+  await anyHour(job.id);
   const answer = await asService(
     async (q) => (await q<{ r: Record<string, unknown> }>("select public.job_message_may_send($1, $2) as r", [job.id, job.lease])).rows[0].r,
   );

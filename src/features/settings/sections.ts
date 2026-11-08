@@ -46,6 +46,7 @@ import { checklistTemplatesPath } from "@/features/task-checklists/paths";
 import { activityTypesPath } from "@/features/activity-types/paths";
 import { modulesSettingsPath } from "@/features/modules/paths";
 import { sendingPauseSettingsPath } from "@/features/sending-pause/paths";
+import { messageSendingSettingsPath } from "@/features/message-sending/paths";
 import { termsSettingsPath } from "@/features/terminology/paths";
 import { canEditCatalog, canImportWith, canManageAutomations } from "@/features/permissions/keys";
 import { isAdminRole } from "@/features/settings/permissions";
@@ -142,6 +143,8 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
               { href: paths.settingsPlan(orgId), label: "חבילה ושימוש", description: "החבילה, ימי הניסיון והשימוש מול כל מכסה", icon: ChartIcon },
               // HEB-09
               { href: sendingPauseSettingsPath(orgId), label: "עצירת שליחה ללקוחות", description: "ביום אבל או בחירום: עוצרים בלחיצה אחת כל שליחה אוטומטית ללקוחות", icon: BellIcon },
+              // MSG-05/MSG-06: everyone reads the hours; owners and admins change them and see the usage
+              { href: messageSendingSettingsPath(orgId), label: "שעות ותקרות שליחה", description: "באילו שעות יוצאות הודעות ללקוחות, וכמה הודעות שיווק בחודש", icon: BellIcon },
               { href: paths.settingsSetupChecklist(orgId), label: "רשימת הקמה", description: "מה כבר מוכן בעסק, ונתוני דוגמה", icon: CheckSquareIcon },
             ]
           : []),

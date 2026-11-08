@@ -1156,6 +1156,25 @@ describe("roles and record visibility", () => {
     }
   });
 
+  it("the message settings: everyone reads them, owners and admins of a writable business change them (MSG-05, MSG-06)", async () => {
+    for (const u of [manager, m1, viewer]) {
+      expect(
+        (await pgError(asUser(u.id, (q) => q("insert into public.org_message_settings (organization_id, window_from) values ($1, '09:00')", [org])))).code,
+        u.email,
+      ).toBe("42501");
+    }
+    await asUser(admin.id, (q) => q("insert into public.org_message_settings (organization_id, window_from) values ($1, '09:00')", [org]));
+    for (const u of [owner, admin, manager, m1, viewer]) {
+      expect(await asUser(u.id, (q) => count(q, "select 1 from public.org_message_settings where organization_id = $1", [org])), u.email).toBe(1);
+    }
+    for (const u of [manager, m1, viewer]) {
+      expect(await asUser(u.id, async (q) => (await q("update public.org_message_settings set window_from = '07:00' where organization_id = $1", [org])).rowCount), u.email).toBe(0);
+    }
+    expect(await asUser(owner.id, async (q) => (await q("update public.org_message_settings set window_from = '08:00' where organization_id = $1", [org])).rowCount)).toBe(1);
+    expect((await pgError(asUser(owner.id, (q) => q("update public.org_message_settings set updated_by = null where organization_id = $1", [org])))).code).toBe("42501");
+    expect((await pgError(asUser(owner.id, (q) => q("delete from public.org_message_settings where organization_id = $1", [org])))).code).toBe("42501");
+  });
+
   it("the privacy officer: everyone reads it, owners and admins of a writable business set it (PRK-06)", async () => {
     for (const u of [manager, m1, viewer]) {
       expect(
