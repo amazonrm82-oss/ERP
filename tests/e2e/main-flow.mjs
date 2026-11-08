@@ -428,11 +428,14 @@ try {
   await moveSheet.getByRole("button", { name: /^העברה$/ }).click();
   await owner.getByText(/"פגישת היכרות" הועברה ל/).waitFor({ timeout: 15000 });
   const [calMoved] = await sql(
-    "select to_char(starts_at at time zone 'Asia/Jerusalem', 'HH24:MI') as at, extract(epoch from ends_at - starts_at)::int as secs from public.meetings where title = 'פגישת היכרות' and lead_id = $1",
+    "select to_char(starts_at at time zone 'Asia/Jerusalem', 'HH24:MI') as at, to_char(starts_at at time zone 'Asia/Jerusalem', 'YYYY-MM-DD') as day, extract(epoch from ends_at - starts_at)::int as secs from public.meetings where title = 'פגישת היכרות' and lead_id = $1",
     [leadIdNow],
   );
   if (calMoved.at !== "12:30" || calMoved.secs !== 3600) throw new Error(`the meeting did not move to 12:30 keeping an hour: ${JSON.stringify(calMoved)}`);
-  await owner.goto(`${orgUrl}/calendar?view=agenda&done=1`);
+  // open the meeting's own day, not "today": a run that crosses midnight in Israel (22:00 UTC in winter) moved
+  // "today" past the meeting (CI run 827, 8 November 2026)
+  const meetingDay = calMoved.day;
+  await owner.goto(`${orgUrl}/calendar?view=agenda&done=1&date=${meetingDay}`);
   await owner.getByRole("button", { name: /12:30.*פגישת היכרות/ }).waitFor();
   if (await owner.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error("the calendar scrolls sideways at 360px");
   await shot(owner, "03a-calendar-agenda-360");
@@ -473,7 +476,7 @@ try {
   if (internal.n !== 1) throw new Error("the internal meeting's new title was not saved");
 
   step("team calendar: side by side on a phone is one person at a time, starting with me (CAL-04)");
-  await owner.goto(`${orgUrl}/calendar?view=people&done=1`);
+  await owner.goto(`${orgUrl}/calendar?view=people&done=1&date=${meetingDay}`);
   await owner.getByRole("navigation", { name: /תצוגת היומן/ }).getByRole("link", { name: /^זה לצד זה$/ }).waitFor();
   await owner.getByRole("combobox", { name: /^היומן של$/ }).waitFor();
   await owner.getByRole("button", { name: /12:30.*פגישת היכרות/ }).waitFor();
