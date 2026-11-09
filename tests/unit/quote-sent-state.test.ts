@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { QuoteDocumentData } from "@/features/quotes/design-server";
 import { quotePdfDocument } from "@/features/quotes/pdf";
 import type { Quote, QuoteLine } from "@/features/quotes/queries";
-import { linesAsSent, parseQuoteSentState, quoteAsSent, remakeRender, SENT_REMAKE_SUFFIX, type QuoteSentState } from "@/features/quotes/sent-state";
+import { linesAsSent, parseQuoteSentState, quoteAsSent, remakeRender, SENT_REMAKE_SUFFIX, sentStateDiffers, type QuoteSentState } from "@/features/quotes/sent-state";
 import { formatMoney } from "@/lib/format";
 
 // Owner's answer (175) ג, 9 November 2026: a PDF as sent made again renders the quote's state as sent (021190), whatever the
@@ -137,5 +137,40 @@ describe("a quote's state as sent (owner (175) ג)", () => {
     const live = quotePdfDocument(data(accepted, lines), null);
     const liveTotals = live.blocks.find((b) => b.kind === "totals");
     expect(liveTotals && liveTotals.kind === "totals" ? liveTotals.rows.at(-1)?.value : null).toBe(formatMoney(17700));
+  });
+});
+
+describe("the remake's \"as sent\" mark only when the state as sent differs from today (owner (176) ב)", () => {
+  const state = parseQuoteSentState(wire) as QuoteSentState;
+  const same = { vatRateBp: 1800, subtotalAgorot: 10000, discountTotalAgorot: 0, netTotalAgorot: 10000, vatAgorot: 1800, totalAgorot: 11800 };
+  const sameLines = [line(A), line(B, { position: 1, isOptional: true, optionalSelected: false })];
+
+  it("equal state and quote: no mark", () => {
+    expect(sentStateDiffers(same, sameLines, state)).toBe(false);
+    expect(sentStateDiffers(same, [], state)).toBe(false);
+  });
+
+  it("each of the rate and the five totals differing is a difference", () => {
+    for (const key of Object.keys(same) as (keyof typeof same)[]) {
+      expect(sentStateDiffers({ ...same, [key]: (same[key] ?? 0) + 1 }, sameLines, state)).toBe(true);
+    }
+    expect(sentStateDiffers({ ...same, vatRateBp: null }, sameLines, state)).toBe(true);
+    expect(sentStateDiffers({ ...same, vatRateBp: null }, sameLines, { ...state, vatRateBp: null })).toBe(false);
+  });
+
+  it("an optional line's selection differing is a difference, even with equal totals", () => {
+    const ticked = [line(A), line(B, { position: 1, isOptional: true, optionalSelected: true })];
+    expect(sentStateDiffers(same, ticked, state)).toBe(true);
+    // the accepted quote of this file: totals and selection differ
+    expect(sentStateDiffers(accepted, lines, state)).toBe(true);
+  });
+
+  it("the order of the lines does not matter; a line the snapshot does not name is not judged", () => {
+    expect(sentStateDiffers(same, [...sameLines].reverse(), state)).toBe(false);
+    const two = { ...state, optionalLines: [{ id: B, selected: false }, { id: A, selected: true }] };
+    const rows = [line(B, { optionalSelected: false }), line(A, { optionalSelected: true })];
+    expect(sentStateDiffers(same, rows, two)).toBe(false);
+    expect(sentStateDiffers(same, [...rows].reverse(), { ...two, optionalLines: [...two.optionalLines].reverse() })).toBe(false);
+    expect(sentStateDiffers(same, [line(A, { optionalSelected: true })], state)).toBe(false);
   });
 });

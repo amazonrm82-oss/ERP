@@ -73,8 +73,32 @@ export function wasAccepted(quote: Pick<Quote, "status" | "cancelledFrom">): boo
   return quote.status === "accepted" || quote.cancelledFrom === "accepted";
 }
 
-/** The line a PDF as sent made again from the snapshot adds to the remake footer. */
+/** The line a PDF as sent made again from the snapshot adds to the remake footer, only when it differs from today (owner (176) ב). */
 export const SENT_REMAKE_SUFFIX = ", כפי שנשלח";
+
+type LiveTotals = Pick<Quote, "vatRateBp" | "subtotalAgorot" | "discountTotalAgorot" | "netTotalAgorot" | "vatAgorot" | "totalAgorot">;
+
+/**
+ * Owner's answer (176) ב, 9 November 2026: does the state as sent differ from the quote as it is today? Any of the five totals,
+ * the rate, or the selection of an optional line the snapshot names (matched by id, so the order of the lines does not matter).
+ * Only then does the remake footer carry SENT_REMAKE_SUFFIX.
+ */
+export function sentStateDiffers(quote: LiveTotals, lines: Pick<QuoteLine, "id" | "optionalSelected">[], state: QuoteSentState): boolean {
+  if (
+    quote.vatRateBp !== state.vatRateBp ||
+    quote.subtotalAgorot !== state.subtotalAgorot ||
+    quote.discountTotalAgorot !== state.discountTotalAgorot ||
+    quote.netTotalAgorot !== state.netTotalAgorot ||
+    quote.vatAgorot !== state.vatAgorot ||
+    quote.totalAgorot !== state.totalAgorot
+  )
+    return true;
+  const now = new Map(lines.map((line) => [line.id, line.optionalSelected]));
+  return state.optionalLines.some((line) => {
+    const current = now.get(line.id);
+    return current !== undefined && current !== line.selected;
+  });
+}
 
 export type RemakeRender = { kind: "sent" } | { kind: "accepted" } | { kind: "live" };
 

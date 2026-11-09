@@ -102,6 +102,21 @@ describe("remakes of the PDF as sent read the state as sent (review M1)", () => 
     expect(documentQuotes[0].totalAgorot).toBe(11800);
   });
 
+  it("owner (176) ב: a snapshot equal to the quote today gives the plain remake line, without the mark", async () => {
+    const today = { subtotalAgorot: 10000, netTotalAgorot: 10000, vatAgorot: 1800, totalAgorot: 11800 } as Partial<Quote>;
+    expect((await storeQuotePdf(client(remakeRpcs(ok(SENT))) as never, "o1", quote(today), "u1")).ok).toBe(true);
+    const legacy = client({ quote_pdf_remake_allowed: ok(true), quote_sent_state: ok(SENT) }, { id: "f-old", name: "a.pdf", unconfirmed_since: null, sha256: null });
+    await remakeLegacyQuotePdf(legacy as never, "o1", quote(today), "u1");
+    expect(rendered).toHaveLength(2);
+    for (const doc of rendered) {
+      expect(doc.footerNote).toMatch(/^נוצר מחדש ב-\d{2}\.\d{2}\.\d{4} מהנתונים השמורים$/);
+    }
+    // only the rate differing brings the mark back
+    rendered.length = 0;
+    await storeQuotePdf(client(remakeRpcs(ok(SENT))) as never, "o1", quote({ ...today, vatRateBp: 1700 }), "u1");
+    expect(rendered[0].footerNote).toMatch(/, כפי שנשלח$/);
+  });
+
   it("the legacy remake renders the snapshot too", async () => {
     const legacy = client({ quote_pdf_remake_allowed: ok(true), quote_sent_state: ok(SENT) }, { id: "f-old", name: "a.pdf", unconfirmed_since: null, sha256: null });
     // the mock store answers ok, the file read back still has no fingerprint: false, but the render happened

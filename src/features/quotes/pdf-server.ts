@@ -16,7 +16,7 @@ import { ACCEPTED_REMAKE_SUFFIX, acceptedChoiceChanged } from "./decision";
 import { getQuoteDecision, type Quote } from "./queries";
 import { readSignature, SIGNATURE_INVALID_MESSAGE, signedQuotePdfFileName } from "./signed-pdf";
 import { renderSignedQuotePdf, writeSignedQuotePdfAsServer } from "./signed-pdf-server";
-import { linesAsSent, parseQuoteSentState, quoteAsSent, remakeRender, SENT_REMAKE_SUFFIX, wasAccepted, type QuoteSentState } from "./sent-state";
+import { linesAsSent, parseQuoteSentState, quoteAsSent, remakeRender, SENT_REMAKE_SUFFIX, sentStateDiffers, wasAccepted, type QuoteSentState } from "./sent-state";
 
 type Client = SupabaseClient<Database>;
 
@@ -103,7 +103,9 @@ async function remadeQuoteDocument(
     acceptedChoiceChanged(await getQuoteDecision(orgId, quote.id).catch(() => null), base.lines);
   const render = remakeRender({ remake: true, hasSentState: sent !== null, acceptedChoiceChanged: changed });
   const data = sent ? { ...base, lines: linesAsSent(base.lines, sent) } : base;
-  const suffix = render.kind === "sent" ? SENT_REMAKE_SUFFIX : render.kind === "accepted" ? ACCEPTED_REMAKE_SUFFIX : "";
+  // owner (176) ב: ", כפי שנשלח" only when the state as sent differs from the quote today (totals, rate, optional selections)
+  const sentMark = sent !== null && sentStateDiffers(quote, base.lines, sent);
+  const suffix = render.kind === "sent" ? (sentMark ? SENT_REMAKE_SUFFIX : "") : render.kind === "accepted" ? ACCEPTED_REMAKE_SUFFIX : "";
   const note = remadeNote(new Date(), org.timezone || TIME_ZONE) + suffix;
   return quotePdfDocument(data, await loadPdfLogo(data.logoUrl), { remadeNote: note, accepted: render.kind === "accepted" });
 }
