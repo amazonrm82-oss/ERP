@@ -1906,6 +1906,22 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   transaction-local `app.punch_payer_merge`); the recipient's export marks such a card "נפתחה ממסמך של לקוח אחר" without payment, price
   or line ids, the payer's export carries the purchase but never staff fields. `app.punch_cards_erase` was last redefined in 021185.
   Tests 64 and 88 end with `_punch_recipient_names.sql`.
+- Draft order from a held meeting (CAL-13, migration 021186, applied 9 November 2026, md5 checked; owner (152) א, (153) ג,
+  (169) א, (170) א, (171) ב; three independent reviews): `org_document_settings.meeting_order_draft` button|auto (default button,
+  owners/admins). One rule `app.meeting_order_draft_refusal` (keys `orders`+`products`, orders module on, writable, held, live
+  contact, a type with an offerable product, no punch card use, no order from the meeting yet) and one maker
+  `app.meeting_order_draft_make` (per-meeting advisory lock, judged again under it; a draft order, source manual, on the meeting's
+  contact, the deal only when live and the same contact's; one line of the product priced by PL-03 as
+  `leads_convert_requested_product`; owner = the organizer while an active non-viewer who reads the order's parent, else none,
+  kept empty by `orders_check_meeting_owner` only for the order id the maker names in `app.meeting_order_no_owner`, never for an
+  `authenticated` insert). "Once" = while an order made from the meeting exists (`app.meeting_order_drafts`, cascades with the
+  order, so deleting the draft frees the meeting). Button: `public.meeting_order_draft_create` (definer, keeps the session and
+  writes under `app.order_server`, so the audit names the presser; answers not_found for an unreadable meeting
+  (`app.meeting_order_draft_meeting_readable` = `meetings_select`, keep in step), then not_permitted, then the rule; the order id only
+  to a reader). Automatic: trigger `meetings_zz_order_draft` (after `meetings_punch_card_use` by name; exception block, never fails
+  the meeting write); a marker who cannot edit the contact gets one `system` notice per meeting (`app.meeting_order_draft_notices`)
+  and no draft; a write with no session makes it as the server. Card states `public.meeting_order_draft_states` (readers only,
+  held or drafted meetings, 200 per call). The advisor's findings on the two RPCs and the two app tables are expected.
 - Punch card report (PKG-07, migration 021169; owner (116) א, (117) ב, (118) ב; two reviews): `public.report_punch_cards(org, days)`
   (invoker, `jit = off`, days 1..366 hint `report:days`) answers `{allowed:false}` to anyone but an owner, admin or manager by
   `app.membership_role`, and without `punch_cards`. Active cards are paid (a payment that still counts) | manual (count only) |
