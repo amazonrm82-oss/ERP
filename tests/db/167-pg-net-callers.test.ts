@@ -12,7 +12,7 @@ afterAll(closePool);
 // they call net.http_*() by that qualified name and look for the extension only by name. These tests pin who calls
 // pg_net and how; a new caller must follow the same rule.
 describe("pg_net callers (FXD-08)", () => {
-  it("only app.dispatch_push, app.cleanup_files and app.wake_job_worker (OPS-04) call pg_net, each as net.http_post(...)", async () => {
+  it("only app.dispatch_push, app.cleanup_files, app.wake_job_worker (OPS-04) and app.wake_meta_lead_sweep (CAP-11) call pg_net, each as net.http_post(...)", async () => {
     const rows = await asAdmin(
       async (q) =>
         (
@@ -31,13 +31,14 @@ describe("pg_net callers (FXD-08)", () => {
       { name: "app.cleanup_files", calls: 1, qualified: 1, other_schema: false },
       { name: "app.dispatch_push", calls: 1, qualified: 1, other_schema: false },
       { name: "app.wake_job_worker", calls: 1, qualified: 1, other_schema: false },
+      { name: "app.wake_meta_lead_sweep", calls: 1, qualified: 1, other_schema: false },
     ]);
   });
 
   it("the callers look for the extension by name only, never by its schema", async () => {
     const bodies = await asAdmin(
       async (q) =>
-        (await q<{ src: string }>("select p.prosrc as src from pg_proc p where p.oid in ('app.dispatch_push()'::regprocedure, 'app.cleanup_files()'::regprocedure, 'app.wake_job_worker()'::regprocedure)")).rows,
+        (await q<{ src: string }>("select p.prosrc as src from pg_proc p where p.oid in ('app.dispatch_push()'::regprocedure, 'app.cleanup_files()'::regprocedure, 'app.wake_job_worker()'::regprocedure, 'app.wake_meta_lead_sweep()'::regprocedure)")).rows,
     );
     for (const { src } of bodies) {
       expect(src).toContain("extname = 'pg_net'");

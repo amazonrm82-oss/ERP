@@ -58,6 +58,8 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "auto_reassign", label: "העברה אוטומטית של ליד לנציג הבא", built: true },
   // CAP-08
   { feature: "lead_distribution", label: "חלוקת לידים לפי משקל, עומס וכללים", built: true },
+  // CAP-11 (owner, 8 November 2026, answer (143) ב): the plans that hold lead_distribution
+  { feature: "meta_leads", label: "לידים מפייסבוק ואינסטגרם", built: true },
   { feature: "orders", label: "מודול הזמנות", built: true },
   { feature: "api", label: "API ו-webhooks", built: false },
   { feature: "custom_reports", label: "דוחות מותאמים", built: false },

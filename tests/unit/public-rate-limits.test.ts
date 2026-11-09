@@ -261,6 +261,15 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
     refusal: "none (503 {ok:false} when the database does not answer true within 3 s)",
   },
   "/api/jobs/run": { guard: "secret", limit: "Bearer PUSH_DISPATCH_SECRET (timing-safe); woken by pg_cron every minute while jobs are due", refusal: "401" },
+  "/api/meta/leads": {
+    guard: "database",
+    functions: ["meta_lead_receive", "meta_lead_claim", "meta_lead_finish"],
+    limit:
+      "CAP-11: POST refused (401) BEFORE the database unless X-Hub-Signature-256 is the HMAC of the raw body with META_APP_SECRET (timing-safe), bodies over 256 KB refused (413); then 100 lead ids a request and 1,000 new ones per connection an hour (app.meta_lead_receive_counts), a lead id taken once per business; intake_submit's 500 per form an hour; GET answers only the challenge against META_VERIFY_TOKEN and reads nothing",
+    refusal: JSON_429 + " (Meta sends it again; what was taken is not taken twice); 401 / 403 / 413 / 503",
+    sender: { leftOut: "(43) א: server-to-server from Meta's servers, which post for many businesses from shared addresses; the signature is the secret" },
+  },
+  "/api/meta/leads/sweep": { guard: "secret", limit: "Bearer PUSH_DISPATCH_SECRET (timing-safe); woken by pg_cron every 5 minutes while a Meta lead is due", refusal: "401" },
 };
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url));

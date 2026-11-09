@@ -15,7 +15,7 @@ export const SESSION_COOKIE = { secure: process.env.NODE_ENV === "production", s
 
 // Reached without a session: sign-in pages, auth callbacks, the lead intake
 // (public forms and webhooks), the push dispatcher (called by the database with
-// a secret), the file cleanup and the job worker (same), the uptime check, the service worker, the offline page, the app manifest, the help
+// a secret), the file cleanup and the job worker (same), the Meta Lead Ads webhook (CAP-11), the uptime check, the service worker, the offline page, the app manifest, the help
 // center, the legal documents, and robots.txt / sitemap.xml for search engines (LND-11).
 // Reached without a session at exactly these paths (no prefix match: /api/healthz or /api/health/x stay private).
 // OPS-05: the uptime check (external monitor, no session); answers only ok or not ok.
@@ -30,6 +30,8 @@ const PUBLIC_PREFIXES = [
   "/api/files/cleanup",
   // OPS-04: the background job worker, woken by the database with the same secret
   "/api/jobs/run",
+  // CAP-11: the Meta Lead Ads webhook (its own signature check) and its sweep (the shared secret)
+  "/api/meta/leads",
   // CAL-07: calendar apps fetch the personal feed with no session; the route checks its own secret token
   "/api/calendar-feed/",
   "/sw.js",

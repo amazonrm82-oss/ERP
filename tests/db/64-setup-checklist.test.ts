@@ -737,6 +737,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       // PKG-03 (138)-(141) redefines app.seed_punch_card_message_templates(), app.punch_card_alert_title() and
       // app.send_punch_card_alerts() of _punch_card_notice_messages.sql / _punch_card_alerts.sql last
       "_punch_card_alert_answers.sql",
+      // CAP-11 redefines app.guard_form() of _quota_outsider_guard.sql last (the Meta Lead Ads form kind)
+      "_meta_lead_ads.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

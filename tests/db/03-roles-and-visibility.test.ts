@@ -2809,6 +2809,67 @@ describe("site widgets by role", () => {
   });
 });
 
+// INT-02: provider connections are managed and seen by owners and admins only (the rest is in 303-provider-secrets)
+describe("provider connections by role", () => {
+  let org: string;
+  const people: Record<string, { id: string; email: string }> = {};
+  const page = 8800000 + (process.pid % 100000) * 10;
+
+  beforeAll(async () => {
+    const owner = await createUser("introle-owner");
+    org = await createOrg(owner.id);
+    people.owner = owner;
+    for (const role of ["admin", "manager", "member", "viewer"] as const) {
+      people[role] = await addMember(org, owner.id, role, `introle-${role}`);
+    }
+  });
+
+  it("owners and admins make, see, change and remove connections; a manager, a member and a viewer can do none of it", async () => {
+    const make = (who: string, n: number) =>
+      asUser(people[who].id, (q) =>
+        q("insert into public.integrations (organization_id, provider, external_id, name) values ($1, 'meta_lead_ads', $2, $3)", [org, String(page + n), `דף ${who}`]),
+      );
+    await make("owner", 1);
+    await make("admin", 2);
+    for (const [i, role] of ["manager", "member", "viewer"].entries()) expect((await pgError(make(role, 3 + i))).code, role).toBe("42501");
+    for (const role of ["owner", "admin", "manager", "member", "viewer"]) {
+      const seen = await asUser(people[role].id, (q) => count(q, "select 1 from public.integrations where organization_id = $1", [org]));
+      expect(seen, role).toBe(role === "owner" || role === "admin" ? 2 : 0);
+      const renamed = await asUser(people[role].id, async (q) => (await q("update public.integrations set name = name where organization_id = $1", [org])).rowCount);
+      expect(renamed, role).toBe(role === "owner" || role === "admin" ? 2 : 0);
+    }
+    for (const role of ["manager", "member", "viewer"]) {
+      const removed = await asUser(people[role].id, async (q) => (await q("delete from public.integrations where organization_id = $1", [org])).rowCount);
+      expect(removed, role).toBe(0);
+    }
+    const removed = await asUser(people.admin.id, async (q) => (await q("delete from public.integrations where organization_id = $1 and name = 'דף admin'", [org])).rowCount);
+    expect(removed).toBe(1);
+  });
+
+  // CAP-11: the Meta forms of a page follow the same rule
+  it("owners and admins map a page's Meta forms; nobody else sees or changes them", async () => {
+    const conn = (await asUser(people.owner.id, (q) => q<{ id: string }>("select id from public.integrations where organization_id = $1 limit 1", [org]))).rows[0].id;
+    const map = (who: string, form: string) =>
+      asUser(people[who].id, (q) => q("insert into public.meta_lead_forms (organization_id, integration_id, meta_form_id, name) values ($1, $2, $3, $4)", [org, conn, form, `טופס ${who}`]));
+    await map("owner", String(page + 11));
+    await map("admin", String(page + 12));
+    for (const [i, role] of ["manager", "member", "viewer"].entries()) expect((await pgError(map(role, String(page + 13 + i)))).code, role).toBe("42501");
+    for (const role of ["owner", "admin", "manager", "member", "viewer"]) {
+      const seen = await asUser(people[role].id, (q) => count(q, "select 1 from public.meta_lead_forms where organization_id = $1", [org]));
+      // the two mapped forms and the page's default row
+      expect(seen, role).toBe(role === "owner" || role === "admin" ? 3 : 0);
+      const changed = await asUser(people[role].id, async (q) => (await q("update public.meta_lead_forms set name = name where organization_id = $1", [org])).rowCount);
+      expect(changed, role).toBe(role === "owner" || role === "admin" ? 3 : 0);
+      if (role !== "owner" && role !== "admin") {
+        const removed = await asUser(people[role].id, async (q) => (await q("delete from public.meta_lead_forms where organization_id = $1", [org])).rowCount);
+        expect(removed, role).toBe(0);
+      }
+    }
+    const removed = await asUser(people.admin.id, async (q) => (await q("delete from public.meta_lead_forms where organization_id = $1 and name = 'טופס admin'", [org])).rowCount);
+    expect(removed).toBe(1);
+  });
+});
+
 // TASK-06: checklist templates are a managed list (owners and admins write, everyone reads); a task's steps follow the
 // task (the rest is in 157-task-checklists).
 describe("checklists by role", () => {

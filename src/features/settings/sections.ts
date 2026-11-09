@@ -33,6 +33,7 @@ import { priceListsPath } from "@/features/price-lists/paths";
 import { detachedQuotesPath, quoteDesignPath, quoteTemplatesPath } from "@/features/quotes/paths";
 import { productListsSettingsPath } from "@/features/products/paths";
 import { siteWidgetSettingsPath } from "@/features/site-widgets/paths";
+import { metaLeadsSettingsPath } from "@/features/meta-leads/paths";
 import { qrCodesSettingsPath } from "@/features/qr-codes/paths";
 import { completenessSettingsPath } from "@/features/data-quality/paths";
 import { documentSettingsPath } from "@/features/tax/paths";
@@ -223,6 +224,10 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         // SPD-07: owners and admins only
         ...(access.admin
           ? [{ href: siteWidgetSettingsPath(orgId), label: "כפתור באתר", description: "כפתור צף לאתר שלכם: WhatsApp, חיוג וטופס קצר שנכנס כליד", icon: ChatIcon }]
+          : []),
+        // CAP-11: owners and admins only
+        ...(access.admin
+          ? [{ href: metaLeadsSettingsPath(orgId), label: "לידים מפייסבוק ואינסטגרם", description: "חיבור דף עסקי: מי שממלא טופס במודעה נכנס כליד", icon: InboxIcon }]
           : []),
         // BIZ-03: owners and admins only
         ...(access.admin

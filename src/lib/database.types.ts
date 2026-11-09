@@ -562,6 +562,47 @@ export type BusinessCardWrite = {
   public_fields?: string[];
 };
 
+// INT-02: a business's connection to a provider (owners/admins only). It holds no secret: secret_set_at /
+// secret_key_version say only that an encrypted one is stored (app.integration_secrets). status pending | connected |
+// disconnected | error; provider 'meta_lead_ads' (CAP-11, external_id = the Meta page id)
+export type IntegrationRow = {
+  id: string;
+  organization_id: string;
+  provider: string;
+  external_id: string | null;
+  name: string;
+  status: string;
+  config: Json;
+  secret_set_at: string | null;
+  secret_key_version: number | null;
+  last_error_code: string | null;
+  last_error_at: string | null;
+  // CAP-11 review finding 1: server only; set by the first successful lead fetch with the connection's own token
+  verified_at: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+export type IntegrationWrite = { name?: string; status?: string; config?: Json };
+
+// CAP-11: which Meta lead form of a page goes to whom (meta_form_id null = the page's default row, "every other form");
+// each row owns an intake form of kind 'meta'. Owners/admins only
+export type MetaLeadFormRow = {
+  id: string;
+  organization_id: string;
+  integration_id: string;
+  meta_form_id: string | null;
+  name: string;
+  assign_mode: string;
+  owner_id: string | null;
+  team_id: string | null;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+export type MetaLeadFormWrite = { name?: string; assign_mode?: string; owner_id?: string | null; team_id?: string | null; is_active?: boolean };
+
 // BIZ-03: a QR code that opens a form or a booking page (target_kind 'form' | 'booking'); token = its link (/f/q/<token>);
 // an empty target = deleted
 // SPD-07: a floating button for the business's own website; token = its public script (/f/w/<token>.js) and form
@@ -1181,6 +1222,8 @@ export type FormRow = {
   business_card_id: string | null;
   // SPD-07: the site widget this form belongs to (kind 'widget' only; made and changed by the widget's triggers)
   site_widget_id: string | null;
+  // CAP-11: the Meta form row this form belongs to (kind 'meta' only; made and changed by that row's triggers)
+  meta_lead_form_id: string | null;
 };
 
 export type FormSubmissionRow = {
@@ -3734,6 +3777,13 @@ export type Database = {
       // BIZ-02: column grants (token is made by the database; the form by the card's trigger)
       business_cards: Table<BusinessCardRow, BusinessCardWrite & { organization_id: string; user_id: string }, BusinessCardWrite>;
       // BIZ-03: owners and admins only; column grants (token made by the database)
+      // INT-02: owners and admins only; column grants (status, secret_set_at and the error are server-kept)
+      meta_lead_forms: Table<
+        MetaLeadFormRow,
+        MetaLeadFormWrite & { organization_id: string; integration_id: string; meta_form_id?: string | null; name: string },
+        MetaLeadFormWrite
+      >;
+      integrations: Table<IntegrationRow, { organization_id: string; provider: string; external_id?: string | null; name: string; config?: Json }, IntegrationWrite>;
       // SPD-07: owners and admins only; column grants (token made by the database; the form by the widget's trigger)
       site_widgets: Table<SiteWidgetRow, SiteWidgetWrite & { organization_id: string; name: string }, SiteWidgetWrite>;
       qr_codes: Table<QrCodeRow, QrCodeWrite & { organization_id: string; name: string; target_kind: string }, QrCodeWrite>;
@@ -4094,6 +4144,13 @@ export type Database = {
       // OPS-02 (owner (40) ב, (42) ד): the secret-link pages' shared per-sender limit of "not found" answers (service_role only)
       public_sender_check: { Args: { p_sender: string }; Returns: boolean };
       public_sender_miss: { Args: { p_sender: string }; Returns: number | null };
+      // INT-02: the server stores a connection's encrypted secret (owners/admins)
+      integration_secret_set: { Args: { p_org: string; p_integration: string; p_ciphertext: string; p_key_version: number }; Returns: string };
+      // CAP-11: the Meta webhook's functions (service_role only) and the settings screen's counts (owners/admins)
+      meta_lead_receive: { Args: { p_page_id: string; p_leads: Json }; Returns: Json };
+      meta_lead_claim: { Args: { p_limit?: number; p_ids?: string[] | null }; Returns: Json };
+      meta_lead_finish: { Args: { p_arrival: string; p_lease: string; p_lead?: Json | null; p_error?: string | null }; Returns: string };
+      meta_lead_summary: { Args: { p_org: string }; Returns: Json };
       // SPD-07: the site widget's display settings and its short form (service_role only)
       site_widget_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       site_widget_submit: {

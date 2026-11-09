@@ -78,6 +78,10 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "qr_codes", file: "qr_codes.csv" },
   // SPD-07: the site widgets (token = the widget's public script and form; its view counts are in schema app, not exported)
   { table: "site_widgets", file: "site_widgets.csv" },
+  // INT-02: provider connections (no secret: the ciphertext is in schema app and never exported)
+  { table: "integrations", file: "integrations.csv" },
+  // CAP-11: which Meta lead form goes to whom (the arrivals are in schema app, ids only, not exported)
+  { table: "meta_lead_forms", file: "meta_lead_forms.csv" },
   // TASK-06
   { table: "task_checklist_items", file: "task_checklist_items.csv" },
   { table: "checklist_templates", file: "checklist_templates.csv" },

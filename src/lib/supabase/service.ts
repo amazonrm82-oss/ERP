@@ -36,6 +36,13 @@ import { getSupabaseEnv } from "@/lib/env";
  *   check of a message, answering no personal data; owner's conditions (52)-(55)); it
  *   registers only message.send, through a provider (only the fake provider exists,
  *   which sends nothing);
+ * - the Meta Lead Ads webhook and its sweep (src/features/meta-leads/webhook-server.ts,
+ *   routes /api/meta/leads and /api/meta/leads/sweep; CAP-11, owner 4 November 2026,
+ *   answer (126) א): the client is made only after the X-Hub-Signature-256 check (or the
+ *   sweep's shared secret) passed, and calls only public.meta_lead_receive(),
+ *   public.meta_lead_claim() (which answers the page token's ciphertext, decrypted on the
+ *   server with PROVIDER_SECRETS_KEY for one Graph API call) and public.meta_lead_finish()
+ *   (the lead through intake_submit);
  * - the public secret-link pages (owner's approved pattern: one service_role-only
  *   definer function per action that checks the token; no table access):
  *   - the personal calendar feed (src/features/calendar-feed/feed-server.ts):

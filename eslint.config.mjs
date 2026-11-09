@@ -78,6 +78,8 @@ const eslintConfig = defineConfig([
       // and the customer downloads it from the order's link (public.order_public_pdf)
       "src/features/orders/pdf-store-server.ts",
       "src/features/orders/pdf-public-server.ts",
+      // CAP-11 (owner, 4 November 2026, answer (126) א): the Meta Lead Ads webhook and its sweep
+      "src/features/meta-leads/webhook-server.ts",
       // ADM-01 (owner, 26 October 2026, answer (ב)): the public subprocessors page (public.subprocessors_public_page)
       "src/features/legal/subprocessors-public-server.ts",
       // OPS-02 (owner, 2 November 2026, answers (40) ב, (42) ד): the secret-link pages' shared per-sender limit of "not found"

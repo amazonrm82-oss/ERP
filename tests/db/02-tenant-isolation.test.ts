@@ -202,6 +202,12 @@ describe("tenant isolation", () => {
       await q("insert into public.qr_codes (organization_id, name, target_kind, target_url) values ($1, 'ביקורות', 'url', 'https://a.example.com/')", [orgA]);
       // SPD-07: a site widget of A (its form is made by the widget's trigger)
       await q("insert into public.site_widgets (organization_id, name) values ($1, 'האתר של א')", [orgA]);
+      // INT-02: a provider connection of A (no secret yet)
+      ids.integrationA = (
+        await q<{ id: string }>("insert into public.integrations (organization_id, provider, external_id, name) values ($1, 'meta_lead_ads', '777000111', 'הדף של א') returning id", [orgA])
+      ).rows[0].id;
+      // CAP-11: a mapped Meta form on A's page (the default row is made with the connection)
+      await q("insert into public.meta_lead_forms (organization_id, integration_id, meta_form_id, name) values ($1, $2, '555000111', 'טופס של א')", [orgA, ids.integrationA]);
       ids.productA = (
         await q<{ id: string }>("insert into public.products (organization_id, name, sku, price_agorot) values ($1, 'מוצר של א', 'A-1', 10000) returning id", [orgA])
       ).rows[0].id;
@@ -483,6 +489,10 @@ describe("tenant isolation", () => {
     "qr_codes",
     // SPD-07
     "site_widgets",
+    // INT-02
+    "integrations",
+    // CAP-11
+    "meta_lead_forms",
     // TASK-06
     "task_checklist_items",
     "checklist_templates",
@@ -732,6 +742,8 @@ describe("tenant isolation", () => {
       business_cards: "job_title = job_title",
       qr_codes: "name = name",
       site_widgets: "name = name",
+      integrations: "name = name",
+      meta_lead_forms: "name = name",
       goals: "target = target",
       product_categories: "name = name",
       product_units: "name = name",
@@ -914,6 +926,8 @@ describe("tenant isolation", () => {
       ["insert into public.qr_codes (organization_id, name, target_kind, form_id) values ($1, 'x', 'form', $2)", [orgA, ids.formA]],
       ["insert into public.qr_codes (organization_id, name, target_kind, target_url) values ($1, 'x', 'url', 'https://a.example.com/')", [orgA]],
       ["insert into public.site_widgets (organization_id, name) values ($1, 'x')", [orgA]],
+      ["insert into public.integrations (organization_id, provider, external_id, name) values ($1, 'meta_lead_ads', '777000999', 'x')", [orgA]],
+      ["insert into public.meta_lead_forms (organization_id, integration_id, meta_form_id, name) values ($1, $2, '555000999', 'x')", [orgA, ids.integrationA]],
       ["insert into public.goals (organization_id, scope, period, period_start, metric, target) values ($1, 'org', 'month', '2026-11-01', 'won_deals', 1)", [orgA]],
       ["insert into public.product_categories (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.product_units (organization_id, name) values ($1, 'x')", [orgA]],
@@ -1057,6 +1071,8 @@ describe("tenant isolation", () => {
       ["business_cards", "job_title = 'HACKED'", "job_title = 'HACKED'"],
       ["qr_codes", "name = 'HACKED'", "name = 'HACKED'"],
       ["site_widgets", "name = 'HACKED'", "name = 'HACKED'"],
+      ["integrations", "name = 'HACKED'", "name = 'HACKED'"],
+      ["meta_lead_forms", "name = 'HACKED'", "name = 'HACKED'"],
       ["task_checklist_items", "done = true", "done"],
       ["checklist_templates", "name = 'HACKED'", "name = 'HACKED'"],
       ["goals", "target = 777", "target = 777"],
