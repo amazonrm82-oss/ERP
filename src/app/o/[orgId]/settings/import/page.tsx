@@ -5,6 +5,10 @@ import { ButtonLink, buttonClasses } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { UploadIcon } from "@/components/ui/icons";
 import { EmptyState } from "@/components/ui/feedback";
+import { OrderExportButton } from "@/features/background/components/background-buttons";
+import { BackgroundList } from "@/features/background/components/background-list";
+import { listBackgroundRequests } from "@/features/background/queries";
+import { backgroundJobsReady } from "@/features/background/user-token";
 import { importConsentsLockedLine } from "@/features/imports/consent";
 import { importEntityLabel } from "@/features/imports/fields";
 import { getOrgTerms } from "@/features/terminology/queries";
@@ -44,15 +48,19 @@ export default async function ImportsPage({ params }: { params: Promise<{ orgId:
   if (!canImport && role !== "owner") {
     notFound();
   }
-  const [jobs, terms] = await Promise.all([
+  const [jobs, terms, background] = await Promise.all([
     canImport ? listImportJobs(orgId) : Promise.resolve([]),
     // FLD-10: the business's words for leads, contacts and deals
     getOrgTerms(orgId),
+    // IMP-04: the person's own background imports and exports
+    listBackgroundRequests(orgId),
   ]);
+  const backgroundReady = backgroundJobsReady();
   const objects = `${terms.lead.plural}, ${terms.contact.plural}, חברות, ${terms.deal.plural}`;
 
   return (
     <div className="space-y-5">
+      <BackgroundList orgId={orgId} rows={background} />
       {canImport ? (
         <Card aria-labelledby="import-title">
           <CardHeader id="import-title" title="ייבוא מ-Excel או CSV" action={<ButtonLink href={paths.importNew(orgId)} size="sm">ייבוא קובץ</ButtonLink>} />
@@ -109,9 +117,13 @@ export default async function ImportsPage({ params }: { params: Promise<{ orgId:
             קובץ ZIP עם כל הנתונים של העסק: {objects}, משימות, ציר הזמן, תהליכי מכירה, תגיות ושדות מותאמים. כל טבלה בקובץ CSV שנפתח ב-Excel.
           </p>
           {role === "owner" ? (
-            <a href={paths.fullExport(orgId)} className={buttonClasses("secondary", "md")} download>
-              הורדת ייצוא מלא
-            </a>
+            <div className="flex flex-wrap items-start gap-3">
+              <a href={paths.fullExport(orgId)} className={buttonClasses("secondary", "md")} download>
+                הורדת ייצוא מלא
+              </a>
+              {/* IMP-04: a large business prepares the file in the background and gets a notice when it is ready */}
+              {backgroundReady ? <OrderExportButton orgId={orgId} /> : null}
+            </div>
           ) : (
             <p className="text-sm text-ink-soft">ייצוא מלא זמין לבעלים של העסק בלבד. ייצוא של דוח בודד נמצא במסך הדוחות.</p>
           )}

@@ -67,6 +67,9 @@ export function notificationHref(orgId: string, entityType: string | null, entit
     // MSG-02 (96): a message from this template was not sent (too long after filling, and the like); the templates page
     case "message_template":
       return messageTemplatesPath(orgId);
+    // IMP-04: a background import or export ended (its id); the import page lists it, with the export's download
+    case "background_request":
+      return paths.imports(orgId);
     default:
       return null;
   }

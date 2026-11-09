@@ -34,8 +34,12 @@ import { getSupabaseEnv } from "@/lib/env";
  *   with the same secret. It calls only public.claim_jobs(), public.finish_job() and
  *   public.job_message_may_send() (the business, event time, HEB-09 pause and consent
  *   check of a message, answering no personal data; owner's conditions (52)-(55)); it
- *   registers only message.send, through a provider (only the fake provider exists,
- *   which sends nothing);
+ *   registers message.send, through a provider (only the fake provider exists,
+ *   which sends nothing), and, once the owner sets the JWT secret (IMP-04, owner (155) א,
+ *   (160) א), import.run and export.run, for which it calls only
+ *   public.background_job_begin(), public.background_job_token(),
+ *   public.background_job_progress() and public.background_job_end(); the work itself
+ *   runs under a short token for the ordering person, never with the service key;
  * - the Meta Lead Ads webhook and its sweep (src/features/meta-leads/webhook-server.ts,
  *   routes /api/meta/leads and /api/meta/leads/sweep; CAP-11, owner 4 November 2026,
  *   answer (126) א): the client is made only after the X-Hub-Signature-256 check (or the

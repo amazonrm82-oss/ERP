@@ -2,7 +2,8 @@
 // tests/unit/jobs-queue.test.ts reads it). A kind runs only when a handler for it is registered, so a job whose handler is
 // not ready (no provider yet) stays queued instead of failing.
 
-export const JOB_KINDS = ["message.send"] as const;
+// IMP-04 (owner (155) א): import.run and export.run, the background import and full export of src/features/background/
+export const JOB_KINDS = ["message.send", "import.run", "export.run"] as const;
 export type JobKind = (typeof JOB_KINDS)[number];
 
 export function isJobKind(value: unknown): value is JobKind {
@@ -34,7 +35,9 @@ export type ProviderReceipt = { provider: string; providerMessageId?: string; er
 export type JobOutcome =
   | { status: "done"; receipt?: ProviderReceipt }
   | { status: "failed"; error: string; final?: boolean; receipt?: ProviderReceipt }
-  | { status: "ended"; reason: string };
+  | { status: "ended"; reason: string }
+  // IMP-04: a long job saved its progress and stops at its time budget; it goes back to the queue uncounted
+  | { status: "yield" };
 
 export type JobHandler = (job: ClaimedJob) => Promise<JobOutcome>;
 

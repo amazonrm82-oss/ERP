@@ -93,7 +93,9 @@ describe("MSG-01: the send handler uses the job's channel's provider", () => {
 describe("MSG-01: the worker asks only for channels with a provider", () => {
   it("passes the configured channels to claim_jobs", () => {
     const code = readFileSync(join(root, "src/features/jobs/run-server.ts"), "utf8");
-    expect(code).toMatch(/rpc\("claim_jobs", \{[^}]*p_channels: Object\.keys\(providers\)/);
+    // IMP-04: the messages' pass claims with the channels of a provider; the background pass claims no message kind
+    expect(code).toMatch(/rpc\("claim_jobs", \{[^}]*p_channels: channels/);
+    expect(code).toMatch(/runJobs\(calls\(undefined, Object\.keys\(providers\)\), registry\)/);
   });
 });
 

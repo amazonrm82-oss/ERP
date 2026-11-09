@@ -95,6 +95,20 @@ export async function runJobs(
         } else if (outcome.status === "failed") {
           summary.failed += 1;
           await report(job, false, redactJobError(outcome.error), outcome.final === true, ["failed", "dead"], "failure", outcome.receipt);
+        } else if (outcome.status === "yield") {
+          // IMP-04: the handler saved its progress and stopped at its time budget; handed back uncounted, so the next run
+          // goes on from there (finish_job with started = false)
+          let answer: FinishAnswer = null;
+          try {
+            answer = await calls.finish(job, { ok: false, error: null, final: false, started: false });
+          } catch {
+            answer = null;
+          }
+          if (answer === "released") summary.released += 1;
+          else {
+            summary.unconfirmed += 1;
+            log(`[jobs] hand-back not recorded: job ${job.id} kind ${job.kind} answer ${answer ?? "error"}`);
+          }
         } else {
           summary.ended += 1;
         }

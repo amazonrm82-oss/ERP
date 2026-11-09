@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { getOrgTerms } from "@/features/terminology/queries";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
+import { backgroundJobsReady } from "@/features/background/user-token";
 import { ImportWizard } from "@/features/imports/components/import-wizard";
 import { canEditCatalog, canImportWith } from "@/features/permissions/keys";
 import { getMyPermissions } from "@/features/permissions/queries";
@@ -51,6 +52,7 @@ export default async function NewImportPage({ params, searchParams }: Props) {
         canOpeningBalance={documents && isAdminRole(role)}
         initialEntity={initialEntity === "product" && !catalog ? "lead" : initialEntity}
         terms={terms}
+        canBackground={backgroundJobsReady()}
       />
     </>
   );

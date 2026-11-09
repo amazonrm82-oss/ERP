@@ -2,6 +2,9 @@ import "server-only";
 
 import { isPrivacyClass } from "@/features/privacy-center/classes";
 import { listMembers } from "@/features/settings/queries";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+import type { Database } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
 
 import { parseCondition } from "./conditions";
@@ -12,9 +15,10 @@ import { isFieldType, isLinkTarget, type FieldDefinition, type FieldObject } fro
 export async function listFieldDefinitions(
   orgId: string,
   objectType: FieldObject,
-  options: { includeInactive?: boolean } = {},
+  // IMP-04: a background import reads with the ordering person's own client (there are no request cookies there)
+  options: { includeInactive?: boolean; client?: SupabaseClient<Database> } = {},
 ): Promise<FieldDefinition[]> {
-  const supabase = await createClient();
+  const supabase = options.client ?? (await createClient());
   let query = supabase
     .from("field_definitions")
     .select("id, key, label, field_type, options, is_required, is_active, help_text, position, is_unique, is_read_only, default_value, condition, condition_removed_at, option_colors, link_target, privacy_class")

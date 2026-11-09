@@ -13,6 +13,7 @@ const LEFT_OUT: Record<string, string> = {
   audit_log: "history; the audit log screen exports it",
   automations: "configuration that points at ids; not part of SPEC 12.4 yet",
   support_requests: "USR-12: the business's messages to the platform's support, not business data; the support page lists them",
+  background_requests: "IMP-04: the person's own orders of background imports and exports (states and counts), not business data; the import page lists them",
   consent_blocklist: "CNS-06: hashes only (no address), useless outside the business's own key; the settings page finds an address",
   automation_runs: "engine log",
   forms: "configuration with public tokens",

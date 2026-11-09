@@ -6,8 +6,10 @@ import { latestMigrationText } from "./helpers/migrations";
 // USR-01 and FLD-04: the nightly cleanup removes objects only from the three known buckets,
 // whatever bucket name the database answers with.
 describe("file cleanup bucket allow-list (USR-01)", () => {
-  it("knows exactly record-files, avatars and org-logos", () => {
-    expect([...CLEANUP_BUCKETS].sort()).toEqual(["avatars", "org-logos", "record-files"]);
+  // IMP-04 (owner (155) א): and job-files, the files of background imports and exports after their 7 days
+  it("knows exactly record-files, avatars, org-logos and job-files", () => {
+    expect([...CLEANUP_BUCKETS].sort()).toEqual(["avatars", "job-files", "org-logos", "record-files"]);
+    expect(isCleanupBucket("job-files")).toBe(true);
     expect(isCleanupBucket("avatars")).toBe(true);
     expect(isCleanupBucket("record-files")).toBe(true);
     expect(isCleanupBucket("org-logos")).toBe(true);

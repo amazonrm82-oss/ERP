@@ -15,6 +15,9 @@ import { paths } from "@/lib/paths";
 import { RECORD_TYPES } from "@/lib/record-types";
 
 import { productsPath } from "@/features/products/paths";
+import { orderBackgroundImportAction, submitBackgroundImportAction } from "@/features/background/actions";
+import { BACKGROUND_IMPORT_MIN_ROWS, JOB_FILES_BUCKET, type BackgroundSource } from "@/features/background/rules";
+import { createClient } from "@/lib/supabase/client";
 
 import { finishImportAction, importChunkAction, previewImportAction, startImportAction } from "../actions";
 import {
@@ -64,10 +67,12 @@ type Props = {
   canOpeningBalance?: boolean;
   initialEntity?: ImportEntityKey;
   terms?: OrgTerms;
+  // IMP-04: the server can run a large file in the background (the browser path stays for every size)
+  canBackground?: boolean;
 };
 
 type Sheet = { fileName: string; headers: string[]; rows: string[][] };
-type Step = "file" | "map" | "preview" | "running" | "done";
+type Step = "file" | "map" | "preview" | "running" | "done" | "background";
 type Totals = { created: number; updated: number; skipped: number; failed: number };
 // CNS-05: consents written to the register, and those an opt-out kept out
 type ConsentTotals = { written: number; locked: number };
@@ -139,6 +144,7 @@ export function ImportWizard({
   canOpeningBalance = false,
   initialEntity = "lead",
   terms = DEFAULT_TERMS,
+  canBackground = false,
 }: Props) {
   const [customFields, setCustomFields] = useState(initialFields);
   // the column whose "new field" form is open
@@ -249,6 +255,47 @@ export function ImportWizard({
     setWarnings(warned);
     setStopped(stop);
     setStep("done");
+  }
+
+  /**
+   * IMP-04: the parsed rows go to the business's private folder (the user's own session; the bucket's policy decides)
+   * and the server imports them in the background with the same rules, as this user. A notice tells when it ends.
+   */
+  async function runInBackground() {
+    if (!sheet) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const order = await orderBackgroundImportAction(orgId, { entity, mode, fileName: sheet.fileName, totalRows: sheet.rows.length });
+      if (!order.ok || !order.data) {
+        setError(order.ok ? "לא הצלחנו להזמין את הייבוא ברקע." : order.message);
+        return;
+      }
+      const source: BackgroundSource = {
+        version: 1,
+        entity,
+        mode,
+        fileName: sheet.fileName,
+        mapsCompany: entity === "contact" && mapping.includes("company"),
+        consent: withConsent ? { method: consentMethod, note: consentNote } : null,
+        mapping,
+        rows: sheet.rows,
+      };
+      const body = new Blob([JSON.stringify(source)], { type: "application/json" });
+      const { error: uploadError } = await createClient().storage.from(JOB_FILES_BUCKET).upload(order.data.path, body, { contentType: "application/json", upsert: false });
+      if (uploadError) {
+        setError("לא הצלחנו להעלות את הקובץ לשרת. נסו שוב.");
+        return;
+      }
+      const submitted = await submitBackgroundImportAction(orgId, order.data.requestId);
+      if (!submitted.ok) {
+        setError(submitted.message);
+        return;
+      }
+      setStep("background");
+    } finally {
+      setBusy(false);
+    }
   }
 
   function downloadFailures() {
@@ -538,11 +585,26 @@ export function ImportWizard({
           </div>
           <p className="text-sm text-ink-soft">מספרי השורות הם כמו בקובץ (שורה 1 היא הכותרות). שורות עם שגיאה לא ייובאו, ובסוף אפשר להוריד אותן לתיקון.</p>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={run} disabled={missingDeclaration}>ייבוא {formatNumber(sheet.rows.length)} שורות</Button>
+            <Button onClick={run} disabled={missingDeclaration || busy}>ייבוא {formatNumber(sheet.rows.length)} שורות</Button>
+            {/* owner (163) ב: only when duplicates are skipped or updated */}
+            {canBackground && sheet.rows.length > BACKGROUND_IMPORT_MIN_ROWS && mode !== "create" ? (
+              <Button variant="secondary" onClick={runInBackground} disabled={missingDeclaration || busy} aria-busy={busy || undefined}>
+                {busy ? "שולחים…" : "ייבוא ברקע"}
+              </Button>
+            ) : null}
             <Button variant="ghost" onClick={() => setStep("map")}>
               חזרה למיפוי
             </Button>
           </div>
+        </div>
+      ) : null}
+
+      {step === "background" ? (
+        <div className="space-y-3 rounded-lg border border-line bg-surface p-4 sm:p-5" role="status">
+          <p className="text-md">הייבוא ירוץ ברקע. אפשר לסגור את הדף; נודיע לכם בהתראה כשיסתיים.</p>
+          <Link href={paths.imports(orgId)} className={buttonClasses("secondary", "md")}>
+            לעמוד הייבוא והייצוא
+          </Link>
         </div>
       ) : null}
 

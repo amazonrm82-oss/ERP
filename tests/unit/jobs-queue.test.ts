@@ -32,7 +32,7 @@ const IN_USE_LINE =
   "first (`src/lib/shared-secret.ts`) and calls only `public.claim_jobs()`, `public.finish_job()` and `public.job_message_may_send()`. " +
   "(55) א: only `job_message_may_send` reads customer records and it answers may_send, reason and retry only; `claim_jobs` answers " +
   "only id, lease, kind, organization_id, payload (ids and codes, optional event_at) and attempt, `finish_job` only its status; " +
-  "`app.job_kinds()` is exactly `message.send`, and every new kind needs the owner's approval and its own In use line; the three " +
+  "`app.job_kinds()` is exactly `message.send`, `import.run` and `export.run` (IMP-04, its own In use line), and every new kind needs the owner's approval and its own In use line; the three " +
   "bodies are pinned by md5 and a change needs a fresh review (test 284). " +
   "The send check works on a live lease only: a business that cannot write (`app.org_writable`: deleted, suspended, cancelled or " +
   "read-only, (53) א, (54) ב) or an `event_at` that passed cancels the job; while HEB-09 `app.customer_sending_paused` holds, the job " +
@@ -96,10 +96,11 @@ describe("OPS-04: the worker route", () => {
     expect((await post("Bearer route-secret")).status).toBe(503);
   });
 
-  it("calls only its three queue functions and touches no table or storage", () => {
+  // IMP-04 (owner (155) א): plus the background job's three calls; the job's own work is done with the person's token
+  it("calls only its queue functions and touches no table or storage", () => {
     const code = read("src/features/jobs/run-server.ts");
     const rpcs = [...code.matchAll(/\.rpc\(\s*"([a-z_]+)"/g)].map((m) => m[1]).sort();
-    expect(rpcs).toEqual(["claim_jobs", "finish_job", "job_message_may_send"]);
+    expect(rpcs).toEqual(["background_job_begin", "background_job_end", "background_job_progress", "claim_jobs", "finish_job", "job_message_may_send"]);
     expect(code).not.toMatch(/\.from\(|\.storage\b|\.schema\(/);
     expect(read("src/app/api/jobs/run/route.ts")).toContain("runJobsRoute");
   });
@@ -107,7 +108,10 @@ describe("OPS-04: the worker route", () => {
 
 describe("OPS-04: the registry", () => {
   it("mirrors app.job_kinds() of the migration", () => {
-    const m = migration().match(/function app\.job_kinds\(\)[\s\S]*?array\[([^\]]*)\]/);
+    // the latest definition (IMP-04 added two kinds in _background_jobs.sql)
+    const files = readdirSync(join(root, "supabase/migrations")).filter((f) => f.endsWith(".sql")).sort();
+    const latest = [...files].reverse().map((f) => read(join("supabase/migrations", f))).find((sql) => /function app\.job_kinds\(\)/.test(sql)) ?? migration();
+    const m = latest.match(/function app\.job_kinds\(\)[\s\S]*?array\[([^\]]*)\]/);
     expect(m).not.toBeNull();
     const kinds = [...(m as RegExpMatchArray)[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
     expect(kinds).toEqual([...JOB_KINDS]);

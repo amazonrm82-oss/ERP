@@ -1,18 +1,21 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { strToU8, zipSync } from "fflate";
 
 import { EXPORT_COLUMNS, EXPORT_README, EXPORT_TABLES, exportKey, exportNames, type ExportRow, type ExportTable, toCsv } from "@/features/imports/export-build";
 import { FILES_BUCKET } from "@/features/files/types";
 import { must } from "@/lib/db-read";
 import { readAllPages } from "@/lib/paged-read";
+import type { Database } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
+
+type Client = SupabaseClient<Database>;
 
 // the files themselves go into the ZIP up to this total; past it, files.csv still lists them
 const FILES_MAX_BYTES = 150 * 1024 * 1024;
 
-async function fetchAll(t: ExportTable, orgId: string): Promise<ExportRow[]> {
-  const supabase = await createClient();
+async function fetchAll(supabase: Client, t: ExportTable, orgId: string): Promise<ExportRow[]> {
   // past PostgREST's 1,000-row cap page by page (RVW-2); every table here has organization_id, created_at and a key
   const { rows } = await readAllPages<ExportRow>(async (from, to) => {
     let query = supabase
@@ -29,10 +32,13 @@ async function fetchAll(t: ExportTable, orgId: string): Promise<ExportRow[]> {
   return rows;
 }
 
-/** ZIP of every table, read with the user's session (RLS applies), and how many rows it holds. */
-export async function buildFullExport(orgId: string): Promise<{ zip: Uint8Array; rows: number }> {
-  const data = await Promise.all(EXPORT_TABLES.map(async (t) => ({ ...t, rows: await fetchAll(t, orgId) })));
-  const supabase = await createClient();
+/**
+ * ZIP of every table, read with the user's session (RLS applies), and how many rows it holds. IMP-04: the background
+ * export hands in the client of the person who ordered it (a short-lived token of that person, never the service key).
+ */
+export async function buildFullExport(orgId: string, client?: Client): Promise<{ zip: Uint8Array; rows: number }> {
+  const supabase = client ?? (await createClient());
+  const data = await Promise.all(EXPORT_TABLES.map(async (t) => ({ ...t, rows: await fetchAll(supabase, t, orgId) })));
   const members = must(await supabase.from("memberships").select("user_id").eq("organization_id", orgId), "memberships");
   const profiles = members.length
     ? must(await supabase.from("profiles").select("id, full_name, email").in("id", members.map((m) => m.user_id)), "profiles")

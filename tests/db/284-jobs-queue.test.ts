@@ -167,7 +167,9 @@ describe("background job queue (OPS-04)", () => {
       const error = await pgError(enqueue(org, bad as Record<string, unknown>));
       expect(error.hint, JSON.stringify(bad)).toBe("job:payload");
     }
-    expect((await pgError(asAdmin((q) => q("select app.enqueue_job($1, 'import.run', '{}'::jsonb)", [org]))))).toMatchObject({ hint: "job:kind" });
+    expect((await pgError(asAdmin((q) => q("select app.enqueue_job($1, 'report.run', '{}'::jsonb)", [org]))))).toMatchObject({ hint: "job:kind" });
+    // IMP-04: a background kind holds only {request_id, user_id}
+    expect((await pgError(asAdmin((q) => q("select app.enqueue_job($1, 'import.run', '{}'::jsonb)", [org]))))).toMatchObject({ hint: "job:payload" });
     // the table refuses a direct write of personal text too
     const direct = await pgError(
       asAdmin((q) => q("insert into app.jobs (organization_id, kind, payload) values ($1, 'message.send', $2)", [org, JSON.stringify({ channel: "sms", lead_id: lead, phone: "0501234567" })])),
@@ -730,10 +732,11 @@ describe("background job queue (OPS-04)", () => {
   });
 
   // (55) א 3: every job kind needs the owner's own approval and its own "In use" line in CLAUDE.md (hard rule 5).
-  // Adding a kind here without that approval is not allowed.
-  it("(55) א: the job kinds are exactly {message.send}", async () => {
+  // Adding a kind here without that approval is not allowed. IMP-04: import.run and export.run, owner's answer (155) א,
+  // 9 November 2026 (test 309 covers them).
+  it("(55) א: the job kinds are exactly {message.send, import.run, export.run}", async () => {
     const kinds = await asAdmin(async (q) => (await q<{ k: string[] }>("select app.job_kinds() as k")).rows[0].k);
-    expect(kinds).toEqual(["message.send"]);
+    expect(kinds).toEqual(["message.send", "import.run", "export.run"]);
   });
 
   it("the worker is woken only with its settings, pg_net and due work; the cron job is registered where pg_cron exists", async () => {

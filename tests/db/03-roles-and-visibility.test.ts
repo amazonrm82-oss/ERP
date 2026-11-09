@@ -2968,3 +2968,36 @@ describe("content library by role", () => {
     expect(await asUser(people.manager.id, async (q) => (await q("delete from public.library_items where organization_id = $1 and title = 'של owner'", [org])).rowCount)).toBe(1);
   });
 });
+
+describe("background jobs by role (IMP-04)", () => {
+  let org: string;
+  const people: Record<string, { id: string; email: string }> = {};
+
+  beforeAll(async () => {
+    const owner = await createUser("bgrole-owner");
+    org = await createOrg(owner.id);
+    people.owner = owner;
+    for (const role of ["admin", "manager", "member", "viewer"] as const) {
+      people[role] = await addMember(org, owner.id, role, `bgrole-${role}`);
+    }
+  });
+
+  it("owners, admins and managers order an import; only the owner orders the full export; each reads only their own", async () => {
+    const importers = ["owner", "admin", "manager"];
+    for (const [role, user] of Object.entries(people)) {
+      const imp = asUser(user.id, (q) =>
+        q("insert into public.background_requests (organization_id, kind, entity_type, file_name, total_rows, duplicate_mode) values ($1, 'import', 'contact', 'a.csv', 10, 'update')", [org]),
+      );
+      if (importers.includes(role)) await imp;
+      else expect((await pgError(imp)).code, role).toBe("42501");
+      const exp = asUser(user.id, (q) => q("insert into public.background_requests (organization_id, kind) values ($1, 'export')", [org]));
+      if (role === "owner") await exp;
+      else expect((await pgError(exp)).code, role).toBe("42501");
+    }
+    for (const [role, user] of Object.entries(people)) {
+      const own = await asUser(user.id, (q) => count(q, "select 1 from public.background_requests where organization_id = $1", [org]));
+      expect(own, role).toBe(role === "owner" ? 2 : importers.includes(role) ? 1 : 0);
+      expect(await asUser(user.id, async (q) => (await q("select 1 from public.background_requests where organization_id = $1 and created_by <> $2", [org, user.id])).rowCount), role).toBe(0);
+    }
+  });
+});

@@ -38,6 +38,8 @@ create table auth.sessions (
   updated_at   timestamptz default now(),
   refreshed_at timestamp,
   aal          text,
+  -- when Supabase Auth ends the session (time-boxed sessions); null = no end (IMP-04 reads it)
+  not_after    timestamptz,
   user_agent   text,
   ip           inet
 );

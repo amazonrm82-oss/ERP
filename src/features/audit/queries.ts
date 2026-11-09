@@ -1,7 +1,7 @@
 import "server-only";
 
 import { MEMBER_PERMISSIONS } from "@/features/permissions/keys";
-import { automationNameOf } from "./automation-name";
+import { automationNameOf, viaBackgroundJob } from "./automation-name";
 import { getUserNames } from "@/features/shell/queries";
 import type { Json } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
@@ -26,6 +26,8 @@ export type AuditItem = {
   note: string | null;
   // PRM-01: the rule, when an automation made the change ("שונה על ידי האוטומציה: …")
   automationName: string | null;
+  // IMP-04: the person made it through a background job ("דרך עבודה ברקע")
+  viaBackground: boolean;
 };
 
 export type AuditFilters = { entityType: string | null; actorId: string | null; from: string | null; to: string | null; page: number };
@@ -121,6 +123,7 @@ export async function listAudit(orgId: string, filters: AuditFilters): Promise<{
     erased: isErased(r.changes),
       note: auditEntryNote(r.action, r.changes, terms),
     automationName: isErased(r.changes) ? null : automationNameOf(r.changes),
+    viaBackground: !isErased(r.changes) && viaBackgroundJob(r.changes),
     })),
     more: data.length > AUDIT_PAGE,
     days,
@@ -152,6 +155,7 @@ export async function listRecordHistory(orgId: string, entityType: string, entit
     erased: isErased(r.changes),
     note: auditEntryNote(r.action, r.changes),
     automationName: isErased(r.changes) ? null : automationNameOf(r.changes),
+    viaBackground: !isErased(r.changes) && viaBackgroundJob(r.changes),
   }));
 }
 

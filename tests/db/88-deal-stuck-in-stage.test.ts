@@ -70,6 +70,8 @@ const RERUN = [
   // PKG-06 redefines app.sample_untouched(), app.import_record_worked(), app.send_punch_card_alerts() and the others of
   // the files above last (the service recipient)
   migrationFile("_punch_card_recipients.sql"),
+  // IMP-04 redefines app.job_kinds() of _jobs_queue.sql and app.job_payload_ok() of _punch_card_notice_messages.sql last
+  migrationFile("_background_jobs.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

@@ -743,6 +743,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       // of _punch_card_uses.sql, app.send_punch_card_alerts() of _punch_card_alert_answers.sql, public.quote_duplicate() of
       // _product_bundles.sql and app.order_lines_check() of _order_line_price_claim.sql last (the service recipient)
       "_punch_card_recipients.sql",
+      // IMP-04 redefines app.job_kinds() of _jobs_queue.sql and app.job_payload_ok() of _punch_card_notice_messages.sql last
+      "_background_jobs.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

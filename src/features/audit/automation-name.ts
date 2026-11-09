@@ -14,3 +14,14 @@ export function automationNameOf(changes: Json): string | null {
   if (!rule || typeof rule !== "object" || Array.isArray(rule)) return null;
   return typeof rule.name === "string" && rule.name.trim() !== "" ? rule.name : AUTOMATION_NAME_MISSING;
 }
+
+/**
+ * IMP-04 (owner (160) א): a change made by a background import or export carries the order's id, stamped by the
+ * database from the worker's token of the person (trigger audit_log_background on public.audit_log). The entry's
+ * actor is the person; this only says it went through a background job.
+ */
+export function viaBackgroundJob(changes: Json): boolean {
+  if (!changes || typeof changes !== "object" || Array.isArray(changes)) return false;
+  const job = changes.background;
+  return Boolean(job && typeof job === "object" && !Array.isArray(job) && typeof job.request_id === "string");
+}

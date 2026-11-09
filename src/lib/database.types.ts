@@ -814,6 +814,38 @@ export type SupportRequestRow = {
   updated_at: string;
 };
 
+// IMP-04: a background import or full export ordered by a person (migration background_jobs). Only the person reads
+// it; every column but the five insert columns is server-kept (trigger background_requests_new and the worker's calls).
+export type BackgroundRequestRow = {
+  id: string;
+  organization_id: string;
+  // import | export
+  kind: string;
+  created_by: string;
+  // awaiting_file | queued | running | done | failed | cancelled
+  status: string;
+  entity_type: string | null;
+  file_name: string | null;
+  total_rows: number | null;
+  // skip | update for an import (owner (163) ב), null for an export
+  duplicate_mode: string | null;
+  import_job_id: string | null;
+  rows_done: number;
+  counts: Json;
+  result_message: string | null;
+  source_path: string | null;
+  file_path: string | null;
+  file_expires_at: string | null;
+  files_cleared_at: string | null;
+  ordered_aal: string | null;
+  ordered_session_id: string | null;
+  queue_job_id: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // FLD-10: a business's own words for contacts, leads and deals (migration org_terms); null = today's word.
 // Keys mirror src/features/terminology/terms.ts.
 export type OrgTermsRow = {
@@ -3843,6 +3875,19 @@ export type Database = {
         },
         Record<string, never>
       >;
+      // IMP-04: insert only (the person's own order); no update or delete
+      background_requests: Table<
+        BackgroundRequestRow,
+        {
+          organization_id: string;
+          kind: string;
+          entity_type?: string | null;
+          file_name?: string | null;
+          total_rows?: number | null;
+          duplicate_mode?: string | null;
+        },
+        Record<string, never>
+      >;
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -4578,6 +4623,19 @@ export type Database = {
       // {may_send: true} | {may_send: false, reason} and never an address or a name
       // MSG-01: p_channels = the channels with a provider (null = all)
       claim_jobs: { Args: { p_kinds: string[]; p_limit?: number; p_lease_seconds?: number; p_channels?: string[] }; Returns: Json };
+      // IMP-04 (service_role only, live lease only): a background job's begin (the person's claims after the checks, or
+      // {ok: false, reason}), its progress and its end ('ok' | 'ended' | 'stale' | 'cancelled' | 'invalid')
+      background_job_begin: { Args: { p_job: string; p_lease: string; p_legal_version: string }; Returns: Json };
+      // owner (160) א: asked before every signing of the person's token; {ok, claims} or {ok: false, reason}
+      background_job_token: { Args: { p_job: string; p_lease: string; p_legal_version: string }; Returns: Json };
+      background_job_progress: { Args: { p_job: string; p_lease: string; p_rows_done: number; p_counts: Json; p_import_job?: string }; Returns: string };
+      background_job_end: {
+        Args: { p_job: string; p_lease: string; p_ok: boolean; p_counts?: Json; p_message?: string; p_file_path?: string };
+        Returns: string;
+      };
+      // IMP-04: the person's own order: the uploaded file goes to the queue; cancel answers whether it was still open
+      background_request_submit: { Args: { p_org: string; p_request: string }; Returns: Json };
+      background_request_cancel: { Args: { p_org: string; p_request: string }; Returns: boolean };
       finish_job: {
         Args: {
           p_job: string;
