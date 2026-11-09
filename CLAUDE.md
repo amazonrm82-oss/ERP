@@ -1905,7 +1905,22 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   cleared, except by a contact merge that makes the payer the holder (`app.merge_punch_recipients`, last redefined in 021185, under the
   transaction-local `app.punch_payer_merge`); the recipient's export marks such a card "נפתחה ממסמך של לקוח אחר" without payment, price
   or line ids, the payer's export carries the purchase but never staff fields. `app.punch_cards_erase` was last redefined in 021185.
-  Tests 64 and 88 end with `_punch_recipient_names.sql`.
+  Since 021187-021189 (applied 9 November 2026, 021188 pasted by hand by the owner; md5 checked; owner (167) ב, (168) ב, (172) ב,
+  (173) ב, (174) א; two reviews twice): a recipient's erasure (`app.punch_cards_erase`, last redefined in 021187) empties
+  `recipient_name` on the payer's lines and removes only the quote's PDF as sent and the order's PDFs through
+  `app.recipient_pdf_drop` (body in the pasted 021188: rows with `quote_signed is null` and order files only; the signed PDF
+  stays), stamps the orders' `pdf_content_changed_at` (setting `app.order_pdf_restamp`, `app.orders_pdf_content`), and grants one
+  credit per document whose confirmed file was removed (`app.recipient_pdf_credits`, no grants). A credit lets the next PDF of
+  that document be made through the staff paths only (button, numbering), not counted in `max_pdf_per_month`
+  (`app.files_quote_pdf` / `files_order_pdf` and their `_return`), with "נוצר מחדש ב-<date> מהנתונים השמורים"; a closed quote
+  passes `quote_pdf:closed` only while it holds a credit (`public.quote_pdf_store`, last redefined in 021187;
+  `public.quote_pdf_recipient_remake_allowed`, `public.recipient_pdf_remake_pending`), and an accepted quote whose choice changed
+  is rendered as accepted, "כפי שאושר" (`public.recipient_pdf_remade`; owner question 175). The remade PDF as sent becomes the
+  signed PDF's newer version, so the customer still gets the signed one. A merge into the payer (`app.merge_punch_recipients`,
+  last redefined in 021189) renames the duplicate's holder entries, drops it from `former_contact_ids` and sets server-only
+  `punch_cards.payer_holder_id`: the export shows that contact the purchase (staff fields only when it held the card from its
+  creation); earlier holders keep their own periods and the mark. Tests 64 and 88 end with `_recipient_merge_holding.sql`. The
+  advisor's finding on `app.recipient_pdf_credits` is expected.
 - Draft order from a held meeting (CAL-13, migration 021186, applied 9 November 2026, md5 checked; owner (152) א, (153) ג,
   (169) א, (170) א, (171) ב; three independent reviews): `org_document_settings.meeting_order_draft` button|auto (default button,
   owners/admins). One rule `app.meeting_order_draft_refusal` (keys `orders`+`products`, orders module on, writable, held, live
