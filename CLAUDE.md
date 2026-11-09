@@ -37,7 +37,7 @@ and build this CRM here instead. The old code is preserved on the branch
    never run, list its existing tables; if `public` is not empty, stop and ask the owner. (The
    project `eowuxxkiedpjrqvfqcgn` already holds our own schema; see rule 3.)
    Vercel: our project is `erp-3yft` only (production builds from the `production` branch, verified by the owner on 27 October
-   2026). The Vercel team also holds an old project `erp`: never read, deploy, configure or touch it.
+   2026; official domain `https://mexuzsystem.com` since 9 November 2026, the base address only through `NEXT_PUBLIC_SITE_URL`). The Vercel team also holds an old project `erp`: never read, deploy, configure or touch it.
 3. **The hosted database changes in one way only: committed migrations, on one project.**
    On 8 October 2026 the owner connected Supabase and asked that migrations be applied without him.
    - The only project is `eowuxxkiedpjrqvfqcgn` (name `CRM-Saas`). Before every write, read the project
@@ -2780,7 +2780,8 @@ Verified on 6 October 2026:
 - The owner ran migrations 0001–0005 on the hosted project (`eowuxxkiedpjrqvfqcgn`).
 
 Not verified yet:
-- The flow on the hosted project and the live site (`https://erp-3yft.vercel.app`).
+- The flow on the hosted project and the live site (`https://mexuzsystem.com`, the official domain since 9 November 2026;
+  `https://erp-3yft.vercel.app` stays live as a backup and is not redirected until the owner says so).
 - Performance of the per-row access functions on large tables. Seen 13 October 2026: sorting any list of 20,000 rows takes
   about 2 s, mostly `app.can_read_record()` per row (the completeness sort adds little on top).
 
