@@ -757,6 +757,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // PKG-06 (168) ב redefines app.merge_punch_recipients() of _punch_recipient_names.sql last (a merge into the payer
       // makes the recipient's holding the payer's own)
       "_recipient_merge_holding.sql",
+      // FLD (184) ב redefines app.custom_field_files_release_field() of _field_types_part_b.sql last (a deleted file
+      // field's files stay as plain files of their records)
+      "_custom_field_delete.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

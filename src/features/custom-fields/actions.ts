@@ -21,6 +21,7 @@ import { createFieldSchema, updateFieldSchema } from "./schema";
 import { canBeRequired, canBeUnique, canHaveDefault, fieldSettingsProblem } from "./settings";
 import { colorsForOptions } from "./status-colors";
 import { FIELD_OBJECTS, inputName, isFieldType, TYPES_WITH_OPTIONS, type FieldObject, type FieldType } from "./types";
+import { fieldDeleteBlockedText } from "./usage";
 import { parseCustomFields } from "./values";
 import { saveOrder } from "@/lib/reorder";
 
@@ -301,6 +302,36 @@ export async function setFieldActiveAction(orgId: string, fieldId: string, isAct
     .select("id");
   if (error) {
     return fail(dbErrorMessage(error));
+  }
+  if (data.length === 0) {
+    return fail(NOT_FOUND_OR_FORBIDDEN);
+  }
+  revalidateFields(orgId);
+  return ok();
+}
+
+/**
+ * FLD (owner, 9 November 2026): deletes a field that nothing uses. The database decides: the delete policy
+ * (owners and admins of a writable business) and trigger field_definitions_delete_guard, which refuses while
+ * the field holds values or is used anywhere (hint custom_field:in_use, the reasons in the detail).
+ */
+export async function deleteFieldAction(orgId: string, fieldId: string): Promise<ActionResult> {
+  const context = await actionContext(orgId, fieldId);
+  if (!context.ok) {
+    return context;
+  }
+  const { data, error } = await context.supabase
+    .from("field_definitions")
+    .delete()
+    .eq("organization_id", orgId)
+    .eq("id", fieldId)
+    .select("id");
+  if (error) {
+    if ((error.hint ?? "").trim() === "custom_field:in_use") {
+      const reasons = (error.details ?? "").split(",").map((r) => r.trim()).filter(Boolean);
+      return fail(fieldDeleteBlockedText(reasons) ?? dbErrorMessage(error));
+    }
+    return fail(dbErrorMessage(error, "לא הצלחנו למחוק את השדה. נסו שוב."));
   }
   if (data.length === 0) {
     return fail(NOT_FOUND_OR_FORBIDDEN);

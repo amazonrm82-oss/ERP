@@ -515,15 +515,20 @@ describe("new custom field types (FLD-06 part B)", () => {
     expect(await fileExists(v4.id)).toBe(1);
     expect(await previousOf(v4.id)).toBe(v3.id);
     expect(await previousOf(v3.id)).toBe(null);
-    // deleting the field releases every file of it, versions included
+    // FLD (owner (184) ב, 9 November 2026): a field with a current file is not deleted; once the value is cleared, its
+    // earlier versions do not keep it, and they stay as plain files of the record (nothing removed)
     const fieldId = await define(org, "lead", "versioned_tmp", "file");
     const a = await upload(rep.id, lead, "versioned_tmp");
     await setField(rep.id, "leads", lead, { versioned_tmp: a.id });
     const b = await upload(rep.id, lead, "versioned_tmp");
     await setField(rep.id, "leads", lead, { versioned_tmp: b.id });
-    await asUser(owner.id, (q) => q("delete from public.field_definitions where id = $1", [fieldId]));
-    expect(await fileExists(a.id)).toBe(0);
+    expect((await pgError(asUser(owner.id, (q) => q("delete from public.field_definitions where id = $1", [fieldId])))).hint).toBe("custom_field:in_use");
+    await setField(rep.id, "leads", lead, { versioned_tmp: null });
     expect(await fileExists(b.id)).toBe(0);
+    expect(await fileExists(a.id)).toBe(1);
+    expect(await asUser(owner.id, async (q) => (await q("delete from public.field_definitions where id = $1", [fieldId])).rowCount)).toBe(1);
+    expect(await fileExists(a.id)).toBe(1);
+    expect(await asAdmin(async (q) => (await q<{ k: string | null }>("select custom_field_key as k from public.files where id = $1", [a.id])).rows[0].k)).toBeNull();
   });
 
   it("a read-only file field is locked once filled", async () => {
@@ -557,8 +562,11 @@ describe("new custom field types (FLD-06 part B)", () => {
     const lead2 = await insertLead(owner.id, org);
     const tmp = await upload(owner.id, lead2, "temp_file");
     await setField(owner.id, "leads", lead2, { temp_file: tmp.id });
-    await asUser(owner.id, (q) => q("delete from public.field_definitions where id = $1", [fieldId]));
-    expect(await fileExists(tmp.id)).toBe(0);
+    // FLD (owner (184) ב): a server delete (a person's is refused while the file is current) removes no file either:
+    // it stays a plain file of the record
+    await asAdmin((q) => q("delete from public.field_definitions where id = $1", [fieldId]));
+    expect(await fileExists(tmp.id)).toBe(1);
+    expect(await asAdmin(async (q) => (await q<{ k: string | null }>("select custom_field_key as k from public.files where id = $1", [tmp.id])).rows[0].k)).toBeNull();
   });
 
   it("the storage quota and the waiting cap apply to field files", async () => {

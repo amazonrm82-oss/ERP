@@ -242,6 +242,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "dormant_backfill:rule": "אפשר להריץ על לקוחות רדומים קיימים רק אוטומציה של לקוח שהפך לרדום.",
   // MSG-05 (135) ב
   "message_cancel:channel": "הערוץ לא מוכר. רעננו את הדף ונסו שוב.",
+  // FLD (owner, 9 November 2026): a field in use is hidden, not deleted (the action words the reasons from the detail)
+  "custom_field:in_use": "אי אפשר למחוק את השדה כי הוא בשימוש. אפשר להסתיר אותו.",
   "custom_field:invalid": "אחד השדות המותאמים אינו תקין, או שהוסר בינתיים. רעננו את הדף ונסו שוב.",
   // LEAD-03 (migration disqualify_reasons)
   "lead:disqualify_reason": "יש לבחור סיבה מהרשימה. אם הרשימה השתנתה, רעננו את הדף.",

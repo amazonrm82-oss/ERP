@@ -4335,6 +4335,8 @@ export type Database = {
         }>;
       };
       // FLD-07 (migration field_settings): records holding a unique field's value another record holds
+      // FLD (owner, 9 November 2026): what keeps each field of a record type from being deleted (owners/admins; counts only)
+      custom_field_usage: { Args: { p_org: string; p_object: string }; Returns: Json };
       custom_unique_clashes: {
         Args: { p_org: string; p_type: string; p_ids: string[] };
         Returns: Array<{ record_id: string; field_key: string; field_label: string; other_id: string | null }>;

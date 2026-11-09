@@ -12,11 +12,12 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { PRIVACY_CLASS_HINT, PRIVACY_CLASS_LABELS, PRIVACY_CLASSES } from "@/features/privacy-center/classes";
 import type { FormState } from "@/lib/action-result";
 
-import { createFieldAction, moveFieldAction, setFieldActiveAction, updateFieldAction } from "../actions";
+import { createFieldAction, deleteFieldAction, moveFieldAction, setFieldActiveAction, updateFieldAction } from "../actions";
 import { conditionReminder, describeCondition, type BuiltinChoices } from "../conditions";
 import { canBeRequired, canBeUnique, canHaveDefault } from "../settings";
 import { STATUS_COLORS, statusTone } from "../status-colors";
 import { FIELD_OBJECT_LABELS, FIELD_TYPE_LABELS, FIELD_TYPES, LINK_TARGETS, TYPES_WITH_OPTIONS, type FieldDefinition, type FieldObject, type FieldType } from "../types";
+import { fieldDeleteBlockedText, USAGE_UNKNOWN_LINE } from "../usage";
 import { displayCustomFields } from "../values";
 import { ConditionEditor } from "./condition-editor";
 import { CustomFieldInputs } from "./custom-field-inputs";
@@ -148,9 +149,11 @@ type ListProps = {
   editable: boolean;
   // LEAD-06: the question before hiding a field that receives a lead field's value on conversion, by field id
   hideWarnings?: Record<string, string>;
+  // FLD (owner, 9 November 2026): what keeps a field from being deleted, by field id (reason codes); null = unknown
+  usage?: Record<string, string[]> | null;
 };
 
-export function FieldList({ orgId, objectType, fields, builtins, editable, hideWarnings = {} }: ListProps) {
+export function FieldList({ orgId, objectType, fields, builtins, editable, hideWarnings = {}, usage = {} }: ListProps) {
   return (
     <ol className="divide-y divide-line">
       {fields.map((field, index) => (
@@ -163,6 +166,7 @@ export function FieldList({ orgId, objectType, fields, builtins, editable, hideW
           field={field}
           editable={editable}
           hideWarning={hideWarnings[field.id]}
+          deleteBlocked={usage === null ? USAGE_UNKNOWN_LINE : fieldDeleteBlockedText(usage[field.id] ?? [], { hidden: !field.isActive })}
           isFirst={index === 0}
           isLast={index === fields.length - 1}
         />
@@ -179,11 +183,13 @@ type RowProps = {
   field: FieldDefinition;
   editable: boolean;
   hideWarning?: string;
+  // the line that says why "מחיקה" is off; null = the field may be deleted
+  deleteBlocked: string | null;
   isFirst: boolean;
   isLast: boolean;
 };
 
-function FieldRow({ orgId, objectType, fields, builtins, field, editable, hideWarning, isFirst, isLast }: RowProps) {
+function FieldRow({ orgId, objectType, fields, builtins, field, editable, hideWarning, deleteBlocked, isFirst, isLast }: RowProps) {
   const [editing, setEditing] = useState(false);
   const reminder = conditionReminder(field, fields, objectType, builtins);
 
@@ -229,6 +235,17 @@ function FieldRow({ orgId, objectType, fields, builtins, field, editable, hideWa
                 {field.isActive ? "הסתרה" : "הצגה"}
               </ActionButton>
             )}
+            <ConfirmButton
+              variant="danger-ghost"
+              title={`למחוק את "${field.label}"?`}
+              description="השדה יימחק לצמיתות. אי אפשר לבטל."
+              confirmLabel="מחיקה"
+              action={deleteFieldAction.bind(null, orgId, field.id)}
+              disabled={deleteBlocked !== null}
+            >
+              מחיקה
+              <span className="sr-only">: {field.label}</span>
+            </ConfirmButton>
           </span>
         ) : null}
       </div>
@@ -251,6 +268,7 @@ function FieldRow({ orgId, objectType, fields, builtins, field, editable, hideWa
       ) : null}
       {field.condition && !editing ? <p className="text-sm text-ink-soft">{describeCondition(field.condition, fields, objectType, builtins)}</p> : null}
       {reminder ? <p className="text-sm text-warning">{reminder}</p> : null}
+      {editable && deleteBlocked ? <p className="text-sm text-ink-soft">{deleteBlocked}</p> : null}
       {editing ? <EditFieldForm orgId={orgId} objectType={objectType} fields={fields} builtins={builtins} field={field} onDone={() => setEditing(false)} /> : null}
     </li>
   );

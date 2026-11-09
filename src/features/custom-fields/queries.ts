@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import { parseCondition } from "./conditions";
 import { parseOptionColors } from "./status-colors";
+import { parseFieldUsage } from "./usage";
 import { isFieldType, isLinkTarget, type FieldDefinition, type FieldObject } from "./types";
 
 /** Custom field definitions of one object type, in order. Active ones only unless asked. */
@@ -63,4 +64,19 @@ export async function listFieldDefinitions(
     for (const field of definitions) if (field.type === "user") field.choices = choices;
   }
   return definitions;
+}
+
+/**
+ * FLD (owner, 9 November 2026): for owners and admins, what keeps each field of a record type from being
+ * deleted (public.custom_field_usage, counts only), by field id. A field with no entry may be deleted.
+ * Null when the read failed: the page still shows, with every "מחיקה" off (the database refuses anyway).
+ */
+export async function getFieldUsage(orgId: string, objectType: FieldObject): Promise<Record<string, string[]> | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("custom_field_usage", { p_org: orgId, p_object: objectType });
+  if (error) {
+    console.error(`custom field usage read failed: ${error.code ?? ""}`);
+    return null;
+  }
+  return parseFieldUsage(data);
 }

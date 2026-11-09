@@ -3,6 +3,14 @@ import { addMember, asAdmin, asUser, closePool, count, createOrg, createUser, in
 
 afterAll(closePool);
 
+// FLD (9 November 2026): a person may not delete a field in use, so the FK paths below are reached by a server delete
+// (as the organization's cascade), with no session claims (the triggers ask auth.uid())
+const serverDelete = (sql: string, params: unknown[]) =>
+  asAdmin(async (q) => {
+    await q("select set_config('request.jwt.claims', '{}', true)");
+    return q(sql, params);
+  });
+
 /**
  * LEAD-06: owners and admins say which contact and deal field each lead custom
  * field goes to on conversion. No row or "auto" = same label and type (0029),
@@ -235,7 +243,9 @@ describe("lead conversion field mapping (LEAD-06)", () => {
     expect(await customOf("contacts", contact_id)).toEqual({ c_notes: "חם" });
 
     // deleting the target: nothing is copied, and the row remembers that its field was deleted
-    await asUser(admin.id, (q) => q("delete from public.field_definitions where id = $1", [f.dArea]));
+    // FLD (9 November 2026): earlier conversions left values in d_area, and a person may not delete a field that holds
+    // values, so this server delete (as the org cascade) shows the FK path (a person's delete of an empty target: test 314)
+    await serverDelete("delete from public.field_definitions where id = $1", [f.dArea]);
     expect((await stateOf())["area:deal"]).toBe("none");
     expect(await removedOf("area", "deal")).toBe(true);
     const lead2 = await insertLead(rep.id, org, { custom_fields: JSON.stringify(values) });
@@ -273,7 +283,9 @@ describe("lead conversion field mapping (LEAD-06)", () => {
     await addField("tmpLead", "lead", "tmp_lead", "זמני", "text");
     await addField("tmpTarget", "deal", "tmp_target", "זמני יעד", "text");
     await save(admin.id, [["tmpLead", "deal", "tmpTarget"]]);
-    await asUser(admin.id, (q) => q("delete from public.field_definitions where organization_id = $1 and id in ($2, $3)", [org, f.tmpLead, f.tmpTarget]));
+    // FLD (owner (185) ב, 9 November 2026): the lead side of a mapping keeps a person from deleting tmp_lead, so this server
+    // delete (as the org cascade) shows the FK path
+    await serverDelete("delete from public.field_definitions where organization_id = $1 and id in ($2, $3)", [org, f.tmpLead, f.tmpTarget]);
     expect(await asAdmin((q) => count(q, "select 1 from public.conversion_field_maps where lead_field_id = $1", [f.tmpLead]))).toBe(0);
   });
 
@@ -288,7 +300,9 @@ describe("lead conversion field mapping (LEAD-06)", () => {
   });
 
   it("deleting the lead field removes its mapping; changes are audited", async () => {
-    await asUser(admin.id, (q) => q("delete from public.field_definitions where id = $1", [f.notes]));
+    // FLD (9 November 2026): notes holds values and is mapped (lead side, (185) ב), so a person may not delete it; this
+    // server delete (as the org cascade) shows the FK path
+    await serverDelete("delete from public.field_definitions where id = $1", [f.notes]);
     expect(await asAdmin((q) => count(q, "select 1 from public.conversion_field_maps where lead_field_id = $1", [f.notes]))).toBe(0);
     expect(
       await asAdmin((q) => count(q, "select 1 from public.audit_log where organization_id = $1 and entity_type = 'conversion_field_maps'", [org])),

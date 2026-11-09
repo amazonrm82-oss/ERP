@@ -127,7 +127,8 @@ describe("card layouts", () => {
     await write("deal", [{ title: "א", columns: 1, fields: ["cf:size", "owner_id"] }]);
     await asUser(owner.id, (q) => q("update public.field_definitions set is_active = false where organization_id = $1 and object_type = 'deal' and key = 'size'", [org]));
     await write("deal", [{ title: "ב", columns: 2, fields: ["owner_id", "cf:size"] }]);
-    await asUser(owner.id, (q) => q("delete from public.field_definitions where organization_id = $1 and object_type = 'deal' and key = 'size'", [org]));
+    // FLD (9 November 2026): a person may not delete a field in use, so this server delete (as the org cascade) shows the FK path
+    await asAdmin((q) => q("delete from public.field_definitions where organization_id = $1 and object_type = 'deal' and key = 'size'", [org]));
     await write("deal", [{ title: "ג", columns: 2, fields: ["cf:size"] }]);
     expect(await read("deal")).toEqual([{ title: "ג", columns: 2, fields: ["cf:size"] }]);
     // but a new key of a field that is gone is refused

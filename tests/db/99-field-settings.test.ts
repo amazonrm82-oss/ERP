@@ -647,7 +647,8 @@ describe("custom field settings (FLD-07)", () => {
       const goneId = await asAdmin(async (q) => (await q("select id from public.field_definitions where organization_id = $1 and key = 'gone'", [org])).rows[0].id as string);
       const rowsOf = () => asAdmin(async (q) => (await q("select count(*)::int as n from app.custom_unique_values where field_id = $1", [goneId])).rows[0].n);
       expect(await rowsOf()).toBe(1);
-      await asUser(owner.id, (q) => q("delete from public.field_definitions where organization_id = $1 and key = 'gone'", [org]));
+      // FLD (9 November 2026): a person may not delete a field in use, so this server delete (as the org cascade) shows the FK path
+      await asAdmin((q) => q("delete from public.field_definitions where organization_id = $1 and key = 'gone'", [org]));
       const left = await rowsOf();
       expect(left).toBe(0);
     });
