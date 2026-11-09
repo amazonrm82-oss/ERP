@@ -103,6 +103,30 @@ and build this CRM here instead. The old code is preserved on the branch
    carries a lead id only and the details are fetched from the Graph API with the page token, stored encrypted (INT-02); `meta_lead_id`
    unique per business, a repeated lead is taken once; leads that arrived during a failure are fetched by a later sweep; a fake provider
    until the owner sets the App ID and App Secret in Vercel. Its own "In use" line here once built.
+   In use (CAP-11, owner 4 and 8 November 2026, answers (126) א, (143)-(148); migrations 021179-021182; four independent reviews):
+   the Meta Lead Ads webhook (`src/features/meta-leads/webhook-server.ts`, route `/api/meta/leads`: GET answers only Meta's
+   challenge against `META_VERIFY_TOKEN`; POST is refused before the database, without logging the body, unless its
+   `X-Hub-Signature-256` matches `META_APP_SECRET`; public prefix in `src/lib/supabase/proxy.ts`) and its sweep (route
+   `/api/meta/leads/sweep`, woken every 5 minutes by `app.wake_meta_lead_sweep()`, pg_cron `crm-meta-leads-sweep`, `app.settings`
+   `meta_leads_sweep_url`, else derived from `push_dispatch_url`; secret `push_dispatch_secret`, checked timing-safe). It calls only
+   `public.meta_lead_receive()` (stores page id + Meta lead ids only in `app.meta_lead_arrivals`, rate limited, one arrival per
+   live connection while the page is unverified, else only the verified one), `public.meta_lead_claim()` (ids, lease, the
+   connection's ciphertext and page id) and `public.meta_lead_finish()` (creates the lead through `intake_submit`'s path from
+   the fields the Graph fetch returned; `leads.meta_lead_id` unique per business, a repeated lead is taken once). The three and
+   their helpers (`app.meta_lead_end_connection`, `_connection_open`, `_retry_at`, `_source`, `_text`) and the page-ownership
+   rule (`public.integration_secret_set`, `app.integrations_check`, `app.integration_page_taken`) are pinned by md5 in test 305;
+   a change needs a fresh review. A page is proven only by a successful lead fetch with the connection's own page token
+   (`integrations.verified_at`, server only, set by `meta_lead_finish`, which ends every other connection of the page with
+   `page_taken`); only a verified live connection blocks another business (`integration:taken`, "הדף הזה כבר מחובר לעסק אחר
+   במקסוז"); an unverified connection ended by page_taken, token_invalid or secret_unreadable takes nothing until a new token
+   (token_invalid keeps its arrivals pending; the others end them); unverified connections see no counts. Lock order: arrival
+   row, page advisory lock, integration rows (accepted: a person's reconnect racing a token save on the same connection can end
+   in 40P01). The webhook answers Meta first (`after()`), fetches at most 5, each provider call within 10 s; pending arrivals are
+   retried by the sweep and given up after 3 days (one notice for a verified connection). Graph contract
+   (`src/features/meta-leads/graph/types.ts`): `checkPage` proves the token's own page (`/me`). Only the fake provider exists
+   (`META_LEADS_PROVIDER` empty = ids wait); the page token is stored encrypted (INT-02). Finished arrivals are removed after 12
+   months by `app.purge_old_meta_lead_arrivals` (021182, pasted by hand; pg_cron `crm-meta-lead-arrivals-purge`). In the eslint
+   allow-list. Plan key `meta_leads` (the plans of `lead_distribution`).
    In use (PRK-02, owner 26 October 2026, wave 3 use (3), migration 021147): the public privacy-request page
    (`src/features/privacy-requests/public-server.ts`, page `/f/privacy/<token>`, route `POST /api/forms/privacy/<token>`), which calls
    only `public.privacy_request_page()` (the business's display name `organizations.name`, logo and colour only) and
@@ -1777,6 +1801,16 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   entry (`app.merge_punch_cards`). `app.sample_untouched`, `app.import_record_worked`, `app.audit_erase_core` and
   `public.quick_sale` were last redefined in 021165-021167. The advisor's findings on the six definer RPCs and on
   `app.punch_card_retries` / `app.quick_sale_lines` are expected. Re-running 021166 needs 021168 after it.
+- Provider connections (INT-02, migration 021179; owner 26 October and 8 November 2026, answers (145), (146) ג):
+  `public.integrations` (one connection per business, provider and external id; owners/admins read, write name/status/config
+  through column grants and delete; audited; server-only `verified_at`, `last_error_code`) and `app.integration_secrets` (no
+  grants; ciphertext only). The secret is encrypted in the app with AES-256-GCM (`src/features/integrations/crypto.ts`, envelope
+  `v<version>:…`, additional data = business, connection and page) under `PROVIDER_SECRETS_KEY` / `_VERSION` (Vercel env, set by the
+  owner; `_PREVIOUS` keeps old secrets readable) and saved only through `public.integration_secret_set` (definer, owners/admins of a
+  writable business; the database checks the envelope's shape only, a stored secret proves nothing). The key is replaced only by the
+  procedure in DECISIONS.md (answer (146) ג: re-encrypt every secret and verify the count), approved as a new use when needed.
+  Meta Lead Ads (CAP-11) is the first provider: `public.meta_lead_forms` (a Meta form's owner or team routing, one CRM form of kind
+  `meta` each, synced by `app.meta_lead_forms_sync_form`, locked by `app.forms_meta_lock`), settings page `/settings/meta-leads`.
 - Punch card alerts (PKG-03, migrations 021176-021178; owner (127)-(132), (137)-(142), (148); three independent reviews):
   `public.punch_card_alert_settings` (one row per business; `low_entries` 0..100 default 2, `expiry_days` 0..365 default 14, 0 = that
   alert off; `customer_messages` default false; members read; owners/admins of a writable business write through column grants; no
