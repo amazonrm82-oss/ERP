@@ -1423,6 +1423,13 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `pdf_remake` (sizes only); footer "נוצר מחדש ב-<date> מהנתונים השמורים". Unfinished attempts' paths are queued (trigger
   `quote_pdf_remakes_gone`, pg_cron `crm-quote-pdf-remake-sweep` 02:40 UTC). `public.quote_pdf_store` was last redefined in 021015.
   Accepted: the claim checks membership only (app schema, no API); an upload arriving after the nightly cleanup stays (as 020995).
+  Quote as sent (021190, owner (175) ג; two reviews): a quote sent after 021190 keeps its state as sent in `app.quote_sent_states`
+  (one row per quote, written once by trigger `quotes_sent_state` on the move to sent, then frozen for every writer; RLS on, no grants;
+  cascades with the quote). `public.quote_sent_state` / `quote_has_sent_state` (invoker, the quote read under the caller's RLS) over
+  definer `app.quote_sent_state_of` (the PDF paths' rule: can_write, org_writable, `quotes` key, `quote_editable`) and
+  `app.quote_sent_state_exists` (membership, true/false only). A PDF as sent made again (021187's credit, the legacy remake) renders
+  the snapshot with ", כפי שנשלח"; a failed or unparseable read, or none while one exists, renders nothing (`remadeQuoteDocument`,
+  `src/features/quotes/pdf-server.ts`); a quote without one keeps ", לפי מה שאושר" (accepted, or cancelled after acceptance).
 - Quote link (QUO-08 part one, migration 020290): `app.quote_links` (one per quote, SHA-256 of the token only, no grants; a new link
   replaces the old one; revoke clears the hash). `public.quote_link_create/revoke/status(org, quote)` (definer; `app.quote_editable` and the
   `quotes` flag; sent, open quotes only, hints `quote:not_sent`, `quote:closed`; audited without the token). `public.quote_public(token)`
