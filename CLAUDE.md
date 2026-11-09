@@ -1872,7 +1872,9 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   only = nothing when there is no live payer contact; a recipient without a channel = the payer. `app.send_punch_card_alerts`,
   `app.punch_cards_note`, `app.punch_cards_erase`, `app.sample_untouched`, `app.import_record_worked`, `public.quote_duplicate` and
   `app.order_lines_check` were last redefined in 021183; `app.merge_punch_recipients` moves lines and payer columns on the `merged`
-  entry (contacts and companies). The recipient is not shown to the customer (question 156). Tests 64 and 88 end with
+  entry (contacts and companies). The advisor's finding on `punch_card_recipient_options` is expected. Owner (156) א: the
+  customer's page and PDF will show "עבור: <name as sent>" (follow-up, not built yet); (159) ב: the recipient's export marks the card
+  "נפתחה ממסמך של לקוח אחר" without the payer (follow-up). Tests 64 and 88 end with
   `_punch_card_recipients.sql`.
 - Punch card report (PKG-07, migration 021169; owner (116) א, (117) ב, (118) ב; two reviews): `public.report_punch_cards(org, days)`
   (invoker, `jit = off`, days 1..366 hint `report:days`) answers `{allowed:false}` to anyone but an owner, admin or manager by
