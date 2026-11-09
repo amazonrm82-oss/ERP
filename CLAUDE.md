@@ -103,18 +103,41 @@ and build this CRM here instead. The old code is preserved on the branch
    carries a lead id only and the details are fetched from the Graph API with the page token, stored encrypted (INT-02); `meta_lead_id`
    unique per business, a repeated lead is taken once; leads that arrived during a failure are fetched by a later sweep; a fake provider
    until the owner sets the App ID and App Secret in Vercel. Its own "In use" line here once built.
-   Owner, 9 November 2026, answer (155) א (approved, not built yet): two more OPS-04 job kinds, `import.run` and `export.run`
+   Owner, 9 November 2026, answer (155) א (built, see "In use (IMP-04 …)"): two more OPS-04 job kinds, `import.run` and `export.run`
    (IMP-04), under answer (55)'s conditions: ids and codes only in the queue, the functions pinned by md5, an "In use" line here once
    built; the job writes with the rights of the user who ordered it (never as an admin), so every rule of the browser import holds;
    files in a private Storage bucket under the business's folder, kept 7 days, then removed by the nightly cleanup; downloads only
    through a one-minute signed link, as other files; undoing a background import works as today.
-   Owner, 9 November 2026, answer (160) א (approved, not built yet): IMP-04's worker signs a short token for the person who ordered a
+   Owner, 9 November 2026, answer (160) א (built, see "In use (IMP-04 …)"): IMP-04's worker signs a short token for the person who ordered a
    background job with `SUPABASE_JWT_SECRET` (set by the owner in Vercel; as strong as the service key), under these conditions: one
    file only (the job worker's), in the eslint allow-list; a 10-minute token with the ORIGINAL session's aal only (never aal2 beyond it),
    the session id and a "background job" claim that the audit records; before every signing: active member, the right, the session still
    open; every signing logged in `app.platform_log` (ids only); tests prove such a token reads nothing beyond the user; an independent
    review; its own "In use" line. (161) א the job stops when the session ends; (162) ב an export over the upload limit fails with a notice
    pointing to the direct download; (163) ב background import only with "skip" or "update" for duplicates.
+   In use (IMP-04, owner 9 November 2026, answers (155) א, (160) א, (161) א, (162) ב, (163) ב; migration `_background_jobs.sql`; two
+   independent reviews): the OPS-04 worker (same route and secret) also claims `import.run` and `export.run` (payload `{request_id,
+   user_id}` only) in its own pass (lease 900 s, one job, 40 s budget, then saved and handed back uncounted with
+   `finish_job(started=false)`), and calls with the service key only `public.background_job_begin()`, `background_job_progress()`,
+   `background_job_end()` and, through the token source it hands its client to, `background_job_token()`. The token source
+   (`src/features/background/user-token.ts`, the ONLY reader of `SUPABASE_JWT_SECRET`, which the owner sets in Vercel; lint refuses the
+   name elsewhere, and only `src/features/jobs/run-server.ts` may import `createBackgroundTokenSource` / `createUserClient`) takes only
+   that client, the job and its lease, and before EVERY signing (the first and every refresh) asks `background_job_token` with the app's
+   `LEGAL_VERSION`. That function checks the ordering person again (`app.background_refusal`): an active member; the ordering session in
+   `auth.sessions`, not past `not_after`, read fail-closed (`app.background_session_aal`); the latest signed agreement equal to the app's
+   version and registered in `app.agreement_texts`; and the right of the work (`app.can_import` or the owner) judged with the person's
+   own claims. It logs the signing in `app.platform_log` (`background.token`, ids only) and answers sub, role authenticated, the lower of
+   the order's and the session's current aal, the session id, `crm_background` (the order) and the lease's end. The token is HS256, 10
+   minutes and never past the lease; a refusal ends the job and the order with a notice. The worker runs the browser path's own code
+   (`src/features/imports/run-core.ts`, `buildFullExport`) through PostgREST and Storage, so every write is the person's. Trigger
+   `audit_log_background` stamps `changes.background = {request_id}` on the person's non-delete audit entries while the claim names
+   their running order of that business. A background import only skips or updates duplicates (`background_requests.duplicate_mode`).
+   Files are in the private bucket `job-files`: the uploaded rows are read, and the export written, only under the worker's token of
+   that order (`crm_background` in `job_files_select|insert`); the person downloads the finished export through a 60 s signed link made
+   with their own session. Files are kept 7 days and then queued for the nightly cleanup by `app.background_requests_sweep` (pg_cron
+   `crm-background-requests`; `CLEANUP_BUCKETS` + `job-files`). An export over the upload limit ends with a notice pointing to the
+   direct download. The thirteen functions are pinned by md5 in test 309; a change needs a fresh review. Without the secret nothing is
+   registered and the jobs wait. End-to-end check on the local stack: `tests/e2e/background-jobs.mjs` (header says how to run it).
    In use (CAP-11, owner 4 and 8 November 2026, answers (126) א, (143)-(148); migrations 021179-021182; four independent reviews):
    the Meta Lead Ads webhook (`src/features/meta-leads/webhook-server.ts`, route `/api/meta/leads`: GET answers only Meta's
    challenge against `META_VERIFY_TOKEN`; POST is refused before the database, without logging the body, unless its
@@ -157,7 +180,7 @@ and build this CRM here instead. The old code is preserved on the branch
    timing-safe first (`src/lib/shared-secret.ts`) and calls only `public.claim_jobs()`, `public.finish_job()` and
    `public.job_message_may_send()`. (55) א: only `job_message_may_send` reads customer records and it answers may_send, reason and
    retry only; `claim_jobs` answers only id, lease, kind, organization_id, payload (ids and codes, optional event_at) and attempt,
-   `finish_job` only its status; `app.job_kinds()` is exactly `message.send`, and every new kind needs the owner's approval and its
+   `finish_job` only its status; `app.job_kinds()` is exactly `message.send`, `import.run` and `export.run` (IMP-04, its own In use line), and every new kind needs the owner's approval and its
    own In use line; the three bodies are pinned by md5 and a change needs a fresh review (test 284). The send check works on a live
    lease only: a business that cannot write (`app.org_writable`: deleted, suspended, cancelled or read-only, (53) א, (54) ב) or an
    `event_at` that passed cancels the job; while HEB-09 `app.customer_sending_paused` holds, the job waits uncounted (with the
