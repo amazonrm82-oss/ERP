@@ -16,10 +16,10 @@ const setKey = (value: string | null) =>
 
 // md5 of the worker's three functions as reviewed: body, security definer, settings and arguments (see the (55) test)
 const REVIEWED_MD5 = {
-  // MSG-01 (021145): p_channels, a channel without a provider is not claimed; needs a fresh review
+  // MSG-01 (021151): p_channels, a channel without a provider is not claimed (rechecked: three independent reviews, 3 November 2026)
   claim_jobs: "3f6b474aca13963df4616cfd19e20010",
-  // MSG-03 (021146): three optional arguments, the provider's receipt and the message outcome kept on the job; needs a
-  // fresh review
+  // MSG-03 (021152): three optional arguments, the provider's receipt and the message outcome kept on the job
+  // (rechecked: three independent reviews, 3 November 2026)
   finish_job: "058e58191682d7520d64729e26adbd91",
   // MSG-03 (021146): stamps the lease that passed the check (send_checked_lease); CNS-07 (021147, owner (73) א): a service
   // type stops only at the blocklist or an erasure, marketing needs no opt-out and a recorded grant; MSG-06 (021172, owner
@@ -29,20 +29,20 @@ const REVIEWED_MD5 = {
   // marketing job not counted yet waits uncounted over the month's cap (the business's, or the plan's email quota; 15 minutes)
   // or the plan's daily email quota (the next calendar day in the business's zone), with the channel's other due marketing jobs, and tells the owners and
   // admins (app.message_cap_notify); on yes the message is counted once (app.message_usage_days, app.jobs.usage_counted) and
-  // the 80% / 100% notices are judged; NEEDS A FRESH INDEPENDENT REVIEW before merge
+  // the 80% / 100% notices are judged (rechecked: two independent reviews, 8 November 2026)
   // MSG-05/06 answers (133)-(136) (021174): a full cap holds the channel across months until raised (app.message_cap_holds);
   // after the business rate, the system-wide rate (app.message_take_system_rate, 10 shards, waits 'system_rate'); a
-  // verification code skips both rates; NEEDS A FRESH INDEPENDENT REVIEW before merge
+  // verification code skips both rates (rechecked: two independent reviews, 8 November 2026)
   // MSG-05/06 review (021175): every batch move goes through app.message_move_waiting (id order FOR UPDATE; never a job the
   // latest long pause covers; rate and cap moves marketing only; window and rate moves never a cap waiter); a cap waiter
-  // carries app.jobs.cap_wait, cleared when its cap check passes; the 80% rule in bigint; NEEDS A FRESH INDEPENDENT REVIEW
+  // carries app.jobs.cap_wait, cleared when its cap check passes; the 80% rule in bigint (rechecked: two independent reviews, 8 November 2026)
   job_message_may_send: "66c56e9f8bc6c5db9afb045a5e7db386",
 };
 
 // MSG-03: the trigger function that writes public.messages from the worker's path (see its test below)
 // MSG-02 (103) (021160): plus one call of app.message_send_refused(org, payload template_id, 'too_long') when the outcome is
-// 'failed' with code 'too_long' and no provider, in its own exception block (the finish never fails); NEEDS A FRESH
-// INDEPENDENT REVIEW (the lead runs it) before merge
+// 'failed' with code 'too_long' and no provider, in its own exception block (the finish never fails)
+// (rechecked: two independent reviews, 3 November 2026)
 const REVIEWED_RECORD_MESSAGE_MD5 = "c9b18ee53d49a9ea1dfff777f633c306";
 
 type Claimed = { id: string; lease: string; kind: string; organization_id: string; payload: Record<string, unknown>; attempt: number };
@@ -706,7 +706,7 @@ describe("background job queue (OPS-04)", () => {
   });
 
   // MSG-03: claim_jobs and finish_job name no public table; the ONE approved writer of a public table on the worker's path
-  // is the trigger jobs_record_message on app.jobs (owner's approval pending, question 75), which writes public.messages
+  // is the trigger jobs_record_message on app.jobs (owner's approval (75) א, 3 November 2026), which writes public.messages
   // when finish_job sets message_outcome. Every trigger on app.jobs is in this closed list, and the trigger function's
   // body is pinned: a new trigger, or a change of this one, needs a fresh review (and the owner's approval of the path).
   it("MSG-03: the only trigger on app.jobs is jobs_record_message, with the reviewed body", async () => {

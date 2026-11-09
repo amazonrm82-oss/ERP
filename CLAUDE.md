@@ -130,7 +130,7 @@ and build this CRM here instead. The old code is preserved on the branch
    retried by the sweep and given up after 3 days (one notice for a verified connection). Graph contract
    (`src/features/meta-leads/graph/types.ts`): `checkPage` proves the token's own page (`/me`). Only the fake provider exists
    (`META_LEADS_PROVIDER` empty = ids wait); the page token is stored encrypted (INT-02). Finished arrivals are removed after 12
-   months by `app.purge_old_meta_lead_arrivals` (021182, pasted by hand; pg_cron `crm-meta-lead-arrivals-purge`). In the eslint
+   months by `app.purge_old_meta_lead_arrivals` (021182, to be pasted by hand by the owner; NOT on hosted yet as of 9 November 2026, RVW-68; pg_cron `crm-meta-lead-arrivals-purge`). In the eslint
    allow-list. Plan key `meta_leads` (the plans of `lead_distribution`). The advisor's findings on `integration_secret_set`,
    `meta_lead_summary` and the four new app tables are expected.
    In use (PRK-02, owner 26 October 2026, wave 3 use (3), migration 021147): the public privacy-request page
