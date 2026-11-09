@@ -1845,6 +1845,28 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   were last redefined in 021177; `app.send_punch_card_alerts` and `app.punch_card_notice_template` in 021178. The queue's four pinned
   functions are unchanged; `job_message_may_send` treats the new type as a service type through `app.service_message_types()`. Tests
   64 and 88 end with `_punch_card_alert_answers.sql`; `rerunClosure` (`tests/db/rerun.ts`) also closes over `add constraint <name>`.
+- Payer and service recipient (PKG-06, migration 021183; owner 9 November 2026, answers (149) א, (150) ג, (151) ג; three independent
+  reviews; open questions 156-159 built on the lead's choices): `quote_lines.recipient_contact_id` / `order_lines.recipient_contact_id`
+  (composite FK set null, column grants) on punch-card product lines only; the document and its money stay on the payer (its contact or
+  company), the card opens on the recipient. Rule `app.punch_recipient_linked` / `app.punch_recipient_ok` (definer, no grants): the payer
+  itself, a CON-06 `contact_relations` link either way, or an employee of the document's own `company_id` (contacts.company_id or a CON-05
+  link); live and, for a person, readable. Line trigger `app.document_line_recipient` (outsider guard first; hints
+  `punch_recipient:line|contact|not_linked`); frozen with the document (`quote:frozen` / `order:frozen`; FK set-null and merge pass);
+  judged again when the document stops changing (BEFORE status triggers `quotes_punch_recipients_send` / `orders_punch_recipients_send`,
+  `app.document_send_recipients`: in the bin or unreadable = `punch_recipient:contact`, unlinked = `punch_recipient:not_linked`); a sent
+  or numbered document is the record. Copies (version, duplicate, order from quote) keep a recipient only while still linked; a draft's
+  customer change drops unlinked recipients. `public.punch_card_recipient_options(org, kind, doc)` (definer; draft, `punch_cards` key, a
+  person who may edit the document; at most 200 readable eligible contacts). `punch_cards.payer_contact_id` / `payer_company_id`
+  (server only; set when the holder is not the payer). `app.punch_cards_auto_open` (last redefined in 021183) opens each line's cards on
+  its live recipient; a recipient in the bin makes that line wait through the retry path (`app.punch_card_retry_one` /
+  `app.retry_punch_card_openings`, last redefined in 021183: a waiting try keeps what it opened, reported through the transaction-local
+  `app.punch_card_retry_waiting`, `app.punch_card_retrying` stops a second retry row; `opened` sums every try). Notices (151):
+  `punch_card_alert_settings.notices_to` both|payer; `app.punch_card_notice_targets`: the recipient and the payer when different; payer
+  only = nothing when there is no live payer contact; a recipient without a channel = the payer. `app.send_punch_card_alerts`,
+  `app.punch_cards_note`, `app.punch_cards_erase`, `app.sample_untouched`, `app.import_record_worked`, `public.quote_duplicate` and
+  `app.order_lines_check` were last redefined in 021183; `app.merge_punch_recipients` moves lines and payer columns on the `merged`
+  entry (contacts and companies). The recipient is not shown to the customer (question 156). Tests 64 and 88 end with
+  `_punch_card_recipients.sql`.
 - Punch card report (PKG-07, migration 021169; owner (116) א, (117) ב, (118) ב; two reviews): `public.report_punch_cards(org, days)`
   (invoker, `jit = off`, days 1..366 hint `report:days`) answers `{allowed:false}` to anyone but an owner, admin or manager by
   `app.membership_role`, and without `punch_cards`. Active cards are paid (a payment that still counts) | manual (count only) |
