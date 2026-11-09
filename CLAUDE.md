@@ -1896,7 +1896,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   only = nothing when there is no live payer contact; a recipient without a channel = the payer. `app.send_punch_card_alerts`,
   `app.punch_cards_note`, `app.punch_cards_erase`, `app.sample_untouched`, `app.import_record_worked`, `public.quote_duplicate` and
   `app.order_lines_check` were last redefined in 021183; `app.merge_punch_recipients` moves lines and payer columns on the `merged`
-  entry (contacts and companies). The advisor's finding on `punch_card_recipient_options` is expected. Since 021185 (owner (156) א, (159) ב,
+  entry (contacts and companies). The advisor's finding on `punch_card_recipient_options` is expected. Since 021185 (applied 9 November 2026, md5 checked; owner (156) א, (159) ב,
   (164) ב, (165) א; two reviews): quote/order lines keep `recipient_name` / `recipient_named_contact_id` (server only, taken by
   `app.document_recipient_snapshot` when the document is sent or numbered, then frozen; merges repoint them through
   `app.merge_recipient_names`), and `public.quote_public`, `public.order_public` (both last redefined in 021185; test 253 pins them),
