@@ -137,7 +137,8 @@ and build this CRM here instead. The old code is preserved on the branch
    with their own session. Files are kept 7 days and then queued for the nightly cleanup by `app.background_requests_sweep` (pg_cron
    `crm-background-requests`; `CLEANUP_BUCKETS` + `job-files`). An export over the upload limit ends with a notice pointing to the
    direct download. The thirteen functions are pinned by md5 in test 309; a change needs a fresh review. Without the secret nothing is
-   registered and the jobs wait. End-to-end check on the local stack: `tests/e2e/background-jobs.mjs` (header says how to run it).
+   registered and the jobs wait. End-to-end check on the local stack: `tests/e2e/background-jobs.mjs` (header says how to run it;
+   passed 9 November 2026). The advisor's findings on `background_request_submit` / `background_request_cancel` are expected.
    In use (CAP-11, owner 4 and 8 November 2026, answers (126) א, (143)-(148); migrations 021179-021182; four independent reviews):
    the Meta Lead Ads webhook (`src/features/meta-leads/webhook-server.ts`, route `/api/meta/leads`: GET answers only Meta's
    challenge against `META_VERIFY_TOKEN`; POST is refused before the database, without logging the body, unless its
