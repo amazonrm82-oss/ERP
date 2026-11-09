@@ -108,6 +108,13 @@ and build this CRM here instead. The old code is preserved on the branch
    built; the job writes with the rights of the user who ordered it (never as an admin), so every rule of the browser import holds;
    files in a private Storage bucket under the business's folder, kept 7 days, then removed by the nightly cleanup; downloads only
    through a one-minute signed link, as other files; undoing a background import works as today.
+   Owner, 9 November 2026, answer (160) א (approved, not built yet): IMP-04's worker signs a short token for the person who ordered a
+   background job with `SUPABASE_JWT_SECRET` (set by the owner in Vercel; as strong as the service key), under these conditions: one
+   file only (the job worker's), in the eslint allow-list; a 10-minute token with the ORIGINAL session's aal only (never aal2 beyond it),
+   the session id and a "background job" claim that the audit records; before every signing: active member, the right, the session still
+   open; every signing logged in `app.platform_log` (ids only); tests prove such a token reads nothing beyond the user; an independent
+   review; its own "In use" line. (161) א the job stops when the session ends; (162) ב an export over the upload limit fails with a notice
+   pointing to the direct download; (163) ב background import only with "skip" or "update" for duplicates.
    In use (CAP-11, owner 4 and 8 November 2026, answers (126) א, (143)-(148); migrations 021179-021182; four independent reviews):
    the Meta Lead Ads webhook (`src/features/meta-leads/webhook-server.ts`, route `/api/meta/leads`: GET answers only Meta's
    challenge against `META_VERIFY_TOKEN`; POST is refused before the database, without logging the body, unless its
