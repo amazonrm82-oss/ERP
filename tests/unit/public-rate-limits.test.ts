@@ -114,7 +114,7 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
   },
   "/api/forms/booking/manage/[token]": {
     guard: "database",
-    functions: ["public_sender_check", "public_sender_miss", "booking_manage_cancel", "booking_manage_change"],
+    functions: ["public_sender_check", "public_sender_miss", "booking_manage_cancel", "booking_manage_change", "booking_manage_confirm"],
     limit: SENDER + "app.booking_manage_begin: 5 per sender per page in 10 min, shared with bookings; the page closure applies",
     refusal: JSON_429 + "; closed page: Retry-After 3600",
     sender: "first",

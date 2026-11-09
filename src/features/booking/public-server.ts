@@ -57,6 +57,8 @@ const MESSAGES = {
   rateLimited: RATE_LIMITED_TEXT,
   closed: "קביעת התורים בדף הזה סגורה זמנית. נסו שוב בעוד שעה.",
   tooLate: "כבר אי אפשר לבטל או לשנות את הפגישה כאן. לביטול יש להתקשר לעסק.",
+  // CAL-12: the customer's confirm, once the meeting started or was cancelled
+  confirmClosed: "כבר אי אפשר לאשר את הפגישה הזו: היא התחילה או בוטלה.",
   error: "משהו השתבש. נסו שוב בעוד רגע.",
 } as const;
 
@@ -144,7 +146,8 @@ export async function handleBooking(request: Request, token: string): Promise<Re
 
 // ----------------------------------------------------------------------------
 // CAL-10b: the customer's personal link (cancel or change), in the same pattern: public.booking_manage_public(),
-// booking_manage_cancel() and booking_manage_change(), each service_role only and checking the token itself.
+// booking_manage_cancel() and booking_manage_change(), each service_role only and checking the token itself. CAL-12
+// (owner (177) ב): booking_manage_confirm(), the customer's "confirm", in the same route.
 // ----------------------------------------------------------------------------
 
 export type BookingManageState = BookingManage | "not-found" | "unavailable" | "rate-limited" | "not-configured";
@@ -171,12 +174,16 @@ export async function getBookingManage(token: string, from: string | null, ip: s
 
 export type BookingManageReply =
   | { ok: true; cancelled: true }
+  | { ok: true; confirmed: true }
   | { ok: true; confirmation: ReturnType<typeof confirmationFrom> }
   | { ok: false; message: string; slotTaken?: boolean; tooLate?: boolean };
 
 const manageJson = (status: number, reply: BookingManageReply) => Response.json(reply, { status, headers: { "Cache-Control": "no-store" } });
 
-/** POST /api/forms/booking/manage/<token>: {"action": "cancel"} or {"action": "change", "starts_at": "…"}. */
+/**
+ * POST /api/forms/booking/manage/<token>: {"action": "cancel"}, {"action": "confirm"} (CAL-12, owner (177) ב:
+ * public.booking_manage_confirm) or {"action": "change", "starts_at": "…"}.
+ */
 export async function handleBookingManage(request: Request, token: string): Promise<Response> {
   if (!MANAGE_TOKEN.test(token)) return markNotFound(manageJson(404, { ok: false, message: MESSAGES.notFound }));
   const service = createServiceClient();
@@ -196,6 +203,8 @@ export async function handleBookingManage(request: Request, token: string): Prom
   let result;
   if (body.action === "cancel") {
     result = await service.rpc("booking_manage_cancel", { p_token: token, p_ip_hash: ipHash });
+  } else if (body.action === "confirm") {
+    result = await service.rpc("booking_manage_confirm", { p_token: token, p_ip_hash: ipHash });
   } else if (body.action === "change") {
     const startsAt = text(body.starts_at, 40);
     if (!startsAt || Number.isNaN(Date.parse(startsAt))) return manageJson(400, { ok: false, message: MESSAGES.slotTaken, slotTaken: true });
@@ -209,12 +218,14 @@ export async function handleBookingManage(request: Request, token: string): Prom
     if (error.hint === "rate_limited") return rateLimitedJson({ ok: false, message: MESSAGES.rateLimited });
     if (error.hint === "booking:closed") return rateLimitedJson({ ok: false, message: MESSAGES.closed }, { retryAfterSeconds: CLOSED_SECONDS });
     if (error.hint === "booking:too_late") return manageJson(409, { ok: false, message: MESSAGES.tooLate, tooLate: true });
+    if (error.hint === "booking:confirm_closed") return manageJson(409, { ok: false, message: MESSAGES.confirmClosed });
     if (error.hint === "booking:unavailable") return manageJson(403, { ok: false, message: MESSAGES.unavailable });
     console.error("booking_manage failed", error.code, error.message);
     return manageJson(500, { ok: false, message: MESSAGES.error });
   }
   const status = data && typeof data === "object" && !Array.isArray(data) ? (data as { status?: unknown }).status : null;
   if (status === "cancelled") return manageJson(200, { ok: true, cancelled: true });
+  if (status === "confirmed") return manageJson(200, { ok: true, confirmed: true });
   if (status === "slot_taken" || status === "invalid_time") return manageJson(409, { ok: false, message: MESSAGES.slotTaken, slotTaken: true });
   const confirmation = confirmationFrom(data);
   if (!confirmation) {

@@ -41,3 +41,16 @@ export const messageCapsSchema = z.object({
 });
 
 export type MessageCapsInput = z.infer<typeof messageCapsSchema>;
+
+export const MEETING_MESSAGE_FIELD_NAMES = ["meeting_confirm", "meeting_remind_day", "meeting_remind_hour"] as const;
+
+const checkbox = z.preprocess((value) => value === "on" || value === "true", z.boolean());
+
+/** CAL-12: which meeting messages go to the customer (all off by default). */
+export const meetingMessagesSchema = z.object({
+  meeting_confirm: checkbox,
+  meeting_remind_day: checkbox,
+  meeting_remind_hour: checkbox,
+});
+
+export type MeetingMessagesInput = z.infer<typeof meetingMessagesSchema>;

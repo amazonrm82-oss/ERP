@@ -55,6 +55,7 @@ describe("Hebrew messages for the database's hints (RVW-50 ב)", () => {
   // hints whose screen answers them itself; the guard checks that the named file really does
   const HANDLED_ELSEWHERE: Record<string, string> = {
     "booking:closed": "src/features/booking/public-server.ts",
+    "booking:confirm_closed": "src/features/booking/public-server.ts",
     "booking:too_late": "src/features/booking/public-server.ts",
     "booking:unavailable": "src/features/booking/public-server.ts",
     "leave:open": "src/features/suspended/actions.ts",

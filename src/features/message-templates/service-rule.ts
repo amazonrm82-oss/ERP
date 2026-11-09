@@ -20,7 +20,8 @@ const NAMES: readonly MergeFieldKey[] = ["firstName", "fullName", "userName", "b
 
 /** The merge fields each service type may hold (= app.message_type_fields). */
 export const SERVICE_TYPE_FIELDS: Record<ServiceMessageType, readonly MergeFieldKey[]> = {
-  meeting_reminder: [...NAMES, "date", "time"],
+  // CAL-12: the meeting's location and the customer's personal link join date and time
+  meeting_reminder: [...NAMES, "date", "time", "meetingLocation", "manageLink"],
   requested_document: [...NAMES, "document", "quoteLink", "validUntil"],
   collection: [...NAMES, "document", "amount", "dueDate"],
   verification_code: ["businessName", "verificationCode"],

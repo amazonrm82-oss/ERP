@@ -760,6 +760,10 @@ describe("setup checklist and sample data (USR-04)", () => {
       // FLD (184) ב redefines app.custom_field_files_release_field() of _field_types_part_b.sql last (a deleted file
       // field's files stay as plain files of their records)
       "_custom_field_delete.sql",
+      // CAL-12 redefines app.job_payload_ok() of _background_jobs.sql, app.message_merge_fields() /
+      // app.message_type_fields() of _punch_card_notice_messages.sql and app.seed_punch_card_message_templates() of
+      // _punch_card_alert_answers.sql last (the meeting's id and location; the punch card seed reads its own marks only)
+      "_meeting_customer_reminders.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

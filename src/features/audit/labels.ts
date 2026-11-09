@@ -222,7 +222,9 @@ export const HIDDEN_FIELDS = new Set(["id", "organization_id", "created_at", "cr
   // DEAL-03: the reason's name is logged as lost_reason in the same change
   "lost_reason_id",
   // SEG-02: the latest inquiry's UTM and time are technical; its source and campaign are listed (FIELD_LABELS)
-  "last_utm", "last_source_at"]);
+  "last_utm", "last_source_at",
+  // CAL-12: a technical stamp beside the start or status change it marks
+  "person_scheduled_at"]);
 
 export const FIELD_LABELS: Record<string, string> = {
   // MSG-02 (owner (90) ג: a template's type change is recorded and shown)

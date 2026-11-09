@@ -2,13 +2,16 @@ import type { Metadata } from "next";
 
 import { Detail, DetailList } from "@/components/detail-list";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { MeetingMessagesForm } from "@/features/message-sending/components/meeting-messages-form";
 import { MessageCapsForm } from "@/features/message-sending/components/message-caps-form";
 import { MessageUsageCard } from "@/features/message-sending/components/message-usage-card";
 import { SendingHoursForm } from "@/features/message-sending/components/sending-hours-form";
 import { RATE_PER_MINUTE, SHORT_DAY_UNTIL, windowText } from "@/features/message-sending/hours";
-import { getMessageCaps, getMessageUsage, getSendingHours } from "@/features/message-sending/queries";
+import { MEETING_MESSAGE_TEXTS, MEETING_REMINDERS_FEATURE } from "@/features/message-sending/meeting-messages";
+import { getMeetingMessages, getMessageCaps, getMessageUsage, getSendingHours } from "@/features/message-sending/queries";
 import { CHANNEL_LABELS, MESSAGE_CHANNELS } from "@/features/message-sending/usage";
 import { isAdminRole } from "@/features/settings/permissions";
+import { orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatNumber } from "@/lib/format";
 
@@ -16,6 +19,7 @@ export const metadata: Metadata = { title: "שעות ותקרות שליחה" };
 
 type Props = { params: Promise<{ orgId: string }> };
 
+// CAL-12: the meeting messages to the customer (all off by default; owners and admins switch them).
 // MSG-06: when messages go out to customers (owner 4 November 2026, answers (119)-(121)); MSG-05: the monthly caps of marketing
 // messages and this month's usage (answers (122)-(125)). Everyone reads the hours; owners and admins see the usage and caps.
 export default async function MessageSendingSettingsPage({ params }: Props) {
@@ -23,9 +27,11 @@ export default async function MessageSendingSettingsPage({ params }: Props) {
   const { role, canWrite } = await getOrgContext(orgId);
   const admin = isAdminRole(role);
   const editable = admin && canWrite;
-  const [hours, caps, usage] = await Promise.all([
+  const [hours, caps, meetingMessages, meetingRemindersInPlan, usage] = await Promise.all([
     getSendingHours(orgId),
     getMessageCaps(orgId),
+    getMeetingMessages(orgId),
+    orgHasFeature(orgId, MEETING_REMINDERS_FEATURE),
     admin ? getMessageUsage(orgId) : Promise.resolve({ allowed: false } as const),
   ]);
 
@@ -60,6 +66,7 @@ export default async function MessageSendingSettingsPage({ params }: Props) {
         <SendingHoursForm orgId={orgId} hours={hours} />
         {usageCard}
         <MessageCapsForm orgId={orgId} caps={caps} />
+        <MeetingMessagesForm orgId={orgId} settings={meetingMessages} available={meetingRemindersInPlan} />
         {rules}
       </div>
     );
@@ -72,6 +79,9 @@ export default async function MessageSendingSettingsPage({ params }: Props) {
           <DetailList>
             <Detail label="שעות" value={windowText(hours)} />
             <Detail label="ימי מנוחה וחגים" value={hours.skipRestDays ? `לא שולחים; ביום מקוצר עד ${SHORT_DAY_UNTIL}` : "שולחים כרגיל"} />
+            <Detail label={MEETING_MESSAGE_TEXTS.confirm} value={meetingMessages.confirm ? "פעיל" : "כבוי"} />
+            <Detail label={MEETING_MESSAGE_TEXTS.day} value={meetingMessages.day ? "פעיל" : "כבוי"} />
+            <Detail label={MEETING_MESSAGE_TEXTS.hour} value={meetingMessages.hour ? "פעיל" : "כבוי"} />
             {admin
               ? MESSAGE_CHANNELS.map((channel) => {
                   const cap = caps[channel];

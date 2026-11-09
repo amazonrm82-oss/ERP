@@ -53,8 +53,8 @@ import { getSupabaseEnv } from "@/lib/env";
  *     public.calendar_feed_events() only;
  *   - the booking page and the customer's booking link
  *     (src/features/booking/public-server.ts): public.booking_page_public(),
- *     booking_submit(), booking_manage_public(), booking_manage_cancel() and
- *     booking_manage_change() only;
+ *     booking_submit(), booking_manage_public(), booking_manage_cancel(),
+ *     booking_manage_change() and (CAL-12, owner (177) ב) booking_manage_confirm() only;
  *   - the customer's quote page and its accept/decline
  *     (src/features/quotes/public-server.ts): public.quote_public(),
  *     quote_public_decide() and quote_public_version() only;

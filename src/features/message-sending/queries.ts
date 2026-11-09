@@ -43,3 +43,19 @@ export async function getMessageUsage(orgId: string): Promise<MessageUsage> {
   const supabase = await createClient();
   return parseMessageUsage(must(await supabase.rpc("message_usage", { p_org: orgId }), "message usage"));
 }
+
+export type MeetingMessages = { confirm: boolean; day: boolean; hour: boolean };
+
+/** CAL-12: the business's meeting messages to the customer (no row = all off). */
+export const getMeetingMessages = cache(async (orgId: string): Promise<MeetingMessages> => {
+  const supabase = await createClient();
+  const row = must(
+    await supabase
+      .from("org_message_settings")
+      .select("meeting_confirm, meeting_remind_day, meeting_remind_hour")
+      .eq("organization_id", orgId)
+      .maybeSingle(),
+    "meeting messages",
+  );
+  return { confirm: row?.meeting_confirm ?? false, day: row?.meeting_remind_day ?? false, hour: row?.meeting_remind_hour ?? false };
+});

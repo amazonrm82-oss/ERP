@@ -153,8 +153,8 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
               { href: paths.settingsPlan(orgId), label: "חבילה ושימוש", description: "החבילה, ימי הניסיון והשימוש מול כל מכסה", icon: ChartIcon },
               // HEB-09
               { href: sendingPauseSettingsPath(orgId), label: "עצירת שליחה ללקוחות", description: "ביום אבל או בחירום: עוצרים בלחיצה אחת כל שליחה אוטומטית ללקוחות", icon: BellIcon },
-              // MSG-05/MSG-06: everyone reads the hours; owners and admins change them and see the usage
-              { href: messageSendingSettingsPath(orgId), label: "שעות ותקרות שליחה", description: "באילו שעות יוצאות הודעות ללקוחות, וכמה הודעות שיווק בחודש", icon: BellIcon },
+              // MSG-05/MSG-06: everyone reads the hours; owners and admins change them and see the usage; CAL-12: meeting messages
+              { href: messageSendingSettingsPath(orgId), label: "שעות ותקרות שליחה", description: "באילו שעות יוצאות הודעות ללקוחות, כמה הודעות שיווק בחודש, ואישור ותזכורות פגישה ללקוח", icon: BellIcon },
               { href: paths.settingsSetupChecklist(orgId), label: "רשימת הקמה", description: "מה כבר מוכן בעסק, ונתוני דוגמה", icon: CheckSquareIcon },
             ]
           : []),

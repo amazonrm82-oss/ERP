@@ -31,6 +31,10 @@ export const MESSAGE_MERGE_FIELDS = {
   // PKG-03 (owner (127) ב, 4 November 2026; migration punch_card_notice_messages): a punch card notice
   cardName: { token: "{שם הכרטיסייה}", label: "שם הכרטיסייה, בהודעת כרטיסייה" },
   entriesLeft: { token: "{כניסות}", label: "הכניסות שנשארו, כמשפט (\"נשארו 3 כניסות\"), בהודעת כרטיסייה" },
+  // CAL-12 (owner (177), (182); migration meeting_customer_reminders): the meeting's location, and the customer's personal
+  // link (confirm, cancel or change), in a meeting message
+  meetingLocation: { token: "{מיקום}", label: "המיקום של הפגישה, בהודעה על פגישה" },
+  manageLink: { token: "{קישור}", label: "הקישור האישי של הלקוח לאישור, ביטול או שינוי של הפגישה" },
 } as const;
 
 export type MergeFieldKey = keyof typeof MESSAGE_MERGE_FIELDS;
@@ -60,12 +64,29 @@ export function unknownMergeFields(text: string): string[] {
   return [...found];
 }
 
+// CAL-12 (owner (182)): an optional part, "{, ב-{מיקום}}": a field with a short text before and after it inside one more
+// pair of braces. No ":" or "|" (a HEB-01 gender block always holds ":"), at most 20 characters each side.
+export const OPTIONAL_PART_PATTERN = /\{([^{}:|\n]{0,20})\{([^{}:|\n]{1,30})\}([^{}:|\n]{0,20})\}/g;
+
+/**
+ * Fills the optional parts: with the field's value, the part with its text around it; with the field given but empty,
+ * nothing; with the field not given at all (a preview), the part as written.
+ */
+export function fillOptionalParts(text: string, values: MergeValues): string {
+  return text.replace(OPTIONAL_PART_PATTERN, (token, before: string, name: string, after: string) => {
+    const key = NAME_TO_KEY.get(name);
+    if (!key || !(key in values)) return token;
+    const value = values[key]?.trim();
+    return value ? `${before}${value}${after}` : "";
+  });
+}
+
 /**
  * Picks each gender block's wording (HEB-01: by values.gender, neutral when it is not male or female), then replaces
  * every merge field that has a value. A field without a value stays as it is, so the reader sees what a sender fills.
  */
 export function fillMessage(text: string, values: MergeValues): string {
-  return pickVariants(text, values.gender).replace(MERGE_FIELD_PATTERN, (token, name: string) => {
+  return pickVariants(fillOptionalParts(text, values), values.gender).replace(MERGE_FIELD_PATTERN, (token, name: string) => {
     const key = NAME_TO_KEY.get(name);
     const value = key ? values[key]?.trim() : undefined;
     return value ? value : token;

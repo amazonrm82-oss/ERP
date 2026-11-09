@@ -201,3 +201,8 @@ export function bookingIcs(confirmation: BookingConfirmation, business: string, 
     ],
   });
 }
+
+/** CAL-12: has the meeting started (the customer's confirm is offered only before it)? */
+export function meetingStarted(startsAt: string, now: number = Date.now()): boolean {
+  return Date.parse(startsAt) <= now;
+}

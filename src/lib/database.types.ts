@@ -356,6 +356,8 @@ export type MeetingRow = {
   buffer_after_minutes: number;
   // GAP-07: blocked time (set on insert only): no record, type, series, reminder or buffers; planned or cancelled only
   is_block: boolean;
+  // CAL-12: server only; when a signed-in person last inserted, moved or changed the status of the meeting
+  person_scheduled_at: string | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;
@@ -901,6 +903,10 @@ export type OrgMessageSettingsRow = {
   monthly_cap_email: number | null;
   monthly_cap_sms: number | null;
   monthly_cap_whatsapp: number | null;
+  // CAL-12: the meeting messages to the customer, all off by default (a confirmation, 24 hours and an hour before)
+  meeting_confirm: boolean;
+  meeting_remind_day: boolean;
+  meeting_remind_hour: boolean;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
@@ -1141,8 +1147,10 @@ export type MessageTemplateRow = {
   body: string;
   locale: string;
   is_active: boolean;
-  // PKG-03: server only; marks the two seeded templates the punch card alert job sends from
+  // PKG-03: server only; marks the seeded templates the punch card alert job (and CAL-12's meeting messages) send from
   notice_kind: string | null;
+  // CAL-12 (owner (182)): server only; the default wording version the template was seeded with, null once a person edits it
+  wording_version: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -3530,6 +3538,9 @@ export type Database = {
           monthly_cap_email?: number | null;
           monthly_cap_sms?: number | null;
           monthly_cap_whatsapp?: number | null;
+          meeting_confirm?: boolean;
+          meeting_remind_day?: boolean;
+          meeting_remind_hour?: boolean;
         },
         {
           window_from?: string;
@@ -3538,6 +3549,9 @@ export type Database = {
           monthly_cap_email?: number | null;
           monthly_cap_sms?: number | null;
           monthly_cap_whatsapp?: number | null;
+          meeting_confirm?: boolean;
+          meeting_remind_day?: boolean;
+          meeting_remind_hour?: boolean;
         }
       >;
       // PKG-03: column grants (the two numbers); no delete
@@ -4243,6 +4257,10 @@ export type Database = {
       // CAL-10b: the customer's personal link (cancel or change); all service_role only
       booking_manage_public: { Args: { p_token: string; p_from?: string | null; p_ip_hash?: string | null }; Returns: Json };
       booking_manage_cancel: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
+      // CAL-12 (owner (177) ב): the customer confirms the meeting through the personal link
+      booking_manage_confirm: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
+      // CAL-12: the personal link a meeting message carries, for the holder of the job's lease (no caller yet)
+      meeting_reminder_link: { Args: { p_job: string; p_lease: string }; Returns: Json };
       booking_manage_change: { Args: { p_token: string; p_starts_at: string; p_ip_hash?: string | null }; Returns: Json };
       // GAP-01: a test notification to the caller; { ok: true } | { ok: false, reason: "rate", retry_seconds }
       send_test_notification: { Args: { p_org: string }; Returns: Json };

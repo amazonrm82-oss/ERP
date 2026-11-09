@@ -5,9 +5,9 @@ import { cache } from "react";
 
 import { buttonClasses } from "@/components/ui/button";
 import { BackIcon, ForwardIcon } from "@/components/ui/icons";
-import { BookingManageCancel, BookingManageChange } from "@/features/booking/components/booking-manage-actions";
+import { BookingManageCancel, BookingManageChange, BookingManageConfirm } from "@/features/booking/components/booking-manage-actions";
 import { bookingManagePath } from "@/features/booking/paths";
-import { addDays, fromParam, localDate, slotsByDay } from "@/features/booking/public";
+import { addDays, fromParam, localDate, meetingStarted, slotsByDay } from "@/features/booking/public";
 import { getBookingManage } from "@/features/booking/public-server";
 import { clientIp } from "@/lib/keyed-ip-hash";
 import { BrandScope } from "@/features/branding/components/brand-scope";
@@ -110,6 +110,12 @@ export default async function BookingManagePage({ params, searchParams }: Props)
           ) : null}
           {page.status === "past" ? <p className="mt-3 text-md text-ink-soft">הפגישה כבר התקיימה או שהסתיימה.</p> : null}
         </div>
+
+        {page.status === "planned" && !meetingStarted(page.startsAt) ? (
+          <div className="mt-6">
+            <BookingManageConfirm token={token} />
+          </div>
+        ) : null}
 
         {page.status === "planned" && !page.canCancel ? (
           <div className="mt-6 space-y-1">

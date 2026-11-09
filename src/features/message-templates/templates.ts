@@ -159,3 +159,55 @@ export const DEFAULT_PUNCH_CARD_TEMPLATES: ReadonlyArray<{
     noticeKind: "punch_card_expiry",
   },
 ];
+
+// CAL-12 (owner 9 November 2026, answer (182)): the meeting messages to the customer, SMS and email of each (server-only
+// mark notice_kind), seeded by app.seed_meeting_customer_templates with the wording version below;
+// tests/unit/meeting-customer-messages.test.ts keeps the two equal. DRAFT wording until the lawyer edits it. "{, ב-{מיקום}}"
+// is an optional part (fillOptionalParts): shown only when the meeting has a location.
+export const MEETING_MESSAGE_WORDING_VERSION = "meeting-draft-1";
+
+export type MeetingNoticeKind = "meeting_confirm" | "meeting_moved" | "meeting_day" | "meeting_hour";
+
+const CONFIRM_BODY = "שלום {שם פרטי}, נקבעה לך פגישה עם {שם העסק} ב-{תאריך} בשעה {שעה}{, ב-{מיקום}}. לאישור, ביטול או שינוי: {קישור}. {שם העסק}, {טלפון העסק}";
+const DAY_BODY = "תזכורת: מחר, {תאריך} בשעה {שעה}, פגישה עם {שם העסק}{ ב-{מיקום}}. לאישור, ביטול או שינוי: {קישור}. {שם העסק}, {טלפון העסק}";
+const HOUR_BODY = "הפגישה שלך עם {שם העסק} מתחילה בשעה {שעה}{, ב-{מיקום}}. {שם העסק}, {טלפון העסק}";
+const MOVED_BODY = "הפגישה שלך עם {שם העסק} עברה ל-{תאריך} בשעה {שעה}{, ב-{מיקום}}. לאישור, ביטול או שינוי: {קישור}. {שם העסק}, {טלפון העסק}";
+
+export const DEFAULT_MEETING_CUSTOMER_TEMPLATES: ReadonlyArray<{
+  name: string;
+  channel: MessageChannel;
+  messageType: MessageType;
+  subject: string | null;
+  body: string;
+  noticeKind: MeetingNoticeKind;
+}> = [
+  { name: "פגישה: אישור (SMS)", channel: "sms", messageType: "meeting_reminder", subject: null, body: CONFIRM_BODY, noticeKind: "meeting_confirm" },
+  { name: "פגישה: אישור (אימייל)", channel: "email", messageType: "meeting_reminder", subject: "נקבעה לך פגישה עם {שם העסק}", body: CONFIRM_BODY, noticeKind: "meeting_confirm" },
+  { name: "פגישה: תזכורת יום לפני (SMS)", channel: "sms", messageType: "meeting_reminder", subject: null, body: DAY_BODY, noticeKind: "meeting_day" },
+  {
+    name: "פגישה: תזכורת יום לפני (אימייל)",
+    channel: "email",
+    messageType: "meeting_reminder",
+    subject: "תזכורת: פגישה מחר עם {שם העסק}",
+    body: DAY_BODY,
+    noticeKind: "meeting_day",
+  },
+  { name: "פגישה: תזכורת שעה לפני (SMS)", channel: "sms", messageType: "meeting_reminder", subject: null, body: HOUR_BODY, noticeKind: "meeting_hour" },
+  {
+    name: "פגישה: תזכורת שעה לפני (אימייל)",
+    channel: "email",
+    messageType: "meeting_reminder",
+    subject: "הפגישה שלך עם {שם העסק} מתחילה בשעה {שעה}",
+    body: HOUR_BODY,
+    noticeKind: "meeting_hour",
+  },
+  { name: "פגישה: מועד חדש (SMS)", channel: "sms", messageType: "meeting_reminder", subject: null, body: MOVED_BODY, noticeKind: "meeting_moved" },
+  {
+    name: "פגישה: מועד חדש (אימייל)",
+    channel: "email",
+    messageType: "meeting_reminder",
+    subject: "הפגישה שלך עם {שם העסק} עברה למועד חדש",
+    body: MOVED_BODY,
+    noticeKind: "meeting_moved",
+  },
+];

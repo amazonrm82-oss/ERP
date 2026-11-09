@@ -188,7 +188,8 @@ describe("the personal link of a booking (CAL-10b)", () => {
         ).rows,
     );
     expect(fns).toEqual(
-      ["booking_manage_cancel", "booking_manage_change", "booking_manage_public"].map((name) => ({ name, definer: true, anon: false, authed: false, service: true })),
+      // CAL-12 (owner (177) ב) adds the customer's confirm, under the same rule
+      ["booking_manage_cancel", "booking_manage_change", "booking_manage_confirm", "booking_manage_public"].map((name) => ({ name, definer: true, anon: false, authed: false, service: true })),
     );
     // the helpers in schema app: nobody but the owner
     const helpers = await asAdmin(

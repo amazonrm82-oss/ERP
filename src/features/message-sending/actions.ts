@@ -10,7 +10,14 @@ import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { pick } from "@/lib/validation";
 
 import { messageSendingSettingsPath } from "./paths";
-import { MESSAGE_CAP_FIELD_NAMES, messageCapsSchema, SENDING_HOURS_FIELD_NAMES, sendingHoursSchema } from "./schema";
+import {
+  MEETING_MESSAGE_FIELD_NAMES,
+  meetingMessagesSchema,
+  MESSAGE_CAP_FIELD_NAMES,
+  messageCapsSchema,
+  SENDING_HOURS_FIELD_NAMES,
+  sendingHoursSchema,
+} from "./schema";
 import { MESSAGE_CHANNELS } from "./usage";
 
 const SAVE_FAILED = "לא הצלחנו לשמור. נסו שוב.";
@@ -22,6 +29,9 @@ type Values = {
   monthly_cap_email?: number | null;
   monthly_cap_sms?: number | null;
   monthly_cap_whatsapp?: number | null;
+  meeting_confirm?: boolean;
+  meeting_remind_day?: boolean;
+  meeting_remind_hour?: boolean;
 };
 
 /**
@@ -61,6 +71,13 @@ export async function saveSendingHoursAction(orgId: string, _prev: FormState, fo
 /** MSG-05: the monthly caps of marketing messages (empty = no cap of the business). */
 export async function saveMessageCapsAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
   const parsed = messageCapsSchema.safeParse(pick(formData, MESSAGE_CAP_FIELD_NAMES));
+  if (!parsed.success) return invalid(parsed.error, formData);
+  return saveSettings(orgId, parsed.data, formData);
+}
+
+/** CAL-12: which meeting messages go to the customer (a confirmation, 24 hours and an hour before). */
+export async function saveMeetingMessagesAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const parsed = meetingMessagesSchema.safeParse(pick(formData, MEETING_MESSAGE_FIELD_NAMES));
   if (!parsed.success) return invalid(parsed.error, formData);
   return saveSettings(orgId, parsed.data, formData);
 }

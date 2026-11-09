@@ -12,7 +12,7 @@ import { bookingManageSubmitPath } from "../paths";
 import { confirmationFrom, type BookingConfirmation } from "../public";
 import { Booked } from "./public-booking-form";
 
-type Reply = { ok: true; cancelled?: true; confirmation?: unknown } | { ok: false; message: string; slotTaken?: boolean; tooLate?: boolean };
+type Reply = { ok: true; cancelled?: true; confirmed?: true; confirmation?: unknown } | { ok: false; message: string; slotTaken?: boolean; tooLate?: boolean };
 
 const OFFLINE = "אין חיבור לשרת כרגע. בדקו את החיבור לאינטרנט ונסו שוב.";
 
@@ -23,6 +23,38 @@ async function post(token: string, body: Record<string, unknown>): Promise<Reply
   } catch {
     return { ok: false, message: OFFLINE };
   }
+}
+
+/** CAL-12 (owner (177) ב): the customer confirms the meeting through the personal link. */
+export function BookingManageConfirm({ token }: { token: string }) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  async function confirm() {
+    setPending(true);
+    setError(null);
+    const reply = await post(token, { action: "confirm" });
+    setPending(false);
+    if (reply.ok) setDone(true);
+    else setError(reply.message);
+  }
+
+  if (done) {
+    return (
+      <p role="status" className="text-md font-medium text-success">
+        תודה, אישרת את הפגישה.
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      <FormError message={error} />
+      <Button className="w-full" onClick={confirm} loading={pending} disabled={pending}>
+        אישור הפגישה
+      </Button>
+    </div>
+  );
 }
 
 /** CAL-10b: cancels the meeting through the personal link, after asking; the page then shows it cancelled. */

@@ -81,6 +81,10 @@ const RERUN = [
   migrationFile("_recipient_erase_pdfs_delete.sql"),
   // PKG-06 (168) ב redefines app.merge_punch_recipients() of _punch_recipient_names.sql last (the holding after a merge)
   migrationFile("_recipient_merge_holding.sql"),
+  // CAL-12 redefines app.job_payload_ok() of _background_jobs.sql, app.message_merge_fields() /
+  // app.message_type_fields() of _punch_card_notice_messages.sql and app.seed_punch_card_message_templates() of
+  // _punch_card_alert_answers.sql last (the meeting's id and location; the punch card seed reads its own marks only)
+  migrationFile("_meeting_customer_reminders.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its
