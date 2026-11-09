@@ -278,7 +278,8 @@ and build this CRM here instead. The old code is preserved on the branch
    `/f/book/<token>`, route `/api/forms/booking/<token>`), which calls only `public.booking_page_public()` and
    `public.booking_submit()`; it is in the service-key allow-list of `eslint.config.mjs`. Since CAL-10b (owner 15 October 2026) the same
    file serves the customer's personal link (page `/f/book/manage/<token>`, route `/api/forms/booking/manage/<token>`), which calls only
-   `public.booking_manage_public()`, `booking_manage_cancel()` and `booking_manage_change()`.
+   `public.booking_manage_public()`, `booking_manage_cancel()`, `booking_manage_change()` and, since CAL-12 (migration 021196),
+   `booking_manage_confirm()` (the customer's one-click confirmation; same token lookup, page lock and sender limit as cancel).
    In use (QUO-08 part one, owner 8 October 2026, migration 020290): the customer's quote page (`src/features/quotes/public-server.ts`,
    page `/f/quote/<token>`), which calls only `public.quote_public()`; in the eslint allow-list.
    In use (QUO-08 rest, owner 1 November 2026, migration 021117): the decide route now calls `public.quote_public_answer()` (the
@@ -565,6 +566,23 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   holds back `meeting_scheduled`). The sender is the server's keyed IP hash scoped per page by `app.booking_sender`; views, bookings,
   cancels and changes share the page's limits. `app.booking_slots` takes `p_ignore_meeting` (old signature retired).
   Follow-ups: CAL-12 (team pages), token rotation, `meeting_cancelled` for a person's own cancel.
+- Meeting messages to the customer (CAL-12, migration 021196; owner (177)-(182), 9 November 2026; five independent reviews):
+  `org_message_settings.meeting_confirm|meeting_remind_day|meeting_remind_hour` (all off for a new business; plan key
+  `meeting_reminders`, the plans of `lead_distribution`; trigger `org_message_settings_meeting_key`, hint `feature:meeting_reminders`).
+  Jobs are `message.send` of service type `meeting_reminder` with `meeting_id` and `event_at` (`app.job_payload_ok`, last redefined
+  there), from DRAFT templates with `message_templates.notice_kind` meeting_confirm|meeting_moved|meeting_day|meeting_hour and server-only
+  `wording_version` (cleared by a person's edit), seeded on first switch-on; `{מיקום}` and `{קישור}` joined `app.message_merge_fields()`
+  and the meeting_reminder list of `app.message_type_fields` (both last redefined there); `fillOptionalParts` fills `{, ב-{מיקום}}`.
+  Confirmation on insert / planned again, "moved" on a person's start change (first meeting of a series only); day reminder 24h-23h,
+  hour reminder 60-15 minutes before, by pg_cron `crm-meeting-customer-reminders`. Trust: a meeting with `created_by`, or server-only
+  `meetings.person_scheduled_at` (stamped only by an `authenticated` insert or start/status change), or carried from a person-made
+  meeting through `booking_manage_change` (`app.meeting_customer_carried`); a session-less meeting otherwise sends only for a known
+  customer (made by a person, imported, or contacted by a person). Caps: 200 a business day, one confirmation and (session-less) 3
+  messages per address a day, by HMAC bucket (`app.meeting_confirm_buckets`, no key = nothing). Lock order: day row, then bucket. A move,
+  cancel or delete cancels waiting jobs (`refused:meeting_changed`). `public.meeting_reminder_link(job, lease)` (service_role, lease-bound,
+  only for a template holding `{קישור}`) mints a new CAL-10b link per reminder: NO CALLER YET; the future sender re-reads the meeting by
+  `meeting_id` and sends nothing unless it is still planned, not a block, at the job's start with the job's customer, and needs its own
+  "In use" line in hard rule 5. `app.seed_punch_card_message_templates` (reads its two marks only) was last redefined there.
 - Blocked time (GAP-07, migration 020115): `meetings.is_block` (insert-only column grant); constraint `meetings_block_shape` (no record
   links, business type, series, reminder or buffers; planned or cancelled only). Booking slots, `meeting_busy` and the calendar feed treat
   blocks as busy unchanged; `public.report_meetings` (last redefined in 020115), My day and tomorrow's reminders leave them out. App:
