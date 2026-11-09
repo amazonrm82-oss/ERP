@@ -17,6 +17,8 @@ import type { NamedPriceList } from "@/features/deal-lines/pricing";
 import { DISCOUNT_KIND_LABELS, DISCOUNT_KINDS, type DiscountKind } from "@/features/deal-lines/schema";
 import { agorotInput } from "@/features/deals/recurring";
 import { BundleLineControl } from "@/features/products/components/bundle-line-control";
+import { RecipientLineControl } from "@/features/punch-cards/components/recipient-line-control";
+import type { RecipientSetup } from "@/features/punch-cards/recipient-server";
 import { BILLING_LABELS } from "@/features/products/schema";
 import { documentVatError, vatRateLabel, type DocumentVat } from "@/features/tax/rates";
 import type { FormState } from "@/lib/action-result";
@@ -52,6 +54,8 @@ type Props = {
   features: { products: boolean; discounts: boolean };
   // HEB-03: the business's calendar and today, for the validity shortcuts (null = no shortcuts)
   validity?: ValidityCalendar | null;
+  // PKG-06: the punch card lines' service recipients
+  recipients?: RecipientSetup;
 };
 
 function percentInput(bp: number | null): string {
@@ -71,7 +75,7 @@ function lineDiscountText(line: QuoteLine): string | null {
  * worked out live by the one totals rule while the discount or the VAT choice is being changed. Every
  * change is saved to the draft; nothing is sent to the customer here.
  */
-export function QuoteEditor({ orgId, quote, lines: savedLines, archivedProducts = [], pricing, chargesVat, canEdit, features, validity = null }: Props) {
+export function QuoteEditor({ orgId, quote, lines: savedLines, archivedProducts = [], pricing, chargesVat, canEdit, features, validity = null, recipients }: Props) {
   // the order shown while a move is saved; the server's lines replace it when the page refreshes
   const [lines, setLines] = useState(savedLines);
   const [shown, setShown] = useState(savedLines);
@@ -293,6 +297,16 @@ export function QuoteEditor({ orgId, quote, lines: savedLines, archivedProducts 
                           parts={line.bundleParts}
                           lineQuantity={line.quantity}
                           edit={canEdit ? { orgId, kind: "quote", parentId: quote.id, lineId: line.id } : null}
+                        />
+                      ) : null}
+                      {recipients?.lines[line.id] ? (
+                        <RecipientLineControl
+                          orgId={orgId}
+                          kind="quote"
+                          docId={quote.id}
+                          lineId={line.id}
+                          recipient={recipients.lines[line.id]}
+                          edit={canEdit ? recipients.edit : null}
                         />
                       ) : null}
                     </div>

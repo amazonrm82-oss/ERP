@@ -1,7 +1,7 @@
 import "server-only";
 
 import { FILES_BUCKET } from "@/features/files/types";
-import { cardForExport } from "@/features/punch-cards/export";
+import { cardForExport, paidCardForExport } from "@/features/punch-cards/export";
 import { getUserNames } from "@/features/shell/queries";
 import { readAllPages } from "@/lib/paged-read";
 import { createClient } from "@/lib/supabase/server";
@@ -183,6 +183,10 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
   });
   // a card the person holds now and held before too (A to B to A) is listed once, as theirs now
   const formerPunchCards = heldBefore.filter((card) => !ownCards.some((own) => own.id === card.id)).map((card) => cardForExport(card, cardUses, contactIds, timeZone));
+  // PKG-06: the cards the person paid for that another contact (the service recipient) holds: the purchase only
+  const paidPunchCards = (await readByIds(supabase, orgId, "punch_cards", "*", "payer_contact_id", contactIds))
+    .filter((card) => !ownCards.some((own) => own.id === card.id))
+    .map(paidCardForExport);
   // COL-05: the "do not sell" holds set on the person's contacts
   const customerHolds = await readByIds(supabase, orgId, "customer_holds", "*", "contact_id", contactIds);
   // and their files (the copy of the paper that was issued), listed and stored like the records' files
@@ -264,6 +268,7 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     punch_cards: punchCards,
     punch_card_uses: punchCardUses,
     punch_cards_held_before: formerPunchCards,
+    punch_cards_paid: paidPunchCards,
     customer_holds: customerHolds,
     order_decisions: orderDecisions,
     accounting_documents: accountingDocuments,

@@ -4,17 +4,18 @@ import { useActionState } from "react";
 
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { FormError, FormNotice } from "@/components/ui/feedback";
-import { Checkbox, TextField } from "@/components/ui/field";
+import { Checkbox, SelectField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 
 import { savePunchAlertSettingsAction } from "../alert-actions";
 import { PUNCH_EXPIRY_DAYS_MAX, PUNCH_LOW_ENTRIES_MAX } from "../alerts";
+import { NOTICES_TO, NOTICES_TO_LABELS, type NoticesTo } from "../recipients";
 
-type Props = { orgId: string; lowEntries: number; expiryDays: number; customerMessages: boolean };
+type Props = { orgId: string; lowEntries: number; expiryDays: number; customerMessages: boolean; noticesTo: NoticesTo };
 
 /** PKG-03: when a punch card alerts its rep. Owners and admins of a writable business. */
-export function PunchAlertSettingsForm({ orgId, lowEntries, expiryDays, customerMessages }: Props) {
+export function PunchAlertSettingsForm({ orgId, lowEntries, expiryDays, customerMessages, noticesTo }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(savePunchAlertSettingsAction.bind(null, orgId), null);
   const failure = state && !state.ok ? state : null;
   const errors = failure?.fieldErrors ?? {};
@@ -58,6 +59,20 @@ export function PunchAlertSettingsForm({ orgId, lowEntries, expiryDays, customer
             defaultChecked={failure?.values ? failure.values.customer_messages === "on" : customerMessages}
             hint={'הודעת שירות מהתבניות "כרטיסייה: נשארו מעט כניסות" ו"כרטיסייה: התוקף מתקרב": בערוץ המועדף של איש הקשר, ואם אין, ב-SMS, ב-WhatsApp או באימייל.'}
           />
+          <SelectField
+            label="כשהמשלם ומקבל השירות שונים, ההודעה ללקוח נשלחת"
+            name="notices_to"
+            className="max-w-md"
+            defaultValue={failure?.values?.notices_to ?? noticesTo}
+            hint="למשל הורה שמשלם על כרטיסייה של ילד. מקבל שירות בלי טלפון או אימייל: ההודעה נשלחת רק למשלם."
+            error={errors.notices_to}
+          >
+            {NOTICES_TO.map((option) => (
+              <option key={option} value={option}>
+                {NOTICES_TO_LABELS[option]}
+              </option>
+            ))}
+          </SelectField>
           <FormError message={failure?.message} />
           <FormNotice message={state?.ok ? state.message : null} />
           <SubmitButton>שמירה</SubmitButton>

@@ -67,6 +67,9 @@ const RERUN = [
   // PKG-03 (138)-(141) redefines app.seed_punch_card_message_templates() and app.send_punch_card_alerts() of
   // _punch_card_notice_messages.sql last
   migrationFile("_punch_card_alert_answers.sql"),
+  // PKG-06 redefines app.sample_untouched(), app.import_record_worked(), app.send_punch_card_alerts() and the others of
+  // the files above last (the service recipient)
+  migrationFile("_punch_card_recipients.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

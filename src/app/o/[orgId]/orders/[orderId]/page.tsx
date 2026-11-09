@@ -28,6 +28,8 @@ import { getOrgTerms } from "@/features/terminology/queries";
 import { quotePath } from "@/features/quotes/paths";
 import { priceSourceText } from "@/features/deal-lines/schema";
 import { BundleLineControl } from "@/features/products/components/bundle-line-control";
+import { RecipientLineControl } from "@/features/punch-cards/components/recipient-line-control";
+import { getRecipientSetup } from "@/features/punch-cards/recipient-server";
 import { orgHasFeature } from "@/features/settings/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
 import { must } from "@/lib/db-read";
@@ -79,6 +81,8 @@ export default async function OrderPage({ params }: Props) {
   const parentRow = parent ? must(parent, "order parent") : null;
   const mayEdit = parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
   const editing = orderEditing(order.status);
+  // PKG-06: the service recipient of each punch card line (the choices while the draft is editable)
+  const recipients = await getRecipientSetup(orgId, "order", order.id, { contactId: order.contactId, companyId: order.companyId }, lines, mayEdit && editing.lines);
   // a draft's new lines are priced like deal lines (PL-03): the order's day, VAT mode and the customer's price list
   const [pricing, hasProducts, hasDiscounts] =
     mayEdit && editing.lines
@@ -291,6 +295,16 @@ export default async function OrderPage({ params }: Props) {
                             parts={line.bundleParts}
                             lineQuantity={line.quantity}
                             edit={mayEdit && editing.lines ? { orgId, kind: "order", parentId: order.id, lineId: line.id } : null}
+                          />
+                        ) : null}
+                        {recipients.lines[line.id] ? (
+                          <RecipientLineControl
+                            orgId={orgId}
+                            kind="order"
+                            docId={order.id}
+                            lineId={line.id}
+                            recipient={recipients.lines[line.id]}
+                            edit={mayEdit && editing.lines ? recipients.edit : null}
                           />
                         ) : null}
                       </div>

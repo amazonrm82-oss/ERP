@@ -64,4 +64,11 @@ describe("punch cards in a person's export", () => {
     expect(out.cancel_reason).toBe("נכתב בזמן של B");
     expect((out.uses as { id: string }[]).map((u) => u.id)).toEqual(["u2"]);
   });
+
+  // PKG-06 (review finding 5): the holder's export never carries who paid (another person's ids)
+  it("drops the payer's ids from a card someone else paid for", () => {
+    const out = cardForExport({ ...card, payer_contact_id: "parent", payer_company_id: "company" }, uses, [A], "Asia/Jerusalem");
+    expect(out).not.toHaveProperty("payer_contact_id");
+    expect(out).not.toHaveProperty("payer_company_id");
+  });
 });

@@ -23,6 +23,7 @@ import { listMembers } from "@/features/settings/queries";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { QuoteEditor } from "@/features/quotes/components/quote-editor";
+import { getRecipientSetup } from "@/features/punch-cards/recipient-server";
 import { QuoteTemplateTools } from "@/features/quotes/components/quote-template-tools";
 import { detachedQuotesPath, quoteDocumentPath, quotePath } from "@/features/quotes/paths";
 import { listQuoteTemplates } from "@/features/quotes/template-server";
@@ -116,6 +117,8 @@ export default async function QuotePage({ params, searchParams }: Props) {
   // QUO-12 (owner, 19 October 2026): lines whose product left the catalog stay as they are, marked on this screen only
   const archivedProducts = await listArchivedLineProducts(orgId, lines);
   const canEdit = quote.status === "draft" && parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
+  // PKG-06: the service recipient of each punch card line (the choices while the draft is editable)
+  const recipients = await getRecipientSetup(orgId, "quote", quote.id, { contactId: quote.contactId, companyId: quote.companyId }, lines, canEdit);
   // QUO-08: the customer's link of a sent quote, for those who may edit its deal or contact (the database decides)
   const linkStatus =
     quote.status !== "draft" && parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id)
@@ -540,6 +543,7 @@ export default async function QuotePage({ params, searchParams }: Props) {
         canEdit={canEdit}
         features={{ products: hasProducts, discounts: hasDiscounts }}
         validity={validity}
+        recipients={recipients}
       />
       {/* GAP-09: the payment schedule, shown on the document and the customer's page too */}
       <div className="mt-5">

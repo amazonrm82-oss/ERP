@@ -879,6 +879,8 @@ export type PunchCardAlertSettingsRow = {
   expiry_days: number;
   // PKG-03 (owner (127)-(129)): the customer's service message beside the rep's alert; off by default
   customer_messages: boolean;
+  // PKG-06 (151): both = the service recipient and the payer; payer = the payer only
+  notices_to: string;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
@@ -2154,6 +2156,8 @@ export type OrderLineRow = {
   // PRD-09: single | itemised on a bundle line (null on any other line); the bundle's parts when the line was added
   bundle_display: string | null;
   bundle_items: Json | null;
+  // PKG-06: the service recipient of a punch card line (null = the payer)
+  recipient_contact_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -2170,6 +2174,7 @@ type OrderLineWrite = {
   price_source?: string;
   price_list_id?: string | null;
   bundle_display?: string | null;
+  recipient_contact_id?: string | null;
 };
 
 // GAP-09: a step of a quote's payment schedule (migration quote_payment_schedule). A date or a milestone at least;
@@ -2574,6 +2579,9 @@ export type PunchCardRow = {
   holder_history: Json;
   // the quick-sale deal line it was opened from
   deal_line_id: string | null;
+  // PKG-06: server only: who paid, when the holder is a line's service recipient other than the payer
+  payer_contact_id: string | null;
+  payer_company_id: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -2648,6 +2656,8 @@ export type QuoteLineRow = {
   // PRD-09: single | itemised on a bundle line (null on any other line); the bundle's parts when the line was added
   bundle_display: string | null;
   bundle_items: Json | null;
+  // PKG-06: the service recipient of a punch card line (null = the payer)
+  recipient_contact_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -2683,6 +2693,7 @@ type QuoteLineWrite = {
   price_list_id?: string | null;
   currency?: string;
   bundle_display?: string | null;
+  recipient_contact_id?: string | null;
 };
 
 // DLI-01: a product line on a deal (migration deal_lines). total_agorot, price_includes_vat (one mode per deal),
@@ -3487,8 +3498,8 @@ export type Database = {
       // PKG-03: column grants (the two numbers); no delete
       punch_card_alert_settings: Table<
         PunchCardAlertSettingsRow,
-        { organization_id: string; low_entries?: number; expiry_days?: number; customer_messages?: boolean },
-        { low_entries?: number; expiry_days?: number; customer_messages?: boolean }
+        { organization_id: string; low_entries?: number; expiry_days?: number; customer_messages?: boolean; notices_to?: string },
+        { low_entries?: number; expiry_days?: number; customer_messages?: boolean; notices_to?: string }
       >;
       // HEB-09: column grants (paused, reason); the stamps are the server's; no delete
       org_sending_pauses: Table<
@@ -4316,6 +4327,8 @@ export type Database = {
       punch_card_transfer: { Args: { p_org: string; p_card: string; p_contact: string }; Returns: undefined };
       punch_card_open_for_sale: { Args: { p_org: string; p_deal: string }; Returns: Json };
       punch_card_use_return: { Args: { p_org: string; p_use: string; p_reason: string }; Returns: undefined };
+      // PKG-06: who may be the service recipient of a draft's punch card lines
+      punch_card_recipient_options: { Args: { p_org: string; p_kind: string; p_doc: string }; Returns: Array<{ contact_id: string; name: string; how: string }> };
       // GAP-10: an empty draft that adds to an accepted quote
       quote_new_addendum: { Args: { p_org: string; p_quote: string }; Returns: string };
       // ORD-01 / ORD-03: confirm a manual draft ({number}); make a numbered order from an accepted quote or a won deal (its id)

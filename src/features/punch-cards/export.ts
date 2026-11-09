@@ -42,6 +42,17 @@ function shown(spans: readonly Holding[], timeZone: string) {
   return spans.map((s) => ({ from: zoneDate(s.from, timeZone), until: s.until ? zoneDate(s.until, timeZone) : null }));
 }
 
+// PKG-06: what a payer's export carries of a card another contact (the service recipient) holds: the purchase, never the
+// holder, its history or its use
+const PAID_FIELDS = ["id", "name", "product_id", "entries_total", "status", "payment_id", "price_agorot", "currency", "order_line_id", "quote_line_id", "unit_no", "activated_at", "expires_on", "cancelled_at", "payer_contact_id", "payer_company_id", "created_at"] as const;
+
+/** A card the person paid for and someone else holds, as their export carries it. */
+export function paidCardForExport(card: Row): Row {
+  const copy: Row = {};
+  for (const field of PAID_FIELDS) if (field in card) copy[field] = card[field];
+  return copy;
+}
+
 /** A card, as the person's export carries it (their current card or one they held before). */
 export function cardForExport(card: Row, uses: Row[], contactIds: readonly string[], timeZone: string): Row {
   const spans = holdings(String(card.created_at), card.holder_history, contactIds, card.contact_id);
@@ -50,6 +61,9 @@ export function cardForExport(card: Row, uses: Row[], contactIds: readonly strin
   const copy: Row = { ...card };
   delete copy.former_contact_ids;
   delete copy.holder_history;
+  // PKG-06 (review finding 5): who paid is another person's data on the holder's card
+  delete copy.payer_contact_id;
+  delete copy.payer_company_id;
   if (!fromCreation) for (const field of PURCHASE_FIELDS) delete copy[field];
   // a card held before: its current holder is someone else
   if (!(typeof card.contact_id === "string" && contactIds.includes(card.contact_id))) delete copy.contact_id;

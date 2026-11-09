@@ -92,6 +92,8 @@ export type QuoteLine = {
   // PRD-09: a bundle line's display (null on any other line) and its parts as kept when the line was added
   bundleDisplay: BundleDisplay | null;
   bundleParts: BundlePartSnapshot[];
+  // PKG-06: a punch card line's service recipient (null = the payer); read on the document's own page only
+  recipientId?: string | null;
 };
 
 const QUOTE_COLUMNS =
@@ -140,7 +142,7 @@ function toQuote(row: Pick<QuoteDbRow, keyof QuoteDbRow>): Quote {
 }
 
 const LINE_COLUMNS =
-  "id, position, kind, product_id, name, description, unit_name, quantity, unit_price_agorot, discount_bp, discount_agorot, vat_exempt, billing, is_optional, optional_selected, price_source, price_list_id, price_list_name, total_agorot, bundle_display, bundle_items";
+  "id, position, kind, product_id, name, description, unit_name, quantity, unit_price_agorot, discount_bp, discount_agorot, vat_exempt, billing, is_optional, optional_selected, price_source, price_list_id, price_list_name, total_agorot, bundle_display, bundle_items, recipient_contact_id";
 
 function toLine(row: Pick<LineDbRow, keyof LineDbRow>): QuoteLine {
   return {
@@ -165,6 +167,7 @@ function toLine(row: Pick<LineDbRow, keyof LineDbRow>): QuoteLine {
     totalAgorot: Number(row.total_agorot),
     bundleDisplay: isBundleDisplay(row.bundle_display) ? row.bundle_display : null,
     bundleParts: parseBundleItems(row.bundle_items),
+    recipientId: row.recipient_contact_id ?? null,
   };
 }
 

@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import { expiryNear, PUNCH_ALERT_DEFAULTS, type PunchAlertSettings } from "./alerts";
 import { punchBalance, refundSuggestion, type PunchBalance } from "./balance";
+import { isNoticesTo } from "./recipients";
 
 // PKG-01, PKG-02: a contact's punch cards and their entries, read with the user's session (RLS: whoever reads the contact).
 
@@ -43,13 +44,14 @@ export const getPunchAccess = cache(async (orgId: string): Promise<PunchAccess> 
 export const getPunchAlertSettings = cache(async (orgId: string): Promise<PunchAlertSettings> => {
   const supabase = await createClient();
   const row = must(
-    await supabase.from("punch_card_alert_settings").select("low_entries, expiry_days, customer_messages").eq("organization_id", orgId).maybeSingle(),
+    await supabase.from("punch_card_alert_settings").select("low_entries, expiry_days, customer_messages, notices_to").eq("organization_id", orgId).maybeSingle(),
     "punch card alert settings",
   );
   return {
     lowEntries: row?.low_entries ?? PUNCH_ALERT_DEFAULTS.lowEntries,
     expiryDays: row?.expiry_days ?? PUNCH_ALERT_DEFAULTS.expiryDays,
     customerMessages: row?.customer_messages ?? PUNCH_ALERT_DEFAULTS.customerMessages,
+    noticesTo: isNoticesTo(row?.notices_to) ? row.notices_to : PUNCH_ALERT_DEFAULTS.noticesTo,
   };
 });
 

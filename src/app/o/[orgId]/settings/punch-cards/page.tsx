@@ -51,7 +51,7 @@ export default async function PunchCardSettingsPage({ params }: Props) {
   if (editable) {
     return (
       <div className="space-y-5">
-        <PunchAlertSettingsForm orgId={orgId} lowEntries={settings.lowEntries} expiryDays={settings.expiryDays} customerMessages={settings.customerMessages} />
+        <PunchAlertSettingsForm orgId={orgId} lowEntries={settings.lowEntries} expiryDays={settings.expiryDays} customerMessages={settings.customerMessages} noticesTo={settings.noticesTo} />
         {rules}
       </div>
     );

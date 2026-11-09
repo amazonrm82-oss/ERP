@@ -739,6 +739,10 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_punch_card_alert_answers.sql",
       // CAP-11 redefines app.guard_form() of _quota_outsider_guard.sql last (the Meta Lead Ads form kind)
       "_meta_lead_ads.sql",
+      // PKG-06 redefines app.sample_untouched() and app.import_record_worked() of _punch_card_work.sql, app.punch_cards_erase()
+      // of _punch_card_uses.sql, app.send_punch_card_alerts() of _punch_card_alert_answers.sql, public.quote_duplicate() of
+      // _product_bundles.sql and app.order_lines_check() of _order_line_price_claim.sql last (the service recipient)
+      "_punch_card_recipients.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

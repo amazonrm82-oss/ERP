@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { PUNCH_LOW_ENTRIES } from "./balance";
+import { NOTICES_TO, type NoticesTo } from "./recipients";
 
 // PKG-03 (owner's answers of 4 November 2026, (130)-(132)): a punch card alerts its rep once when it has few entries left
 // and once when its last day is near. The business sets both numbers (public.punch_card_alert_settings; no row = the
@@ -9,13 +10,14 @@ import { PUNCH_LOW_ENTRIES } from "./balance";
 
 // customerMessages: PKG-03 (127)-(129), the customer's service message beside the rep's alert; off until the business turns
 // it on (the lead's choice, a question to the owner)
-export const PUNCH_ALERT_DEFAULTS = { lowEntries: PUNCH_LOW_ENTRIES, expiryDays: 14, customerMessages: false } as const;
+// noticesTo: PKG-06 (151) ג, the customer's message to the service recipient and the payer (both), or the payer only
+export const PUNCH_ALERT_DEFAULTS = { lowEntries: PUNCH_LOW_ENTRIES, expiryDays: 14, customerMessages: false, noticesTo: "both" as NoticesTo } as const;
 export const PUNCH_LOW_ENTRIES_MAX = 100;
 export const PUNCH_EXPIRY_DAYS_MAX = 365;
 
-export type PunchAlertSettings = { lowEntries: number; expiryDays: number; customerMessages: boolean };
+export type PunchAlertSettings = { lowEntries: number; expiryDays: number; customerMessages: boolean; noticesTo: NoticesTo };
 
-export const PUNCH_ALERT_FIELD_NAMES = ["low_entries", "expiry_days", "customer_messages"] as const;
+export const PUNCH_ALERT_FIELD_NAMES = ["low_entries", "expiry_days", "customer_messages", "notices_to"] as const;
 
 const wholeNumber = (missing: string, max: number, unit: string) =>
   z.preprocess(
@@ -32,6 +34,8 @@ export const punchAlertSettingsSchema = z.object({
   expiry_days: wholeNumber("יש לכתוב כמה ימים לפני סוף התוקף להתריע.", PUNCH_EXPIRY_DAYS_MAX, "ימים"),
   // a checkbox: "on" when ticked, missing otherwise
   customer_messages: z.preprocess((value) => value === "on", z.boolean()),
+  // PKG-06 (151): a form without the choice keeps the default
+  notices_to: z.preprocess((value) => (typeof value === "string" && value !== "" ? value : "both"), z.enum(NOTICES_TO, { error: "בחרו למי נשלחת ההודעה." })),
 });
 
 /** Whole days from today to a day (both YYYY-MM-DD, business calendar). */

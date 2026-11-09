@@ -81,6 +81,8 @@ export type OrderLine = {
   // PRD-09: a bundle line's display (null on any other line) and its parts as kept when the line was added
   bundleDisplay: BundleDisplay | null;
   bundleParts: BundlePartSnapshot[];
+  // PKG-06: a punch card line's service recipient (null = the payer); read on the document's own page only
+  recipientId?: string | null;
 };
 
 function toOrder(row: OrderRow): Order {
@@ -138,6 +140,7 @@ function toLine(row: OrderLineRow): OrderLine {
     totalAgorot: Number(row.total_agorot),
     bundleDisplay: isBundleDisplay(row.bundle_display) ? row.bundle_display : null,
     bundleParts: parseBundleItems(row.bundle_items),
+    recipientId: row.recipient_contact_id ?? null,
   };
 }
 

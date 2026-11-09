@@ -349,6 +349,10 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "punch_card:cancelled": "הכרטיסייה מבוטלת.",
   "punch_card:reason": "כתבו נימוק (עד 500 תווים).",
   "punch_card_use:returned": "הכניסה הזו כבר הוחזרה. רעננו את הדף.",
+  // PKG-06 (migration punch_card_recipients)
+  "punch_recipient:line": "מקבל שירות נבחר רק בשורה של כרטיסייה.",
+  "punch_recipient:contact": "אי אפשר לבחור את איש הקשר הזה כמקבל השירות. ייתכן שהוא בסל המחזור או שאין לכם גישה אליו.",
+  "punch_recipient:not_linked": "מקבל השירות צריך להיות קשור למשלם (קשר בין אנשי קשר) או עובד של החברה המשלמת. הוסיפו את הקשר ונסו שוב.",
   // DLI-01, DLI-02, PL-03 (migration deal_lines)
   "deal_lines:max": "אפשר עד 200 שורות מוצר בעסקה אחת. מחקו שורה כדי להוסיף חדשה.",
   "deal_lines:vat_mode": "הגדרת המע\"מ של השורות השתנתה בזמן שמילאתם. רעננו את הדף ונסו שוב.",
