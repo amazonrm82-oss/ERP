@@ -103,6 +103,11 @@ and build this CRM here instead. The old code is preserved on the branch
    carries a lead id only and the details are fetched from the Graph API with the page token, stored encrypted (INT-02); `meta_lead_id`
    unique per business, a repeated lead is taken once; leads that arrived during a failure are fetched by a later sweep; a fake provider
    until the owner sets the App ID and App Secret in Vercel. Its own "In use" line here once built.
+   Owner, 9 November 2026, answer (155) א (approved, not built yet): two more OPS-04 job kinds, `import.run` and `export.run`
+   (IMP-04), under answer (55)'s conditions: ids and codes only in the queue, the functions pinned by md5, an "In use" line here once
+   built; the job writes with the rights of the user who ordered it (never as an admin), so every rule of the browser import holds;
+   files in a private Storage bucket under the business's folder, kept 7 days, then removed by the nightly cleanup; downloads only
+   through a one-minute signed link, as other files; undoing a background import works as today.
    In use (CAP-11, owner 4 and 8 November 2026, answers (126) א, (143)-(148); migrations 021179-021182; four independent reviews):
    the Meta Lead Ads webhook (`src/features/meta-leads/webhook-server.ts`, route `/api/meta/leads`: GET answers only Meta's
    challenge against `META_VERIFY_TOKEN`; POST is refused before the database, without logging the body, unless its
