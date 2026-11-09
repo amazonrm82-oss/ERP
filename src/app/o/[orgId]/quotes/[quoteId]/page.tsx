@@ -38,7 +38,8 @@ import { QuoteDecisionCard } from "@/features/quotes/components/quote-decision-c
 import { SendQuoteFlow } from "@/features/quotes/components/send-quote-flow";
 import { QuotePdfButton } from "@/features/quotes/components/quote-pdf-button";
 import { ACCEPTED_REMAKE_PDF_LABEL, acceptedChoiceChanged, AS_SENT_PDF_LABEL, PDF_AS_SENT_STAFF, signedOnText } from "@/features/quotes/decision";
-import { getQuotePdfFile, getSignedQuotePdfFile, quotePdfStorable, recipientPdfRemade, recipientPdfRemakePending } from "@/features/quotes/pdf-server";
+import { wasAccepted } from "@/features/quotes/sent-state";
+import { getQuotePdfFile, getSignedQuotePdfFile, quoteHasSentState, quotePdfStorable, recipientPdfRemade, recipientPdfRemakePending } from "@/features/quotes/pdf-server";
 import { QuoteSignedPdfButton } from "@/features/quotes/components/quote-signed-pdf-button";
 import { currentNameIfChanged } from "@/features/quotes/share";
 import { QUOTE_STATUS_LABELS, VERSIONABLE_STATUSES } from "@/features/quotes/schema";
@@ -247,8 +248,13 @@ export default async function QuotePage({ params, searchParams }: Props) {
     quote.status !== "draft" && pdfFile === null && !quotePdfStorable(quote.status) ? await recipientPdfRemakePending(supabase, orgId, { quoteId: quote.id }) : false;
   // second review M1: an accepted quote's file made again after that erasure shows the accepted state when the customer's
   // choice changed the quote, and is named so (the same rule as the render, storeQuotePdf)
+  // owner (175) ג: a quote sent after 021190 is always made again from its state as sent, so its file keeps the "as sent" name
   const remadeAsAccepted =
-    quote.status === "accepted" && pdfFile !== null && acceptedChoiceChanged(decision, lines) && (await recipientPdfRemade(supabase, orgId, pdfFile.id));
+    wasAccepted(quote) &&
+    pdfFile !== null &&
+    acceptedChoiceChanged(decision, lines) &&
+    (await recipientPdfRemade(supabase, orgId, pdfFile.id)) &&
+    (await quoteHasSentState(supabase, orgId, quote.id, null)) === false;
   const canStorePdf =
     hasQuotes && (quotePdfStorable(quote.status) || pdfRemake) && parentRow !== null && parentRow.deleted_at === null && canEditRecordHint(context, parentRow.owner_id);
 

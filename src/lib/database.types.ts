@@ -4505,6 +4505,9 @@ export type Database = {
       recipient_pdf_remake_pending: { Args: { p_org: string; p_quote?: string | null; p_order?: string | null }; Returns: boolean };
       // second review M1: a stored file made again after that erasure (the staff label of an accepted quote's file)
       recipient_pdf_remade: { Args: { p_org: string; p_file: string }; Returns: boolean };
+      // owner (175) ג (021190): a quote's state as sent, for those who may have its PDF made; whether a readable quote keeps one
+      quote_sent_state: { Args: { p_org: string; p_quote: string }; Returns: Json };
+      quote_has_sent_state: { Args: { p_org: string; p_quote: string }; Returns: boolean };
       quote_pdf_store: { Args: { p_org: string; p_quote: string; p_user: string; p_size: number; p_sha256: string; p_name: string; p_path?: string | null }; Returns: Json };
       quote_public_pdf: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       // QUO-09 signed PDF: staff's right and the signature block to render (their own session); the server's write for staff

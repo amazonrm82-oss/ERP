@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { PdfDocument } from "@/features/pdf/document";
 import { loadPdfLogo } from "@/features/pdf/logo";
 import { renderPdf } from "@/features/pdf/render";
 import type { Database } from "@/lib/database.types";
@@ -15,6 +16,7 @@ import { ACCEPTED_REMAKE_SUFFIX, acceptedChoiceChanged } from "./decision";
 import { getQuoteDecision, type Quote } from "./queries";
 import { readSignature, SIGNATURE_INVALID_MESSAGE, signedQuotePdfFileName } from "./signed-pdf";
 import { renderSignedQuotePdf, writeSignedQuotePdfAsServer } from "./signed-pdf-server";
+import { linesAsSent, parseQuoteSentState, quoteAsSent, remakeRender, SENT_REMAKE_SUFFIX, wasAccepted, type QuoteSentState } from "./sent-state";
 
 type Client = SupabaseClient<Database>;
 
@@ -43,6 +45,67 @@ export async function recipientPdfRemakePending(supabase: Client, orgId: string,
 export async function recipientPdfRemade(supabase: Client, orgId: string, fileId: string): Promise<boolean> {
   const { data, error } = await supabase.rpc("recipient_pdf_remade", { p_org: orgId, p_file: fileId });
   return !error && data === true;
+}
+
+/**
+ * Owner (175) ג: the quote's state as sent (021190), with the person's own session. `state` is null for a quote sent before
+ * 021190 (or when the person may not have the quote's PDF made); a failed read, or an answer we cannot read, is `ok: false`,
+ * so a remake renders nothing rather than guess (review M1).
+ */
+export async function getQuoteSentState(
+  supabase: Client,
+  orgId: string,
+  quoteId: string,
+): Promise<{ ok: true; state: QuoteSentState | null } | { ok: false }> {
+  const { data, error } = await supabase.rpc("quote_sent_state", { p_org: orgId, p_quote: quoteId });
+  if (error) return { ok: false };
+  if (data === null || data === undefined) return { ok: true, state: null };
+  const state = parseQuoteSentState(data);
+  return state ? { ok: true, state } : { ok: false };
+}
+
+/** Owner (175) ג: does a quote the caller reads keep its state as sent (a boolean only; `onError` when it cannot be read)? */
+export async function quoteHasSentState<E extends boolean | null = false>(
+  supabase: Client,
+  orgId: string,
+  quoteId: string,
+  onError: E = false as E,
+): Promise<boolean | E> {
+  const { data, error } = await supabase.rpc("quote_has_sent_state", { p_org: orgId, p_quote: quoteId });
+  if (error || typeof data !== "boolean") return onError;
+  return data;
+}
+
+/**
+ * The document of a PDF as sent that the server makes again: from the state as sent when the quote has one (owner (175) ג),
+ * else 021187's rule (second review M1: an accepted quote whose customer's choice changed it is made again as accepted, and
+ * says so). The footer always says it was made again (owner, 26 October 2026, answer 3: the day in the business's zone).
+ */
+async function remadeQuoteDocument(
+  supabase: Client,
+  orgId: string,
+  quote: Quote,
+  org: { name: string; timezone: string | null },
+  // the recipient-erasure remake (021187) falls back to "as accepted"; the legacy remake (021015) to the quote as it is
+  acceptedFallback: boolean,
+): Promise<PdfDocument | null> {
+  const read = await getQuoteSentState(supabase, orgId, quote.id);
+  if (!read.ok) return null;
+  const sent = read.state;
+  // review M1: a quote that keeps its state as sent but whose state came back empty (a reader who may not have it, a race)
+  // is never made again by the fallback rule
+  if (!sent && (await quoteHasSentState(supabase, orgId, quote.id, null)) !== false) return null;
+  const base = await getQuoteDocumentData(orgId, sent ? quoteAsSent(quote, sent) : quote, org.name);
+  const changed =
+    acceptedFallback &&
+    !sent &&
+    wasAccepted(quote) &&
+    acceptedChoiceChanged(await getQuoteDecision(orgId, quote.id).catch(() => null), base.lines);
+  const render = remakeRender({ remake: true, hasSentState: sent !== null, acceptedChoiceChanged: changed });
+  const data = sent ? { ...base, lines: linesAsSent(base.lines, sent) } : base;
+  const suffix = render.kind === "sent" ? SENT_REMAKE_SUFFIX : render.kind === "accepted" ? ACCEPTED_REMAKE_SUFFIX : "";
+  const note = remadeNote(new Date(), org.timezone || TIME_ZONE) + suffix;
+  return quotePdfDocument(data, await loadPdfLogo(data.logoUrl), { remadeNote: note, accepted: render.kind === "accepted" });
 }
 
 /**
@@ -79,10 +142,11 @@ export async function remakeLegacyQuotePdf(supabase: Client, orgId: string, quot
   if (allowed.error || allowed.data !== true) return false;
   const org = await supabase.from("organizations").select("name, timezone").eq("id", orgId).maybeSingle();
   if (org.error || !org.data) return false;
-  const data = await getQuoteDocumentData(orgId, quote, org.data.name);
-  // owner, 26 October 2026 (answer 3): a remade file says so at its bottom, with the day in the business's zone
-  const note = remadeNote(new Date(), org.data.timezone || TIME_ZONE);
-  const bytes = await renderPdf(quotePdfDocument(data, await loadPdfLogo(data.logoUrl), { remadeNote: note }));
+  // a remade file says so at its bottom; owner (175) ג: from the state as sent when the quote has one
+  const doc = await remadeQuoteDocument(supabase, orgId, quote, org.data, false);
+  // review M1: the state as sent could not be read; the old file stays as it is
+  if (!doc) return false;
+  const bytes = await renderPdf(doc);
   const stored = await writeQuotePdfAsServer({ orgId, quoteId: quote.id, userId, bytes, name: quotePdfFileName(quote.numberDisplay, quote.title) });
   if (!stored.ok) return false;
   const now = await getQuotePdfFile(supabase, orgId, quote.id);
@@ -119,11 +183,19 @@ export async function storeQuotePdf(supabase: Client, orgId: string, quote: Quot
 
   const org = await supabase.from("organizations").select("name, timezone").eq("id", orgId).maybeSingle();
   if (org.error || !org.data) return { ok: false, message: NOT_MADE };
-  const data = await getQuoteDocumentData(orgId, quote, org.data.name);
-  // second review M1: an accepted quote whose customer's choice changed it is made again as accepted, and says so
-  const asAccepted = remake && quote.status === "accepted" && acceptedChoiceChanged(await getQuoteDecision(orgId, quote.id).catch(() => null), data.lines);
-  const note = remake ? remadeNote(new Date(), org.data.timezone || TIME_ZONE) + (asAccepted ? ACCEPTED_REMAKE_SUFFIX : "") : null;
-  const bytes = await renderPdf(quotePdfDocument(data, await loadPdfLogo(data.logoUrl), { remadeNote: note, accepted: asAccepted }));
+  // a first PDF is the live quote (still the sent state: made only while sent or viewed); a remake after a recipient's erasure
+  // renders the state as sent when the quote has one (owner (175) ג), else 021187's rule (remadeQuoteDocument)
+  let doc: PdfDocument;
+  if (remake) {
+    const remade = await remadeQuoteDocument(supabase, orgId, quote, org.data, true);
+    // review M1: the state as sent could not be read; nothing is made, so the credit is kept for the next try
+    if (!remade) return { ok: false, message: NOT_MADE };
+    doc = remade;
+  } else {
+    const data = await getQuoteDocumentData(orgId, quote, org.data.name);
+    doc = quotePdfDocument(data, await loadPdfLogo(data.logoUrl));
+  }
+  const bytes = await renderPdf(doc);
 
   const stored = await writeQuotePdfAsServer({ orgId, quoteId: quote.id, userId, bytes, name: quotePdfFileName(quote.numberDisplay, quote.title) });
   if (!stored.ok) return { ok: false, message: stored.busy ? IN_PROGRESS : stored.message };
