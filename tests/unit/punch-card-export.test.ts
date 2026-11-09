@@ -132,4 +132,95 @@ describe("punch cards in a person's export", () => {
     expect(JSON.stringify(payerView)).not.toContain("staff");
     expect(payerView).toMatchObject({ payment_id: "pay-parent", price_agorot: 40000, order_line_id: "ol-1", quote_line_id: "ql-1", payer_contact_id: "parent" });
   });
+
+  // owner (168) ב (migration 021189): a merge that folds the recipient R into the payer P rewrites R's holding entries to P,
+  // so P holds the card from its creation and its export shows the purchase as P's own; a card that came to R from another
+  // holder by a transfer keeps that holder first, so the purchase stays out (transfers unchanged)
+  it("shows the purchase to the payer once a merge made the recipient's holding the payer's own", () => {
+    const P = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    const R = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    const X = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+    const merged = {
+      id: "c2",
+      contact_id: P,
+      name: "כרטיסייה",
+      entries_total: 10,
+      created_at: "2026-10-01T08:00:00Z",
+      payment_id: "pay-P",
+      price_agorot: 40000,
+      order_line_id: "ol-P",
+      activated_at: "2026-10-01T09:00:00Z",
+      payer_contact_id: null,
+      opened_for_other_payer: false,
+      former_contact_ids: [R],
+    };
+    const mergeUse = [{ id: "u9", card_id: "c2", created_at: "2026-10-05T08:00:00Z", used_on: "2026-10-05" }];
+    // as the merge now writes it: R's entry names P
+    const own = cardForExport({ ...merged, payer_holder_id: P, holder_history: [{ contact: P, until: "2026-10-10T08:00:00Z" }] }, mergeUse, [P], "Asia/Jerusalem");
+    expect(own).toMatchObject({ payment_id: "pay-P", price_agorot: 40000, order_line_id: "ol-P" });
+    expect(own).not.toHaveProperty("opened_from");
+    // R's use, made before the merge, is P's too (the same person)
+    expect((own.uses as { id: string }[]).map((u) => u.id)).toEqual(["u9"]);
+    expect(own.held).toEqual([
+      { from: "2026-10-01", until: "2026-10-10" },
+      { from: "2026-10-10", until: null },
+    ]);
+    // the history the merge wrote before 021189 (R's entry kept): the purchase stays out, as a card that came by a merge
+    const before = cardForExport({ ...merged, holder_history: [{ contact: R, until: "2026-10-10T08:00:00Z" }] }, mergeUse, [P], "Asia/Jerusalem");
+    for (const field of PURCHASE_FIELDS) expect(before, field).not.toHaveProperty(field);
+    // owner (173) ב: a card X held first and transferred to R, then R merged into P: the merge marks P (payer_holder_id), so
+    // P gets the purchase as their own; X, who did not pay, sees it as opened from another customer's document, without it
+    const transferredCard = {
+      ...merged,
+      payer_holder_id: P,
+      opened_for_other_payer: true,
+      former_contact_ids: [X],
+      holder_history: [{ contact: X, until: "2026-10-03T08:00:00Z" }, { contact: P, until: "2026-10-10T08:00:00Z" }],
+    };
+    const payerView = cardForExport(transferredCard, mergeUse, [P], "Asia/Jerusalem");
+    expect(payerView).toMatchObject({ payment_id: "pay-P", price_agorot: 40000, order_line_id: "ol-P" });
+    expect(payerView).not.toHaveProperty("opened_from");
+    expect(payerView).not.toHaveProperty("payer_holder_id");
+    expect(JSON.stringify(payerView)).not.toContain(X);
+    const firstHolder = cardForExport(transferredCard, mergeUse, [X], "Asia/Jerusalem");
+    for (const field of PURCHASE_FIELDS) expect(firstHolder, field).not.toHaveProperty(field);
+    expect(firstHolder.opened_from).toBe(OPENED_FROM_OTHER_CUSTOMER);
+    expect(JSON.stringify(firstHolder)).not.toContain(P);
+    // P transfers it on to Y: Y never gets P's purchase; P, holding it no more, still does
+    const later = { ...transferredCard, contact_id: "y", former_contact_ids: [X, P], holder_history: [...transferredCard.holder_history, { contact: P, until: "2026-10-20T08:00:00Z" }] };
+    for (const field of PURCHASE_FIELDS) expect(cardForExport(later, [], ["y"], "Asia/Jerusalem"), field).not.toHaveProperty(field);
+    expect(cardForExport(later, [], [P], "Asia/Jerusalem")).toMatchObject({ payment_id: "pay-P" });
+  });
+
+  // second review L3 and L4
+  it("treats a card that was the payer's own from the start as ordinary for a later holder, and keeps staff fields out", () => {
+    const P = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    const X = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+    const base = {
+      id: "c3",
+      name: "כרטיסייה",
+      entries_total: 10,
+      created_at: "2026-10-01T08:00:00Z",
+      payment_id: "pay-P",
+      price_agorot: 40000,
+      activated_by: "staff",
+      created_by: "staff",
+      activated_manually: false,
+      activated_at: "2026-10-01T09:00:00Z",
+      payer_contact_id: null,
+      payer_holder_id: P,
+    };
+    // L3: the merge made it wholly P's (no mark); P transferred it to Y: Y sees an ordinary transferred card, no mark
+    const ownThenTransferred = { ...base, contact_id: "y", opened_for_other_payer: false, former_contact_ids: [P], holder_history: [{ contact: P, until: "2026-10-20T08:00:00Z" }] };
+    const y = cardForExport(ownThenTransferred, [], ["y"], "Asia/Jerusalem");
+    expect(y).not.toHaveProperty("opened_from");
+    for (const field of PURCHASE_FIELDS) expect(y, field).not.toHaveProperty(field);
+    // and P, who held it from its opening, keeps all of the purchase, staff fields included (an ordinary own card)
+    expect(cardForExport(ownThenTransferred, [], [P], "Asia/Jerusalem")).toMatchObject({ payment_id: "pay-P", activated_by: "staff", created_by: "staff" });
+    // L4: X held it first; P's purchase is P's, without who opened or activated it
+    const xFirst = { ...base, contact_id: P, opened_for_other_payer: true, former_contact_ids: [X], holder_history: [{ contact: X, until: "2026-10-03T08:00:00Z" }] };
+    const p = cardForExport(xFirst, [], [P], "Asia/Jerusalem");
+    expect(p).toMatchObject({ payment_id: "pay-P", price_agorot: 40000, activated_at: "2026-10-01T09:00:00Z" });
+    for (const field of PURCHASE_STAFF_FIELDS) expect(p, field).not.toHaveProperty(field);
+  });
 });

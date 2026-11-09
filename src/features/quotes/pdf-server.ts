@@ -11,7 +11,8 @@ import { TIME_ZONE } from "@/lib/app";
 import { getQuoteDocumentData } from "./design-server";
 import { quotePdfDocument, quotePdfFileName, remadeNote } from "./pdf";
 import { writeQuotePdfAsServer } from "./pdf-store-server";
-import type { Quote } from "./queries";
+import { ACCEPTED_REMAKE_SUFFIX, acceptedChoiceChanged } from "./decision";
+import { getQuoteDecision, type Quote } from "./queries";
 import { readSignature, SIGNATURE_INVALID_MESSAGE, signedQuotePdfFileName } from "./signed-pdf";
 import { renderSignedQuotePdf, writeSignedQuotePdfAsServer } from "./signed-pdf-server";
 
@@ -27,6 +28,21 @@ const CLOSED = "קובץ PDF נשמר רק להצעה שנשלחה ועדיין 
 /** Review L3: a PDF is made (at sending, or later) only while the quote is sent or viewed. */
 export function quotePdfStorable(status: Quote["status"]): boolean {
   return status === "sent" || status === "viewed";
+}
+
+/**
+ * PKG-06 (owner (172) ב): the next PDF of this quote or order is made again after a service recipient's erasure removed its
+ * file (asked with the person's own session; false when it cannot be read).
+ */
+export async function recipientPdfRemakePending(supabase: Client, orgId: string, doc: { quoteId?: string; orderId?: string }): Promise<boolean> {
+  const { data, error } = await supabase.rpc("recipient_pdf_remake_pending", { p_org: orgId, p_quote: doc.quoteId ?? null, p_order: doc.orderId ?? null });
+  return !error && data === true;
+}
+
+/** PKG-06 (second review M1): is this stored file a PDF made again after a service recipient's erasure (the user's session)? */
+export async function recipientPdfRemade(supabase: Client, orgId: string, fileId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("recipient_pdf_remade", { p_org: orgId, p_file: fileId });
+  return !error && data === true;
 }
 
 /**
@@ -88,18 +104,26 @@ export async function storeQuotePdf(supabase: Client, orgId: string, quote: Quot
     if (!existing.fingerprinted) await remakeLegacyQuotePdf(supabase, orgId, quote, userId).catch(() => false);
     return { ok: true, fileId: existing.id };
   }
+  // PKG-06 (owner (172) ב): the PDF as sent that a service recipient's erasure removed is made again, whatever the quote's
+  // status, with the footer of a remake (the database keeps the marker and lets only that one through)
+  const remake = await recipientPdfRemakePending(supabase, orgId, { quoteId: quote.id });
   // review L3: a later PDF only while the quote is still the open offer that was sent
-  if (!quotePdfStorable(quote.status)) return { ok: false, message: CLOSED };
+  if (!quotePdfStorable(quote.status) && !remake) return { ok: false, message: CLOSED };
 
   // the person's own session decides first (writable business, the flag, may edit the quote's deal or contact)
-  const allowed = await supabase.rpc("quote_pdf_allowed", { p_org: orgId, p_quote: quote.id });
+  const allowed = quotePdfStorable(quote.status)
+    ? await supabase.rpc("quote_pdf_allowed", { p_org: orgId, p_quote: quote.id })
+    : await supabase.rpc("quote_pdf_recipient_remake_allowed", { p_org: orgId, p_quote: quote.id });
   if (allowed.error) return { ok: false, message: dbErrorMessage(allowed.error) };
   if (allowed.data !== true) return { ok: false, message: NOT_PERMITTED };
 
-  const org = await supabase.from("organizations").select("name").eq("id", orgId).maybeSingle();
+  const org = await supabase.from("organizations").select("name, timezone").eq("id", orgId).maybeSingle();
   if (org.error || !org.data) return { ok: false, message: NOT_MADE };
   const data = await getQuoteDocumentData(orgId, quote, org.data.name);
-  const bytes = await renderPdf(quotePdfDocument(data, await loadPdfLogo(data.logoUrl)));
+  // second review M1: an accepted quote whose customer's choice changed it is made again as accepted, and says so
+  const asAccepted = remake && quote.status === "accepted" && acceptedChoiceChanged(await getQuoteDecision(orgId, quote.id).catch(() => null), data.lines);
+  const note = remake ? remadeNote(new Date(), org.data.timezone || TIME_ZONE) + (asAccepted ? ACCEPTED_REMAKE_SUFFIX : "") : null;
+  const bytes = await renderPdf(quotePdfDocument(data, await loadPdfLogo(data.logoUrl), { remadeNote: note, accepted: asAccepted }));
 
   const stored = await writeQuotePdfAsServer({ orgId, quoteId: quote.id, userId, bytes, name: quotePdfFileName(quote.numberDisplay, quote.title) });
   if (!stored.ok) return { ok: false, message: stored.busy ? IN_PROGRESS : stored.message };

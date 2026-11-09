@@ -75,6 +75,12 @@ const RERUN = [
   // PKG-06 (156) redefines public.quote_public(), public.order_public() and app.punch_cards_erase() of the files above last
   // (the recipient's name as sent)
   migrationFile("_punch_recipient_names.sql"),
+  // PKG-06 (167) ב redefines app.punch_cards_erase() of _punch_recipient_names.sql last (only the PDF as sent and the
+  // order's PDF go); the pasted file gives app.recipient_pdf_drop() its body
+  migrationFile("_recipient_erase_pdfs.sql"),
+  migrationFile("_recipient_erase_pdfs_delete.sql"),
+  // PKG-06 (168) ב redefines app.merge_punch_recipients() of _punch_recipient_names.sql last (the holding after a merge)
+  migrationFile("_recipient_merge_holding.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

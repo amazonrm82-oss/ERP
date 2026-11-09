@@ -6,7 +6,10 @@ import { zoneDate } from "@/lib/format";
 // hold from its creation came to them by a transfer or a merge: its purchase (payment, price, the line it was sold on, who
 // opened and activated it) is the first holder's and stays out. A cancel reason counts only when the card was cancelled
 // within the person's holdings, a used entry only when it was made within them (by instant). Days shown are the
-// business's calendar days.
+// business's calendar days. PKG-06, owner (168) ב and (173) ב: a merge that makes the payer the card's holder marks it
+// (payer_holder_id, app.merge_punch_recipients, 021189): that contact gets the purchase as their own, even when the card
+// reached the merged recipient by a transfer, and everyone else sees it as paid by another customer; a transfer alone never
+// moves the purchase.
 
 type Row = Record<string, unknown>;
 type HolderEntry = { contact?: unknown; until?: unknown };
@@ -83,6 +86,11 @@ export const OPENED_FROM_OTHER_CUSTOMER = "נפתחה ממסמך של לקוח �
  * LOW 3: once the payer is purged its columns are empty, and the server-kept `opened_for_other_payer` still says so.
  */
 function paidByAnother(card: Row, contactIds: readonly string[]): boolean {
+  // owner (173) ב: a merge made this contact both the payer and the holder; for someone else who held it before (the mark
+  // stays) it was paid by another; a card that was the contact's own from the start (no mark) is an ordinary card for a later
+  // holder (second review L3)
+  const payerHolder = card.payer_holder_id;
+  if (typeof payerHolder === "string" && payerHolder !== "") return !contactIds.includes(payerHolder) && card.opened_for_other_payer === true;
   const contact = card.payer_contact_id;
   if (typeof contact === "string" && contact !== "") return !contactIds.includes(contact);
   if (typeof card.payer_company_id === "string" && card.payer_company_id !== "") return true;
@@ -101,12 +109,19 @@ export function cardForExport(card: Row, uses: Row[], contactIds: readonly strin
   delete copy.payer_contact_id;
   delete copy.payer_company_id;
   delete copy.opened_for_other_payer;
+  delete copy.payer_holder_id;
+  // owner (168) ב, (173) ב: the contact a merge made the payer and the holder gets the purchase as their own, also when the
+  // card reached the merged recipient by a transfer (app.merge_punch_recipients, 021189)
+  const ownByMerge = typeof card.payer_holder_id === "string" && contactIds.includes(card.payer_holder_id);
   // owner (159) ב: a card opened from another customer's document says so, without the payer's name or the document's number;
   // owner (164) ב: and it carries none of the payer's purchase (that stays in the payer's own export, punch_cards_paid), only
   // what is the recipient's own: the card, its entries, validity, status and uses
   const paidByOther = paidByAnother(card, contactIds);
   if (paidByOther) copy.opened_from = OPENED_FROM_OTHER_CUSTOMER;
-  if (!fromCreation || paidByOther) for (const field of PURCHASE_FIELDS) delete copy[field];
+  if (!ownByMerge && (!fromCreation || paidByOther)) for (const field of PURCHASE_FIELDS) delete copy[field];
+  // second review L4: the payer did not hold it from its opening (X did): who opened and activated it stays out, as in the
+  // payer's own export of a card another holds
+  if (ownByMerge && !fromCreation) for (const field of PURCHASE_STAFF_FIELDS) delete copy[field];
   // a card held before: its current holder is someone else
   if (!(typeof card.contact_id === "string" && contactIds.includes(card.contact_id))) delete copy.contact_id;
   if (copy.cancel_reason != null && !within(instant(card.cancelled_at), spans)) copy.cancel_reason = null;

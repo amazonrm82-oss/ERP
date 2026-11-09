@@ -2622,6 +2622,8 @@ export type PunchCardRow = {
   payer_company_id: string | null;
   // PKG-06 (review LOW 3): server only, true once the card had a payer other than its holder; never cleared
   opened_for_other_payer: boolean;
+  // PKG-06 (owner (168) ב, (173) ב): server only, the contact a merge made both the payer and the holder (its own purchase)
+  payer_holder_id: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -4497,6 +4499,12 @@ export type Database = {
       quote_pdf_allowed: { Args: { p_org: string; p_quote: string }; Returns: boolean };
       // QUO-06 follow-up (answer 1 (ג)): may the caller have a PDF kept without a fingerprint made again (their own session)
       quote_pdf_remake_allowed: { Args: { p_org: string; p_quote: string }; Returns: boolean };
+      // PKG-06 (owner (172) ב): after a service recipient's erasure removed the PDF as sent of a closed quote, may the caller
+      // have it made again (their own session); is the next PDF of a quote or order such a remake (footer)
+      quote_pdf_recipient_remake_allowed: { Args: { p_org: string; p_quote: string }; Returns: boolean };
+      recipient_pdf_remake_pending: { Args: { p_org: string; p_quote?: string | null; p_order?: string | null }; Returns: boolean };
+      // second review M1: a stored file made again after that erasure (the staff label of an accepted quote's file)
+      recipient_pdf_remade: { Args: { p_org: string; p_file: string }; Returns: boolean };
       quote_pdf_store: { Args: { p_org: string; p_quote: string; p_user: string; p_size: number; p_sha256: string; p_name: string; p_path?: string | null }; Returns: Json };
       quote_public_pdf: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       // QUO-09 signed PDF: staff's right and the signature block to render (their own session); the server's write for staff

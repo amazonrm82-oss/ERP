@@ -150,6 +150,29 @@ export const SIGNED_PDF_LABEL = "הורדת PDF חתום";
 export const AS_SENT_PDF_LABEL = "הורדת PDF (כפי שנשלח)";
 
 /**
+ * PKG-06 (second review M1, lead's choice until owner question 175): an accepted quote's PDF made again after a service
+ * recipient's erasure is rendered from the stored data as accepted. When the customer's choice changed the quote it shows the
+ * accepted state and is named so; otherwise it is the quote as sent.
+ */
+export const ACCEPTED_REMAKE_PDF_LABEL = "הורדת PDF (כפי שאושר)";
+export const ACCEPTED_REMAKE_SUFFIX = ", לפי מה שאושר";
+
+/**
+ * Did the customer's choice change the accepted quote? From the decision when the reader may see it (a different accepted
+ * total, or optional lines chosen); otherwise, as the staff page's rule for other readers, any optional item line counts.
+ */
+export function acceptedChoiceChanged(
+  decision: { sentTotalAgorot?: number | null; acceptedTotalAgorot?: number | null; optionalChosen?: number | null } | null,
+  lines: readonly { kind: "item" | "group"; isOptional: boolean }[],
+): boolean {
+  if (decision) {
+    const totals = decision.sentTotalAgorot != null && decision.acceptedTotalAgorot != null && decision.sentTotalAgorot !== decision.acceptedTotalAgorot;
+    return totals || (decision.optionalChosen ?? 0) > 0;
+  }
+  return lines.some((line) => line.kind === "item" && line.isOptional);
+}
+
+/**
  * QUO-09 (owner, 2 November 2026, answer (37) ב): the staff line of an accepted quote, "נחתמה ב-[תאריך]", with the day of the
  * acceptance in the business's zone. Owners and admins also read the decision's card; everyone else sees only this line.
  */

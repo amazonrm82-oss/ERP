@@ -14,7 +14,7 @@ type Page = { lines?: Line[]; status_page?: unknown };
  * PKG-06 follow-up (owner's answer (156) א, 9 November 2026): the customer's quote and order pages and PDFs show a punch
  * card line's service recipient as "עבור: <name as sent>". The name is a server-only snapshot taken when the quote is sent or
  * the order numbered, copied by a version and an order from the quote, frozen afterwards (a rename or a purge changes
- * nothing), only on the full page (never the status page), and replaced by a neutral text by the person's erasure.
+ * nothing), only on the full page (never the status page), and emptied by the person's erasure (owner (167) ב).
  */
 describe("the service recipient's name as sent (PKG-06, owner (156) א)", () => {
   let owner: U;
@@ -165,7 +165,7 @@ describe("the service recipient's name as sent (PKG-06, owner (156) א)", () => 
     expect(JSON.stringify(status)).not.toContain("תמר");
   });
 
-  it("a purge keeps the name; a merge carries it to the kept contact, whose erasure empties it with a neutral text and its log", async () => {
+  it("a purge keeps the name; a merge carries it to the kept contact, whose erasure empties it and its log", async () => {
     const parent = await contact("אסתר");
     const gone = await contact("אורי", "בן");
     await relate(parent, gone);
@@ -186,20 +186,21 @@ describe("the service recipient's name as sent (PKG-06, owner (156) א)", () => 
     await asAdmin((q) => q("delete from public.contacts where id = $1", [gone]));
     expect((await linesOf("quote", q1))[0]).toMatchObject({ r: null, n: "אורי בן" });
     expect(await nameOf("order", ol)).toBe("אורי בן כפול");
-    // the erasure: a neutral text on both lines, and no log entry keeps the name or the id
+    // the erasure: both lines lose the name, and no log entry keeps the name or the id
     await run((q) => q("select public.audit_erase_record($1, 'contacts', $2)", [org, gone]));
-    expect(await nameOf("quote", l1)).toBe("השם נמחק (מחיקת פרטיות)");
-    expect(await nameOf("order", ol)).toBe("השם נמחק (מחיקת פרטיות)");
+    // owner (167) ב: the name is emptied, so neither the page nor the PDF made again shows a "עבור" line
+    expect(await nameOf("quote", l1)).toBeNull();
+    expect(await nameOf("order", ol)).toBeNull();
     const log = JSON.stringify(
       await asAdmin(async (q) => (await q("select changes from public.audit_log where organization_id = $1 and entity_type in ('quote_lines', 'order_lines')", [org])).rows),
     );
     expect(log).not.toContain("אורי");
     expect(log).not.toContain(gone);
     const { page } = await quotePage(q1);
-    expect((await page()).lines?.[0].recipient).toBe("השם נמחק (מחיקת פרטיות)");
+    expect((await page()).lines?.[0].recipient ?? null).toBeNull();
   });
 
-  // review HIGH 1: the stored PDFs printed the name; the erasure removes them so they are made again from the neutral data
+  // review HIGH 1: the stored PDFs printed the name; the erasure removes them so they are made again from the emptied data
   it("the recipient's erasure removes the stored PDFs of the payer's quote and order that named them, and only those", async () => {
     type Store = { status: string; path?: string; file_id?: string };
     const sha = (c: string) => c.repeat(64);
@@ -211,7 +212,7 @@ describe("the service recipient's name as sent (PKG-06, owner (156) א)", () => 
     const storeQuote = (q1: string, digest: string) =>
       asService(async (q) => (await one<{ r: Store }>(q, "select public.quote_pdf_store($1, $2, $3, 20000, $4, 'הצעה.pdf') as r", [org, q1, owner.id, digest])).r);
     const storeOrder = (o1: string, digest: string, path: string | null = null) =>
-      asService(async (q) => (await one<{ r: Store }>(q, "select public.order_pdf_store($1, $2, $3, 20000, $4, 'אישור הזמנה.pdf', $5) as r", [org, o1, owner.id, digest, path])).r);
+      asService(async (q) => (await one<{ r: Store }>(q, "select public.order_pdf_store($1, $2, $3, 20000, $4, 'אישור הזמנה.pdf', $5, (select pdf_content_changed_at from public.orders where id = $2)) as r", [org, o1, owner.id, digest, path])).r);
     const storedQuote = async (q1: string) => {
       const first = await storeQuote(q1, sha("a"));
       expect(first.status).toBe("upload");
@@ -255,11 +256,11 @@ describe("the service recipient's name as sent (PKG-06, owner (156) א)", () => 
     expect(await queued(quotePath)).toBe(1);
     expect(await queued(orderPath)).toBe(1);
     expect(await files("quote_id", other)).toBe(1);
-    // the next render is a fresh file, made from the stored data, which now holds the neutral text
+    // the next render is a fresh file, made from the stored data, which no longer holds the name
     expect((await storeQuote(q1, sha("c"))).status).toBe("upload");
     expect((await storeOrder(o1, sha("d"))).status).toBe("upload");
-    expect((await linesOf("quote", q1))[0].n).toBe("השם נמחק (מחיקת פרטיות)");
-    expect((await linesOf("order", o1))[0].n).toBe("השם נמחק (מחיקת פרטיות)");
+    expect((await linesOf("quote", q1))[0].n).toBeNull();
+    expect((await linesOf("order", o1))[0].n).toBeNull();
   });
 
   // review LOW 2: a deleted draft line that held the duplicate's name is reached by the kept contact's erasure after a merge
@@ -328,16 +329,55 @@ describe("the service recipient's name as sent (PKG-06, owner (156) א)", () => 
     expect(Number(exported.price_agorot)).toBe(40000);
     expect(exported).toHaveProperty("payment_id");
     expect(exported).toHaveProperty("activated_at");
-    // (b) the recipient (a duplicate) is merged into the payer (the second card update): the mark goes too; the card came to
-    // the payer by the merge, so PKG-01's holding rule (unchanged) leaves its purchase out of the kept contact's export
+    // (b) the recipient (a duplicate) is merged into the payer (the second card update): the mark goes too, and (owner (168)
+    // ב) the duplicate's holding is the payer's own: its history entries name the payer, so the export shows the purchase
     const parent = await contact("נחמה");
     const kidDup = await contact("נחמה", "כפולה");
     const card2 = await run(async (q) => (await one<{ id: string }>(q, "select public.punch_card_open($1, $2, $3, null, true) as id", [org, kidDup, product])).id);
-    await asAdmin((q) => q("update public.punch_cards set payer_contact_id = $2 where id = $1", [card2, parent]));
+    await asAdmin((q) => q("update public.punch_cards set payer_contact_id = $2, price_agorot = 40000 where id = $1", [card2, parent]));
     await run((q) => q("select public.merge_records($1, 'contact', $2, $3, '{}'::jsonb)", [org, parent, kidDup]));
     const after2 = await row(card2);
     expect(after2).toMatchObject({ contact_id: parent, payer_contact_id: null, opened_for_other_payer: false });
-    expect(exportOf(after2, [parent])).not.toHaveProperty("opened_from");
+    expect((after2.holder_history as { contact?: string }[]).map((e) => e.contact)).toEqual([parent]);
+    const exported2 = exportOf(after2, [parent]);
+    expect(exported2).not.toHaveProperty("opened_from");
+    expect(Number(exported2.price_agorot)).toBe(40000);
+    expect(exported2).toHaveProperty("payment_id");
+    // review 3: the duplicate is the payer now, so it is no former holder; its erasure afterwards keeps the payer's reasons
+    expect(after2.former_contact_ids).toEqual([]);
+    await run((q) => q("select public.punch_card_cancel($1, $2, 'סיבה של נחמה')", [org, card2]));
+    await run((q) => q("select public.audit_erase_record($1, 'contacts', $2)", [org, kidDup]));
+    expect((await row(card2)).cancel_reason).toBe("סיבה של נחמה");
+    expect(after2.payer_holder_id).toBe(parent);
+    // (c) owner (173) ב: a card that came to the duplicate by a transfer (X first) and is then merged into the payer: the
+    // purchase is the payer's in its export; X, who did not pay, keeps the mark and never gets it; X's period stays X's, so
+    // X's own erasure still reaches it
+    const first = await contact("ראשון");
+    const tDup = await contact("טל", "כפול");
+    const tPayer = await contact("טל");
+    const card3 = await run(async (q) => (await one<{ id: string }>(q, "select public.punch_card_open($1, $2, $3, null, true) as id", [org, first, product])).id);
+    await asAdmin((q) => q("update public.punch_cards set payer_contact_id = $2, price_agorot = 40000 where id = $1", [card3, tPayer]));
+    await run((q) => q("select public.punch_card_transfer($1, $2, $3)", [org, card3, tDup]));
+    await run((q) => q("select public.merge_records($1, 'contact', $2, $3, '{}'::jsonb)", [org, tPayer, tDup]));
+    const after3 = await row(card3);
+    expect(after3).toMatchObject({ contact_id: tPayer, payer_contact_id: null, payer_holder_id: tPayer, opened_for_other_payer: true });
+    expect((after3.holder_history as { contact?: string }[]).map((e) => e.contact)).toEqual([first, tPayer]);
+    expect(after3.former_contact_ids).toEqual([first]);
+    const payerView = exportOf(after3, [tPayer]);
+    expect(Number(payerView.price_agorot)).toBe(40000);
+    expect(payerView).not.toHaveProperty("opened_from");
+    const firstView = exportOf(after3, [first]);
+    expect(firstView).not.toHaveProperty("price_agorot");
+    expect(firstView).not.toHaveProperty("payment_id");
+    expect(firstView.opened_from).toBeTruthy();
+    await asAdmin((q) => q("delete from public.contacts where id = $1", [first]));
+    await run((q) => q("select public.audit_erase_record($1, 'contacts', $2)", [org, first]));
+    const erased3 = await row(card3);
+    expect(erased3.former_contact_ids).toEqual([]);
+    expect(JSON.stringify(erased3.holder_history)).not.toContain(first);
+    expect((erased3.holder_history as { contact?: string }[]).map((e) => e.contact ?? null)).toEqual([null, tPayer]);
+    // still the payer's own purchase, and still no one else's
+    expect(Number(exportOf(erased3, [tPayer]).price_agorot)).toBe(40000);
     // a card still held by someone other than its payer keeps its mark through the same kind of merge
     const other = await contact("רועי");
     const otherDup = await contact("רועי", "כפול");

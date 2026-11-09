@@ -48,7 +48,7 @@ export function orderPdfFileName(numberDisplay: string | null): string {
   return `${base.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 150)}.pdf`;
 }
 
-export function orderPdfDocument(data: OrderDocumentData, logo: PdfLogo | null): PdfDocument {
+export function orderPdfDocument(data: OrderDocumentData, logo: PdfLogo | null, options: { remadeNote?: string | null } = {}): PdfDocument {
   const { design, business, customer, order, lines } = data;
   const schedule = data.schedule ?? [];
   const sums = groupSubtotals(lines.map((line) => ({ ...line, isOptional: false, optionalSelected: false })));
@@ -159,7 +159,8 @@ export function orderPdfDocument(data: OrderDocumentData, logo: PdfLogo | null):
     meta,
     blocks,
     closing: design.footerText,
-    footerNote: null,
+    // PKG-06 (owner (172) ב, lead's choice for orders): a PDF made again after a service recipient's erasure says so
+    footerNote: options.remadeNote ?? null,
     pageNote: order.numberDisplay ? `אישור הזמנה ${order.numberDisplay} · ${NOT_A_TAX_INVOICE}` : NOT_A_TAX_INVOICE,
   };
 }

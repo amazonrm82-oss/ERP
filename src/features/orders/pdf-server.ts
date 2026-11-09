@@ -4,6 +4,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { loadPdfLogo } from "@/features/pdf/logo";
 import { renderPdf } from "@/features/pdf/render";
+import { remadeNote } from "@/features/quotes/pdf";
+import { recipientPdfRemakePending } from "@/features/quotes/pdf-server";
+import { TIME_ZONE } from "@/lib/app";
 import type { Database } from "@/lib/database.types";
 import { dbErrorMessage } from "@/lib/errors";
 
@@ -87,10 +90,13 @@ export async function storeOrderPdf(
     if (allowed.error) return { ok: false, message: dbErrorMessage(allowed.error) };
     if (allowed.data !== true) return { ok: false, message: NOT_PERMITTED };
 
-    const org = await supabase.from("organizations").select("name").eq("id", orgId).maybeSingle();
+    const org = await supabase.from("organizations").select("name, timezone").eq("id", orgId).maybeSingle();
     if (org.error || !org.data) return { ok: false, message: NOT_MADE };
     const data = await getOrderDocumentData(orgId, current, org.data.name);
-    const bytes = await renderPdf(orderPdfDocument(data, await loadPdfLogo(data.logoUrl)));
+    // PKG-06 (owner (172) ב): the PDF that a service recipient's erasure removed is made again with the remake's footer
+    const remake = await recipientPdfRemakePending(supabase, orgId, { orderId: current.id });
+    const note = remake ? remadeNote(new Date(), org.data.timezone || TIME_ZONE) : null;
+    const bytes = await renderPdf(orderPdfDocument(data, await loadPdfLogo(data.logoUrl), { remadeNote: note }));
 
     const stored = await writeOrderPdfAsServer({
       orgId,

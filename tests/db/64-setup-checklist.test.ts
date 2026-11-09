@@ -748,6 +748,15 @@ describe("setup checklist and sample data (USR-04)", () => {
       // PKG-06 (156) redefines public.quote_public() and public.order_public() of _product_bundles.sql and
       // app.punch_cards_erase() of _punch_card_recipients.sql last (the recipient's name as sent)
       "_punch_recipient_names.sql",
+      // PKG-06 (167) ב redefines app.punch_cards_erase() of _punch_recipient_names.sql, app.files_quote_pdf() of
+      // _quote_signed_pdf.sql, app.files_order_pdf() of _order_pdf_versions.sql and the two count returns last (only the PDF
+      // as sent and the order's PDF go, with a credit for the PDF made again)
+      "_recipient_erase_pdfs.sql",
+      // the pasted removal gives app.recipient_pdf_drop() of _recipient_erase_pdfs.sql its body (listed for staleRestores)
+      "_recipient_erase_pdfs_delete.sql",
+      // PKG-06 (168) ב redefines app.merge_punch_recipients() of _punch_recipient_names.sql last (a merge into the payer
+      // makes the recipient's holding the payer's own)
+      "_recipient_merge_holding.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
