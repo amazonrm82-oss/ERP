@@ -2,9 +2,13 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import type { TimelineSubject } from "@/features/activities/schema";
 import { InviteFileLink } from "@/features/calendar-feed/components/invite-file-link";
+import { MeetingOrderDraft } from "@/features/meeting-order-draft/components/draft-button";
+import { listMeetingOrderDraftStates } from "@/features/meeting-order-draft/queries";
+import { isQuietReason, type MeetingOrderDraftState } from "@/features/meeting-order-draft/rules";
 import { listMeetingTypeChoices } from "@/features/meeting-types/queries";
+import { getOrdersAccess } from "@/features/orders/access";
 import { usablePunchBalances } from "@/features/punch-cards/queries";
-import { listMembers } from "@/features/settings/queries";
+import { listMembers, orgHasFeature } from "@/features/settings/queries";
 import { zoneDate } from "@/lib/format";
 
 import { formatMeetingWhen, meetingFormTimes, MEETING_STATUS_TONE } from "../display";
@@ -29,13 +33,28 @@ type Props = {
  * meeting is a stacked block; forms open as a bottom sheet.
  */
 export async function RecordMeetings({ orgId, subject, canWrite, timeZone, userId }: Props) {
-  const [meetings, members, meetingTypes, punchBalances] = await Promise.all([
+  const [meetings, members, meetingTypes, punchBalances, orders, products] = await Promise.all([
     listRecordMeetings(orgId, subject),
     canWrite ? listMembers(orgId) : Promise.resolve([]),
     listMeetingTypeChoices(orgId),
     // PKG-02: a contact's usable punch card balance, shown when a meeting is booked
     subject.kind === "contact" ? usablePunchBalances(orgId, subject.id, timeZone) : Promise.resolve([]),
+    getOrdersAccess(orgId),
+    orgHasFeature(orgId, "products"),
   ]);
+  // CAL-13: a held meeting's draft order (the button, the link, or why not), while orders and products are on; a meeting
+  // that left "held" keeps the link to its draft. The database answers only for held meetings and meetings with a draft.
+  const draftStates: Map<string, MeetingOrderDraftState> =
+    orders.on && products ? await listMeetingOrderDraftStates(orgId, meetings.map((m) => m.id)) : new Map();
+  const draftFor = (meeting: MeetingItem): MeetingOrderDraftState | null => {
+    const state = draftStates.get(meeting.id);
+    if (!state) return null;
+    if (state.orderId) return state;
+    // the button and its reasons are for someone who may write, and never "not permitted"
+    if (!canWrite || meeting.status !== "held" || isQuietReason(state.reason)) return null;
+    if (state.reason === "not_held" || state.reason === "not_permitted") return null;
+    return state;
+  };
   const punchNote = punchBalances.length > 0 ? `יתרת כרטיסייה: ${punchBalances.join("; ")}` : null;
   const typeById = new Map(meetingTypes.map((type) => [type.id, type]));
   const options: MemberOption[] = members
@@ -61,6 +80,7 @@ export async function RecordMeetings({ orgId, subject, canWrite, timeZone, userI
 
   const item = (meeting: MeetingItem) => {
     const meetingType = meeting.meetingTypeId ? typeById.get(meeting.meetingTypeId) : undefined;
+    const draft = draftFor(meeting);
     return (
     <li key={meeting.id} className="space-y-1.5 py-3 last:pb-0">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -101,6 +121,7 @@ export async function RecordMeetings({ orgId, subject, canWrite, timeZone, userI
           {meeting.outcome}
         </p>
       ) : null}
+      {draft ? <MeetingOrderDraft orgId={orgId} meetingId={meeting.id} subject={subject} state={draft} /> : null}
       {canWrite ? (
         <MeetingItemButtons
           orgId={orgId}

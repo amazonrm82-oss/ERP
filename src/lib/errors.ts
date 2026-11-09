@@ -617,6 +617,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "import:original_date_fixed": "תאריך היצירה המקורי נכתב רק בייבוא, ואי אפשר לשנות אותו.",
   "import_note:too_many": "נשלחו יותר מדי הערות בבת אחת. נסו שוב.",
   "import_note:items": "ההערות שנשלחו אינן תקינות. נסו שוב.",
+  // CAL-13: the meetings card asks about at most 200 meetings at once
+  "meeting_order_draft:too_many": "יותר מדי פגישות בבת אחת. רעננו את הדף.",
   // WAB-06: the share flow always sends the mark; a direct write without it
   "share_note:mark": "הערת שיתוף מתחילה בשורה \"שותף מהטלפון\". נסו לשתף שוב.",
   // WAB-07: an imported WhatsApp chat

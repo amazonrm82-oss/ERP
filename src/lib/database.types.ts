@@ -170,6 +170,8 @@ export type OrgDocumentSettingsRow = {
   quote_accept_deal: string;
   // GAP-08 (migration quick_sale): the sales process of quick sales; null, hidden or deleted = the default one
   quick_sale_pipeline_id: string | null;
+  // CAL-13 (migration meeting_order_draft): text with a check: button | auto (a held meeting's draft order)
+  meeting_order_draft: string;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
@@ -311,6 +313,7 @@ type OrgDocumentSettingsWrite = {
   prices_include_vat?: boolean;
   quote_accept_deal?: "auto" | "ask" | "none";
   quick_sale_pipeline_id?: string | null;
+  meeting_order_draft?: "button" | "auto";
   legal_name?: string | null;
   tax_id?: string | null;
   address_line?: string | null;
@@ -4168,6 +4171,9 @@ export type Database = {
       // CAL-09: a weekly series made in one transaction (security invoker); { series_id, ids }
       // CAL-09: of the given meetings, the ids the caller could delete now (mirrors meetings_delete)
       meetings_removable: { Args: { p_org: string; p_ids: string[] }; Returns: string[] };
+      // CAL-13: a held meeting's draft order (the button) and what each meeting's card shows
+      meeting_order_draft_create: { Args: { p_org: string; p_meeting: string }; Returns: Json };
+      meeting_order_draft_states: { Args: { p_org: string; p_meetings: string[] }; Returns: Json };
       create_meeting_series: {
         Args: { p_org: string; p_meeting: Json; p_times: Json; p_participants?: string[] };
         Returns: Json;
