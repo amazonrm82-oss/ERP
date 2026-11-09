@@ -1,7 +1,9 @@
 -- =============================================================================
--- ON HOLD (owner, 9 November 2026): reset of business e3bcb98c-2cd7-47f9-ab61-e0f233a66305. NOT a migration: it lives in
--- scripts/ops so that no build and no apply ever runs it. It is run only when the owner says so, pasted by hand in the SQL
--- Editor (it holds row removals). Its test (tests/db/316-org-reset-arizot.test.ts) runs it on fixture businesses.
+-- Owner's go-ahead (hard rule 3, 9 November 2026; on hold earlier that day, released the same evening): reset of business
+-- e3bcb98c-2cd7-47f9-ab61-e0f233a66305 (Arizot Design). The people linked to it are NOT removed (owner): auth users,
+-- profiles, memberships, teams and every per-person row stay. Pasted by hand in the SQL Editor (it holds row removals).
+-- Its test (tests/db/316-org-reset-arizot.test.ts) runs it on fixture businesses. On a fresh build the business does not
+-- exist and the file does nothing.
 -- =============================================================================
 -- One DO block, so the whole file is one transaction: it either does everything or nothing. Safe to run twice: the second
 -- run finds nothing to remove. It changes no schema object (no function, policy, grant, trigger or constraint).
@@ -100,6 +102,13 @@ begin
               where f.organization_id = v_reset and f.unconfirmed_since is null
                 and (f.accounting_document_id is not null or f.payment_id is not null)) then
     raise exception 'org reset: business % has a kept file of a document or a payment (files_keep_attached); nothing was done', v_reset;
+  end if;
+
+  -- an opt-out or a do-not-contact is never lost (review, 9 November 2026): consents survive a purge on purpose, so a
+  -- person who said no stays protected if they come back; the reset removes only granted consents' business, else it stops
+  if exists (select 1 from public.consents c
+              where c.organization_id = v_reset and (c.state <> 'granted' or c.source = 'erasure')) then
+    raise exception 'org reset: business % holds an opt-out or a do-not-contact consent; nothing was done', v_reset;
   end if;
 
   -- the PDFs of its quotes and orders may go (files_keep_attached's erasure path, this business only)

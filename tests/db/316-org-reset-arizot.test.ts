@@ -19,14 +19,14 @@ import {
 import { addMember, asAdmin, asUser, closePool, createOrg, createUser, insertLead } from "./helpers";
 
 /**
- * scripts/ops/org-reset-arizot.sql (owner, 9 November 2026: ON HOLD, kept out of supabase/migrations so no build runs it):
+ * supabase/migrations/20261006021195_org_reset_arizot.sql (owner's go-ahead, 9 November 2026; pasted by hand):
  * the reset of business e3bcb98c-… removes every record and what hangs on records, and keeps the business, its people and
  * its settings; no other business changes. The fixture businesses get random ids, so the script runs here with its one
  * hard-coded id replaced by the fixture's id: the same text otherwise. The script as committed is also run unchanged, where
  * it finds no such business and must change nothing.
  */
 
-const SQL = readFileSync(path.join(__dirname, "../../scripts/ops/org-reset-arizot.sql"), "utf8");
+const SQL = readFileSync(path.join(__dirname, "../../supabase/migrations/20261006021195_org_reset_arizot.sql"), "utf8");
 const RESET_ID = "e3bcb98c-2cd7-47f9-ab61-e0f233a66305";
 const runFor = (reset: string) => SQL.replaceAll(RESET_ID, reset);
 
@@ -167,6 +167,19 @@ describe("resetting a business (script on hold, owner 9 November 2026)", () => {
     await expect(asAdmin((q) => q(runFor(org4)))).rejects.toThrow(/kept file of a document or a payment/);
     expect(await snapshot(org4)).toEqual(before);
     expect(await exists("select 1 from public.leads where id = $1", [lead])).toBe(true);
+  });
+
+  it("refuses a reset while the business holds an opt-out (consents survive a purge on purpose)", async () => {
+    const owner5 = await createUser("opt-out-owner");
+    const org5 = await createOrg(owner5.id, "עסק עם סירוב");
+    prefixes.push(`${org5}/%`);
+    const lead = await insertLead(owner5.id, org5);
+    await asAdmin((q) =>
+      q("insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'sms', 'denied', 'manual', 'בשיחה')", [org5, lead]),
+    );
+    const before = await snapshot(org5);
+    await expect(asAdmin((q) => q(runFor(org5)))).rejects.toThrow(/opt-out or a do-not-contact/);
+    expect(await snapshot(org5)).toEqual(before);
   });
 
   describe("after the run", () => {
