@@ -346,7 +346,17 @@ describe("the customer's statement link (BAL-04)", () => {
     const hash = "a".repeat(64);
     for (let i = 0; i < 60; i++) expect((await page(token, hash)).rate_limited, `view ${i + 1}`).toBeUndefined();
     expect(await page(token, hash)).toEqual({ rate_limited: true });
-    expect((await page(token, "b".repeat(64))).documents).toBeDefined();
+    // senders share 1,024 buckets per link, keyed by the link's random id: pick a sender whose bucket is not hash's
+    // (a fixed second hash collided once in 1,024 runs, CI run 42559410141)
+    const other = await asAdmin(async (q) => {
+      const bucket = async (sender: string) =>
+        (await one<{ b: number }>(q, `select ((hashtextextended(app.statement_link_sender(l.id, $2), 0) % 1024) + 1024) % 1024 as b
+                                         from app.statement_links l where l.contact_id = $1`, [h, sender])).b;
+      const taken = await bucket(hash);
+      for (const c of "bcdef") if ((await bucket(c.repeat(64))) !== taken) return c.repeat(64);
+      throw new Error("no free bucket");
+    });
+    expect((await page(token, other)).documents).toBeDefined();
     const stored = await asAdmin(async (q) => JSON.stringify((await q("select v.* from app.statement_link_view_counts v join app.statement_links l on l.id = v.link_id where l.contact_id = $1", [h])).rows));
     expect(stored).not.toContain(hash);
     await asAdmin((q) => q("update app.statement_links set window_started_at = now(), window_count = 120 where contact_id = $1", [h]));
