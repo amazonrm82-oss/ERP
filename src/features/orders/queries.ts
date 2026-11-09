@@ -83,6 +83,8 @@ export type OrderLine = {
   bundleParts: BundlePartSnapshot[];
   // PKG-06: a punch card line's service recipient (null = the payer); read on the document's own page only
   recipientId?: string | null;
+  // PKG-06 (owner (156) א): the recipient's name as sent (taken when the quote is sent or the order numbered); null otherwise
+  recipientName?: string | null;
 };
 
 function toOrder(row: OrderRow): Order {
@@ -141,6 +143,7 @@ function toLine(row: OrderLineRow): OrderLine {
     bundleDisplay: isBundleDisplay(row.bundle_display) ? row.bundle_display : null,
     bundleParts: parseBundleItems(row.bundle_items),
     recipientId: row.recipient_contact_id ?? null,
+    recipientName: row.recipient_name ?? null,
   };
 }
 

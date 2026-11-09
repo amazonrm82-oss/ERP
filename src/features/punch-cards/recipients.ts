@@ -30,6 +30,16 @@ export function recipientLine(recipientName: string | null): string {
   return recipientName ? `${RECIPIENT_LABEL}: ${recipientName}` : `${RECIPIENT_LABEL}: ${PAYER_CHOICE}`;
 }
 
+/**
+ * Owner (156) א: the line the customer's quote and order (page and PDF) and the staff documents show under a punch card line
+ * whose service recipient is not the payer: "עבור: <name as sent>". The name is the server's snapshot taken when the quote
+ * was sent or the order numbered (recipient_name); null = nothing to show.
+ */
+export function servedForText(recipientName: string | null | undefined): string | null {
+  const name = recipientName?.trim();
+  return name ? `עבור: ${name}` : null;
+}
+
 // (151) the business's choice for the customer's card messages (punch_card_alert_settings.notices_to)
 export const NOTICES_TO = ["both", "payer"] as const;
 export type NoticesTo = (typeof NOTICES_TO)[number];

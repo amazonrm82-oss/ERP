@@ -514,11 +514,15 @@ describe("link previews for preview bots (WAB-05)", () => {
     // TAX-02 (021087, bank details) adds only `bank` to the full page; every not-found branch is unchanged (rechecked 3 November
     // 2026 against the not-found matrix above, RVW-65)
     // PRD-09 (product_bundles) adds only `components` to each line of the full page; every not-found branch is unchanged (rechecked)
-    "public.quote_public(text)": "ac15f8460f5149554788af11722bdbce",
+    // PKG-06 (punch_recipient_names, owner (156) א) adds only `recipient` (the name as sent) to each line of the full page;
+    // every not-found branch is unchanged (changed: the line object; rechecked 9 November 2026 against the matrix above)
+    "public.quote_public(text)": "1653fd8f9786ebecea94410698c06186",
     // TAX-02 (021087, bank details) adds only `bank` to the full page (rechecked 3 November 2026, RVW-65)
     // ORD-05 PDF (order_pdfs) adds only the `pdf` key to the full page; every not-found branch is unchanged (rechecked)
     // PRD-09 (product_bundles) adds only `components` to each line of the full page (rechecked)
-    "public.order_public(text,text)": "8dfb0e7e80c09621dc8ef72f36657856",
+    // PKG-06 (punch_recipient_names, owner (156) א) adds only `recipient` to each line of the full page; the status page and
+    // every not-found branch are unchanged (changed: the line object; rechecked 9 November 2026)
+    "public.order_public(text,text)": "ce43766a6a66c0f8e884df26735ce8ce",
     "public.booking_page_public(text,date,text)": "7ce1280bdcd77f4b22212665c9ce9481",
     "public.booking_manage_public(text,date,text)": "8b489cfee0bed9f5ea592d22df63a70a",
     "public.business_card_public(text,text)": "3ec340a7db5b5d5cf50f79bd49f8a1d4",

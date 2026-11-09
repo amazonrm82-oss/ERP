@@ -64,6 +64,23 @@ describe("the customer's quote page (QUO-08)", () => {
     expect(publicQuoteFrom(answer({ customer: { name: null, contact: null } }))!.customer).toBeNull();
   });
 
+  it("PKG-06 (owner (156) א): a punch card line's `recipient` is read and drawn as 'עבור: <name as sent>'", () => {
+    const base = answer();
+    const lines = [{ ...base.lines[1], recipient: "נועה לוי" }, { ...base.lines[1], position: 3, recipient: null }];
+    const page = publicQuoteFrom(answer({ lines }));
+    expect(page!.lines.map((l) => l.recipientName)).toEqual(["נועה לוי", null]);
+    // older answers carry no key: nothing shown
+    expect(publicQuoteFrom(answer())!.lines.map((l) => l.recipientName ?? null)).toEqual([null, null]);
+    const p = page!;
+    const html = renderToStaticMarkup(
+      createElement(QuoteDocument, {
+        data: { design: p.design, color: p.color, logoUrl: null, business: p.business, customer: p.customer, quote: p.quote, lines: p.lines },
+      }),
+    );
+    // both layouts (computer table and phone cards) carry the line once each
+    expect(html.split("עבור: נועה לוי").length - 1).toBe(2);
+  });
+
   it("QUO-12: a newer version on an old link names the number the link was made for", () => {
     expect(publicQuoteFrom(answer())!.replaced).toBeNull();
     expect(publicQuoteFrom(answer({ replaced: null }))!.replaced).toBeNull();

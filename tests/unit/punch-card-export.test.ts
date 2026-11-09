@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { cardForExport, holdings, within } from "@/features/punch-cards/export";
+import { cardForExport, holdings, OPENED_FROM_OTHER_CUSTOMER, paidCardForExport, PURCHASE_FIELDS, PURCHASE_STAFF_FIELDS, within } from "@/features/punch-cards/export";
 
 // PKG-01/PKG-02 (reviews 3 and 4): a person's export carries only what belongs to their holdings of a punch card
 describe("punch cards in a person's export", () => {
@@ -70,5 +70,66 @@ describe("punch cards in a person's export", () => {
     const out = cardForExport({ ...card, payer_contact_id: "parent", payer_company_id: "company" }, uses, [A], "Asia/Jerusalem");
     expect(out).not.toHaveProperty("payer_contact_id");
     expect(out).not.toHaveProperty("payer_company_id");
+  });
+
+  // owner (159) ב: a card opened from another customer's document is marked, with no payer name or document number
+  it("marks a card another customer paid for, and only such a card", () => {
+    const byParent = cardForExport({ ...card, payer_contact_id: "parent" }, uses, [A], "Asia/Jerusalem");
+    expect(byParent.opened_from).toBe(OPENED_FROM_OTHER_CUSTOMER);
+    expect(OPENED_FROM_OTHER_CUSTOMER).toBe("נפתחה ממסמך של לקוח אחר");
+    expect(JSON.stringify(byParent)).not.toContain("parent");
+    const byCompany = cardForExport({ ...card, payer_company_id: "company" }, uses, [A], "Asia/Jerusalem");
+    expect(byCompany.opened_from).toBe(OPENED_FROM_OTHER_CUSTOMER);
+    expect(cardForExport(card, uses, [A], "Asia/Jerusalem")).not.toHaveProperty("opened_from");
+    // the payer is the person (a conversion relative of the exported record): no mark
+    expect(cardForExport({ ...card, payer_contact_id: "A-lead-contact" }, uses, [A, "A-lead-contact"], "Asia/Jerusalem")).not.toHaveProperty("opened_from");
+  });
+
+  // owner (164) ב: the recipient's export carries none of the payer's purchase; the payer's own export carries all of it
+  it("leaves the payer's purchase out of a card another customer paid for, and keeps it on a card the person paid for", () => {
+    const bought = {
+      ...card,
+      payment_id: "pay-parent",
+      price_agorot: 40000,
+      currency: "ILS",
+      order_line_id: "ol-1",
+      quote_line_id: "ql-1",
+      deal_line_id: "dl-1",
+      unit_no: 1,
+      activated_by: "staff",
+      activated_at: "2026-10-01T09:00:00.000Z",
+      activated_manually: false,
+      created_by: "staff",
+      payment_void_at: null,
+      status: "active",
+      expires_on: "2027-01-01",
+    };
+    for (const paid of [{ payer_contact_id: "parent" }, { payer_company_id: "company" }]) {
+      const out = cardForExport({ ...bought, ...paid }, uses, [A], "Asia/Jerusalem");
+      for (const field of PURCHASE_FIELDS) expect(out, field).not.toHaveProperty(field);
+      for (const value of ["pay-parent", "ol-1", "ql-1", "dl-1", "parent", "company"]) expect(JSON.stringify(out)).not.toContain(value);
+      // what is the recipient's own stays: the card, its entries, validity, status and uses
+      expect(out).toMatchObject({ id: card.id, name: card.name, entries_total: card.entries_total, status: "active", expires_on: "2027-01-01", opened_from: OPENED_FROM_OTHER_CUSTOMER });
+      expect((out.uses as { id: string }[]).map((u) => u.id)).toEqual(["u1", "u3"]);
+    }
+    // review LOW 3: the payer was purged (its columns emptied); the server's mark still marks it and drops the purchase
+    const purged = cardForExport({ ...bought, opened_for_other_payer: true }, uses, [A], "Asia/Jerusalem");
+    expect(purged.opened_from).toBe(OPENED_FROM_OTHER_CUSTOMER);
+    expect(purged).not.toHaveProperty("opened_for_other_payer");
+    for (const field of PURCHASE_FIELDS) expect(purged, field).not.toHaveProperty(field);
+    // the person paid for it themselves: the purchase stays, no mark
+    const own = cardForExport(bought, uses, [A], "Asia/Jerusalem");
+    expect(own).toMatchObject({ payment_id: "pay-parent", price_agorot: 40000, order_line_id: "ol-1", quote_line_id: "ql-1" });
+    expect(own).not.toHaveProperty("opened_from");
+    // the payer's own export (punch_cards_paid) carries every purchase field the recipient's leaves out, except the staff
+    // fields, which neither export carries
+    const payerView = paidCardForExport({ ...bought, payer_contact_id: "parent" });
+    const staff: readonly string[] = PURCHASE_STAFF_FIELDS;
+    for (const field of PURCHASE_FIELDS) {
+      if (staff.includes(field)) expect(payerView, field).not.toHaveProperty(field);
+      else expect(payerView, field).toHaveProperty(field);
+    }
+    expect(JSON.stringify(payerView)).not.toContain("staff");
+    expect(payerView).toMatchObject({ payment_id: "pay-parent", price_agorot: 40000, order_line_id: "ol-1", quote_line_id: "ql-1", payer_contact_id: "parent" });
   });
 });

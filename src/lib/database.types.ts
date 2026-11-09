@@ -2190,6 +2190,9 @@ export type OrderLineRow = {
   bundle_items: Json | null;
   // PKG-06: the service recipient of a punch card line (null = the payer)
   recipient_contact_id: string | null;
+  // PKG-06 (owner (156) א): the recipient's name as sent (server only), and whose name it is (erasure finds it)
+  recipient_name: string | null;
+  recipient_named_contact_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -2614,6 +2617,8 @@ export type PunchCardRow = {
   // PKG-06: server only: who paid, when the holder is a line's service recipient other than the payer
   payer_contact_id: string | null;
   payer_company_id: string | null;
+  // PKG-06 (review LOW 3): server only, true once the card had a payer other than its holder; never cleared
+  opened_for_other_payer: boolean;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -2690,6 +2695,9 @@ export type QuoteLineRow = {
   bundle_items: Json | null;
   // PKG-06: the service recipient of a punch card line (null = the payer)
   recipient_contact_id: string | null;
+  // PKG-06 (owner (156) א): the recipient's name as sent (server only), and whose name it is (erasure finds it)
+  recipient_name: string | null;
+  recipient_named_contact_id: string | null;
   created_at: string;
   updated_at: string;
 };

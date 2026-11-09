@@ -61,6 +61,8 @@ const answerSchema = z.object({
       total_agorot: money,
       // PRD-09: an itemised bundle line's parts (names and quantities per bundle); null on any other line
       components: z.unknown().optional(),
+      // PKG-06 (owner (156) א): a punch card line's service recipient, the name as sent; null on any other line
+      recipient: z.string().nullable().optional(),
     }),
   ),
   schedule: z.array(z.object({ name: z.string(), percent_bp: z.number().int(), due_date: text, milestone: text, amount_agorot: money })),
@@ -170,6 +172,7 @@ export function publicOrderFrom(raw: unknown): PublicOrder | null {
       totalAgorot: line.total_agorot,
       bundleDisplay: Array.isArray(line.components) ? "itemised" : null,
       bundleParts: parseBundleItems(line.components),
+      recipientName: line.recipient ?? null,
     })),
     schedule: schedule.map((step, index) => ({
       key: `step-${index + 1}`,

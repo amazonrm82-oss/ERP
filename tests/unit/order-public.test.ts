@@ -56,6 +56,10 @@ describe("the customer's order page (ORD-05)", () => {
     const page = publicOrderFrom(answer)!;
     expect(page.order).toMatchObject({ numberDisplay: "ORD-1001", status: "new", totalAgorot: 23600, dealId: null, contactId: null });
     expect(page.lines.map((l) => l.id)).toEqual(["line-1"]);
+    // PKG-06 (owner (156) א): a punch card line's service recipient, the name as sent; an older answer has none
+    expect(page.lines[0].recipientName ?? null).toBeNull();
+    const withRecipient = publicOrderFrom({ ...answer, lines: [{ ...answer.lines[0], recipient: "תמר כהן" }] })!;
+    expect(withRecipient.lines[0].recipientName).toBe("תמר כהן");
     expect(page.schedule[0]).toMatchObject({ key: "step-1", amountAgorot: 23600 });
     expect(page.business.address).toBe("הרצל 1, חיפה");
     expect(page.fingerprint).toBe("a".repeat(64));

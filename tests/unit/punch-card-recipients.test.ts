@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { PUNCH_ALERT_DEFAULTS, punchAlertSettingsSchema } from "@/features/punch-cards/alerts";
-import { isNoticesTo, NOTICES_TO, recipientLine, recipientOptionLabel } from "@/features/punch-cards/recipients";
+import { isNoticesTo, NOTICES_TO, recipientLine, recipientOptionLabel, servedForText } from "@/features/punch-cards/recipients";
 import { dbErrorMessage, GENERIC_ERROR } from "@/lib/errors";
 
 import { latestMigration } from "./helpers/migrations";
@@ -27,6 +27,11 @@ describe("payer and service recipient (PKG-06)", () => {
   it("the texts", () => {
     expect(recipientLine(null)).toBe("מקבל השירות: המשלם עצמו");
     expect(recipientLine("דנה")).toBe("מקבל השירות: דנה");
+    // owner (156) א: the customer's page and PDF line, from the name as sent
+    expect(servedForText("נועה לוי")).toBe("עבור: נועה לוי");
+    expect(servedForText("  ")).toBeNull();
+    expect(servedForText(null)).toBeNull();
+    expect(servedForText(undefined)).toBeNull();
     expect(recipientOptionLabel({ id: "x", name: "יואב", how: "employee" })).toBe("יואב (עובד בחברה המשלמת)");
     expect(recipientOptionLabel({ id: "x", name: "", how: "relation" })).toBe("ללא שם (קשר של המשלם)");
   });

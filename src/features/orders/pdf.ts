@@ -6,6 +6,7 @@
 
 import { ltr, type PdfBlock, type PdfDocument, type PdfLine, type PdfLogo, type PdfRow } from "@/features/pdf/document";
 import { bundlePartsText } from "@/features/products/bundle";
+import { servedForText } from "@/features/punch-cards/recipients";
 import { BILLING_LABELS } from "@/features/products/schema";
 import { BANK_HEADING } from "@/features/quotes/bank";
 import { bankPdfText } from "@/features/quotes/pdf";
@@ -30,7 +31,13 @@ function discountText(line: OrderLine): string {
 function lineNotes(line: OrderLine): string | null {
   const billing = line.billing !== "one_time" && line.billing in BILLING_LABELS ? BILLING_LABELS[line.billing as keyof typeof BILLING_LABELS] : null;
   // PRD-09: an itemised bundle lists its parts under the line, without prices
-  const parts = [line.description?.trim() || null, billing, bundlePartsText(line.bundleDisplay, line.bundleParts, line.quantity)].filter(Boolean);
+  // PKG-06 (owner (156) א): the punch card's service recipient, the name as sent
+  const parts = [
+    line.description?.trim() || null,
+    servedForText(line.recipientName),
+    billing,
+    bundlePartsText(line.bundleDisplay, line.bundleParts, line.quantity),
+  ].filter(Boolean);
   return parts.length > 0 ? parts.join("\n") : null;
 }
 

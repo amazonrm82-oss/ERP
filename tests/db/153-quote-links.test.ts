@@ -173,6 +173,8 @@ describe("the customer's link to a quote (QUO-08)", () => {
           "optional_selected",
           "position",
           "quantity",
+          // PKG-06 (owner (156) א): a punch card line's service recipient, the name as sent; null on any other line
+          "recipient",
           "total_agorot",
           "unit_name",
           "unit_price_agorot",

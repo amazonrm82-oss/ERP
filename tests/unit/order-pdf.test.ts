@@ -150,6 +150,19 @@ describe("the order confirmation PDF (ORD-05)", () => {
     expect(all).not.toContain(reverse("מסנן"));
   });
 
+  it("prints a punch card line's service recipient as sent, 'עבור: <name>', and nothing on other lines (PKG-06, owner (156) א)", async () => {
+    const data = sample(0);
+    data.lines = [
+      { ...line(1), name: "כרטיסיית חוג", recipientName: "נועה לוי" },
+      { ...line(2), name: "שיעור בודד", recipientName: null },
+    ];
+    const all = pdfText(await renderPdf(orderPdfDocument(data, null)))
+      .flatMap((page) => page.pieces.map((p) => p.text))
+      .join("\n");
+    expect(all).toContain(reverse("עבור: נועה לוי"));
+    expect(all.split(reverse("עבור:")).length).toBe(2);
+  });
+
   it("names the file after the order's number, keeps the document's wording, and links the customer's download", () => {
     expect(orderPdfFileName("ORD-2041")).toBe("אישור הזמנה ORD-2041.pdf");
     expect(orderPdfFileName(null)).toBe("אישור הזמנה.pdf");

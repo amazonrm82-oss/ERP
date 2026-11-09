@@ -185,7 +185,9 @@ export function signedQuotePdfFileName(numberDisplay: string | null, title: stri
 export function quoteSignedPdfDocument(data: QuoteDocumentData, logo: PdfLogo | null, signature: QuoteSignature): PdfDocument {
   // owner (38) ב: the customer named as printed when the quote was sent (QUO-07) with their billing address, email and tax id,
   // like the PDF as sent; staff read them with their session, the customer's route from quote_signed_pdf_public's `billing`
-  const base = quotePdfDocument(data, logo, { accepted: true });
+  // PKG-06 (review HIGH 1, lead's interim choice until the owner answers): the signed PDF does not print a punch card line's
+  // service recipient ("עבור: ..."), so a privacy erasure has nothing to take from it
+  const base = quotePdfDocument({ ...data, lines: data.lines.map((line) => ({ ...line, recipientName: null })) }, logo, { accepted: true });
   const when = signedAtText(signature.decidedAt, signature.timeZone);
   const wording =
     signature.wordingVersion === ACCEPT_WORDING_VERSION

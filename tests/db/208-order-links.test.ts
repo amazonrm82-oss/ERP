@@ -179,7 +179,8 @@ describe("the customer's link to an order (ORD-05)", () => {
     expect(p.lines).toHaveLength(1);
     expect(Object.keys(p.lines[0]).sort()).toEqual(
       // PRD-09: components = an itemised bundle's parts (names and quantities only); null on any other line
-      ["billing", "components", "description", "discount_agorot", "discount_bp", "kind", "name", "position", "quantity", "total_agorot", "unit_name", "unit_price_agorot", "vat_exempt"].sort(),
+      // PKG-06 (owner (156) א): recipient = a punch card line's service recipient, the name as sent; null on any other line
+      ["billing", "components", "description", "discount_agorot", "discount_bp", "kind", "name", "position", "quantity", "recipient", "total_agorot", "unit_name", "unit_price_agorot", "vat_exempt"].sort(),
     );
     // ORD-04: the schedule with each step's share of the total (23,600: 30% and 70%)
     expect(p.schedule.map((s) => s.amount_agorot)).toEqual([7080, 16520]);

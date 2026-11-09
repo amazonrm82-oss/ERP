@@ -1,6 +1,7 @@
 import { BrandScope } from "@/features/branding/components/brand-scope";
 import { OrgLogo } from "@/features/branding/components/org-logo";
 import { BundleItemsList } from "@/features/products/components/bundle-items-list";
+import { servedForText } from "@/features/punch-cards/recipients";
 import { BILLING_LABELS } from "@/features/products/schema";
 import { vatRateLabel } from "@/features/tax/rates";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
@@ -162,6 +163,11 @@ export function QuoteDocument({ data, headingLevel = 1 }: { data: QuoteDocumentD
                           <bdi>{line.name}</bdi>
                         </p>
                         {line.description ? <p className="whitespace-pre-line text-ink-soft">{line.description}</p> : null}
+                        {servedForText(line.recipientName) ? (
+                          <p className="text-ink-soft">
+                            <bdi>{servedForText(line.recipientName)}</bdi>
+                          </p>
+                        ) : null}
                         {optionalNote(line) || line.billing !== "one_time" ? (
                           <p className="text-ink-soft">{[optionalNote(line), line.billing !== "one_time" ? BILLING_LABELS[line.billing] : null].filter(Boolean).join(", ")}</p>
                         ) : null}
@@ -197,6 +203,11 @@ export function QuoteDocument({ data, headingLevel = 1 }: { data: QuoteDocumentD
                       <span className={`shrink-0 font-medium tabular-nums ${isCounted(line) ? "" : "text-ink-soft"}`}>{formatMoney(line.totalAgorot)}</span>
                     </div>
                     {line.description ? <p className="whitespace-pre-line text-ink-soft">{line.description}</p> : null}
+                    {servedForText(line.recipientName) ? (
+                      <p className="text-ink-soft">
+                        <bdi>{servedForText(line.recipientName)}</bdi>
+                      </p>
+                    ) : null}
                     <p className="text-ink-soft">
                       {formatNumber(line.quantity)}
                       {line.unitName ? ` ${line.unitName}` : ""} × {formatMoney(line.unitPriceAgorot)}

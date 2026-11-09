@@ -12,7 +12,7 @@ type Row = Record<string, unknown>;
 type HolderEntry = { contact?: unknown; until?: unknown };
 export type Holding = { from: Date; until: Date | null };
 
-const PURCHASE_FIELDS = ["payment_id", "price_agorot", "currency", "order_line_id", "quote_line_id", "deal_line_id", "unit_no", "activated_by", "activated_at", "activated_manually", "created_by", "payment_void_at"] as const;
+export const PURCHASE_FIELDS = ["payment_id", "price_agorot", "currency", "order_line_id", "quote_line_id", "deal_line_id", "unit_no", "activated_by", "activated_at", "activated_manually", "created_by", "payment_void_at"] as const;
 
 const entries = (history: unknown): HolderEntry[] => (Array.isArray(history) ? (history as HolderEntry[]) : []);
 const instant = (value: unknown): Date | null => {
@@ -43,14 +43,50 @@ function shown(spans: readonly Holding[], timeZone: string) {
 }
 
 // PKG-06: what a payer's export carries of a card another contact (the service recipient) holds: the purchase, never the
-// holder, its history or its use
-const PAID_FIELDS = ["id", "name", "product_id", "entries_total", "status", "payment_id", "price_agorot", "currency", "order_line_id", "quote_line_id", "unit_no", "activated_at", "expires_on", "cancelled_at", "payer_contact_id", "payer_company_id", "created_at"] as const;
+// holder, its history or its use. Owner (164) ב: the purchase the recipient's export leaves out is here, except the staff
+// fields (who activated or opened it, and whether by hand), which neither export carries (lead's choice).
+export const PURCHASE_STAFF_FIELDS = ["activated_by", "created_by", "activated_manually"] as const;
+const PAID_FIELDS = [
+  "id",
+  "name",
+  "product_id",
+  "entries_total",
+  "status",
+  "payment_id",
+  "price_agorot",
+  "currency",
+  "order_line_id",
+  "quote_line_id",
+  "deal_line_id",
+  "unit_no",
+  "activated_at",
+  "payment_void_at",
+  "expires_on",
+  "cancelled_at",
+  "payer_contact_id",
+  "payer_company_id",
+  "created_at",
+] as const;
 
 /** A card the person paid for and someone else holds, as their export carries it. */
 export function paidCardForExport(card: Row): Row {
   const copy: Row = {};
   for (const field of PAID_FIELDS) if (field in card) copy[field] = card[field];
   return copy;
+}
+
+/** Owner (159) ב: the mark on a card of the person's export that was opened from a document of another payer. */
+export const OPENED_FROM_OTHER_CUSTOMER = "נפתחה ממסמך של לקוח אחר";
+
+/**
+ * The card was paid for by a contact or a company that is not the person (the payer columns are set only then). Review
+ * LOW 3: once the payer is purged its columns are empty, and the server-kept `opened_for_other_payer` still says so.
+ */
+function paidByAnother(card: Row, contactIds: readonly string[]): boolean {
+  const contact = card.payer_contact_id;
+  if (typeof contact === "string" && contact !== "") return !contactIds.includes(contact);
+  if (typeof card.payer_company_id === "string" && card.payer_company_id !== "") return true;
+  return card.opened_for_other_payer === true;
 }
 
 /** A card, as the person's export carries it (their current card or one they held before). */
@@ -64,7 +100,13 @@ export function cardForExport(card: Row, uses: Row[], contactIds: readonly strin
   // PKG-06 (review finding 5): who paid is another person's data on the holder's card
   delete copy.payer_contact_id;
   delete copy.payer_company_id;
-  if (!fromCreation) for (const field of PURCHASE_FIELDS) delete copy[field];
+  delete copy.opened_for_other_payer;
+  // owner (159) ב: a card opened from another customer's document says so, without the payer's name or the document's number;
+  // owner (164) ב: and it carries none of the payer's purchase (that stays in the payer's own export, punch_cards_paid), only
+  // what is the recipient's own: the card, its entries, validity, status and uses
+  const paidByOther = paidByAnother(card, contactIds);
+  if (paidByOther) copy.opened_from = OPENED_FROM_OTHER_CUSTOMER;
+  if (!fromCreation || paidByOther) for (const field of PURCHASE_FIELDS) delete copy[field];
   // a card held before: its current holder is someone else
   if (!(typeof card.contact_id === "string" && contactIds.includes(card.contact_id))) delete copy.contact_id;
   if (copy.cancel_reason != null && !within(instant(card.cancelled_at), spans)) copy.cancel_reason = null;

@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { renderPdf } from "@/features/pdf/render";
 import { ACCEPT_WORDING_VERSION, signedOnText } from "@/features/quotes/decision";
 import type { QuoteDocumentData } from "@/features/quotes/design-server";
+import { quotePdfDocument } from "@/features/quotes/pdf";
 import type { Quote, QuoteLine } from "@/features/quotes/queries";
 import {
   checkSignaturePng,
@@ -193,6 +194,17 @@ describe("the signed PDF of an accepted quote, read back from a real file (QUO-0
     expect(all).toContain("Acme Ltd.");
     expect(all).not.toContain("billing@acme.example");
     expect(all).not.toContain(reverse("מספר מזהה:"));
+  });
+
+  // PKG-06 (review HIGH 1, lead's interim choice): the PDF as sent prints "עבור: <name>", the signed PDF never does
+  it("leaves a punch card line's service recipient out of the signed PDF, while the PDF as sent prints it", async () => {
+    const data = sample(1);
+    const withRecipient = { ...data, lines: data.lines.map((l) => ({ ...l, recipientName: "נועה כהן" })) };
+    const signed = pieces(await renderPdf(quoteSignedPdfDocument(withRecipient, null, signature()))).join("\n");
+    expect(signed).not.toContain(reverse("עבור:"));
+    expect(signed).not.toContain(reverse("נועה כהן"));
+    const asSent = pieces(await renderPdf(quotePdfDocument(withRecipient, null))).join("\n");
+    expect(asSent).toContain(reverse("עבור: נועה כהן"));
   });
 
   it("a typed signature prints the name in the signature box and no image", async () => {
