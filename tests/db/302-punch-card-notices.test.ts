@@ -67,8 +67,19 @@ describe("punch card notices to the customer (PKG-03)", () => {
     asAdmin(async (q) =>
       (await q<Job>("select payload from app.jobs where organization_id = $1 and payload ->> 'contact_id' = $2 order by created_at, id", [org, contactId])).rows.map((r) => r.payload),
     );
-  const template = (kind: string) =>
-    asAdmin(async (q) => (await one<{ id: string }>(q, "select id from public.message_templates where organization_id = $1 and notice_kind = $2", [org, kind])).id);
+  // the seeded notice of a mark on one channel (SMS: the channel every phone-only contact here gets). "the channel" test adds
+  // WhatsApp and email copies of the few-left notice under the same mark, so a lookup by the mark alone answered whichever
+  // copy the plan met first (seen in full runs, never alone)
+  const template = (kind: string, channel = "sms") =>
+    asAdmin(async (q) =>
+      (
+        await one<{ id: string }>(
+          q,
+          "select id from public.message_templates where organization_id = $1 and notice_kind = $2 and channel = $3 order by created_at, id limit 1",
+          [org, kind, channel],
+        )
+      ).id,
+    );
   const setCustomerMessages = (on: boolean) =>
     asUser(owner.id, async (q) => {
       const updated = await q("update public.punch_card_alert_settings set customer_messages = $2 where organization_id = $1", [org, on]);

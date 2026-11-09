@@ -4,8 +4,21 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { addMember, asAdmin, asService, asUser, closePool, createOrg, createUser, defaultPipeline, pgError, type Query } from "./helpers";
+import { migrationFile, rerunClosure } from "./rerun";
 
 afterAll(closePool);
+
+// Re-runs _product_bundles.sql the way every re-running test must (tests/db/rerun.ts): with every later migration that redefines
+// one of its functions after it (PKG-06's _punch_card_recipients.sql redefines public.quote_duplicate). A bare re-run left the
+// 021136 body of quote_duplicate live for every later test file until test 64 put it back (seen in CI, where files run in another
+// order: test 306's duplicate lost its service recipient).
+async function rerunBundles() {
+  const rerun = rerunClosure([migrationFile("_product_bundles.sql")]);
+  expect(rerun.files).toContain(migrationFile("_punch_card_recipients.sql"));
+  await asAdmin(async (q) => {
+    for (const sql of rerun.sql) await q(sql);
+  });
+}
 
 type U = { id: string; email: string };
 type Part = { name: string; quantity: number; unit_name: string | null };
@@ -465,9 +478,7 @@ describe("bundles (PRD-09)", () => {
 
     // the migration's own fill: 'single' and the parts on the draft, nothing on the sent quote
     await clear();
-    const dir = path.join(process.cwd(), "supabase/migrations");
-    const file = readdirSync(dir).find((f) => f.endsWith("_product_bundles.sql")) as string;
-    await asAdmin((q) => q(readFileSync(path.join(dir, file), "utf8")));
+    await rerunBundles();
     const filled = await asAdmin(async (q) =>
       (await q<{ id: string; d: string | null; i: Part[] | null }>("select quote_id as id, bundle_display as d, bundle_items as i from public.quote_lines where quote_id = any($1)", [[draft, sent]])).rows,
     );
@@ -539,9 +550,7 @@ describe("bundles (PRD-09)", () => {
       await q("set local session_replication_role = replica");
       await q("update public.deal_lines set bundle_display = null where id = $1", [line]);
     });
-    const dir = path.join(process.cwd(), "supabase/migrations");
-    const file = readdirSync(dir).find((f) => f.endsWith("_product_bundles.sql")) as string;
-    await asAdmin((q) => q(readFileSync(path.join(dir, file), "utf8")));
+    await rerunBundles();
     const row = await asAdmin(async (q) => one<{ d: string | null }>(q, "select bundle_display as d from public.deal_lines where id = $1", [line]));
     expect(row.d).toBeNull();
     // its next update gives it the default choice
