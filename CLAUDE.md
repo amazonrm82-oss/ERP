@@ -1896,10 +1896,16 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   only = nothing when there is no live payer contact; a recipient without a channel = the payer. `app.send_punch_card_alerts`,
   `app.punch_cards_note`, `app.punch_cards_erase`, `app.sample_untouched`, `app.import_record_worked`, `public.quote_duplicate` and
   `app.order_lines_check` were last redefined in 021183; `app.merge_punch_recipients` moves lines and payer columns on the `merged`
-  entry (contacts and companies). The advisor's finding on `punch_card_recipient_options` is expected. Owner (156) א: the
-  customer's page and PDF will show "עבור: <name as sent>" (follow-up, not built yet); (159) ב: the recipient's export marks the card
-  "נפתחה ממסמך של לקוח אחר" without the payer (follow-up). Tests 64 and 88 end with
-  `_punch_card_recipients.sql`.
+  entry (contacts and companies). The advisor's finding on `punch_card_recipient_options` is expected. Since 021185 (owner (156) א, (159) ב,
+  (164) ב, (165) א; two reviews): quote/order lines keep `recipient_name` / `recipient_named_contact_id` (server only, taken by
+  `app.document_recipient_snapshot` when the document is sent or numbered, then frozen; merges repoint them through
+  `app.merge_recipient_names`), and `public.quote_public`, `public.order_public` (both last redefined in 021185; test 253 pins them),
+  the PDFs and the signed PDF print "עבור: <name as sent>" only when the recipient differs from the payer.
+  `punch_cards.opened_for_other_payer` (server only, trigger `punch_cards_other_payer`): set once the card has another payer, never
+  cleared, except by a contact merge that makes the payer the holder (`app.merge_punch_recipients`, last redefined in 021185, under the
+  transaction-local `app.punch_payer_merge`); the recipient's export marks such a card "נפתחה ממסמך של לקוח אחר" without payment, price
+  or line ids, the payer's export carries the purchase but never staff fields. `app.punch_cards_erase` was last redefined in 021185.
+  Tests 64 and 88 end with `_punch_recipient_names.sql`.
 - Punch card report (PKG-07, migration 021169; owner (116) א, (117) ב, (118) ב; two reviews): `public.report_punch_cards(org, days)`
   (invoker, `jit = off`, days 1..366 hint `report:days`) answers `{allowed:false}` to anyone but an owner, admin or manager by
   `app.membership_role`, and without `punch_cards`. Active cards are paid (a payment that still counts) | manual (count only) |
