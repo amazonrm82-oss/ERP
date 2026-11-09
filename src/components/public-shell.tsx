@@ -43,6 +43,12 @@ export function SiteFooter() {
                 מרכז עזרה
               </Link>
             </li>
+            {/* TRU-01 */}
+            <li>
+              <Link href={paths.roadmap} className="underline-offset-4 hover:underline">
+                מפת דרכים
+              </Link>
+            </li>
             {LEGAL_DOCUMENTS.map((doc) => (
               <li key={doc.slug}>
                 <Link href={paths.legal(doc.slug)} className="underline-offset-4 hover:underline">

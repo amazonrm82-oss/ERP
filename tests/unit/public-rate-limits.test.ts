@@ -60,6 +60,8 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
   "/auth/callback": { guard: "supabase-auth", limit: "Supabase Auth code / OTP verification limits", refusal: "redirect to /login with an error" },
   "/help": { guard: "static", limit: "help center from code", refusal: "none" },
   "/help/[slug]": { guard: "static", limit: "help center from code", refusal: "none" },
+  // TRU-01: the public roadmap is a static list in the code; votes are cast inside the system
+  "/help/roadmap": { guard: "static", limit: "roadmap from code (src/features/roadmap/public-items.ts)", refusal: "none" },
   "/legal/[doc]": { guard: "static", limit: "legal texts from code", refusal: "none" },
   "/legal/subprocessors": {
     guard: "database",

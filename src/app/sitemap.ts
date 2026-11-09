@@ -13,6 +13,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     { url: url(paths.landing), changeFrequency: "weekly", priority: 1 },
     { url: url(paths.help), changeFrequency: "monthly" },
+    { url: url(paths.roadmap), changeFrequency: "monthly" },
     ...HELP_ARTICLES.map((article) => ({ url: url(paths.helpArticle(article.slug)), changeFrequency: "monthly" as const })),
     ...LEGAL_DOCUMENTS.filter((doc) => !doc.interim).map((doc) => ({ url: url(paths.legal(doc.slug)), changeFrequency: "yearly" as const })),
   ];

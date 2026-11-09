@@ -40,6 +40,9 @@ export const ACTION_LABELS: Record<string, string> = {
   // ADM-04
   "banner.add": "הודעת מערכת חדשה",
   "banner.end": "הסרת הודעת מערכת",
+  // TRU-01
+  "roadmap.add": "פריט חדש במפת הדרכים",
+  "roadmap.update": "עדכון פריט במפת הדרכים",
   // ADM-05
   "support_request.status": "שינוי מצב של פנייה לתמיכה",
   "support_request.note": "הערה פנימית בפנייה לתמיכה",

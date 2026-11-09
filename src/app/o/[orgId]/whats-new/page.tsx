@@ -35,6 +35,12 @@ export default async function WhatsNewPage({ params }: { params: Promise<{ orgId
         </ol>
       </Card>
       <p className="mt-5 text-md">
+        מה בבנייה ומה מתוכנן:{" "}
+        <Link href={paths.orgRoadmap(orgId)} className="text-accent-strong underline underline-offset-4">
+          מפת הדרכים
+        </Link>
+      </p>
+      <p className="mt-2 text-md">
         משהו לא ברור, או חסר לכם משהו?{" "}
         <Link href={paths.support(orgId)} className="text-accent-strong underline underline-offset-4">
           פנייה לתמיכה

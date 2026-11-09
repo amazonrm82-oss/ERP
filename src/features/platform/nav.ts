@@ -13,6 +13,8 @@ export const ADMIN_NAV = [
   // ADM-04, ADM-05
   { href: paths.adminBanners, label: "הודעות מערכת" },
   { href: paths.adminSupport, label: "פניות תמיכה" },
+  // TRU-01
+  { href: paths.adminRoadmap, label: "מפת דרכים" },
   { href: paths.adminStaff, label: "צוות" },
   { href: paths.adminLog, label: "יומן" },
   { href: paths.adminDesign, label: "עיצוב" },

@@ -4617,6 +4617,21 @@ export type Database = {
       // [{ id, body, severity: info | warning, dismissable }], at most 3; [] to a non-member
       system_banners_for: { Args: { p_org: string }; Returns: Json };
       system_banner_dismiss: { Args: { p_org: string; p_banner: string }; Returns: undefined };
+      // TRU-01: the roadmap (platform owner/support write; every platform role lists with vote counts; members read and vote)
+      platform_add_roadmap_item: {
+        Args: { p_title: string; p_description: string; p_status: string; p_published: boolean; p_sort_order: number; p_request_ids: string[] };
+        Returns: string;
+      };
+      platform_update_roadmap_item: {
+        Args: { p_id: string; p_title: string; p_description: string; p_status: string; p_published: boolean; p_sort_order: number; p_request_ids: string[] };
+        Returns: undefined;
+      };
+      // [{ id, title, description, status, published, sort_order, request_ids, votes, created_at, updated_at }]
+      platform_list_roadmap_items: { Args: Record<string, never>; Returns: Json };
+      // [{ id, title, description, status, votes, voted, can_vote }]; [] to a non-member
+      roadmap_items_for: { Args: { p_org: string }; Returns: Json };
+      // { votes, voted }
+      roadmap_vote: { Args: { p_org: string; p_item: string; p_vote: boolean }; Returns: Json };
       // ADM-05: support requests on the platform panel (platform owner and support)
       // { total, counts: { open, in_progress, closed }, rows: [{ id, organization_id, organization_name, requester_*, category,
       //   subject, message, page_path, status, created_at, status_changed_at, notes: [{ id, body, author_name, created_at }] }] }

@@ -312,6 +312,10 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "subprocessor:end_before_start": "תאריך הסיום צריך להיות אחרי תאריך התחילה.",
   // ADM-04 (migration system_banners): a warning the platform marked as staying on screen
   "banner:not_dismissable": "את ההודעה הזו אי אפשר לסגור. היא תיעלם לבד בסוף התקופה שלה.",
+  // TRU-01 (migration roadmap): the business's one vote is cast by an owner or admin of an open business, on an item not done
+  "roadmap:vote_admin": "רק בעלים ומנהלי מערכת מצביעים בשם העסק.",
+  "roadmap:closed": "העסק סגור כרגע, ולכן אי אפשר להצביע.",
+  "roadmap:done": "הפריט הזה כבר נבנה, וההצבעה עליו הסתיימה.",
   // USR-12 (migration support_requests): 5 requests per person per hour
   "support:rate": `שלחתם כבר 5 פניות בשעה האחרונה. נסו שוב מאוחר יותר, או פנו אלינו ישירות: ${SUPPORT_LINE}.`,
   // IMP-04 (migration background_jobs): three open background jobs per person; mirrors src/features/background/rules.ts

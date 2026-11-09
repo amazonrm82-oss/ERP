@@ -102,6 +102,10 @@ export const paths = {
   // ADM-04 system banners, ADM-05 support requests
   adminBanners: "/admin/banners",
   adminSupport: "/admin/support",
+  // TRU-01: the roadmap (public static page, the business's page with votes, the platform screen)
+  roadmap: "/help/roadmap",
+  orgRoadmap: (orgId: string) => `/o/${orgId}/roadmap`,
+  adminRoadmap: "/admin/roadmap",
   // USR-12: what's new, and the support request form
   whatsNew: (orgId: string) => `/o/${orgId}/whats-new`,
   support: (orgId: string) => `/o/${orgId}/support`,
