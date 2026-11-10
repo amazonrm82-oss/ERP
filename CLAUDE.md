@@ -2637,7 +2637,9 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   (server-only reason `sms_reply`, hash only, outside the 100,000 cap; `consent_blocklist_add_noted` last redefined in 021203) and a
   withdrawn consent on records holding it as primary phone; whole-message match against `src/features/messaging/sms-optout-words.json`
   (mirrored by `app.sms_optout_words`, unit test); 600 opt-outs a minute per business. `public.sms_sender_code_issue` (service_role,
-  lease-bound) has NO CALLER YET either: the future SMS sender needs its own "In use" line in hard rule 5 for both.
+  lease-bound) has NO CALLER YET either: the future SMS sender needs its own "In use" line in hard rule 5 for both. The advisor's
+  findings on `record_sms_queue`, `sms_sender_verify(_start)`, the two `platform_*sms_sender*` functions and the four new app tables
+  (`sms_optout_counts`, `sms_quota_months`, `sms_quota_notices`, `sms_sender_checks`) are expected.
 - Document templates (SGN-01, migration 021200; owner (67) ג, (200) א, (201) ב, (202) ב; independent review): plan key
   `signatures` (personal off; basic, pro, business on) and `max_signatures_per_month` (0 / 20 / 100 / no cap; counted by SGN-02,
   nothing counts it yet); `app.plan_key_defaults` was last redefined in 021200. `public.document_templates` (managed list: members
