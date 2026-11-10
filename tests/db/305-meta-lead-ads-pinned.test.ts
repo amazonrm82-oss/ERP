@@ -33,9 +33,13 @@ const REVIEWED_HELPER_MD5: Record<string, string> = {
 };
 // Third review, R2: these three carry the page-ownership rule (only a VERIFIED live connection takes a page, the going-live
 // check, the secret save's lock order). A change needs a fresh review against review finding 1 and N1-N2.
+// Re-open fix (_meta_page_taken_reopen.sql, 10 November 2026; reviewed independently on 10 November 2026): app.integrations_check's
+// going-live condition also runs when an update clears a set last_error_code (a new token on a connection ended by
+// page_taken), so the save is refused with integration:taken while the page is verified elsewhere. Nothing else changed;
+// the page lock is still taken before the row by every path (integration_secret_set's order is unchanged).
 const REVIEWED_OWNERSHIP_MD5: Record<string, string> = {
   "app.integration_page_taken": "4238ceb0a268c9f6fdcfc5be73d06497",
-  "app.integrations_check": "cb1449612233fea234ac86ba829d1517",
+  "app.integrations_check": "17de443b7aed3948d081e6b2346cefc4",
   "public.integration_secret_set": "ce21bf64ac5578e0f00ecafd0cc2d6f7",
 };
 
