@@ -200,6 +200,21 @@ and build this CRM here instead. The old code is preserved on the branch
    token). `public.consent_preference_link_for_job(job, lease)` (service_role, lease-bound, refuses service types) has NO CALLER YET;
    the future sender needs its own "In use" line. In the eslint allow-list. The advisor's findings on
    `consent_preference_link_create` and the three `app.consent_preference_*` tables are expected.
+   In use (SGN-02, owner 9 and 10 November 2026, answers (191) א, (219) ב, (223) ב, (224) ב; migrations 021212 and 021213 pasted by
+   hand; two full independent reviews and two delta reviews): a document for signature (`src/features/signatures/public-server.ts`,
+   page `/f/sign/<token>`, routes `POST /api/forms/sign/<token>` and `GET /api/forms/sign/<token>/pdf`), which calls only
+   `public.signature_public()` (title, filled text, status and dates, the business display name, phone, logo, colour and time zone;
+   120 views per link and 60 per sender, keyed IP hash scope `signature`, in 10 minutes; a view moves sent to viewed),
+   `public.signature_public_sign()` (one signature kept like `quote_decisions`, on the shown fingerprint, only a wording version
+   registered in `app.signature_wording_versions`; 10 tries per link in 10 minutes) and, after signing, `public.signature_public_pdf()`
+   (path, SHA-256 and name only, only through the link it was signed with; the link's window plus 20 downloads per sender in 10
+   minutes; the bytes compared with the SHA-256); one not-found rule `app.signature_link_usable` (unknown or replaced token, record in
+   the bin or purged, a detached or erased document, public pages closed, no `signatures` key); cancelled or expired = state only. Its
+   signed PDF (`src/features/signatures/pdf-server.ts`) calls only `public.signature_pdf_public()` and `signature_pdf_public_store()`
+   from the sign route after a signature, and `public.signature_pdf_store()` for an owner or admin after `signature_pdf_allowed` with
+   their session; it uploads (upsert off) only to the path the database answers, which checks the object before keeping a `files`
+   row (`files.signature_document_id`, read by owners and admins only, no person adds or removes it; SHA-256 checked when served).
+   Never framed, no-referrer; shared not-found limit; preview bots read nothing. In the eslint allow-list.
    In use (PRK-02, owner 26 October 2026, wave 3 use (3), migration 021147): the public privacy-request page
    (`src/features/privacy-requests/public-server.ts`, page `/f/privacy/<token>`, route `POST /api/forms/privacy/<token>`), which calls
    only `public.privacy_request_page()` (the business's display name `organizations.name`, logo and colour only) and
@@ -2747,6 +2762,23 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   alone is never trusted); no health declaration is seeded until PRV-05. Merge fields are a closed list per record type,
   `app.document_merge_fields` = `src/features/document-templates/fields.ts` (hint `document_template:field`); HEB-01 blocks hold.
   Nothing is filled, sent or signed yet (SGN-02). Page `/settings/document-templates`.
+- Signing documents (SGN-02, migrations 021212 and 021213 pasted by hand; hard rule 5, In use (SGN-02 …)): `public.signature_documents`
+  (a filled SGN-01 template on a lead, contact, company or deal; status draft..signed|cancelled|expired; column select grants for every
+  column but the server-only `people`, the leads/contacts the document names, read through `public.signature_documents_naming`,
+  owners/admins, 2,000 ids) and `public.signature_signatures` (owners/admins read). The database fills the template
+  (`app.signature_document_fill` over `app.document_fill`, values escaped by `app.document_literal`, direction marks removed by
+  `app.document_strip_invisible`); `public.signature_document_draft` gives the editor its sections and `signature_document_send` refuses
+  a body whose locked sections (`::: נעול` ... `:::`, whole lines only, `app.document_locked_segments` = `lockedSegments()`, shared fixture
+  `document-locked-sections.json`) or filled values changed (`signature_document:locked_changed`) or that holds bidi or zero-width
+  characters (`signature_document:invisible`). Counted against `max_signatures_per_month`. A purge detaches documents
+  (`former_*_id`, `customer_deleted_at`; triggers `*_signature_documents_detach`, skipped while the business is deleted; read by
+  owners, admins and managers, the signature and PDF owners/admins only); `app.audit_erase_core` (last redefined in 021212) calls
+  `app.signature_documents_erase` for every record type (by `people`, the `former_*` columns and a contact's deals), which empties the
+  text, title, signer's details, timeline entries and notices, revokes the link and calls `app.signature_pdf_drop` (body in the pasted
+  021213). `app.lead_retention_candidates` (last redefined in 021212) keeps a lead that holds or is named by a signed document.
+  `app.document_templates_check` was last redefined in 021212 (locked sections). The files_select policy and the storage policy
+  `record_files_delete` were last altered in 021212; `files_one_subject` counts ten columns. Tests 64 and 88 end with
+  `_signature_pdf_erase.sql`. Questions 234-235 built as (א); a document sent before 021212 has no `people` (none on hosted).
 - In-app guide (UX-05, migration 021199; owner's answers 203 ב, 204 א, 205 א, 206 ב, 10 November 2026): `profiles.guide_tour_seen_at` (own column
   grant; null = the first-visit tour opens; never marked in a support session; replaying from the account menu "סיור במערכת" changes
   nothing). Texts are Markdown in `docs/help/` (articles, screens, tour; frontmatter checked by `tests/unit/in-app-guide.test.ts`),
