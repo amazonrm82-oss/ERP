@@ -2601,6 +2601,14 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   only the request itself (text, page, business, requester) and no record of the business; opening any business record still needs a
   session; each request is logged once per staff member (`app.support_request_reads`, one `support_request.read` entry, id only).
   Email to the support team waits for an email provider (owner (48)).
+- Public roadmap (TRU-01, migration 021197; owner's answer 192, 9 November 2026; two reviews): `app.roadmap_items` and
+  `app.roadmap_votes` (schema app, RLS on, no grants), written only by `platform_add/update_roadmap_item` (owner/support, aal2,
+  logged `roadmap.add|update`); `platform_list_roadmap_items` answers `{items, total}` (newest 500; linked support request ids only to
+  owner/support). Members read published items through `public.roadmap_items_for` (`app.role_in`) and owners/admins cast the
+  business's one vote per item through `public.roadmap_vote` (`app.membership_role`; closed or deleted business refused,
+  `roadmap:closed`; done items `roadmap:done`); only counts and the caller's own vote go out, never which business voted, never a
+  support request's text. The public page `/help/roadmap` is a static list in `src/features/roadmap/public-items.ts` (five items,
+  status only, no dates, "הסדר והזמנים עשויים להשתנות"); changing that list needs the owner's approval; no service key.
 - Imports (migration 0012): `import_jobs` plus `import_job_id` on leads/contacts/companies (guarded:
   only a running job of the same user and type, set on insert, never changed). `emit_event` marks such
   inserts `origin: 'import'`; `process_outbox` skips origins `automation` and `import`;
