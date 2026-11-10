@@ -392,9 +392,17 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   (`mfa_required_orgs()`, `mfa_status()`). The proxy calls `auth.getUser()` so signed-out sessions end
   on the next page load; since FXC-10 a transient auth error (`isTransientAuthError`, src/lib/auth-transient.ts: network, 5xx, 429, unknown)
   never signs out: the proxy lets the request through and pages throw `AuthUnavailableError` ("בעיית תקשורת"). Since FXC-13 `src/app/global-error.tsx` is a Hebrew RTL page for a failing root layout, and
-  `src/instrumentation.ts` `onRequestError` logs one line per error (`requestErrorLine()`, src/lib/request-error-log.ts: digest =
+  `src/instrumentation.ts` `onRequestError` logs one line per error (`requestErrorFields()`, event `request.error`, src/lib/request-error-log.ts: digest =
   the support code, route, method, path without query and with the secret token of a public link replaced by `[token]` (`redactPublicPath`), redacted message; never headers, cookies or body). Each admin page checks `platformReady()` itself: Next renders a page in
   parallel with its layout, so a layout cannot guard its pages.
+- Structured logs (OPS-06, no migration; independent review): `src/lib/log.ts` is the ONLY writer to the console on the server
+  (eslint `no-console`, `no-restricted-globals` console and `process.stdout|stderr` for `src/**` except it; a unit scan too): one JSON
+  line per event `{time, level, event, request_id, org_id?, …}` with a CLOSED field list `LOG_FIELDS` (each with a kind; an unknown
+  field or a value that fails its kind is dropped; a new field needs an entry there), free text through `redactText` (emails, phones,
+  JWTs, base64 runs, credentials after Bearer/token=/key=, never a body, header, token, address or message content), paths through
+  the `path` kind (query dropped, percent-decoded, public-link tokens hidden by `redactPublicPath`). The request id is
+  `x-crm-request-id`, set (overwritten) by `src/lib/supabase/proxy.ts` from a valid `x-vercel-id` else a new uuid (`src/lib/request-id.ts`);
+  `serverLog()` in `src/lib/log-server.ts` reads it inside a request, `logEvent` outside one (prerendered code).
 - Backup codes (migration 0015): `app.mfa_recovery_codes` holds SHA-256 hashes only (schema app, no
   API access). `mfa_recovery_codes_create()` needs aal2; `mfa_recover(code)` (password session) deletes
   the user's rows in `auth.mfa_factors`, logs `mfa_recovery` in the audit log of their organizations,
