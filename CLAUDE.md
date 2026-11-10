@@ -214,7 +214,8 @@ and build this CRM here instead. The old code is preserved on the branch
    from the sign route after a signature, and `public.signature_pdf_store()` for an owner or admin after `signature_pdf_allowed` with
    their session; it uploads (upsert off) only to the path the database answers, which checks the object before keeping a `files`
    row (`files.signature_document_id`, read by owners and admins only, no person adds or removes it; SHA-256 checked when served).
-   Never framed, no-referrer; shared not-found limit; preview bots read nothing. In the eslint allow-list.
+   Never framed, no-referrer; shared not-found limit; preview bots read nothing. In the eslint allow-list. The advisor's findings on
+   the six staff `signature_*` definers (cancel, draft, link, send, documents_naming, pdf_allowed) and the six `app.signature_*` tables are expected.
    In use (PRK-02, owner 26 October 2026, wave 3 use (3), migration 021147): the public privacy-request page
    (`src/features/privacy-requests/public-server.ts`, page `/f/privacy/<token>`, route `POST /api/forms/privacy/<token>`), which calls
    only `public.privacy_request_page()` (the business's display name `organizations.name`, logo and colour only) and
