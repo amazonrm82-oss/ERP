@@ -2772,13 +2772,24 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `document-locked-sections.json`) or filled values changed (`signature_document:locked_changed`) or that holds bidi or zero-width
   characters (`signature_document:invisible`). Counted against `max_signatures_per_month`. A purge detaches documents
   (`former_*_id`, `customer_deleted_at`; triggers `*_signature_documents_detach`, skipped while the business is deleted; read by
-  owners, admins and managers, the signature and PDF owners/admins only); `app.audit_erase_core` (last redefined in 021212, defined again unchanged in 021214 to fix the hosted copy's transport) calls
-  `app.signature_documents_erase` for every record type (by `people`, the `former_*` columns and a contact's deals), which empties the
-  text, title, signer's details, timeline entries and notices, revokes the link and calls `app.signature_pdf_drop` (body in the pasted
-  021213). `app.lead_retention_candidates` (last redefined in 021212) keeps a lead that holds or is named by a signed document.
+  owners, admins and managers, the signature and PDF owners/admins only); `app.audit_erase_core` (last redefined in 021216) calls, for a lead or contact and BEFORE it erases the record's
+  audit entries, `app.signature_documents_erase_named` (owner (234) ב): documents of OTHER records that name the person (`people`, or a
+  document of the contact's deal) keep status, link and dates, and the person's values (full names, phones of 7+ digits, emails, ID,
+  addresses, birth date from the deleted row and audit history; a lone first/last name only in the deal's own document; for a SIGNED
+  document only values held at `signed_at`, names 3+ characters) become "(נמחק)", whole words only (`app.signature_scrub`), in text,
+  title, timeline entries (audit erased) and notices; server-only `signature_documents.text_erased_at` is stamped and a signed document
+  shows "פרטים אישיים הוסרו מהמסמך אחרי החתימה (מחיקת פרטיות)" (page, staff, remade PDF; `text_erased` boolean); an unsigned one gets
+  the new text's fingerprint, a signed one keeps `content_sha256`. The signature is emptied when the person signed (the deal's contact at
+  signing, or name/ID held at signing). `app.signature_pdf_source` answers `document.fingerprint` (current text) and
+  `app.signature_pdf_write` refuses a render of a changed text (`changed`); erasures take `signature_pdf:<id>` locks and abandon open
+  attempts. Then `app.signature_documents_erase` (last redefined in 021216) empties the person's own documents and a purged deal's or
+  company's (text, title, signer, timeline, notices, link, `app.signature_pdf_drop`, body in the pasted 021213). `public.signature_public`,
+  `app.signature_pdf_source` and `app.signature_pdf_write` were last redefined in 021216. Detached documents are listed on
+  `/settings/deleted-customer-documents` ("מסמכים ללא רשומה", owner (235) ב; owners, admins, managers by role, the user's session; the
+  signed PDF for owners and admins only). Accepted (review): a rare 40P01 between two concurrent erasures in one business. `app.lead_retention_candidates` (last redefined in 021212) keeps a lead that holds or is named by a signed document.
   `app.document_templates_check` was last redefined in 021212 (locked sections). The files_select policy and the storage policy
   `record_files_delete` were last altered in 021212; `files_one_subject` counts ten columns. Tests 64 and 88 end with
-  `_audit_erase_core_again.sql`. Questions 234-235 built as (א); a document sent before 021212 has no `people` (none on hosted).
+  `_signature_erase_named.sql`. Questions 241-243 built as (א); a document sent before 021212 has no `people` (none on hosted).
 - In-app guide (UX-05, migration 021199; owner's answers 203 ב, 204 א, 205 א, 206 ב, 10 November 2026): `profiles.guide_tour_seen_at` (own column
   grant; null = the first-visit tour opens; never marked in a support session; replaying from the account menu "סיור במערכת" changes
   nothing). Texts are Markdown in `docs/help/` (articles, screens, tour; frontmatter checked by `tests/unit/in-app-guide.test.ts`),
