@@ -31,7 +31,6 @@ import {
   IMPORT_TARGETS,
   MAX_IMPORT_ROWS,
   PRODUCT_DUPLICATE_HINT,
-  suggestMapping,
   TASK_DUPLICATE_HINT,
   type DuplicateModeKey,
   type ImportEntityKey,
@@ -52,6 +51,7 @@ import { HISTORY_HINTS, mapsHistory } from "../history";
 import { mapsOpeningBalance, OPENING_HINTS, OPENING_KEYS } from "../opening-balance";
 import { columnValues } from "../new-field";
 import { moreRowsText, warnedRowsTitle } from "../wording";
+import { presetFor, presetMapping, presetMarkText, sourceSystem, SOURCE_SYSTEMS, type PresetMark } from "../source-systems";
 import { NewFieldForm } from "./new-field-form";
 
 type CustomField = { key: string; label: string };
@@ -154,6 +154,9 @@ export function ImportWizard({
   const [mode, setMode] = useState<DuplicateModeKey>("skip");
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const [mapping, setMapping] = useState<string[]>([]);
+  // CHN-05: the system the file was exported from ("" = a file of my own) and how its preset filled each column
+  const [system, setSystem] = useState("");
+  const [marks, setMarks] = useState<PresetMark[]>([]);
   const [preview, setPreview] = useState<RowOutcome[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -181,7 +184,9 @@ export function ImportWizard({
     try {
       const read = await readFile(file);
       setSheet(read);
-      setMapping(suggestMapping(read.headers, targets));
+      const filled = presetMapping(read.headers, system, entity, targets);
+      setMapping(filled.mapping);
+      setMarks(filled.marks);
       setStep("map");
     } catch (e) {
       setError(e instanceof Error ? e.message : "לא הצלחנו לקרוא את הקובץ.");
@@ -315,6 +320,7 @@ export function ImportWizard({
     setNewFieldFor(null);
     setSheet(null);
     setMapping([]);
+    setMarks([]);
     setPreview([]);
     setError(null);
     setProgress(0);
@@ -344,6 +350,10 @@ export function ImportWizard({
   const declaration = consentDeclarationSchema.safeParse({ method: consentMethod, note: consentNote });
   const missingDeclaration = withConsent && !declaration.success;
   const listHref = isProduct ? productsPath(orgId) : RECORD_TYPES[entity].list(orgId);
+
+  // CHN-05: the preset applies only when the system has one for the object being imported
+  const chosenSystem = presetFor(system, entity) ? sourceSystem(system) : null;
+  const presetCount = marks.filter((m) => m === "preset").length;
 
   function chooseEntity(next: ImportEntityKey) {
     setEntity(next);
@@ -375,6 +385,26 @@ export function ImportWizard({
               ))}
             </div>
           </fieldset>
+          {entity === "lead" || entity === "contact" || entity === "company" || entity === "deal" ? (
+            <SelectField
+              label="מאיזו מערכת הקובץ?"
+              hint={
+                system && !presetFor(system, entity)
+                  ? `אין מיפוי מוכן של ${sourceSystem(system)?.label ?? ""} ל${entityLabel}. העמודות יותאמו לפי השמות שלהן.`
+                  : "לא חובה. מערכת מהרשימה ממלאת את מיפוי העמודות לפי הייצוא שלה, ואפשר לשנות כל עמודה."
+              }
+              value={system}
+              onChange={(e) => setSystem(e.target.value)}
+              className="max-w-sm"
+            >
+              <option value="">קובץ משלי, או מערכת אחרת</option>
+              {SOURCE_SYSTEMS.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.label}
+                </option>
+              ))}
+            </SelectField>
+          ) : null}
           <div>
             <p className="mb-1.5 text-sm font-medium" id={`${fileId}-label`}>
               קובץ Excel או CSV
@@ -407,6 +437,16 @@ export function ImportWizard({
             <p className="border-b border-line px-4 py-3 text-md sm:px-5">
               <span className="font-semibold">{sheet.fileName}</span>: {formatNumber(sheet.rows.length)} שורות, ייבוא ל{entityLabel}. לכל עמודה בחרו לאיזה שדה היא נכנסת.
             </p>
+            {chosenSystem ? (
+              <div className="border-b border-line px-4 py-3 text-sm sm:px-5">
+                <p>
+                  {presetCount > 0
+                    ? `${formatNumber(presetCount)} עמודות מולאו לפי המיפוי המוכן של ${chosenSystem.label}, ומסומנות ברשימה. בדקו כל עמודה לפני ההמשך.`
+                    : `לא מצאנו בקובץ עמודות של הייצוא הרגיל של ${chosenSystem.label}. העמודות הותאמו לפי השמות שלהן.`}
+                </p>
+                {chosenSystem.note ? <p className="mt-1 text-ink-soft">{chosenSystem.note}</p> : null}
+              </div>
+            ) : null}
             <ul className="divide-y divide-line">
               {sheet.headers.map((header, index) => (
                 <li key={index} className="grid gap-2 px-4 py-3 sm:grid-cols-[1fr_1fr_16rem] sm:items-center sm:px-5">
@@ -417,8 +457,12 @@ export function ImportWizard({
                   <div className="space-y-1">
                     <Select
                       aria-label={`שדה לעמודה ${header}`}
+                      aria-describedby={chosenSystem && marks[index] ? `${fileId}-mark-${index}` : undefined}
                       value={mapping[index] ?? ""}
-                      onChange={(e) => setMapping((m) => m.map((v, i) => (i === index ? e.target.value : v)))}
+                      onChange={(e) => {
+                        setMapping((m) => m.map((v, i) => (i === index ? e.target.value : v)));
+                        setMarks((m) => m.map((v, i) => (i === index ? null : v)));
+                      }}
                     >
                       <option value="">לא לייבא</option>
                       {targets.map((t) => (
@@ -427,6 +471,9 @@ export function ImportWizard({
                         </option>
                       ))}
                     </Select>
+                    {chosenSystem && presetMarkText(marks[index] ?? null, chosenSystem.label) ? (
+                      <p id={`${fileId}-mark-${index}`} className="text-sm text-ink-soft">{presetMarkText(marks[index] ?? null, chosenSystem.label)}</p>
+                    ) : null}
                     {canAddField && !mapping[index] && newFieldFor !== index ? (
                       <Button variant="ghost" size="sm" onClick={() => setNewFieldFor(index)} aria-label={`שדה חדש לעמודה ${header}`}>
                         + שדה חדש
@@ -444,6 +491,7 @@ export function ImportWizard({
                       onCreated={(field) => {
                         setCustomFields((all) => ({ ...all, [entity]: [...all[entity], field] }));
                         setMapping((m) => m.map((v, i) => (i === index ? `${CUSTOM_PREFIX}${field.key}` : v)));
+                        setMarks((m) => m.map((v, i) => (i === index ? null : v)));
                         setNewFieldFor(null);
                       }}
                     />
