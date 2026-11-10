@@ -21,7 +21,7 @@ type Props = { params: Promise<{ orgId: string }> };
 
 export default async function NewLeadPage({ params }: Props) {
   const { orgId } = await params;
-  const { canWrite } = await getOrgContext(orgId);
+  const { canWrite, user } = await getOrgContext(orgId);
   const term = (await getOrgTerms(orgId)).lead;
   const back = { href: paths.leads(orgId), label: term.plural };
 
@@ -47,7 +47,7 @@ export default async function NewLeadPage({ params }: Props) {
       <PageHeader title={term.newOne} back={back} />
       <Card>
         <CardBody>
-          <LeadForm orgId={orgId} statuses={statuses} sources={sources} fields={fields} reasons={reasons} products={products} />
+          <LeadForm orgId={orgId} userId={user.id} statuses={statuses} sources={sources} fields={fields} reasons={reasons} products={products} />
         </CardBody>
       </Card>
     </div>

@@ -36,9 +36,13 @@ export function TypingWarningLine({ id, warning, onFix }: { id: string; warning:
   );
 }
 
-type Props = Omit<ComponentProps<typeof TextField>, "value" | "onChange" | "defaultValue"> & {
+type Props = Omit<ComponentProps<typeof TextField>, "value" | "onChange" | "defaultValue" | "onPaste"> & {
   check: CheckKind;
   defaultValue?: string | null;
+  // UX-03: told every value the box takes (typed, pasted, fixed), e.g. for a duplicate check while typing
+  onValueChange?: (value: string) => void;
+  // UX-03: a pasted text's clean form, or null to paste it unchanged; used only when the whole box is replaced
+  cleanPaste?: (text: string) => string | null;
 };
 
 /**
@@ -46,8 +50,12 @@ type Props = Omit<ComponentProps<typeof TextField>, "value" | "onChange" | "defa
  * typos). The warning shows once the user has left the box, and stays in step while
  * they go on typing.
  */
-export function CheckedTextField({ check, defaultValue, error, ...props }: Props) {
-  const [value, setValue] = useState(defaultValue ?? "");
+export function CheckedTextField({ check, defaultValue, error, onValueChange, cleanPaste, ...props }: Props) {
+  const [value, setStoredValue] = useState(defaultValue ?? "");
+  const setValue = (next: string) => {
+    setStoredValue(next);
+    onValueChange?.(next);
+  };
   const [touched, setTouched] = useState(false);
   const warningId = useId();
   // a field error (the save was refused) wins over a warning
@@ -60,6 +68,20 @@ export function CheckedTextField({ check, defaultValue, error, ...props }: Props
         error={error}
         value={value}
         onChange={(event) => setValue(event.target.value)}
+        onPaste={
+          cleanPaste
+            ? (event) => {
+                const box = event.currentTarget;
+                // a paste into part of the text is left alone: only a paste that replaces the whole box is cleaned
+                const whole = box.value === "" || (box.selectionStart === 0 && box.selectionEnd === box.value.length);
+                const cleaned = whole ? cleanPaste(event.clipboardData.getData("text")) : null;
+                if (cleaned !== null) {
+                  event.preventDefault();
+                  setValue(cleaned);
+                }
+              }
+            : undefined
+        }
         onBlur={() => setTouched(true)}
         {...(visible ? { "aria-describedby": warningId } : {})}
       />
