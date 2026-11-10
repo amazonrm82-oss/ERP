@@ -175,7 +175,7 @@ and build this CRM here instead. The old code is preserved on the branch
    `last_error_code` under CAP-11's page-ownership rule copied from `meta_lead_finish`, a page verified elsewhere ending this
    connection by its code; one log line `test_ok` / `test_failed:<code>`). The token is decrypted in memory (INT-02) for one
    `checkPage` call within 10 s, and never logged, stored or returned. In the eslint allow-list. The advisor's findings on the two
-   functions are expected.
+   functions and on `app.integration_tests` / `app.integration_notice_days` are expected.
    In use (PRK-02, owner 26 October 2026, wave 3 use (3), migration 021147): the public privacy-request page
    (`src/features/privacy-requests/public-server.ts`, page `/f/privacy/<token>`, route `POST /api/forms/privacy/<token>`), which calls
    only `public.privacy_request_page()` (the business's display name `organizations.name`, logo and colour only) and
