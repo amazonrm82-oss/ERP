@@ -781,6 +781,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_sms_d_sender_check.sql",
       // SMS-01b review (8) replaces the table select grant of org_message_settings (_message_sending_hours.sql) by column grants
       "_sms_sender_approved_by_hidden.sql",
+      // EML-02 (198) ב redefines app.record_email_enqueue() of _record_email.sql last (library files with a service template,
+      // the attachments' audit entry)
+      "_record_email_library_service.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

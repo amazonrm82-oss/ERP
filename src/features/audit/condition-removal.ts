@@ -43,6 +43,7 @@ export function auditEntryNote(action: string, changes: Json, terms: OrgTerms = 
     if (changes.link === "revoked") return "הקישור ללקוח בוטל";
     return null;
   }
+  if (action === "email_attachments") return emailAttachmentsNote(changes);
   if (action === "retention_policy") return retentionPolicyNote(changes);
   if (action === "retention_purge" && typeof changes.count === "number") {
     // in the business's own words (FLD-10)
@@ -63,4 +64,21 @@ function retentionPolicyNote(changes: { [key: string]: Json | undefined }): stri
   if (changes.enabled !== true || months === null) return null;
   if (changes.previous_enabled === true && before !== null && before !== months) return `מספר החודשים שונה מ-${before} ל-${months}`;
   return `המדיניות הופעלה: ${months} חודשים בלי קשר`;
+}
+
+/** EML-02 (198) ב: the files an email from the record card carried, record files first, then content-library files. */
+function emailAttachmentsNote(changes: { [key: string]: Json | undefined }): string | null {
+  const names = (list: Json | undefined): string[] =>
+    Array.isArray(list)
+      ? list.flatMap((file) =>
+          file && typeof file === "object" && !Array.isArray(file) && typeof file.name === "string" && file.name !== "" ? [`"${file.name}"`] : [],
+        )
+      : [];
+  const record = names(changes.files);
+  const library = names(changes.library_files);
+  const parts = [
+    record.length > 0 ? `מהרשומה: ${record.join(", ")}` : null,
+    library.length > 0 ? `מספריית התוכן: ${library.join(", ")}` : null,
+  ].filter((part): part is string => part !== null);
+  return parts.length > 0 ? `צורפו ${parts.join("; ")}` : null;
 }

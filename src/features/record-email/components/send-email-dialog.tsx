@@ -45,7 +45,8 @@ const linkClass = "font-medium text-accent underline underline-offset-4 hover:te
 
 /**
  * EML-02: "שליחת אימייל" on a record's card. The person picks an email template (shown filled with the record's values,
- * a marketing one inside the envelope the system adds) and up to 5 of the record's files, and the email is queued; it goes
+ * a marketing one inside the envelope the system adds) and up to 5 files of the record and the content library (with any
+ * template, owner (198) ב; the audit log records which went), and the email is queued; it goes
  * from the platform's address with the person's own address as "reply to". Until a provider is set it waits ("ממתין
  * לשליחה"); the card lists the last emails sent from it and their state.
  */
@@ -74,8 +75,9 @@ function SendEmailForm({ orgId, kind, recordId, address, templates, files, libra
 
   const template = templates.find((t) => t.id === templateId) ?? null;
   const preview = template ? emailPreview(template, values) : null;
-  // library files go on marketing only (lead's interim choice, the database refuses them on a service type)
-  const libraryOffered = template?.messageType === "marketing" && library.length > 0;
+  // owner (198) ב: library files go with a marketing template and with a card's service template alike (a manual send
+  // from the card only); a service email stays a service email, without the marketing envelope
+  const libraryOffered = template !== null && library.length > 0;
   const sentLibrary = libraryOffered ? pickedLibrary : [];
   const fileProblem = fileSelectionProblem(files, picked, library, sentLibrary);
 
@@ -175,6 +177,9 @@ function SendEmailForm({ orgId, kind, recordId, address, templates, files, libra
         {libraryOffered ? (
           <>
             <h3 className="text-sm font-medium text-ink-soft">מספריית התוכן</h3>
+            {preview && !preview.marketing ? (
+              <p className="text-sm text-ink-soft">הקבצים יישלחו כחלק מהודעת השירות, בלי תוספות של הודעה שיווקית.</p>
+            ) : null}
             <ul className="max-h-48 space-y-2 overflow-y-auto">
               {library.map((item) => (
                 <li key={item.id}>

@@ -98,6 +98,8 @@ const RERUN = [
   migrationFile("_sms_d_sender_check.sql"),
   // SMS-01b review (8) replaces the table select grant of org_message_settings by column grants
   migrationFile("_sms_sender_approved_by_hidden.sql"),
+  // EML-02 (198) ב redefines app.record_email_enqueue() of _record_email.sql last (library files with a service template)
+  migrationFile("_record_email_library_service.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

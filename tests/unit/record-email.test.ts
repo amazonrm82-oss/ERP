@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { auditEntryNote } from "@/features/audit/condition-removal";
+import { ACTION_LABELS } from "@/features/audit/labels";
 import type { ClaimedJob } from "@/features/jobs/registry";
 import { clearFakeSentMessages, createFakeProvider, fakeSentMessages } from "@/features/messaging/providers/fake";
 import { createSendHandler, recordEmailParts } from "@/features/messaging/send-handler";
@@ -24,6 +26,14 @@ const migration = (() => {
   const dir = join(root, "supabase", "migrations");
   const file = readdirSync(dir).find((f) => f.endsWith("_record_email.sql"));
   if (!file) throw new Error("record_email migration missing");
+  return readFileSync(join(dir, file), "utf8");
+})();
+
+// EML-02 (198) ב: the follow-up that redefines app.record_email_enqueue (library files with a service template, the audit entry)
+const followUp = (() => {
+  const dir = join(root, "supabase", "migrations");
+  const file = readdirSync(dir).find((f) => f.endsWith("_record_email_library_service.sql"));
+  if (!file) throw new Error("record_email_library_service migration missing");
   return readFileSync(join(dir, file), "utf8");
 })();
 
@@ -49,8 +59,11 @@ describe("EML-02: the dialog's rules equal the database's", () => {
   });
 
   it("every P0001 hint the migration raises has its own Hebrew message", () => {
-    const hints = new Set([...migration.matchAll(/errcode = 'P0001', hint = '(record_email:[a-z_]+)'/g)].map((m) => m[1]));
+    const hints = new Set([...`${migration}\n${followUp}`.matchAll(/errcode = 'P0001', hint = '(record_email:[a-z_]+)'/g)].map((m) => m[1]));
     expect(hints.size).toBeGreaterThan(8);
+    // (198) ב: the interim marketing-only refusal is gone; library files are refused only while an automation runs
+    expect(followUp).not.toContain("hint = 'record_email:library_service'");
+    expect(hints.has("record_email:library_automation")).toBe(true);
     for (const hint of hints) expect(dbErrorMessage({ code: "P0001", hint, message: "" }, "FALLBACK"), hint).not.toBe("FALLBACK");
   });
 
@@ -155,5 +168,25 @@ describe("EML-02: the send handler hands the email's ids to the provider", () =>
     expect(recordEmailParts({ channel: "sms" })).toBeUndefined();
     expect(recordEmailParts({ reply_to_user_id: id(1), file_ids: "x" })).toEqual({ templateId: null, dealId: null, fileIds: [], libraryFileIds: [], replyToUserId: id(1) });
     expect(recordEmailParts({ library_file_ids: [id(2), 3] })).toEqual({ templateId: null, dealId: null, fileIds: [], libraryFileIds: [id(2)], replyToUserId: null });
+  });
+});
+
+describe("EML-02 (198) ב: the audit entry of an email's attachments", () => {
+  it("has a Hebrew label and one line naming the files", () => {
+    expect(ACTION_LABELS.email_attachments).toBe("קבצים שצורפו לאימייל");
+    expect(
+      auditEntryNote("email_attachments", {
+        job_id: id(1),
+        files: [{ id: id(2), name: "הצעה.pdf" }],
+        library_files: [{ id: id(3), name: "מצגת.pdf", library_item_id: id(4) }],
+      }),
+    ).toBe('צורפו מהרשומה: "הצעה.pdf"; מספריית התוכן: "מצגת.pdf"');
+    expect(auditEntryNote("email_attachments", { files: [], library_files: [{ id: id(3), name: "מצגת.pdf" }] })).toBe('צורפו מספריית התוכן: "מצגת.pdf"');
+    expect(auditEntryNote("email_attachments", { files: [], library_files: [] })).toBeNull();
+    expect(auditEntryNote("email_attachments", { files: "x" })).toBeNull();
+  });
+  it("the definer half writes it on the person's own record, ids and names only", () => {
+    expect(followUp).toMatch(/insert into public\.audit_log \(organization_id, actor_id, action, entity_type, entity_id, changes\)\s*values \(p_org, v_user, 'email_attachments'/);
+    expect(followUp).toMatch(/case when p_kind = 'lead' then 'leads' else 'contacts' end/);
   });
 });

@@ -506,7 +506,9 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "record_email:kind": "אפשר לשלוח אימייל רק מכרטיס של ליד, איש קשר או עסקה.",
   // raised as 42501: dbErrorMessage answers NO_PERMISSION before this map; kept here so the hint is named
   "record_email:not_permitted": NO_PERMISSION,
+  // retired by _record_email_library_service.sql (owner (198) ב); kept because _record_email.sql still names it
   "record_email:library_service": "קבצים מספריית התוכן נשלחים רק עם תבנית שיווקית. הסירו אותם או בחרו תבנית שיווקית.",
+  "record_email:library_automation": "קבצים מספריית התוכן נשלחים רק בשליחה ידנית מכרטיס הרשומה, לא מאוטומציה.",
   "record_email:no_contact": "לעסקה אין איש קשר פעיל שאפשר לשלוח אליו. הוסיפו איש קשר לעסקה ונסו שוב.",
   "record_email:no_address": "לרשומה אין כתובת אימייל. הוסיפו כתובת ונסו שוב.",
   "record_email:template": "התבנית לא נמצאה. רעננו את הדף ובחרו תבנית אחרת.",

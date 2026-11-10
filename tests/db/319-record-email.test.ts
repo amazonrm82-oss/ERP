@@ -314,7 +314,7 @@ describe("email from the record card (EML-02)", () => {
     expect((await queue(pausedOwner.id, pausedOrg, "lead", lead))[0]).toMatchObject({ state: "waiting" });
   });
 
-  it("library files (197) ב: marketing only, active, valid today, by the current file; counted with the record's files", async () => {
+  it("library files (197) ב: active, valid today, by the current file; counted with the record's files", async () => {
     const lead = await insertLead(member.id, org, { email: "eml-lib@example.test", owner_id: member.id });
     const mkt = await template(owner.id, org, { name: "שיווק עם קבצים", type: "marketing", body: "שלום {שם פרטי}" });
     const item = await libraryItem(owner.id, org);
@@ -326,11 +326,9 @@ describe("email from the record card (EML-02)", () => {
     // the item is sent by its current file, under its own key
     expect(await payloadOf(answer.job_id)).toMatchObject({ file_ids: [recordFile], library_file_ids: [current] });
     expect((await queue(member.id, org, "lead", lead))[0]).toMatchObject({ job_id: answer.job_id, files: 2 });
-    // lead's interim choice: never on a service template, in both halves
-    expect((await pgError(send(member.id, org, "lead", lead, service, [], [item]))).hint).toBe("record_email:library_service");
-    expect(
-      (await pgError(asUser(member.id, (q) => q("select app.record_email_enqueue($1, 'lead', $2, $3, '{}', $4)", [org, lead, service, [current]])))).hint,
-    ).toBe("record_email:library_service");
+    // owner (198) ב: on a service template too (a manual send from the card), as a service email
+    const withService = await send(member.id, org, "lead", lead, service, [], [item]);
+    expect(await payloadOf(withService.job_id)).toMatchObject({ message_type: "requested_document", library_file_ids: [current] });
     // the definer half refuses an older file of the item, and an item that is not a file
     expect(
       (await pgError(asUser(member.id, (q) => q("select app.record_email_enqueue($1, 'lead', $2, $3, '{}', $4)", [org, lead, mkt, [older]])))).hint,
@@ -368,6 +366,138 @@ describe("email from the record card (EML-02)", () => {
       "record_email:files_size",
     );
     expect((await send(member.id, org, "lead", lead, mkt, [], [bigItem])).job_id).toBeTruthy();
+  });
+
+  it("library files (198) ב: with a service template from the card, never while an automation runs; the audit log names the files", async () => {
+    const lead = await insertLead(member.id, org, { email: "eml-lib-svc@example.test", owner_id: member.id });
+    const item = await libraryItem(owner.id, org);
+    const libFile = await libraryFile(org, item);
+    const recordFile = await serverFile(org, "lead_id", lead);
+    const answer = await send(member.id, org, "lead", lead, service, [recordFile], [item]);
+    // a service email stays a service email: its own type, judged by the service rule (no marketing consent needed)
+    expect(await payloadOf(answer.job_id)).toMatchObject({ message_type: "requested_document", file_ids: [recordFile], library_file_ids: [libFile] });
+    expect(await maySend(await claimOne(answer.job_id))).toEqual({ may_send: true });
+    // one entry on the lead: the job, the template, and each file by id and name; no address
+    const entries = await asAdmin(
+      async (q) =>
+        (
+          await q<{ actor_id: string; entity_type: string; entity_id: string; changes: Payload }>(
+            "select actor_id, entity_type, entity_id, changes from public.audit_log where organization_id = $1 and action = 'email_attachments' and changes ->> 'job_id' = $2",
+            [org, answer.job_id],
+          )
+        ).rows,
+    );
+    expect(entries).toEqual([
+      {
+        actor_id: member.id,
+        entity_type: "leads",
+        entity_id: lead,
+        changes: {
+          job_id: answer.job_id,
+          template_id: service,
+          message_type: "requested_document",
+          files: [{ id: recordFile, name: "הצעה.pdf" }],
+          library_files: [{ id: libFile, name: "מצגת.pdf", library_item_id: item }],
+        },
+      },
+    ]);
+    expect(JSON.stringify(entries)).not.toContain("eml-lib-svc@");
+    // an email with no file writes no entry
+    const plain = await send(member.id, org, "lead", lead, service);
+    expect(
+      await asAdmin(
+        async (q) => (await q("select 1 from public.audit_log where action = 'email_attachments' and changes ->> 'job_id' = $1", [plain.job_id])).rowCount,
+      ),
+    ).toBe(0);
+    // never while an automation runs (no automation sends email; a manual-button rule runs under the same setting)
+    expect(
+      (
+        await pgError(
+          asUser(member.id, async (q) => {
+            await q("select set_config('app.automation_running', 'on', true)");
+            return q("select public.record_email_send($1, 'lead', $2, $3, '{}', $4)", [org, lead, service, [item]]);
+          }),
+        )
+      ).hint,
+    ).toBe("record_email:library_automation");
+    // a record file alone still goes under the setting (the guard is about library files)
+    const underAutomation = await asUser(member.id, async (q) => {
+      await q("select set_config('app.automation_running', 'on', true)");
+      return (await q<{ r: { job_id: string } }>("select public.record_email_send($1, 'lead', $2, $3, $4, '{}') as r", [org, lead, service, [recordFile]])).rows[0].r;
+    });
+    expect(underAutomation.job_id).toBeTruthy();
+    // a deal's email is recorded on its contact, with the deal's id, so the contact's erasure reaches it
+    const contact = await asUser(owner.id, async (q) =>
+      (await q<{ id: string }>("insert into public.contacts (organization_id, first_name, email) values ($1, 'רוני', 'eml-lib-deal@example.test') returning id", [org]))
+        .rows[0].id,
+    );
+    const { pipelineId, stages } = await defaultPipeline(org);
+    const deal = await asUser(owner.id, async (q) =>
+      (
+        await q<{ id: string }>(
+          "insert into public.deals (organization_id, name, pipeline_id, stage_id, contact_id) values ($1, 'עסקת ספרייה', $2, $3, $4) returning id",
+          [org, pipelineId, stages[0].id, contact],
+        )
+      ).rows[0].id,
+    );
+    const dealAnswer = await send(owner.id, org, "deal", deal, service, [], [item]);
+    const dealEntry = await asAdmin(
+      async (q) =>
+        (
+          await q<{ entity_type: string; entity_id: string; changes: Payload }>(
+            "select entity_type, entity_id, changes from public.audit_log where action = 'email_attachments' and changes ->> 'job_id' = $1",
+            [dealAnswer.job_id],
+          )
+        ).rows[0],
+    );
+    expect(dealEntry).toMatchObject({ entity_type: "contacts", entity_id: contact, changes: { deal_id: deal, files: [], library_files: [{ id: libFile }] } });
+  });
+
+  it("(198) ב: a privacy erasure of the person erases the attachments' audit entry (lead, and a deal's contact)", async () => {
+    // by the entity, since the erasure replaces the whole of changes (job id included)
+    const entryOf = (entity: string) =>
+      asAdmin(
+        async (q) =>
+          (await q<{ changes: Payload }>("select changes from public.audit_log where action = 'email_attachments' and entity_id = $1", [entity])).rows,
+      );
+    const item = await libraryItem(owner.id, org);
+    await libraryFile(org, item);
+
+    // a lead: purged, then erased
+    const lead = await insertLead(owner.id, org, { email: "eml-erase-lead@example.test", full_name: "ליד למחיקה" });
+    const leadFile = await serverFile(org, "lead_id", lead);
+    const leadJob = (await send(owner.id, org, "lead", lead, service, [leadFile], [item])).job_id;
+    expect((await entryOf(lead))[0].changes).toMatchObject({ job_id: leadJob, files: [{ id: leadFile }] });
+    await asUser(owner.id, async (q) => {
+      await q("update public.leads set deleted_at = now() where id = $1", [lead]);
+      await q("delete from public.leads where id = $1", [lead]);
+      await q("select public.audit_erase_record($1, 'leads', $2)", [org, lead]);
+    });
+    expect(await entryOf(lead)).toEqual([{ changes: { erased: true } }]);
+
+    // a deal's email is on its contact: the contact purged and erased erases it, the deal stays
+    const contact = await asUser(owner.id, async (q) =>
+      (await q<{ id: string }>("insert into public.contacts (organization_id, first_name, email) values ($1, 'נועה', 'eml-erase-deal@example.test') returning id", [org]))
+        .rows[0].id,
+    );
+    const { pipelineId, stages } = await defaultPipeline(org);
+    const deal = await asUser(owner.id, async (q) =>
+      (
+        await q<{ id: string }>(
+          "insert into public.deals (organization_id, name, pipeline_id, stage_id, contact_id) values ($1, 'עסקת מחיקה', $2, $3, $4) returning id",
+          [org, pipelineId, stages[0].id, contact],
+        )
+      ).rows[0].id,
+    );
+    const dealFile = await serverFile(org, "deal_id", deal);
+    const dealJob = (await send(owner.id, org, "deal", deal, service, [dealFile], [item])).job_id;
+    expect((await entryOf(contact))[0].changes).toMatchObject({ job_id: dealJob, deal_id: deal, files: [{ id: dealFile }] });
+    await asUser(owner.id, async (q) => {
+      await q("update public.contacts set deleted_at = now() where id = $1", [contact]);
+      await q("delete from public.contacts where id = $1", [contact]);
+      await q("select public.audit_erase_record($1, 'contacts', $2)", [org, contact]);
+    });
+    expect(await entryOf(contact)).toEqual([{ changes: { erased: true } }]);
   });
 
   it("at most 30 emails a person an hour", async () => {

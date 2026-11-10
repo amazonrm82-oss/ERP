@@ -208,6 +208,8 @@ export const ACTION_LABELS: Record<string, string> = {
   retention: "נמחק לפי מדיניות השמירה",
   // QUO-06 follow-up (answer 1 (ג)): the server made a quote PDF kept without a fingerprint again, once (sizes only)
   pdf_remake: "יצירה מחדש של קובץ PDF של הצעה",
+  // EML-02 (198) ב: the files an email from the record card carried (ids and names; the details are in the entry's note)
+  email_attachments: "קבצים שצורפו לאימייל",
 };
 
 export const LOGIN_ACTION_LABELS: Record<string, string> = {
