@@ -2626,9 +2626,12 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   there, keeps CAL-12's `meeting_id`); consent, HEB-09, sending hours and caps are the queue's own checks. `public.record_email_queue`
   lists a card's own emails (waiting|sent|not_sent with consent|paused|other; no address, no code; viewers and non-readers get []).
   No provider sends yet (fake). Owner (195) א approved, for when a provider is chosen, one service_role definer that hands a locked
-  job its re-checked file paths, filled body and reply-to (shape in the migration header); its own In use line then. Interim
-  lead choices: library files only with marketing templates (question 198), collection needs the plan keys (question 199). The advisor's
-  finding on `record_email_queue` is expected.
+  job its re-checked file paths, filled body and reply-to (shape in the migration header); its own In use line then. Collection needs
+  the plan keys (owner (199) א). Since 021207 (owner (198) ב) library files go with a service template too, in a manual card send only:
+  `app.record_email_enqueue` (last redefined there) refuses library files while `app.automation_running = 'on'` (hint
+  `record_email:library_automation`), never adds the marketing envelope to a service template, and writes one `audit_log` entry
+  `email_attachments` per send with files (ids and names only, no address or content) on the lead, or on the contact for a deal's email
+  (with `deal_id`), so the person's erasure reaches it. The advisor's finding on `record_email_queue` is expected.
 - SMS (SMS-01..03, SMS-01b; migrations 021201-021205; owner (207)-(211), 10 November 2026; four independent reviews): one platform
   provider account (fake only; InforU and SMS4Free stubs are `built: false` and never selected). Plan key `sms` + quota
   `max_sms_per_month` (personal off/0, basic 100, pro 300, business 1,000) cover EVERY SMS to a customer (card, automations, CAL-12,
