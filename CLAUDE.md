@@ -2613,7 +2613,8 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   lists a card's own emails (waiting|sent|not_sent with consent|paused|other; no address, no code; viewers and non-readers get []).
   No provider sends yet (fake). Owner (195) א approved, for when a provider is chosen, one service_role definer that hands a locked
   job its re-checked file paths, filled body and reply-to (shape in the migration header); its own In use line then. Interim
-  lead choices: library files only with marketing templates (question 198), collection needs the plan keys (question 199).
+  lead choices: library files only with marketing templates (question 198), collection needs the plan keys (question 199). The advisor's
+  finding on `record_email_queue` is expected.
 - Public roadmap (TRU-01, migration 021197; owner's answer 192, 9 November 2026; two reviews): `app.roadmap_items` and
   `app.roadmap_votes` (schema app, RLS on, no grants), written only by `platform_add/update_roadmap_item` (owner/support, aal2,
   logged `roadmap.add|update`); `platform_list_roadmap_items` answers `{items, total}` (newest 500; linked support request ids only to
