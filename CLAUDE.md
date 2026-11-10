@@ -198,7 +198,8 @@ and build this CRM here instead. The old code is preserved on the branch
    and writes; OPS-02 shared guard first. Never framed, no-referrer, always light, generic previews. Lock order: record FOR KEY SHARE,
    link counter, blocklist lock. Staff: `public.consent_preference_link_create` (owners/admins, audited `consent_link` without the
    token). `public.consent_preference_link_for_job(job, lease)` (service_role, lease-bound, refuses service types) has NO CALLER YET;
-   the future sender needs its own "In use" line. In the eslint allow-list.
+   the future sender needs its own "In use" line. In the eslint allow-list. The advisor's findings on
+   `consent_preference_link_create` and the three `app.consent_preference_*` tables are expected.
    In use (PRK-02, owner 26 October 2026, wave 3 use (3), migration 021147): the public privacy-request page
    (`src/features/privacy-requests/public-server.ts`, page `/f/privacy/<token>`, route `POST /api/forms/privacy/<token>`), which calls
    only `public.privacy_request_page()` (the business's display name `organizations.name`, logo and colour only) and
