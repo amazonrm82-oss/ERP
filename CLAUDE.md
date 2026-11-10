@@ -947,6 +947,20 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   a body tap opens `/o/[org]/leads/[id]/respond`. Waiting screen (owner, 13 October): a taken lead stays only for the taker,
   owners/admins and managers of its team or a parent team (`takenLeadsFilter`), marked "נלקח על ידי …"; the clock and
   "answered" are unchanged. A test that re-runs a migration must re-run the later ones that redefine the same function.
+- Unowned leads offered to take (SPD-01 completion, migration 021206; owner (186)-(190), (212) ב, (213) ב, 10 November 2026; three
+  independent reviews): NO policy changes; the old visibility rule holds everywhere (reports, global search, export, imports and
+  duplicate checks, My day, lists and board). One rule `app.unowned_lead_visible(org, lead)` (definer, no grants): an open,
+  unconverted, unbinned, unowned lead for an active owner/admin/manager/member by `app.membership_role` (never a viewer, a support
+  session or a closed business); a lead with a team only for that team's members and the managers of it or a parent team (188).
+  It is read only through narrow definers granted to authenticated: `public.unowned_lead` (the take-only page and the push's
+  respond screen fields), `public.unowned_lead_timeline` (newest 100 non-private entries; metadata only through the allow-list
+  `app.unowned_timeline_metadata`, never `merged`, `attribution`, `custom_fields` or contact details; file metadata only, no
+  custom-field files, no paths or downloads), `public.unowned_leads_waiting` (oldest 200, the waiting rule of
+  `src/features/leads/waiting.ts`, imported leads left out; keep in step) and `public.unowned_leads_waiting_count` (stops at 100,
+  "99+"), over `app.unowned_waiting_leads(org, limit, oldest)`. `public.take_lead` (last redefined in 021206) also takes such a lead
+  (186). Nothing is written before taking (187): every write path keeps the old rule. The waiting list shows offered leads only on
+  "כל מה שאני רואה" with "ללא אחראי"; the menu entry links there and is hidden from viewers (190). When UX-01's side panel is built it
+  joins the same functions (213). Advisor findings on the four public definers are expected.
 - Response time (SPD-06, migrations 0114, 0117): `app.response_target_minutes(org)` is the target (60, owner's decision, until
   CAP-10 reads an org setting whose initial value is 60; labels come from the returned value, `src/features/reports/response-target.ts`); `report_response_time` rows carry `within_target`; `public.report_response_breakdown()` (security invoker) returns
   `target_minutes`, `by_source`, `by_hour` (hour of arrival in the org's time zone). Uncontacted leads have minutes = null;
