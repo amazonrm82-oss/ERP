@@ -21,7 +21,8 @@ export type BlocklistPersonReason = (typeof BLOCKLIST_PERSON_REASONS)[number];
  * Every stored reason (constraint consent_blocklist_reason): the person's ones and 'sms_reply', written only by the server
  * when a customer answers an SMS with an opt-out word (SMS-03, owner's answer (208) ב).
  */
-export const BLOCKLIST_REASONS = [...BLOCKLIST_PERSON_REASONS, "sms_reply"] as const;
+// CNS-09 adds 'unsubscribe_link': a customer unsubscribed through the link of a message or the preferences page
+export const BLOCKLIST_REASONS = [...BLOCKLIST_PERSON_REASONS, "sms_reply", "unsubscribe_link"] as const;
 export type BlocklistReason = (typeof BLOCKLIST_REASONS)[number];
 
 export const BLOCKLIST_REASON_LABELS: Record<BlocklistReason, string> = {
@@ -31,15 +32,25 @@ export const BLOCKLIST_REASON_LABELS: Record<BlocklistReason, string> = {
   not_the_person: "הכתובת לא שייכת לאדם שחשבנו",
   other: "אחר",
   sms_reply: "בקשת הסרה ב-SMS",
+  unsubscribe_link: "בקשת הסרה בקישור",
 };
 
-export const BLOCKLIST_REMOVED_REASONS = ["added_by_mistake", "person_consented", "other"] as const;
+/** The reasons a person picks when removing an entry (public.consent_blocklist_remove accepts only these). */
+export const BLOCKLIST_PERSON_REMOVED_REASONS = ["added_by_mistake", "person_consented", "other"] as const;
+/**
+ * Every stored removal reason (constraint consent_blocklist_removed_reason): the person's ones and 'resubscribed', written only by
+ * the server when a customer turns a channel back on from the preferences page after their own unsubscribe (CNS-10, owner (231) ב).
+ */
+// ... and 'superseded': a link's own entry replaced by a stronger one on the same channel (delta review 1)
+export const BLOCKLIST_REMOVED_REASONS = [...BLOCKLIST_PERSON_REMOVED_REASONS, "resubscribed", "superseded"] as const;
 export type BlocklistRemovedReason = (typeof BLOCKLIST_REMOVED_REASONS)[number];
 
 export const BLOCKLIST_REMOVED_REASON_LABELS: Record<BlocklistRemovedReason, string> = {
   added_by_mistake: "נוספה בטעות",
   person_consented: "האדם ביקש בעצמו לחזור לקבל דיוור",
   other: "אחר",
+  resubscribed: "הלקוח חידש את ההרשמה בדף ההעדפות",
+  superseded: "הוחלפה ברשומת חסימה אחרת לאותה כתובת",
 };
 
 /**

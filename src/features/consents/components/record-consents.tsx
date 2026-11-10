@@ -1,5 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { PreferenceLinkButton } from "@/features/preferences/components/preference-link-button";
+import type { PreferenceChannel } from "@/features/preferences/model";
 import { formatDateTime } from "@/lib/format";
 
 import { BLOCK_LABELS, CHANNEL_LABELS, LIFT_METHOD_LABELS, SOURCE_LABELS, STATE_LABELS, STATE_TONES, channelNeeds, type ConsentChannel } from "../model";
@@ -26,6 +28,8 @@ export async function RecordConsents({ orgId, subject, canEdit, hasPhone, hasEma
   const available: ConsentChannel[] = channels
     .map((c) => c.channel)
     .filter((channel) => (channelNeeds(channel) === "email" ? hasEmail : hasPhone));
+  // CNS-10: the channels a preferences link can be made for (owners and admins; the database decides)
+  const linkChannels: PreferenceChannel[] = [...(hasEmail ? (["email"] as const) : []), ...(hasPhone ? (["sms", "whatsapp"] as const) : [])];
 
   return (
     <Card aria-labelledby="record-consents-title">
@@ -86,6 +90,7 @@ export async function RecordConsents({ orgId, subject, canEdit, hasPhone, hasEma
                 : "כדי לרשום הסכמה ל-SMS, ל-WhatsApp או לשיחות, הוסיפו לרשומה מספר טלפון."}
           </p>
         ) : null}
+        {canLift && linkChannels.length > 0 ? <PreferenceLinkButton orgId={orgId} subject={subject} channels={linkChannels} /> : null}
         {history.length > 0 ? (
           <details className="border-t border-line pt-3">
             <summary className="cursor-pointer text-md font-medium">היסטוריית ההסכמות ({history.length})</summary>

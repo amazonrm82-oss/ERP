@@ -75,6 +75,9 @@ const serviceKeyAllowList = {
     "src/features/orders/public-server.ts",
     // BAL-04: the customer's statement page, approved public secret-link pattern (owner, 8 October 2026)
     "src/features/statements/public-server.ts",
+    // CNS-09 / CNS-10: the customer's preferences page and unsubscribe link, approved public secret-link pattern (owner's
+    // answer (225) א, 10 November 2026)
+    "src/features/preferences/public-server.ts",
     // QUO-06 follow-ups (owner, 26 October 2026): the server alone writes a quote's PDF (public.quote_pdf_store), and the
     // customer downloads it from the quote's link (public.quote_public_pdf)
     "src/features/quotes/pdf-store-server.ts",

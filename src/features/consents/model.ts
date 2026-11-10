@@ -11,7 +11,8 @@ export type ConsentChannel = (typeof CONSENT_CHANNELS)[number];
 export const CONSENT_STATES = ["granted", "denied", "withdrawn", "unknown", "awaiting_confirmation"] as const;
 export type ConsentState = (typeof CONSENT_STATES)[number];
 
-export const CONSENT_SOURCES = ["form", "manual", "import", "api", "unsubscribe", "erasure"] as const;
+// CNS-10 (migration _consent_preference_links.sql) adds the customer's own choice on the preferences page
+export const CONSENT_SOURCES = ["form", "manual", "import", "api", "unsubscribe", "erasure", "preferences"] as const;
 export type ConsentSource = (typeof CONSENT_SOURCES)[number];
 
 /** What a person may record by hand (CNS-03); "unknown" is what no entry means. */
@@ -54,6 +55,8 @@ export const SOURCE_LABELS: Record<ConsentSource, string> = {
   unsubscribe: "הודעת הסרה",
   // a privacy erasure paused until the server can complete it: no contact meanwhile
   erasure: "בקשת מחיקה",
+  // CNS-10: the customer's own choice on the preferences page of the business
+  preferences: "דף העדפות",
 };
 
 // the record's address a channel needs: a phone for SMS, WhatsApp and calls, an email for email

@@ -14,7 +14,7 @@ import {
   BLOCKLIST_CHANNEL_LABELS,
   BLOCKLIST_REASON_LABELS,
   BLOCKLIST_REMOVED_REASON_LABELS,
-  BLOCKLIST_REMOVED_REASONS,
+  BLOCKLIST_PERSON_REMOVED_REASONS,
 } from "../model";
 
 /**
@@ -101,7 +101,7 @@ function EntryRow({ orgId, entry, editable }: { orgId: string; entry: BlocklistF
             <option value="" disabled>
               בחרו סיבה
             </option>
-            {BLOCKLIST_REMOVED_REASONS.map((reason) => (
+            {BLOCKLIST_PERSON_REMOVED_REASONS.map((reason) => (
               <option key={reason} value={reason}>
                 {BLOCKLIST_REMOVED_REASON_LABELS[reason]}
               </option>

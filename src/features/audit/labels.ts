@@ -194,6 +194,7 @@ export const ACTION_LABELS: Record<string, string> = {
   order_link: "קישור ללקוח להזמנה",
   // BAL-04: the customer's statement link on a contact or company (created / revoked; never the token)
   statement_link: "קישור לדף חשבון",
+  consent_link: "קישור להעדפות דיוור",
   // PRK-02: the business's public privacy-request link (created / revoked; never the token)
   privacy_request_link: "קישור לבקשות פרטיות",
   // PRV-01: turning the retention policy on, off or changing its months; "keep" on one lead; the count the policy erased

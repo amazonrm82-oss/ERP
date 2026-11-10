@@ -26,7 +26,9 @@ type Options = {
  * customer's statement page (BAL-04), which shows a customer's debts and must never sit inside another site either.
  * next.config.ts leaves the same two prefixes out of `frame-ancestors *`; keep the two in step.
  */
-export const NOT_EMBEDDABLE_PUBLIC_PREFIXES = ["/f/q/", "/f/statement/"] as const;
+// CNS-09 / CNS-10: the customer's preferences page and unsubscribe confirmation change what the person receives, so they
+// never sit inside another site either (a framed button could be clicked without the person seeing it).
+export const NOT_EMBEDDABLE_PUBLIC_PREFIXES = ["/f/q/", "/f/statement/", "/f/prefs/", "/f/unsub/"] as const;
 
 export function isEmbeddablePublicPath(pathname: string): boolean {
   return pathname.startsWith("/f/") && !NOT_EMBEDDABLE_PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));

@@ -784,6 +784,10 @@ describe("setup checklist and sample data (USR-04)", () => {
       // EML-02 (198) ב redefines app.record_email_enqueue() of _record_email.sql last (library files with a service template,
       // the attachments' audit entry)
       "_record_email_library_service.sql",
+      // CNS-09/10 redefines public.consent_blocklist_add_noted() of _sms_c_optout.sql (link unsubscribes are left out of the
+      // 100,000 cap too), app.consent_service_blocked() of _message_types.sql and app.consent_state_of() / app.consent_prepare()
+      // of _import_consent_undo.sql last
+      "_consent_preference_links.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

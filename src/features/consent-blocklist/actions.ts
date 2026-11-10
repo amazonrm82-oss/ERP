@@ -8,7 +8,7 @@ import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, type FormState } from "@/lib/action-result";
 import { dbErrorMessage } from "@/lib/errors";
 
-import { BLOCKLIST_ADD_MAX, BLOCKLIST_CHANNELS, BLOCKLIST_NOTE_MAX, BLOCKLIST_PERSON_REASONS, BLOCKLIST_REMOVED_REASONS, splitAddresses, type BlocklistChannel, type BlocklistReason } from "./model";
+import { BLOCKLIST_ADD_MAX, BLOCKLIST_CHANNELS, BLOCKLIST_NOTE_MAX, BLOCKLIST_PERSON_REASONS, BLOCKLIST_PERSON_REMOVED_REASONS, BLOCKLIST_REMOVED_REASONS, splitAddresses, type BlocklistChannel, type BlocklistReason } from "./model";
 import { consentBlocklistPath } from "./paths";
 import { blocklistAddResultSchema, blocklistFindSchema } from "./schema";
 
@@ -130,7 +130,7 @@ export async function findInBlocklistAction(orgId: string, _prev: FormState<Bloc
   };
 }
 
-const removeSchema = z.object({ reason: z.enum(BLOCKLIST_REMOVED_REASONS, { error: "יש לבחור למה מסירים." }) });
+const removeSchema = z.object({ reason: z.enum(BLOCKLIST_PERSON_REMOVED_REASONS, { error: "יש לבחור למה מסירים." }) });
 
 /** CNS-06: removes one entry (never deleted: marked removed with the reason, audited). */
 export async function removeFromBlocklistAction(orgId: string, entryId: string, _prev: FormState, formData: FormData): Promise<FormState> {

@@ -19,8 +19,8 @@ const nextConfig: NextConfig = {
       {
         // The app itself must never be framed by another site (clickjacking); nor the QR scan route, whose page
         // before an external link (BIZ-03) names the business on our domain, nor the customer's statement page (BAL-04),
-        // which shows a customer's debts. Same prefixes as NOT_EMBEDDABLE_PUBLIC_PREFIXES in src/lib/csp.ts.
-        source: "/((?!f/(?!q/|statement/)).*)",
+        // which shows a customer's debts, nor the preferences and unsubscribe pages (CNS-09/10). Same prefixes as NOT_EMBEDDABLE_PUBLIC_PREFIXES in src/lib/csp.ts.
+        source: "/((?!f/(?!q/|statement/|prefs/|unsub/)).*)",
         headers: [
           { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
           { key: "X-Frame-Options", value: "DENY" },
@@ -31,7 +31,7 @@ const nextConfig: NextConfig = {
       {
         // Public lead forms are made to be embedded in customers' websites (every /f/ page but the QR scan route and
         // the statement page).
-        source: "/f/((?!q/|statement/).*)",
+        source: "/f/((?!q/|statement/|prefs/|unsub/).*)",
         headers: [
           { key: "Content-Security-Policy", value: "frame-ancestors *" },
           { key: "Referrer-Policy", value: "no-referrer" },
@@ -42,6 +42,14 @@ const nextConfig: NextConfig = {
         // The statement page (BAL-04) is never framed (the block above) and, like every customer page, sends no
         // referrer: its address holds the secret token. Later keys override the block above.
         source: "/f/statement/:path*",
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+        ],
+      },
+      {
+        // CNS-09 / CNS-10: the preferences page and the unsubscribe confirmation, the same as the statement page
+        source: "/f/:page(prefs|unsub)/:path*",
         headers: [
           { key: "Referrer-Policy", value: "no-referrer" },
           { key: "X-Content-Type-Options", value: "nosniff" },

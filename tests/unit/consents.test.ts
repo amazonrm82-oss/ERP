@@ -39,7 +39,8 @@ describe("consents (CNS-01, CNS-03)", () => {
     expect(checkList(sql, "consents_channel", "channel")).toEqual([...CONSENT_CHANNELS]);
     // the state list was widened later (CAP-07 follow-up: awaiting_confirmation): the latest definition counts
     expect(checkList(latestConstraint("consents_state"), "consents_state", "state")).toEqual([...CONSENT_STATES]);
-    expect(checkList(sql, "consents_source", "source")).toEqual([...CONSENT_SOURCES]);
+    // CNS-10 widened the source list (preferences): the latest definition counts
+    expect(checkList(latestConstraint("consents_source"), "consents_source", "source")).toEqual([...CONSENT_SOURCES]);
     expect(checkList(sql, "consents_lift_method", "lift_method")).toEqual([...LIFT_METHODS]);
     for (const m of LIFT_METHODS) expect(LIFT_METHOD_LABELS[m]).toBeTruthy();
   });

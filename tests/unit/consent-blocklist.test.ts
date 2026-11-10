@@ -35,7 +35,9 @@ describe("consent blocklist (CNS-06)", () => {
     // SMS-03 (208) ב adds the server-only 'sms_reply' in a later migration
     const reasons = latestMigrationText("add constraint consent_blocklist_reason check") ?? sql;
     expect(checkList(reasons, "consent_blocklist_reason", "reason")).toEqual([...BLOCKLIST_REASONS]);
-    expect(checkList(sql, "consent_blocklist_removed_reason", "removed_reason")).toEqual([...BLOCKLIST_REMOVED_REASONS]);
+    // CNS-10 (231) ב adds the server-only 'resubscribed' in a later migration
+    const removed = latestMigrationText("add constraint consent_blocklist_removed_reason check") ?? sql;
+    expect(checkList(removed, "consent_blocklist_removed_reason", "removed_reason")).toEqual([...BLOCKLIST_REMOVED_REASONS]);
     for (const c of BLOCKLIST_CHANNELS) expect(BLOCKLIST_CHANNEL_LABELS[c]).toBeTruthy();
     for (const r of BLOCKLIST_REASONS) expect(BLOCKLIST_REASON_LABELS[r]).toBeTruthy();
     for (const r of BLOCKLIST_REMOVED_REASONS) expect(BLOCKLIST_REMOVED_REASON_LABELS[r]).toBeTruthy();

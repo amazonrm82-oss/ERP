@@ -28,6 +28,9 @@ const CUSTOMER_PAGES = [
   "src/app/f/statement/[token]/page.tsx",
   // PRK-02
   "src/app/f/privacy/[token]/page.tsx",
+  // CNS-09 / CNS-10
+  "src/app/f/prefs/[token]/page.tsx",
+  "src/app/f/unsub/[token]/page.tsx",
 ];
 
 // pages whose own header is the family header (quote, order and statement documents draw their own letterhead)
@@ -38,6 +41,8 @@ const HEADER_PAGES = [
   "src/app/f/book/manage/[token]/page.tsx",
   "src/app/f/card/[token]/page.tsx",
   "src/app/f/privacy/[token]/page.tsx",
+  "src/app/f/prefs/[token]/page.tsx",
+  "src/app/f/unsub/[token]/page.tsx",
   // the status pages of a closed quote or a cancelled order
   "src/app/f/quote/[token]/page.tsx",
   "src/app/f/order/[token]/page.tsx",

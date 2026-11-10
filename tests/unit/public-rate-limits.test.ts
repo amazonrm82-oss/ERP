@@ -226,6 +226,35 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
     refusal: TEXT_429,
     sender: "first",
   },
+  // CNS-09 / CNS-10 (owner's answer (225) א)
+  "/f/prefs/[token]": {
+    guard: "database",
+    functions: ["public_sender_check", "public_sender_miss", "consent_preferences_public"],
+    limit: SENDER + "120 calls per link and 60 per sender (keyed IP hash, scope preferences, re-scoped per link) in 10 min, after the lookup, shared with the unsubscribe page and both writes; a preview bot gets a generic page and no read",
+    refusal: PAGE_TEXT,
+    sender: "first",
+  },
+  "/f/unsub/[token]": {
+    guard: "database",
+    functions: ["public_sender_check", "public_sender_miss", "consent_preferences_public"],
+    limit: SENDER + "a call of the preferences link (same counters); opening it changes nothing",
+    refusal: PAGE_TEXT,
+    sender: "first",
+  },
+  "/api/forms/prefs/[token]": {
+    guard: "database",
+    functions: ["public_sender_check", "public_sender_miss", "consent_preferences_submit"],
+    limit: SENDER + "a call of the preferences link (same counters)",
+    refusal: JSON_429 + " (with status)",
+    sender: "first",
+  },
+  "/api/forms/unsub/[token]": {
+    guard: "database",
+    functions: ["public_sender_check", "public_sender_miss", "consent_preferences_submit"],
+    limit: SENDER + "a call of the preferences link (same counters); RFC 8058 one-click posts get plain text",
+    refusal: JSON_429 + " (with status), or " + TEXT_429 + " for a one-click post",
+    sender: "first",
+  },
   "/f/privacy/[token]": {
     guard: "database",
     functions: ["privacy_request_page"],

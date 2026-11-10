@@ -4575,6 +4575,11 @@ export type Database = {
       sms_sender_verify_start: { Args: { p_org: string }; Returns: Json };
       sms_sender_verify: { Args: { p_org: string; p_code: string }; Returns: Json };
       sms_sender_code_issue: { Args: { p_job: string; p_lease: string }; Returns: Json };
+      // CNS-09 / CNS-10: the customer's preferences link (owners/admins mint; the public page and its routes, service_role only)
+      consent_preference_link_create: { Args: { p_org: string; p_kind: string; p_id: string; p_channel: string }; Returns: string };
+      consent_preference_link_for_job: { Args: { p_job: string; p_lease: string }; Returns: Json };
+      consent_preferences_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
+      consent_preferences_submit: { Args: { p_token: string; p_mode: string; p_choices?: Json | null; p_ip_hash?: string | null }; Returns: Json };
       // BAL-04: the customer's statement link (migration statement_links)
       statement_link_create: { Args: { p_org: string; p_contact?: string | null; p_company?: string | null }; Returns: string };
       statement_link_revoke: { Args: { p_org: string; p_contact?: string | null; p_company?: string | null }; Returns: boolean };

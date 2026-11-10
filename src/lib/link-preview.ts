@@ -91,4 +91,6 @@ export const PREVIEW_TEXTS = {
   card: { what: "כרטיס ביקור", joiner: "של", description: "כרטיס ביקור דיגיטלי: חיוג, WhatsApp ושמירה באנשי הקשר." },
   // BAL-04: always generic (no business name either): the page is never read for a preview
   statement: { what: "דף חשבון", joiner: "מאת", description: "פירוט החובות הפתוחים, בקישור אישי." },
+  // CNS-09 / CNS-10: always generic as well: the page is never read for a preview (a read counts a call)
+  preferences: { what: "העדפות דיוור", joiner: "של", description: "בחירה באילו ערוצים לקבל הודעות, בקישור אישי." },
 } as const;

@@ -61,19 +61,22 @@ describe("content security policy (FXS-05)", () => {
       }
       return out;
     };
-    for (const path of ["/o/x", "/f/q/abc", "/f/statement/abc", "/app"]) {
+    for (const path of ["/o/x", "/f/q/abc", "/f/statement/abc", "/f/prefs/abc", "/f/unsub/abc", "/app"]) {
       const h = headersFor(path);
       expect(h["Content-Security-Policy"], path).toBe("frame-ancestors 'none'");
       expect(h["X-Frame-Options"], path).toBe("DENY");
       expect(isEmbeddablePublicPath(path), path).toBe(false);
     }
-    for (const path of ["/f/abc", "/f/book/abc", "/f/order/abc", "/f/statementx"]) {
+    for (const path of ["/f/abc", "/f/book/abc", "/f/order/abc", "/f/statementx", "/f/prefsx"]) {
       const h = headersFor(path);
       expect(h["Content-Security-Policy"], path).toBe("frame-ancestors *");
       expect(h["X-Frame-Options"], path).toBeUndefined();
       expect(isEmbeddablePublicPath(path), path).toBe(true);
     }
     expect(headersFor("/f/statement/abc")).toMatchObject({ "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" });
+    // CNS-09 / CNS-10
+    expect(headersFor("/f/prefs/abc")).toMatchObject({ "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" });
+    expect(headersFor("/f/unsub/abc")).toMatchObject({ "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" });
   });
 
   it("development keeps eval for React's error stacks", () => {
