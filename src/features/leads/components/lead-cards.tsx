@@ -20,10 +20,12 @@ type Props = {
   whatsapp?: WhatsappListContext | null;
   // SPD-01: whether the viewer writes in the business, so a lead nobody owns offers "לקחתי"
   canWrite?: boolean;
+  // UX-01: a card opens the side panel (?peek=<id>) instead of the full page
+  hrefFor?: (id: string) => string;
 };
 
 /** Leads on a phone (FXU-02): name, status, company and owner, with call / WhatsApp. */
-export function LeadCards({ orgId, leads, statuses, showScore, className, whatsapp = null, canWrite = false }: Props) {
+export function LeadCards({ orgId, leads, statuses, showScore, className, whatsapp = null, canWrite = false, hrefFor }: Props) {
   const statusById = new Map(statuses.map((status) => [status.id, status]));
   return (
     <RecordCards
@@ -33,7 +35,7 @@ export function LeadCards({ orgId, leads, statuses, showScore, className, whatsa
         const status = statusById.get(lead.statusId);
         return {
           id: lead.id,
-          href: paths.lead(orgId, lead.id),
+          href: hrefFor ? hrefFor(lead.id) : paths.lead(orgId, lead.id),
           title: leadDisplayName(lead),
           badge: status ? <Badge tone={statusTone(status)}>{status.name}</Badge> : null,
           details: [

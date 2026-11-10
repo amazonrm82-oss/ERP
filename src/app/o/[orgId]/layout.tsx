@@ -150,7 +150,7 @@ export default async function OrgLayout({ children, params }: Props) {
           </Link>
         </div>
         <div className="flex-1 overflow-y-auto px-3 py-2">
-          <SidebarNav orgId={org.id} terms={terms} modules={modules} counts={navCounts} viewer={context.role === "viewer"} />
+          <SidebarNav orgId={org.id} terms={terms} modules={modules} counts={navCounts} viewer={!context.canWrite} />
         </div>
       </aside>
 
@@ -238,7 +238,7 @@ export default async function OrgLayout({ children, params }: Props) {
         terms={terms}
         modules={modules}
         counts={navCounts}
-        viewer={context.role === "viewer"}
+        viewer={!context.canWrite}
         extra={[
           { href: paths.notifications(org.id), label: "התראות" },
           { href: paths.orgHelp(org.id), label: "מרכז עזרה" },

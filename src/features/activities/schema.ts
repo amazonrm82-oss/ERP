@@ -234,3 +234,8 @@ export const callLogSchema = z.object({
   next: z.preprocess((value) => value ?? "none", z.enum(["none", "tomorrow", "week"], { error: "יש לבחור מה הלאה." })),
   next_title: optionalText(300, "הכותרת ארוכה מדי (עד 300 תווים)."),
 });
+
+/** UX-01: the anchor of a timeline entry on its record's page (the side panel links each item to it). */
+export function timelineEntryId(activityId: string): string {
+  return `entry-${activityId}`;
+}

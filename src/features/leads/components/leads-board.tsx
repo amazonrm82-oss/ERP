@@ -16,6 +16,8 @@ import { isMoveRefusal } from "@/features/custom-fields/required-move";
 import { moveAsk } from "@/features/record-move/ask";
 import { moveRecordAction } from "@/features/record-move/actions";
 
+import { peekRowHref, type PeekRows } from "@/features/lead-peek/model";
+
 import type { LeadBoard, LeadBoardCard } from "../queries";
 import { takeOffered } from "../take";
 import { LeadStatusMenu } from "./lead-status-menu";
@@ -30,14 +32,15 @@ const columnRule: Record<LeadStatusKind, string> = {
 const DRAG_TYPE = "application/x-lead-id";
 
 // reasons: the organization's active "not relevant" reasons (LEAD-03); empty: typed in freely
-type Props = { orgId: string; board: LeadBoard; canWrite: boolean; reasons: string[] };
+// peek (UX-01): a card's name opens the side panel; null = the lead's page
+type Props = { orgId: string; board: LeadBoard; canWrite: boolean; reasons: string[]; peek?: PeekRows | null };
 
 /**
  * Leads by status, one column per status a lead can be moved to by hand.
  * Cards are dragged with a mouse; the status menu on every card does the same
  * with a keyboard or a touch screen. A drop on "not relevant" asks for the reason.
  */
-export function LeadsBoard({ orgId, board, canWrite, reasons }: Props) {
+export function LeadsBoard({ orgId, board, canWrite, reasons, peek = null }: Props) {
   const [cards, moveOptimistic] = useOptimistic(board.cards, (current: LeadBoardCard[], move: { leadId: string; statusId: string }) =>
     current.map((card) => (card.id === move.leadId ? { ...card, statusId: move.statusId } : card)),
   );
@@ -199,10 +202,17 @@ export function LeadsBoard({ orgId, board, canWrite, reasons }: Props) {
                               event.dataTransfer.setData(DRAG_TYPE, card.id);
                               event.dataTransfer.effectAllowed = "move";
                             }}
-                            className={cn("rounded-md border border-line bg-surface p-3", canWrite && "cursor-grab active:cursor-grabbing")}
+                            className={cn(
+                              "rounded-md border border-line bg-surface p-3",
+                              canWrite && "cursor-grab active:cursor-grabbing",
+                              // UX-01: the lead open in the side panel
+                              peek?.peekId === card.id && "border-accent bg-canvas",
+                            )}
                           >
                             <Link
-                              href={paths.lead(orgId, card.id)}
+                              href={peek ? peekRowHref(peek, card.id) : paths.lead(orgId, card.id)}
+                              scroll={peek ? false : undefined}
+                              aria-current={peek?.peekId === card.id ? "true" : undefined}
                               draggable={false}
                               className="block break-words font-medium leading-snug underline-offset-4 hover:underline"
                             >

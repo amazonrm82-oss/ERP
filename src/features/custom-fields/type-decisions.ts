@@ -72,6 +72,11 @@ export const FIELD_TYPE_SWITCHES: Record<string, SwitchPlace> = {
   // the app
   "src/features/custom-fields/types.ts": { what: "types, labels, types with options", decisions: ALL_HANDLED },
   "src/features/custom-fields/values.ts": { what: "parse, input value, display", decisions: ALL_HANDLED },
+  "src/features/lead-peek/queries.ts": {
+    what: "the lead side panel's \"מה ביקש\" (UX-01 prototype)",
+    decisions: { rich_text: "excluded", duration: "handled", status: "handled", ...B_ADDRESS_ONLY },
+    note: "shown through displayCustomFields; rich text, record links and files belong on the full page",
+  },
   "src/features/custom-fields/components/custom-field-inputs.tsx": { what: "the record form input", decisions: ALL_HANDLED },
   "src/features/custom-fields/components/custom-field-value.tsx": { what: "card value (status badge, rich text)", decisions: ALL_HANDLED },
   "src/features/custom-fields/components/field-editor.tsx": { what: "field settings (status colours)", decisions: ALL_HANDLED },

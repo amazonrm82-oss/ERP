@@ -21,7 +21,7 @@ import { recordPage } from "@/lib/record-types";
 import { ChatImportButton } from "@/features/whatsapp/components/chat-import-button";
 
 import { getTimeline, managesRecordTeam, TIMELINE_LIMIT } from "../queries";
-import { canEditNoteHint, canPinHint, canRemoveImportNoteHint, isPinnableType, parseTimelineFilter, TIMELINE_FILTERS, timelineFilterHref, type TimelineSubject } from "../schema";
+import { canEditNoteHint, canPinHint, canRemoveImportNoteHint, isPinnableType, parseTimelineFilter, TIMELINE_FILTERS, timelineEntryId, timelineFilterHref, type TimelineSubject } from "../schema";
 import { ImportNoteRemove, NoteActions } from "./note-actions";
 import { NoteForm } from "./note-form";
 import { NoteText } from "./note-text";
@@ -113,8 +113,10 @@ export async function Timeline({ orgId, subject, canWrite, filter: filterParam, 
             {items.map((item) => (
               <li
                 key={item.id}
+                // UX-01: the side panel links each of its items here
+                id={timelineEntryId(item.id)}
                 // GAP-11: someone else's private note stays off paper, even for owners/admins who see it here
-                className={cn("relative", item.pinned ? "rounded-md bg-canvas p-3 ps-8" : "ps-5", !printsTimelineEntry(item, context.user.id) && "print:hidden")}
+                className={cn("relative scroll-mt-24", item.pinned ? "rounded-md bg-canvas p-3 ps-8" : "ps-5", !printsTimelineEntry(item, context.user.id) && "print:hidden")}
               >
                 <span
                   aria-hidden="true"

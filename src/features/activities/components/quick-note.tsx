@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { Checkbox, TextareaField } from "@/components/ui/field";
@@ -15,8 +15,10 @@ import { PRIVATE_NOTE_HINT, type TimelineSubject } from "../schema";
  * phone, the summary is one tap away instead of below everything. It lands in
  * the timeline like any note.
  */
-export function QuickNote({ orgId, subject, className }: { orgId: string; subject: TimelineSubject; className?: string }) {
+// onSaved: after each saved note (UX-01's side panel redraws its timeline)
+export function QuickNote({ orgId, subject, className, onSaved }: { orgId: string; subject: TimelineSubject; className?: string; onSaved?: () => void }) {
   const [state, formAction] = useActionState<FormState<{ id: string }>, FormData>(addNoteAction.bind(null, orgId, subject), null);
+  useSaved(state, onSaved);
   const failure = state && !state.ok ? state : null;
   return (
     <form action={formAction} className={className}>
@@ -49,4 +51,13 @@ export function QuickNote({ orgId, subject, className }: { orgId: string; subjec
       {failure && !failure.fieldErrors ? <FormError message={failure.message} className="mt-2" /> : null}
     </form>
   );
+}
+
+/** Calls onSaved once per successful save (each save is a new state object). */
+function useSaved(state: FormState<{ id: string }>, onSaved: (() => void) | undefined) {
+  const seen = useRef(state);
+  useEffect(() => {
+    if (state !== seen.current && state?.ok) onSaved?.();
+    seen.current = state;
+  }, [state, onSaved]);
 }

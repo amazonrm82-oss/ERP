@@ -10,12 +10,15 @@ import { UniqueClashNote } from "@/features/data-quality/components/unique-clash
 import { findUniqueFieldClashes, type UniqueClash } from "@/features/data-quality/duplicates";
 import { TakeLeadButton } from "@/features/leads/components/take-lead-button";
 import { WaitingClock } from "@/features/leads/components/waiting-clock";
+import { LeadPeek } from "@/features/lead-peek/components/lead-peek";
+import { PEEK_ROW_MARK, peekLinks } from "@/features/lead-peek/model";
 import { takenLabel } from "@/features/leads/take";
 import { getWaitingLeads } from "@/features/leads/waiting";
 import { getOrgTerms } from "@/features/terminology/queries";
 import { byGender, waitingPlural } from "@/features/terminology/terms";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatDateTime, formatNumber } from "@/lib/format";
+import { cn } from "@/lib/cn";
 import { paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 import { waitingText } from "@/lib/waiting-time";
@@ -25,7 +28,7 @@ export async function generateMetadata({ params }: { params: Promise<{ orgId: st
   return { title: waitingPlural((await getOrgTerms((await params).orgId)).lead) };
 }
 
-type Props = { params: Promise<{ orgId: string }>; searchParams: Promise<{ who?: string | string[] }> };
+type Props = { params: Promise<{ orgId: string }>; searchParams: Promise<{ who?: string | string[]; peek?: string | string[] }> };
 
 /**
  * Leads no one has answered yet (SPD-02), the one waiting longest first, each
@@ -36,7 +39,8 @@ export default async function WaitingLeadsPage({ params, searchParams }: Props) 
   const context = await getOrgContext(orgId);
   // FLD-10: the business's own word
   const term = (await getOrgTerms(orgId)).lead;
-  const showAll = (await searchParams).who === "all";
+  const query = await searchParams;
+  const showAll = query.who === "all";
   const { leads, truncated } = showAll
     ? // SPD-01 (lead's interim choice): the leads nobody owns that this person may take show on this tab only
       await getWaitingLeads(orgId, null, { id: context.user.id, role: context.role }, { offered: true })
@@ -50,6 +54,8 @@ export default async function WaitingLeadsPage({ params, searchParams }: Props) 
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
   const base = paths.leadsWaiting(orgId);
+  // UX-01: a lead's name opens the side panel (?peek=); the open lead's name opens its full page
+  const peek = peekLinks(orgId, base, query);
 
   return (
     <>
@@ -81,9 +87,14 @@ export default async function WaitingLeadsPage({ params, searchParams }: Props) 
       ) : (
         <ul className="divide-y divide-line rounded-lg border border-line bg-surface">
           {leads.map((lead) => (
-            <li key={lead.id} className="flex items-center gap-3 px-4 py-3 sm:px-5">
+            <li key={lead.id} className={cn("flex items-center gap-3 px-4 py-3 sm:px-5", peek.peekId === lead.id && PEEK_ROW_MARK)}>
               <div className="min-w-0 flex-1">
-                <Link href={paths.lead(orgId, lead.id)} className="block break-words font-medium underline-offset-4 hover:underline">
+                <Link
+                  href={peek.hrefFor(lead.id)}
+                  scroll={false}
+                  aria-current={peek.peekId === lead.id ? "true" : undefined}
+                  className="block break-words font-medium underline-offset-4 hover:underline"
+                >
                   <bdi>{lead.name}</bdi>
                 </Link>
                 <p className="mt-0.5 flex flex-wrap gap-x-3 text-sm text-ink-soft">
@@ -115,6 +126,7 @@ export default async function WaitingLeadsPage({ params, searchParams }: Props) 
         </ul>
       )}
       {truncated ? <p className="mt-3 text-sm text-ink-soft">מוצגים 200 הלידים הוותיקים שמחכים.</p> : null}
+      <LeadPeek orgId={orgId} context={context} links={peek} listIds={leads.map((lead) => lead.id)} listPath={base} />
     </>
   );
 }

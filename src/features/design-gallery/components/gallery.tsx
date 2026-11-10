@@ -10,6 +10,7 @@ import { BarList, ChartBar, Meter } from "@/components/ui/chart";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Calendar, DateField } from "@/components/ui/date-picker";
 import { Dialog, LeaveDialog } from "@/components/ui/dialog";
+import { SidePanel } from "@/components/ui/side-panel";
 import { EmptyState, FormError, FormNotice } from "@/components/ui/feedback";
 import { Checkbox, SelectField, Switch, TextareaField, TextField } from "@/components/ui/field";
 import * as Icons from "@/components/ui/icons";
@@ -74,6 +75,7 @@ function GalleryBody({ theme }: { theme: "light" | "dark" }) {
   const toast = useToast();
   const [on, setOn] = useState(true);
   const [dialog, setDialog] = useState<"dialog" | "sheet" | null>(null);
+  const [panel, setPanel] = useState(false);
   const [items, setItems] = useState(["חדש", "בטיפול", "נסגר"]);
   const [day, setDay] = useState("2026-10-09");
   const p = (name: string) => `${theme}-${name}`;
@@ -188,6 +190,9 @@ function GalleryBody({ theme }: { theme: "light" | "dark" }) {
           <Button variant="secondary" onClick={() => setDialog("sheet")}>
             פתיחת מגירה
           </Button>
+          <Button variant="secondary" onClick={() => setPanel(true)}>
+            פתיחת פאנל צד
+          </Button>
           <Popover
             label="התראות"
             triggerLabel="התראות"
@@ -228,6 +233,20 @@ function GalleryBody({ theme }: { theme: "light" | "dark" }) {
         >
           <TextField label="שם" name={p("dialog-name")} />
         </Dialog>
+        {/* UX-01: beside the page on a computer (the page stays active), a sheet on a phone */}
+        <SidePanel
+          open={panel}
+          onClose={() => setPanel(false)}
+          title="פאנל צד"
+          subtitle={<span dir="ltr">050-1234567</span>}
+          footer={
+            <Button variant="secondary" onClick={() => setPanel(false)}>
+              סגירה
+            </Button>
+          }
+        >
+          <p className="text-md">במחשב הפאנל עומד בצד והדף שלידו ממשיך לעבוד. בטלפון הוא מגירה תחתונה.</p>
+        </SidePanel>
       </Section>
 
       <Section title="מיקוד אחרי מחיקה (FXA-08)">

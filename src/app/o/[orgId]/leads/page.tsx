@@ -10,6 +10,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ScreenHelp } from "@/features/guide/components/screen-help";
 import { inlineEditing } from "@/features/inline-edit/server";
 import { activeReasonNames } from "@/features/disqualify-reasons/queries";
+import { LeadPeek } from "@/features/lead-peek/components/lead-peek";
+import { peekLinks } from "@/features/lead-peek/model";
 import { LeadCards } from "@/features/leads/components/lead-cards";
 import { LeadFilters } from "@/features/leads/components/lead-filters";
 import { LeadsBoard } from "@/features/leads/components/leads-board";
@@ -133,6 +135,10 @@ export default async function LeadsPage({ params, searchParams }: Props) {
   const sortHref = (key: string) =>
     listHref(1, sortValue(nextSort(sort, key as (typeof sortKeys)[number], key !== "created" && key !== "last_contact" && key !== "score")));
 
+  // UX-01: a row or card opens the side panel (?peek=); the open lead's own name opens its full page
+  const peek = peekLinks(orgId, paths.leads(orgId), query);
+  const peekFor = peek.hrefFor;
+
   const newLeadButton = canWrite ? (
     <ButtonLink href={paths.leadNew(orgId)}>
       <PlusIcon className="size-4.5" />
@@ -218,10 +224,10 @@ export default async function LeadsPage({ params, searchParams }: Props) {
       <LeadFilters orgId={orgId} statuses={lookups.statuses} tags={tags} search={search} statusId={statusId ?? ""} tagId={tagId ?? ""} board={boardView} />
 
       {board ? (
-        <LeadsBoard orgId={orgId} board={board} canWrite={canWrite} reasons={reasons} />
+        <LeadsBoard orgId={orgId} board={board} canWrite={canWrite} reasons={reasons} peek={peek.rows} />
       ) : leads.length > 0 ? (
         <>
-          <LeadCards orgId={orgId} leads={leads} statuses={lookups.statuses} showScore={shownColumns.some((c) => c.key === "score")} className="md:hidden" whatsapp={whatsappListContext(context)} canWrite={canWrite} />
+          <LeadCards orgId={orgId} hrefFor={peekFor} leads={leads} statuses={lookups.statuses} showScore={shownColumns.some((c) => c.key === "score")} className="md:hidden" whatsapp={whatsappListContext(context)} canWrite={canWrite} />
           <div className="hidden md:block">
             <LeadsTable
               orgId={orgId}
@@ -240,6 +246,8 @@ export default async function LeadsPage({ params, searchParams }: Props) {
               whatsapp={whatsappListContext(context)}
               segments={segmentOptions}
               canWrite={canWrite}
+              nameHref={peekFor}
+              peekId={peek.peekId}
             />
           </div>
         </>
@@ -266,6 +274,14 @@ export default async function LeadsPage({ params, searchParams }: Props) {
       )}
 
       {board ? null : <Pagination page={page} hasMore={hasMore} hrefFor={hrefFor} />}
+
+      <LeadPeek
+        orgId={orgId}
+        context={context}
+        links={peek}
+        listIds={board ? board.statuses.flatMap((status) => board.cards.filter((card) => card.statusId === status.id).map((card) => card.id)) : leads.map((row) => row.id)}
+        listPath={paths.leads(orgId)}
+      />
     </>
   );
 }

@@ -83,8 +83,8 @@ export function ListTable<R>({
         </thead>
         <tbody className="divide-y divide-line">
           {rows.map((row) => (
-            <tr key={rowKey(row)} className="group">
-              <td className={`${td} sticky start-0 z-10 bg-surface group-hover:bg-canvas`}>{nameCell(row)}</td>
+            <tr key={rowKey(row)} className="group has-[[data-peek-current]]:bg-canvas">
+              <td className={`${td} sticky start-0 z-10 bg-surface group-hover:bg-canvas group-has-[[data-peek-current]]:bg-canvas rtl:group-has-[[data-peek-current]]:shadow-[inset_-3px_0_0_var(--color-accent)] ltr:group-has-[[data-peek-current]]:shadow-[inset_3px_0_0_var(--color-accent)]`}>{nameCell(row)}</td>
               {columns.map((column) => {
                 const field = fieldByKey.get(column.key);
                 if (field) {

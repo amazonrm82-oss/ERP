@@ -34,6 +34,8 @@ import { getSetupChecklist, getSetupStep } from "@/features/setup/queries";
 import { getCalendarSettings } from "@/features/calendar-days/queries";
 import { readPipelineCleanup } from "@/features/pipeline-cleanup/queries";
 import { cleanupCountText, isCleanupDay } from "@/features/pipeline-cleanup/rules";
+import { LeadPeek } from "@/features/lead-peek/components/lead-peek";
+import { PEEK_ROW_MARK, peekLinks } from "@/features/lead-peek/model";
 import { cn } from "@/lib/cn";
 import { leadDisplayName } from "@/features/leads/display";
 import { getOrgModules } from "@/features/modules/queries";
@@ -45,7 +47,7 @@ import { formatDate, formatMoney, formatNumber, zoneTime } from "@/lib/format";
 import { paths } from "@/lib/paths";
 import { RECORD_TYPES, recordPage } from "@/lib/record-types";
 
-type Props = { params: Promise<{ orgId: string }> };
+type Props = { params: Promise<{ orgId: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> };
 
 const RELATED_LABEL = { lead: "פתיחת הליד", contact: "פתיחת איש הקשר", company: "פתיחת החברה", deal: "פתיחת העסקה" } as const;
 
@@ -56,8 +58,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return { title: { absolute: `היום שלי | ${org.name}` } };
 }
 
-export default async function HomePage({ params }: Props) {
+export default async function HomePage({ params, searchParams }: Props) {
   const { orgId } = await params;
+  // UX-01: a new lead's name opens the side panel (?peek=); the open lead's name opens its full page
+  const peek = peekLinks(orgId, paths.org(orgId), (await searchParams) ?? {});
   const context = await getOrgContext(orgId);
   const { user, canWrite, org, role } = context;
   // WA-01 follow-up: the WhatsApp templates on the new leads; none for someone who cannot write
@@ -382,9 +386,14 @@ export default async function HomePage({ params }: Props) {
                 <>
                   <ul className="divide-y divide-line">
                     {day.newLeads.map((lead) => (
-                      <li key={lead.id} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+                      <li key={lead.id} className={cn("flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0", peek.peekId === lead.id && PEEK_ROW_MARK)}>
                         <span className="min-w-0">
-                          <Link href={paths.lead(orgId, lead.id)} className="block truncate font-medium underline-offset-4 hover:underline">
+                          <Link
+                            href={peek.hrefFor(lead.id)}
+                            scroll={false}
+                            aria-current={peek.peekId === lead.id ? "true" : undefined}
+                            className="block truncate font-medium underline-offset-4 hover:underline"
+                          >
                             {leadDisplayName(lead)}
                           </Link>
                           <span className="block truncate text-sm text-ink-soft">
@@ -519,6 +528,7 @@ export default async function HomePage({ params }: Props) {
           </CardBody>
         </Card>
       </div>
+      {modules.leads ? <LeadPeek orgId={orgId} context={context} links={peek} listIds={day.newLeads.map((lead) => lead.id)} listPath={paths.org(orgId)} /> : null}
     </>
   );
 }

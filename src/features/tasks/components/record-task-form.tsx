@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
 import { FormError, FormNotice } from "@/components/ui/feedback";
@@ -14,8 +14,14 @@ import { addRecordTaskAction } from "../actions";
  * One line and three buttons: add a task to this record, for later, tomorrow or in a week (FXU-01).
  * A day the business does not work becomes the next working day, and the notice says which (HEB-02).
  */
-export function RecordTaskForm({ orgId, subject }: { orgId: string; subject: TimelineSubject }) {
+// onSaved: after each saved task (UX-01's side panel redraws)
+export function RecordTaskForm({ orgId, subject, onSaved }: { orgId: string; subject: TimelineSubject; onSaved?: () => void }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(addRecordTaskAction.bind(null, orgId, subject), null);
+  const seen = useRef(state);
+  useEffect(() => {
+    if (state !== seen.current && state?.ok) onSaved?.();
+    seen.current = state;
+  }, [state, onSaved]);
   const failure = state && !state.ok ? state : null;
   return (
     <form action={formAction} className="space-y-2">

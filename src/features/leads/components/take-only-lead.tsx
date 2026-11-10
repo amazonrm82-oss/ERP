@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { getTimeline } from "@/features/activities/queries";
-import { isPinnableType } from "@/features/activities/schema";
+import { isPinnableType, timelineEntryId } from "@/features/activities/schema";
 import { NoteText } from "@/features/activities/components/note-text";
 import { listActivityTypes } from "@/features/activity-types/queries";
 import { formatBytes } from "@/features/files/types";
@@ -74,7 +74,7 @@ export async function TakeOnlyLead({ orgId, lead, statuses, sources, terms, canW
             ) : (
               <ol className="space-y-5">
                 {items.map((item) => (
-                  <li key={item.id} className={cn("relative", item.pinned ? "rounded-md bg-canvas p-3 ps-8" : "ps-5")}>
+                  <li key={item.id} id={timelineEntryId(item.id)} className={cn("relative scroll-mt-24", item.pinned ? "rounded-md bg-canvas p-3 ps-8" : "ps-5")}>
                     <span
                       aria-hidden="true"
                       className={cn(

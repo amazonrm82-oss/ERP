@@ -46,10 +46,14 @@ type Props = {
   segments?: Array<{ value: string; label: string }> | null;
   // SPD-01: whether the viewer writes in the business, so a lead nobody owns offers "לקחתי" on its row
   canWrite?: boolean;
+  // UX-01: the name opens the side panel (?peek=<id>); a second click on the name of the open lead opens the full page
+  nameHref?: (id: string) => string;
+  // UX-01: the lead open in the side panel, its row marked
+  peekId?: string | null;
 };
 
 /** Leads as a table, with the columns the user chose. */
-export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, fields, sort, sortHref, editing, tags, reasons, completeness, whatsapp = null, segments = null, canWrite = false }: Props) {
+export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, fields, sort, sortHref, editing, tags, reasons, completeness, whatsapp = null, segments = null, canWrite = false, nameHref, peekId = null }: Props) {
   const statusById = new Map(statuses.map((status) => [status.id, status]));
   // "converted" is set only by the conversion
   const statusOptions = statuses
@@ -99,7 +103,7 @@ export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, 
                 initial={{ text: lead.fullName ?? "" }}
                 canEdit={editing.canEdit(lead.ownerId)}
               >
-                <Link href={paths.lead(orgId, lead.id)} className="font-medium text-ink underline-offset-4 hover:underline">
+                <Link href={nameHref ? nameHref(lead.id) : paths.lead(orgId, lead.id)} scroll={nameHref ? false : undefined} aria-current={peekId === lead.id ? "true" : undefined} data-peek-current={peekId === lead.id ? "" : undefined} className="font-medium text-ink underline-offset-4 hover:underline">
                   {leadDisplayName(lead)}
                 </Link>
               </InlineEdit>

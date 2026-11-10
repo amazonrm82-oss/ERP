@@ -46,7 +46,7 @@ export function navItems(
   orgId: string,
   terms: OrgTerms = DEFAULT_TERMS,
   modules: OrgModules = DEFAULT_MODULES,
-  // SPD-01 (owner (190) ב): a viewer takes no lead, so the waiting leads leave a viewer's menu
+  // SPD-01 (owner (190) ב, menu decision of 10 November 2026): only who writes in the business takes a lead, so the waiting leads leave the menu of anyone who cannot write (a viewer, a support session, a read-only business)
   options: { viewer?: boolean } = {},
 ): NavItem[] {
   const items: NavItem[] = [

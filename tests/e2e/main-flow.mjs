@@ -127,6 +127,15 @@ async function newPage(width) {
   return page;
 }
 
+// UX-01: a lead's name in a list opens the side panel; a second click on the same name opens its full page
+async function openLeadPage(page, name) {
+  await page.getByRole("link", { name, exact: true }).first().click();
+  await page.waitForURL((url) => url.searchParams.has("peek"));
+  await page.locator("dialog[data-side-panel][open]").waitFor();
+  await page.getByRole("link", { name, exact: true }).first().click();
+  await page.waitForURL(/\/leads\/[0-9a-f-]{36}$/);
+}
+
 async function expectText(page, text) {
   // visible only: the same text may also sit in a collapsed change history
   await page.getByText(text, { exact: false }).filter({ visible: true }).first().waitFor({ timeout: 15000 });
@@ -1129,6 +1138,70 @@ try {
   const back = await boardStatus("חדש");
   if (back.reason !== null) throw new Error("the reason stayed after the lead was reopened");
 
+  step("lead side panel: a row opens it beside the list, a call is logged, a lead nobody owns is taken from it (UX-01)");
+  {
+    const orgId = orgUrl.split("/").pop();
+    const [{ id: newStatus }] = await sql("select id from public.lead_statuses where organization_id = $1 and is_default", [orgId]);
+    // two leads nobody owns, as a form would leave them
+    const [{ id: panelLead }] = await sql(
+      "insert into public.leads (organization_id, full_name, phone, status_id, message) values ($1, 'ליד בפאנל', '050-5551234', $2, 'מבקש הצעת מחיר') returning id",
+      [orgId, newStatus],
+    );
+    const [{ id: takeLead }] = await sql(
+      "insert into public.leads (organization_id, full_name, phone, status_id) values ($1, 'ליד לקחת', '050-5554321', $2) returning id",
+      [orgId, newStatus],
+    );
+    await ownerDesk.goto(`${orgUrl}/leads?q=${encodeURIComponent("ליד בפאנל")}`);
+    await ownerDesk.getByRole("link", { name: "ליד בפאנל", exact: true }).click();
+    await ownerDesk.waitForURL((url) => url.searchParams.get("peek") === panelLead);
+    const panel = ownerDesk.locator("dialog[data-side-panel][open]");
+    await panel.getByRole("heading", { name: "ליד בפאנל" }).waitFor();
+    await panel.getByText("מבקש הצעת מחיר").waitFor();
+    // beside the list on a computer: the page is not inert, and the open lead's own name now opens its full page
+    if (await panel.evaluate((d) => d.matches(":modal"))) throw new Error("the side panel covers the list on a computer");
+    const ownName = ownerDesk.getByRole("link", { name: "ליד בפאנל", exact: true });
+    if (!(await ownName.getAttribute("href"))?.endsWith(`/leads/${panelLead}`)) throw new Error("a second click on the name does not open the full page");
+    // "התקשרתי" -> "לא ענה": one call entry with how it ended
+    await panel.getByRole("button", { name: "התקשרתי" }).click();
+    await panel.getByRole("button", { name: "לא ענה" }).click();
+    await panel.getByRole("button", { name: "שמירת השיחה" }).click();
+    await panel.getByText("השיחה נרשמה בציר הזמן.").waitFor({ timeout: 15000 });
+    const [{ count: calls }] = await sql(
+      "select count(*)::int as count from public.activities where lead_id = $1 and type = 'call' and metadata ->> 'outcome' = 'no_answer'",
+      [panelLead],
+    );
+    if (calls !== 1) throw new Error(`the panel's call was not logged once (${calls})`);
+    await panel.locator("a", { hasText: "לא ענה" }).first().waitFor({ timeout: 15000 });
+    // "לחזור ב…": a call task with a reminder, on the next working day at 10:00 by default
+    await panel.getByRole("button", { name: "התקשרתי" }).click();
+    await panel.getByRole("button", { name: "לחזור ב…" }).click();
+    await panel.getByRole("button", { name: "שמירה", exact: true }).click();
+    await panel.getByText('השיחה נרשמה ונוספה משימת "לחזור".', { exact: false }).waitFor({ timeout: 15000 });
+    const [task] = await sql("select task_type, remind_at = due_at as reminded from public.tasks where lead_id = $1 and title like 'לחזור אל%'", [panelLead]);
+    if (task?.task_type !== "call" || !task.reminded) throw new Error("the call-back task was not made with its reminder");
+    // Escape closes it
+    await ownerDesk.keyboard.press("Escape");
+    await ownerDesk.waitForURL((url) => !url.searchParams.has("peek"));
+    await shot(ownerDesk, "24b-lead-panel-closed-1280");
+
+    // a member takes a lead nobody owns from the panel, opened from the waiting list
+    await invitee.goto(`${orgUrl}/leads/waiting?who=all&peek=${takeLead}`);
+    const memberPanel = invitee.locator("dialog[data-side-panel][open]");
+    await memberPanel.getByRole("heading", { name: "ליד לקחת" }).waitFor({ timeout: 15000 });
+    await memberPanel.getByRole("button", { name: "לקחתי את ליד לקחת" }).click();
+    let takenBy = null;
+    for (let i = 0; i < 60 && !takenBy; i++) {
+      [{ owner_name: takenBy }] = await sql(
+        "select p.full_name as owner_name from public.leads l left join public.profiles p on p.id = l.owner_id where l.id = $1",
+        [takeLead],
+      );
+      if (!takenBy) await new Promise((r) => setTimeout(r, 250));
+    }
+    if (takenBy !== "דנה חברה") throw new Error(`the lead was not taken by the member (${takenBy})`);
+    // once taken, the panel offers the work: the call buttons and "התקשרתי"
+    await memberPanel.getByRole("button", { name: "התקשרתי" }).waitFor({ timeout: 15000 });
+  }
+
   step("'not relevant' reasons come from the organization's list, which starts with the default reasons (LEAD-03)");
   await ownerDesk.goto(`${orgUrl}/settings/lead-reasons`);
   await ownerDesk.getByRole("textbox", { name: /^שם הסיבה קנה אצל מתחרה/ }).waitFor({ timeout: 15000 });
@@ -1798,7 +1871,7 @@ try {
   await ownerDesk.goto(`${orgUrl}/leads?q=${encodeURIComponent("אבי")}`);
   const aviRows = await ownerDesk.locator("tbody tr").count();
   if (aviRows !== 1) throw new Error(`expected one lead for Avi, found ${aviRows}`);
-  await ownerDesk.getByRole("link", { name: "אבי מזאפייר" }).click();
+  await openLeadPage(ownerDesk, "אבי מזאפייר");
   await expectText(ownerDesk, "פנייה נוספת דרך \"Zapier\"");
   await expectText(ownerDesk, "רוצה הצעה עדכנית");
   await shot(ownerDesk, "50-repeat-inquiry-1280");
@@ -1825,8 +1898,7 @@ try {
   };
   const ownerOfLead = async (name) => {
     await ownerDesk.goto(`${orgUrl}/leads?q=${encodeURIComponent(name)}`);
-    await ownerDesk.getByRole("link", { name }).click();
-    await ownerDesk.waitForURL(/\/leads\/[0-9a-f-]{36}$/);
+    await openLeadPage(ownerDesk, name);
     return (await ownerDesk.locator("dt", { hasText: "אחראי" }).locator("xpath=following-sibling::dd[1]").innerText()).trim();
   };
   await sendLead("סבב אחד", "058-1000001");
@@ -2050,7 +2122,7 @@ try {
   if (!/נוצרו\s*3/.test(importSummary) || !/דולגו \(כבר קיימים\)\s*2/.test(importSummary) || !/נכשלו\s*1/.test(importSummary)) throw new Error("unexpected import counts");
   await ownerDesk.getByRole("button", { name: /הורדת 1 השורות שנכשלו/ }).waitFor();
   await ownerDesk.goto(`${orgUrl}/leads?q=${encodeURIComponent("נועה מהקובץ")}`);
-  await ownerDesk.getByRole("link", { name: "נועה מהקובץ" }).click();
+  await openLeadPage(ownerDesk, "נועה מהקובץ");
   await expectText(ownerDesk, "0521110002"); // the leading 0 Excel drops is restored
   await ownerDesk.goto(`${orgUrl}/settings/import`);
   await shot(ownerDesk, "91-import-history-1280");
@@ -2392,7 +2464,7 @@ try {
   await ownerDesk.goto(`${orgUrl}/settings/audit?tab=logins`);
   await expectText(ownerDesk, "כניסה");
   await ownerDesk.goto(`${orgUrl}/leads?q=${encodeURIComponent("סבב אחד")}`);
-  await ownerDesk.getByRole("link", { name: "סבב אחד" }).click();
+  await openLeadPage(ownerDesk, "סבב אחד");
   await ownerDesk.getByText(/היסטוריית שינויים/).click();
   await shot(ownerDesk, "113-record-history-1280");
 
