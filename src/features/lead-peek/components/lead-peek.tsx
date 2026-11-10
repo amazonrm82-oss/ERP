@@ -13,6 +13,7 @@ import { waitingText } from "@/lib/waiting-time";
 
 import { callBackPick, peekHref, peekNeighbours, peekRights, showCreatedAgo, timelineItemHref, type PeekLinks } from "../model";
 import { getPeekLead } from "../queries";
+import { queueLinks, queuePositionText } from "../queue";
 import { LeadPeekPanel } from "./lead-peek-panel";
 
 type Props = {
@@ -22,10 +23,12 @@ type Props = {
   // the leads of the list as shown, for ↑ / ↓
   listIds: string[];
   listPath: string;
+  // UX-02: the waiting list's "מצב תור": after an action in the panel, the next lead of `listIds` opens in it
+  queue?: boolean;
 };
 
 /** UX-01: reads the lead the address names (?peek=) with the user's session and shows the side panel. A lead that cannot be read shows nothing. */
-export async function LeadPeek({ orgId, context, links, listIds, listPath }: Props) {
+export async function LeadPeek({ orgId, context, links, listIds, listPath, queue = false }: Props) {
   const leadId = links.peekId;
   if (!leadId) return null;
   const lead = await getPeekLead(orgId, leadId);
@@ -52,6 +55,7 @@ export async function LeadPeek({ orgId, context, links, listIds, listPath }: Pro
   const pick = (shortcut: "hour" | "tomorrow" | "week") =>
     callBackPick(shortcut, today, nowTime, (day) => (calendar ? nextWorkingDay(calendar, day) : day), addDays);
   const age = now.getTime() - Date.parse(lead.createdAt);
+  const inQueue = queue ? queueLinks(listPath, links.params, listIds, lead.id) : null;
 
   return (
     <LeadPeekPanel
@@ -63,6 +67,7 @@ export async function LeadPeek({ orgId, context, links, listIds, listPath }: Pro
       fullHref={paths.lead(orgId, lead.id)}
       previousHref={previous ? peekHref(listPath, links.params, previous) : null}
       nextHref={next ? peekHref(listPath, links.params, next) : null}
+      queue={inQueue ? { afterHref: inQueue.afterHref, label: queuePositionText(inQueue.position) } : null}
       callBack={rights.canLog ? { hour: pick("hour"), tomorrow: pick("tomorrow"), week: pick("week") } : null}
       whatsappValues={recordTemplateValues({ fullName: lead.fullName, gender: lead.gender }, context)}
       lead={{

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Button, buttonClasses, IconButton } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { FormError, FormNotice } from "@/components/ui/feedback";
 import { Input, Label, SelectField, TextareaField } from "@/components/ui/field";
 import { ArrowDownIcon, ArrowUpIcon, ChatIcon, CheckIcon, ChevronDownIcon, LockIcon, MailIcon, PhoneIcon } from "@/components/ui/icons";
 import { SidePanel } from "@/components/ui/side-panel";
+import { useToast } from "@/components/ui/toast";
 import { QuickNote } from "@/features/activities/components/quick-note";
 import { movedToWorkingDayNotice } from "@/features/calendar-days/rest-day-note";
 import { RequiredFieldsDialog, type RequiredAsk } from "@/features/custom-fields/components/required-fields-dialog";
@@ -69,6 +70,8 @@ type Props = {
   // "לחזור ב…": the business's working days, worked out on the server
   callBack: { hour: CallBackPick; tomorrow: CallBackPick; week: CallBackPick } | null;
   whatsappValues: TemplateValues;
+  // UX-02 "מצב תור": after an action the panel goes to `afterHref` (the next waiting lead, or the end of the queue)
+  queue?: { afterHref: string; label: string } | null;
 };
 
 type Section = "status" | "owner" | "call" | "note" | "task" | null;
@@ -96,14 +99,35 @@ function keyBelongsElsewhere(event: KeyboardEvent): boolean {
  * write goes with the user's session through the lead page's own actions; a lead offered only to take shows its
  * details and "לקחתי", and call / WhatsApp / email take it first (216 ב).
  */
-export function LeadPeekPanel({ orgId, lead, rights, reasons, owners, closeHref, fullHref, previousHref, nextHref, callBack, whatsappValues }: Props) {
+export function LeadPeekPanel({ orgId, lead, rights, reasons, owners, closeHref, fullHref, previousHref, nextHref, callBack, whatsappValues, queue = null }: Props) {
   const router = useRouter();
   const [, startNavigation] = useTransition();
   const [section, setSection] = useState<Section>(null);
   const [call, setCall] = useState<CallChoice>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  // UX-02: what was saved on the previous lead of the queue, said once on the next one
+  const [carried, setCarried] = useState<string | null>(null);
+  const [queueNotice, setQueueNotice] = useState<string | null>(null);
+  const advanced = useRef(false);
   const go = (href: string) => startNavigation(() => router.replace(href, { scroll: false }));
   const refresh = () => router.refresh();
+
+  /**
+   * An action on this lead was saved. Outside the queue the panel shows `text` and redraws; in the queue (UX-02) the
+   * next waiting lead opens (the server reads the list again, so the saved lead's own row is redrawn too).
+   */
+  const finished = (text: string | null, panelText: string | null = text) => {
+    setSection(null);
+    setCall(null);
+    if (queue) {
+      setCarried(text ? `${lead.name}: ${text}` : null);
+      advanced.current = true;
+      go(queue.afterHref);
+      return;
+    }
+    setMessage(panelText ? { ok: true, text: panelText } : null);
+    refresh();
+  };
 
   // another lead in the panel starts with every menu closed
   const [shownId, setShownId] = useState(lead.id);
@@ -112,7 +136,16 @@ export function LeadPeekPanel({ orgId, lead, rights, reasons, owners, closeHref,
     setSection(null);
     setCall(null);
     setMessage(null);
+    setQueueNotice(carried);
+    setCarried(null);
   }
+
+  // after the queue moved on, the keyboard starts at the new lead's name (the button that was pressed is gone)
+  useEffect(() => {
+    if (!advanced.current) return;
+    advanced.current = false;
+    document.querySelector<HTMLElement>("[data-side-panel] [data-panel-title], [data-side-panel] [data-sheet-title]")?.focus({ preventScroll: true });
+  }, [lead.id]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -154,6 +187,14 @@ export function LeadPeekPanel({ orgId, lead, rights, reasons, owners, closeHref,
       }
     >
       <div className="flex flex-col gap-5">
+        {/* UX-02: the queue's place, and what was saved on the lead before this one */}
+        {queue ? (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm font-medium text-accent">{queue.label}</p>
+            {queueNotice ? <FormNotice message={queueNotice} /> : null}
+          </div>
+        ) : null}
+
         {/* (1) reach the person; status and owner, or "לקחתי" */}
         <section aria-label="פרטי קשר וסטטוס" className="flex flex-col gap-3">
           <ReachButtons
@@ -217,10 +258,7 @@ export function LeadPeekPanel({ orgId, lead, rights, reasons, owners, closeHref,
                 currentStatusId={lead.status.id}
                 statuses={lead.statuses}
                 reasons={reasons}
-                onMoved={() => {
-                  setSection(null);
-                  refresh();
-                }}
+                onMoved={(statusName) => finished(statusName ? `הסטטוס עודכן ל"${statusName}".` : "הסטטוס עודכן.", null)}
               />
             </div>
           ) : null}
@@ -230,14 +268,11 @@ export function LeadPeekPanel({ orgId, lead, rights, reasons, owners, closeHref,
               leadId={lead.id}
               current={lead.ownerId}
               owners={owners}
-              onSaved={() => {
-                setSection(null);
-                refresh();
-              }}
+              onSaved={() => finished("האחראי עודכן.", null)}
             />
           ) : null}
 
-          {rights.canTake ? <TakeLeadButton orgId={orgId} leadId={lead.id} leadName={lead.name} /> : null}
+          {rights.canTake ? <TakeLeadButton orgId={orgId} leadId={lead.id} leadName={lead.name} onTaken={queue ? () => finished("הליד נלקח.") : undefined} /> : null}
           {rights.mode === "take_only" ? (
             <p role="status" className="flex items-start gap-2 rounded-md bg-warning-soft px-3 py-2 text-md text-warning">
               <LockIcon className="mt-0.5 size-4.5 shrink-0" />
@@ -319,24 +354,14 @@ export function LeadPeekPanel({ orgId, lead, rights, reasons, owners, closeHref,
                     key={call}
                     outcome={call}
                     save={(note) => peekLogCallAction(orgId, lead.id, lead.name, call, note)}
-                    onSaved={() => {
-                      setSection(null);
-                      setCall(null);
-                      setMessage({ ok: true, text: "השיחה נרשמה בציר הזמן." });
-                      refresh();
-                    }}
+                    onSaved={() => finished("השיחה נרשמה בציר הזמן.")}
                   />
                 ) : null}
                 {call === "call_back" && callBack ? (
                   <CallBackForm
                     picks={callBack}
                     save={(date, time, note) => peekCallBackAction(orgId, lead.id, lead.name, date, time, note)}
-                    onSaved={(text) => {
-                      setSection(null);
-                      setCall(null);
-                      setMessage({ ok: true, text });
-                      refresh();
-                    }}
+                    onSaved={(text) => finished(text)}
                   />
                 ) : null}
                 {call === "not_relevant" && lead.disqualifiedStatusId ? (
@@ -346,12 +371,7 @@ export function LeadPeekPanel({ orgId, lead, rights, reasons, owners, closeHref,
                     leadName={lead.name}
                     statusId={lead.disqualifiedStatusId}
                     reasons={reasons}
-                    onSaved={() => {
-                      setSection(null);
-                      setCall(null);
-                      setMessage({ ok: true, text: "השיחה נרשמה והליד סומן כלא רלוונטי." });
-                      refresh();
-                    }}
+                    onSaved={() => finished("השיחה נרשמה והליד סומן כלא רלוונטי.")}
                   />
                 ) : null}
               </div>
@@ -359,13 +379,18 @@ export function LeadPeekPanel({ orgId, lead, rights, reasons, owners, closeHref,
 
             {section === "note" ? (
               <div className="rounded-md border border-line bg-canvas p-3">
-                <QuickNote key={lead.id} orgId={orgId} subject={subject} onSaved={refresh} />
+                <QuickNote key={lead.id} orgId={orgId} subject={subject} onSaved={queue ? () => finished("ההערה נשמרה.") : refresh} />
               </div>
             ) : null}
 
             {section === "task" ? (
               <div className="rounded-md border border-line bg-canvas p-3">
-                <RecordTaskForm key={lead.id} orgId={orgId} subject={subject} onSaved={refresh} />
+                {queue ? (
+                  // owner (237) ב: in the queue a saved task moves on too, with a toast
+                  <QueueTaskForm key={lead.id} orgId={orgId} subject={subject} onSaved={() => finished(TASK_SAVED)} />
+                ) : (
+                  <RecordTaskForm key={lead.id} orgId={orgId} subject={subject} onSaved={refresh} />
+                )}
               </div>
             ) : null}
             {message ? message.ok ? <FormNotice message={message.text} /> : <FormError message={message.text} /> : null}
@@ -708,5 +733,25 @@ function NotRelevantForm({
       <FormError message={error} />
       <RequiredFieldsDialog ask={ask} onClose={() => setAsk(null)} />
     </div>
+  );
+}
+
+const TASK_SAVED = "המשימה נשמרה.";
+
+/**
+ * The task form in the queue (UX-02, owner (237) ב): the saved task is said in a toast as well, because the panel
+ * moves on to the next lead. Rendered only under the waiting screen's ToastProvider (queue mode).
+ */
+function QueueTaskForm({ orgId, subject, onSaved }: { orgId: string; subject: { kind: "lead"; id: string }; onSaved: () => void }) {
+  const toast = useToast();
+  return (
+    <RecordTaskForm
+      orgId={orgId}
+      subject={subject}
+      onSaved={() => {
+        toast("המשימה נשמרה");
+        onSaved();
+      }}
+    />
   );
 }

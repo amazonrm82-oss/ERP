@@ -10,10 +10,11 @@ import { cn } from "@/lib/cn";
 
 import { takeLeadAction } from "../take-actions";
 
-type Props = { orgId: string; leadId: string; leadName: string; size?: "md" | "sm"; className?: string };
+// onTaken: called after a successful take instead of redrawing the page (UX-02's queue moves on to the next lead)
+type Props = { orgId: string; leadId: string; leadName: string; size?: "md" | "sm"; className?: string; onTaken?: () => void };
 
 /** "לקחתי" (SPD-01): takes a lead nobody has, or marks your own as being handled. */
-export function TakeLeadButton({ orgId, leadId, leadName, size = "md", className }: Props) {
+export function TakeLeadButton({ orgId, leadId, leadName, size = "md", className, onTaken }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
@@ -29,7 +30,10 @@ export function TakeLeadButton({ orgId, leadId, leadName, size = "md", className
             const answer = await takeLeadAction(orgId, leadId);
             setResult({ ok: answer.ok, message: answer.message ?? "" });
             // a refusal stays on screen to be read; a success redraws the page (owner, clock, button)
-            if (answer.ok) router.refresh();
+            if (answer.ok) {
+              if (onTaken) onTaken();
+              else router.refresh();
+            }
           })
         }
       >
