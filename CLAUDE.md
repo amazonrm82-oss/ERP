@@ -2615,6 +2615,29 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   job its re-checked file paths, filled body and reply-to (shape in the migration header); its own In use line then. Interim
   lead choices: library files only with marketing templates (question 198), collection needs the plan keys (question 199). The advisor's
   finding on `record_email_queue` is expected.
+- SMS (SMS-01..03, SMS-01b; migrations 021201-021205; owner (207)-(211), 10 November 2026; four independent reviews): one platform
+  provider account (fake only; InforU and SMS4Free stubs are `built: false` and never selected). Plan key `sms` + quota
+  `max_sms_per_month` (personal off/0, basic 100, pro 300, business 1,000) cover EVERY SMS to a customer (card, automations, CAL-12,
+  PKG-03), judged at send time in `public.job_message_may_send` (last redefined in 021204; test 284's md5 changed, rechecked by the
+  final review) under the channel's rate row: without the flag the job waits (`cap_wait = 'sms_off'`), over the quota it waits
+  (`over_cap`) with notices (`app.sms_quota_notify`: 80% once a month, full once a day); counted once when sent in
+  `app.sms_quota_months`; `verification_code` is never counted or held. Card send `public.record_sms_send` (invoker) over definer
+  `app.record_sms_enqueue` (EML-02's rule: readable record, its own `phone_e164`, sendable SMS template, collection only with
+  `can_record_payments` + keys, 30 an hour per person including button presses); automation step `send_sms`
+  (`app.automation_send_sms`; a collection step is saved only by a payment recorder, trigger `automations_sms_collection`; button
+  runs judge the presser; one SMS per rule, record and business day). `app.run_automation_actions` was last redefined in 021202,
+  `app.job_payload_ok` in 021204 (on SMS `verification_code` iff `sender_check_id`), `app.plan_key_defaults` in 021202.
+  Sender (211 א): a number only equal to `organizations.phone`, verified once by an SMS code (`sms_sender_verify_start` /
+  `sms_sender_verify`, owners/admins; 5 tries then 30 minutes; 3 checks an hour; code hashed, 10 minutes, issued only for the
+  send-checked lease); a letter name waits for `platform_set_sms_sender_approval` (owner/support, aal2, logged; reject = server-only
+  `sms_sender_rejected_at` + one `system` notice); effective sender `app.sms_effective_sender` (approved name, else verified number,
+  else platform default). Since 021205 clients read `org_message_settings` through column select grants (not `sms_sender_approved_by`):
+  a new column needs its own select grant and its place in `EXPORT_COLUMNS`. Opt-out (208, 209 ב): `public.sms_inbound_optout`
+  (service_role, NO CALLER YET; the inbound webhook needs its own "In use" line) adds the number to the business blocklist
+  (server-only reason `sms_reply`, hash only, outside the 100,000 cap; `consent_blocklist_add_noted` last redefined in 021203) and a
+  withdrawn consent on records holding it as primary phone; whole-message match against `src/features/messaging/sms-optout-words.json`
+  (mirrored by `app.sms_optout_words`, unit test); 600 opt-outs a minute per business. `public.sms_sender_code_issue` (service_role,
+  lease-bound) has NO CALLER YET either: the future SMS sender needs its own "In use" line in hard rule 5 for both.
 - Document templates (SGN-01, migration 021200; owner (67) ג, (200) א, (201) ב, (202) ב; independent review): plan key
   `signatures` (personal off; basic, pro, business on) and `max_signatures_per_month` (0 / 20 / 100 / no cap; counted by SGN-02,
   nothing counts it yet); `app.plan_key_defaults` was last redefined in 021200. `public.document_templates` (managed list: members
