@@ -108,7 +108,7 @@ describe("theme choice (USR-07)", () => {
       expect(pageThemeChoice(path, "dark"), path).toBe("light");
       expect(pageThemeChoice(path, undefined), path).toBe("light");
     }
-    for (const path of ["/app", "/o/1/leads", "/login", "/fx", "/admin/design"]) {
+    for (const path of ["/app", "/o/1/leads", "/login", "/fx", "/admin/design", "/help", "/help/leads", "/help/roadmap", "/o/1/help", "/o/1/help/leads"]) {
       expect(isAlwaysLightPath(path), path).toBe(false);
     }
     expect(pageThemeChoice("/o/1", "dark")).toBe("dark");

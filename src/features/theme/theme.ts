@@ -71,7 +71,8 @@ export function cspNonce(policy: string | null): string | undefined {
 /**
  * Customer-facing pages stay light until the owner decides otherwise (review of USR-07, 19 October 2026): the landing
  * page and every /f/* page (forms, embedded forms and widgets, booking, quotes, cards). The person's choice is about
- * their own app, so neither the cookie nor the device applies there.
+ * their own app, so neither the cookie nor the device applies there. The public help center (/help, /help/*, the
+ * roadmap included) follows the viewer's own preference like the app (owner's answer (239) ב, UX-06).
  */
 export function isAlwaysLightPath(pathname: string | null | undefined): boolean {
   if (!pathname) return false;

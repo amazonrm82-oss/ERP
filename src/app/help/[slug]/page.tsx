@@ -14,7 +14,14 @@ export const dynamicParams = false;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const article = getHelpArticle((await params).slug);
-  return article ? { title: `${article.title} | מרכז עזרה`, description: article.summary } : {};
+  if (!article) return {};
+  const url = paths.helpArticle(article.slug);
+  return {
+    title: `${article.title} | מרכז עזרה`,
+    description: article.summary,
+    alternates: { canonical: url },
+    openGraph: { title: article.title, description: article.summary, url, type: "article", locale: "he_IL" },
+  };
 }
 
 export default async function HelpArticlePage({ params }: Props) {

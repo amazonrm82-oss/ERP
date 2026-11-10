@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { HELP_ARTICLES } from "@/features/help/articles";
@@ -18,6 +19,14 @@ export default async function OrgHelpPage({ params }: { params: Promise<{ orgId:
     <>
       <PageHeader title="מרכז עזרה" description="מדריכים קצרים, צעד אחר צעד. את הסיור במערכת אפשר לראות שוב מתפריט החשבון." />
       <HelpIndex articles={HELP_ARTICLES} base={paths.orgHelp(orgId)} />
+      {/* UX-06: the approved articles are open to anyone too, e.g. to send to a new employee before they join */}
+      <p className="mt-12 border-t border-line pt-6 text-md text-ink-soft">
+        המדריכים הסופיים פתוחים גם בלי כניסה, ב
+        <Link href={paths.help} className="text-accent-strong underline underline-offset-4">
+          מרכז העזרה הציבורי
+        </Link>
+        . אפשר לשלוח את הקישור גם למי שעוד לא הצטרף.
+      </p>
     </>
   );
 }
