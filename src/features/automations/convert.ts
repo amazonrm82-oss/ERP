@@ -10,6 +10,7 @@ import { createDealAction, createDealDraft, createQuoteAction, createQuoteDraft 
 import { dateTriggerConfig, dateTriggerDraft } from "./date-trigger";
 import { fieldTriggerConfig } from "./field-trigger";
 import { scheduleTriggerConfig, scheduleTriggerDraft } from "./schedule-trigger";
+import { sendSmsAction, sendSmsDraft } from "./send-sms";
 import { customDefinition, setFieldDraft, setFieldRelativeDraft, setFieldValue } from "./set-field";
 
 export const REASON_REQUIRED = "יש לבחור סיבה לסטטוס \"לא רלוונטי\".";
@@ -160,6 +161,10 @@ export function toDbRule(rule: Rule, lookups: Lookups): DbRule | string {
       const built = createQuoteAction(entity, action, lookups);
       if (typeof built === "string") return built;
       actions.push(built);
+    } else if (action.type === "send_sms") {
+      const built = sendSmsAction(entity, action, lookups);
+      if (typeof built === "string") return built;
+      actions.push(built);
     }
   }
 
@@ -257,6 +262,8 @@ export function fromDbRule(
         return [{ type: "create_note", body: str(a.body) }];
       case "create_quote":
         return [createQuoteDraft(a)];
+      case "send_sms":
+        return [sendSmsDraft(a)];
       default:
         return [];
     }

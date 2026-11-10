@@ -89,6 +89,13 @@ describe("set_lead_status and the not-relevant reason", () => {
   });
 });
 
+// app.automation_send_sms's body, in the latest migration that defines it
+function smsStepSql(): string {
+  const sql = latestMigrationText("create or replace function app.automation_send_sms")!;
+  const start = sql.indexOf("create or replace function app.automation_send_sms");
+  return sql.slice(start, sql.indexOf("$$;", sql.indexOf("as $$", start)));
+}
+
 describe("run log warnings", () => {
   it("every warning the engine writes has a Hebrew text (the latest app.run_automation_actions)", () => {
     // the newest migration that redefines the engine's action runner (0095, then HEB-03, then HEB-08 and its follow-up)
@@ -97,8 +104,14 @@ describe("run log warnings", () => {
     const written = [
       ...[...sql.matchAll(/v_warning := '([^']+)'/g)].map((m) => m[1]),
       ...[...sql.matchAll(/v_warnings := v_warnings \|\| '((?:[^']|'')+)'::text/g)].map((m) => m[1].replaceAll("''", "'")),
+      // SMS-02: app.automation_send_sms answers its step warning (null = none), which the send_sms branch writes
+      ...[...smsStepSql().matchAll(/return (?:case when [^\n]* then )?'((?:[^']|'')+)'/g)].map((m) => m[1].replaceAll("''", "'")),
     ];
     expect([...new Set(written)].sort()).toEqual([
+      // SMS-02 (review F4): one SMS per rule and record a business day
+      "an SMS was already sent today by this rule",
+      // SMS-02: a send_sms step queued while customer sending is paused (HEB-09)
+      "customer sending is paused",
       "no reason is set",
       "some lines were not copied",
       "some template lines were skipped",
@@ -113,6 +126,8 @@ describe("run log warnings", () => {
       // AUT-01 part B: a set_field step's relative date
       "the relative date is invalid",
       "the requested owner is away, the lead stays with its owner",
+      // SMS-02 review (7): a button press counts in the presser's 30 SMS an hour
+      "too many SMS this hour by the person who pressed",
     ]);
     for (const warning of written) {
       expect(STEP_WARNINGS[warning]).toBeTruthy();

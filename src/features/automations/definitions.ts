@@ -203,7 +203,9 @@ export type ActionType =
   | "set_field"
   | "create_deal"
   | "create_note"
-  | "create_quote";
+  | "create_quote"
+  // SMS-02: one SMS of the business's SMS template to the record (a deal: its contact)
+  | "send_sms";
 
 export const ACTION_LABELS: Record<ActionType, string> = {
   create_task: "יצירת משימה",
@@ -216,6 +218,7 @@ export const ACTION_LABELS: Record<ActionType, string> = {
   create_deal: "יצירת עסקה",
   create_note: "הוספת הערה",
   create_quote: "יצירת הצעת מחיר מתבנית",
+  send_sms: "שליחת SMS",
 };
 
 export function actionsFor(entity: Entity): ActionType[] {
@@ -224,6 +227,7 @@ export function actionsFor(entity: Entity): ActionType[] {
     "create_deal",
     "create_note",
     "create_quote",
+    "send_sms",
     "notify",
     "assign_owner",
     "add_tag",
@@ -237,6 +241,8 @@ export function actionsFor(entity: Entity): ActionType[] {
       (type !== "create_deal" || entity !== "lead") &&
       // AUT-02: a quote is made on a deal or a contact
       (type !== "create_quote" || entity === "deal" || entity === "contact") &&
+      // SMS-02: an SMS goes to a lead, a contact or a deal's contact
+      (type !== "send_sms" || entity === "lead" || entity === "contact" || entity === "deal") &&
       (type !== "add_tag" || entity !== "task") &&
       (type !== "set_lead_status" || entity === "lead") &&
       (type !== "move_deal_stage" || entity === "deal"),
@@ -250,9 +256,15 @@ export function actionsFor(entity: Entity): ActionType[] {
  * the expected close date; never a name or a phone (an automation does not rewrite identity).
  */
 export type BuiltinSetField = "source_id" | "task_type" | "preferred_channel" | "preferred_locale" | "expected_close_date";
-/** Whether the builder offers an action: a quote step only with the plan's quotes flag; a saved rule keeps its own. */
-export function actionOffered(type: ActionType, lookups: { quotes?: boolean }, current?: string): boolean {
-  return type !== "create_quote" || !!lookups.quotes || type === current;
+/**
+ * Whether the builder offers an action: a quote step only with the plan's quotes flag, an SMS step only with the sms flag
+ * (SMS-02, review F1); a saved rule keeps its own.
+ */
+export function actionOffered(type: ActionType, lookups: { quotes?: boolean; sms?: boolean }, current?: string): boolean {
+  if (type === current) return true;
+  if (type === "create_quote") return !!lookups.quotes;
+  if (type === "send_sms") return !!lookups.sms;
+  return true;
 }
 
 export const BUILTIN_SET_FIELDS: Array<{ key: BuiltinSetField; label: string; entities: Entity[] }> = [

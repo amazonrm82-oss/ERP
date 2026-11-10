@@ -2,6 +2,7 @@
 // temporary "everything open, high values" defaults). Mirrors migrations plan_pricing
 // (the seed), plan_trial_built_with (the changes of the owner's later decisions) and
 // plan_review_fixes, lead_distribution_plan, campaign_costs_plan, punch_cards_plan, meta_leads_plan, meeting_customer_reminders and document_templates (the latest app.plan_key_defaults()): PLAN_VALUES = the seed with
+// plan_review_fixes, lead_distribution_plan, campaign_costs_plan, punch_cards_plan, meta_leads_plan, meeting_customer_reminders, document_templates and sms_b_send (the latest app.plan_key_defaults()): PLAN_VALUES = the seed with
 // those changes, PLAN_KEY_FALLBACK = the latest app.plan_key_defaults().
 // tests/unit/plan-keys.test.ts reads the migrations and compares; keep them in step.
 //
@@ -75,6 +76,9 @@ const LIMITS: Record<string, Record<SoldPlan, number | null>> = {
   max_booking_team_pages: byPlan(0, 0, 10, 50),
   // SGN-01/SGN-02 (owner, 3 November 2026, answer (67) ג): documents sent for signature a month
   max_signatures_per_month: byPlan(0, 20, 100, null),
+  // SMS (owner (210) ב, 10 November 2026, scope (א2)): every SMS to a customer a month (never a verification code);
+  // personal 0 (later only from the SMS-04 wallet)
+  max_sms_per_month: byPlan(0, 100, 300, 1000),
 };
 
 const ALL = byPlan(true, true, true, true);
@@ -101,6 +105,8 @@ const FEATURES: Record<string, Record<SoldPlan, boolean>> = {
   meta_leads: BASIC_UP, // CAP-11 (owner, 8 November 2026, answer (143) ב: the plans of lead_distribution)
   meeting_reminders: BASIC_UP, // CAL-12 (owner, 9 November 2026, answer (178) ב: the plans of lead_distribution)
   signatures: BASIC_UP, // SGN-01 (owner, 3 November 2026, answer (67) ג: basic and up)
+  // SMS (owner (210) ב, 10 November 2026): basic and up
+  sms: BASIC_UP,
   orders: BASIC_UP,
   api: BASIC_UP,
   custom_reports: BASIC_UP,
@@ -172,6 +178,8 @@ const WAVE2_FEATURE_LIST = [
   "meeting_reminders",
   // SGN-01 (migration document_templates)
   "signatures",
+  // SMS-02 (migration sms_b_send)
+  "sms",
 ] as const;
 const WAVE2_LIMIT_LIST = [
   "max_products", "max_price_lists", "max_quote_templates", "max_booking_pages", "max_booking_pages_per_user",
@@ -183,6 +191,8 @@ const WAVE2_LIMIT_LIST = [
   "ai_credits_per_month", "ai_credits_per_user_per_month",
   // SGN-01 (migration document_templates)
   "max_signatures_per_month",
+  // SMS-02 (migration sms_b_send)
+  "max_sms_per_month",
 ] as const;
 
 export type Wave2FeatureKey = (typeof WAVE2_FEATURE_LIST)[number];

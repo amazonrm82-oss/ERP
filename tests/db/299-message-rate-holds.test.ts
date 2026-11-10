@@ -2,6 +2,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { addMember, asAdmin, asService, asUser, closePool, count, createOrg, createUser, insertLead, pgError } from "./helpers";
 
+// SMS-01b (final review (7)): on sms a verification code is only a sender check's (a check row of the business's own phone)
+const senderCheck = (org: string) =>
+  asAdmin(async (q) => (await q<{ id: string }>("insert into app.sms_sender_checks (organization_id, phone) values ($1, '+972520000000') returning id", [org])).rows[0].id);
+
 const KEY = "test-consent-key";
 
 type Claimed = { id: string; lease: string; organization_id: string };
@@ -147,7 +151,7 @@ describe("system rate, cap holds and cancelling (MSG-05, MSG-06)", () => {
         [org],
       ),
     );
-    expect((await check(org, { channel: "sms", lead_id: lead, message_type: "verification_code" })).answer).toEqual({ may_send: true });
+    expect((await check(org, { channel: "sms", message_type: "verification_code", sender_check_id: await senderCheck(org) })).answer).toEqual({ may_send: true });
     expect(await usageOf(org, "sms")).toEqual({ marketing: 0, service: 1 });
     const business = await asAdmin(
       async (q) => (await q<{ sent: number }>("select sent from app.message_send_rate where organization_id = $1 and channel = 'sms'", [org])).rows[0].sent,

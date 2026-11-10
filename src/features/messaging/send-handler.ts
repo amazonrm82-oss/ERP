@@ -7,6 +7,7 @@ import {
   type MessageChannel,
   type MessagingProvider,
   type RecordEmailParts,
+  type SmsParts,
 } from "./providers/types";
 
 /** The answer of public.job_message_may_send: never an address or a name. */
@@ -40,6 +41,21 @@ export function recordEmailParts(payload: Record<string, unknown>): RecordEmailP
   };
 }
 
+/**
+ * SMS-02: the ids of an SMS sent from a record's card or queued by an automation (app.job_payload_ok holds their shape);
+ * undefined when the job carries none of them, so every other message is handed over exactly as before.
+ */
+export function smsMessageParts(payload: Record<string, unknown>): SmsParts | undefined {
+  const { template_id: template, deal_id: deal, sent_by_user_id: sentBy, automation_id: automation } = payload;
+  if (sentBy === undefined && automation === undefined && deal === undefined) return undefined;
+  return {
+    templateId: isId(template) ? template : null,
+    dealId: isId(deal) ? deal : null,
+    sentByUserId: isId(sentBy) ? sentBy : null,
+    automationId: isId(automation) ? automation : null,
+  };
+}
+
 function target(job: ClaimedJob) {
   const channel = job.payload.channel;
   const lead = job.payload.lead_id;
@@ -50,7 +66,14 @@ function target(job: ClaimedJob) {
   if (given !== undefined && !isMessageType(given)) return null;
   const messageType = given ?? null;
   const email = channel === "email" ? recordEmailParts(job.payload) : undefined;
-  const kind = { channel, messageType, purpose: messagePurpose(messageType), ...(email ? { email } : {}) };
+  const sms = channel === "sms" ? smsMessageParts(job.payload) : undefined;
+  const kind = { channel, messageType, purpose: messagePurpose(messageType), ...(email ? { email } : {}), ...(sms ? { sms } : {}) };
+  // SMS-01b: a sender-number check's code (sms, verification_code, nothing a record carries; app.job_payload_ok)
+  const check = job.payload.sender_check_id;
+  if (typeof check === "string" && lead === undefined && contact === undefined) {
+    if (channel !== "sms" || messageType !== "verification_code") return null;
+    return { ...kind, recordType: "sender_check" as const, recordId: check };
+  }
   if (typeof lead === "string" && contact === undefined) return { ...kind, recordType: "lead" as const, recordId: lead };
   if (typeof contact === "string" && lead === undefined) return { ...kind, recordType: "contact" as const, recordId: contact };
   return null;

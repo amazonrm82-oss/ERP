@@ -13,7 +13,15 @@ export const BLOCKLIST_CHANNEL_LABELS: Record<BlocklistChannel, string> = {
   phone: "שיחות טלפון",
 };
 
-export const BLOCKLIST_REASONS = ["person_request", "complaint", "legal", "not_the_person", "other"] as const;
+/** The reasons a person picks when adding addresses (public.consent_blocklist_add_noted accepts only these). */
+export const BLOCKLIST_PERSON_REASONS = ["person_request", "complaint", "legal", "not_the_person", "other"] as const;
+export type BlocklistPersonReason = (typeof BLOCKLIST_PERSON_REASONS)[number];
+
+/**
+ * Every stored reason (constraint consent_blocklist_reason): the person's ones and 'sms_reply', written only by the server
+ * when a customer answers an SMS with an opt-out word (SMS-03, owner's answer (208) ב).
+ */
+export const BLOCKLIST_REASONS = [...BLOCKLIST_PERSON_REASONS, "sms_reply"] as const;
 export type BlocklistReason = (typeof BLOCKLIST_REASONS)[number];
 
 export const BLOCKLIST_REASON_LABELS: Record<BlocklistReason, string> = {
@@ -22,6 +30,7 @@ export const BLOCKLIST_REASON_LABELS: Record<BlocklistReason, string> = {
   legal: "דרישה משפטית",
   not_the_person: "הכתובת לא שייכת לאדם שחשבנו",
   other: "אחר",
+  sms_reply: "בקשת הסרה ב-SMS",
 };
 
 export const BLOCKLIST_REMOVED_REASONS = ["added_by_mistake", "person_consented", "other"] as const;

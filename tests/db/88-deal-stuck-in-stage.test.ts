@@ -89,6 +89,15 @@ const RERUN = [
   migrationFile("_record_email.sql"),
   // SGN-01 redefines app.plan_key_defaults() of _meeting_customer_reminders.sql last (signatures and its monthly cap)
   migrationFile("_document_templates.sql"),
+  // SMS-01 gives back org_message_settings.sms_sender_name's column grants, which _message_sending_hours.sql resets
+  migrationFile("_sms_a_sender.sql"),
+  // SMS-02 redefines app.job_payload_ok() of _record_email.sql and app.run_automation_actions() of _source_attribution.sql
+  // last (an SMS from the record card or an automation)
+  migrationFile("_sms_b_send.sql"),
+  // SMS-01b redefines app.job_payload_ok() and public.job_message_may_send() of _sms_b_send.sql last (the sender check)
+  migrationFile("_sms_d_sender_check.sql"),
+  // SMS-01b review (8) replaces the table select grant of org_message_settings by column grants
+  migrationFile("_sms_sender_approved_by_hidden.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

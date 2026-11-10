@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { SMS_SENDER_NAME_INVALID, smsSenderNameInput, smsSenderNameOk } from "@/features/messaging/sms-sender";
+
 import { untilFromInput } from "./hours";
 
 export const SENDING_HOURS_FIELD_NAMES = ["window_from", "window_until", "skip_rest_days"] as const;
@@ -54,3 +56,18 @@ export const meetingMessagesSchema = z.object({
 });
 
 export type MeetingMessagesInput = z.infer<typeof meetingMessagesSchema>;
+
+export const SMS_SENDER_FIELD_NAMES = ["sms_sender_name"] as const;
+
+/** SMS-01: the business's SMS sender name (empty = the platform account's default). */
+export const smsSenderSchema = z.object({
+  sms_sender_name: z.preprocess(
+    (value) => (typeof value === "string" ? smsSenderNameInput(value) : ""),
+    z
+      .string()
+      .transform((value) => (value === "" ? null : value))
+      .refine((value) => value === null || smsSenderNameOk(value), { error: SMS_SENDER_NAME_INVALID }),
+  ),
+});
+
+export type SmsSenderInput = z.infer<typeof smsSenderSchema>;

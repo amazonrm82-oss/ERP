@@ -8,7 +8,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 
 import { addToBlocklistAction } from "../actions";
-import { BLOCKLIST_ADD_MAX, BLOCKLIST_CHANNEL_LABELS, BLOCKLIST_NOTE_MAX, BLOCKLIST_CHANNELS, BLOCKLIST_REASON_LABELS, BLOCKLIST_REASONS } from "../model";
+import { BLOCKLIST_ADD_MAX, BLOCKLIST_CHANNEL_LABELS, BLOCKLIST_NOTE_MAX, BLOCKLIST_CHANNELS, BLOCKLIST_REASON_LABELS, BLOCKLIST_PERSON_REASONS } from "../model";
 
 /** CNS-06: one address or a pasted list, a channel and a reason. The addresses are hashed by the database. */
 export function BlocklistAddForm({ orgId }: { orgId: string }) {
@@ -38,7 +38,7 @@ export function BlocklistAddForm({ orgId }: { orgId: string }) {
           ))}
         </SelectField>
         <SelectField label="סיבה" name="reason" defaultValue={values.reason ?? "person_request"} error={failed?.fieldErrors?.reason}>
-          {BLOCKLIST_REASONS.map((reason) => (
+          {BLOCKLIST_PERSON_REASONS.map((reason) => (
             <option key={reason} value={reason}>
               {BLOCKLIST_REASON_LABELS[reason]}
             </option>

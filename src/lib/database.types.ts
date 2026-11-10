@@ -909,6 +909,16 @@ export type OrgMessageSettingsRow = {
   meeting_confirm: boolean;
   meeting_remind_day: boolean;
   meeting_remind_hour: boolean;
+  // SMS-01: the sender the customer's phone shows (app.sms_sender_name_ok); null = the platform account's default
+  sms_sender_name: string | null;
+  // SMS-01b (server only): the business phone verified by a code, and the platform's approval of a letter name
+  sms_sender_verified_phone: string | null;
+  sms_sender_verified_at: string | null;
+  sms_sender_approved_at: string | null;
+  // server only, and not selected by clients (column grants)
+  sms_sender_approved_by: string | null;
+  // SMS-01b: when the platform rejected the letter name (server only); a new name clears it
+  sms_sender_rejected_at: string | null;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
@@ -3567,6 +3577,7 @@ export type Database = {
           meeting_confirm?: boolean;
           meeting_remind_day?: boolean;
           meeting_remind_hour?: boolean;
+          sms_sender_name?: string | null;
         },
         {
           window_from?: string;
@@ -3578,6 +3589,7 @@ export type Database = {
           meeting_confirm?: boolean;
           meeting_remind_day?: boolean;
           meeting_remind_hour?: boolean;
+          sms_sender_name?: string | null;
         }
       >;
       // PKG-03: column grants (the two numbers); no delete
@@ -4275,6 +4287,9 @@ export type Database = {
       // platform staff: the emergency switch for one business's external QR links (owner or support; logged)
       platform_qr_external_block: { Args: { p_org: string }; Returns: Json };
       platform_set_qr_external_block: { Args: { p_org: string; p_blocked: boolean; p_reason: string }; Returns: Json };
+      // SMS-01b: the platform's approval of a business's letter SMS sender name
+      platform_set_sms_sender_approval: { Args: { p_org: string; p_name: string; p_approved: boolean }; Returns: Json };
+      platform_list_sms_sender_pending: { Args: Record<string, never>; Returns: Json };
       business_card_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       business_card_submit: {
         Args: { p_token: string; p_payload: Json; p_ip_hash?: string | null; p_user_agent?: string | null; p_is_spam?: boolean };
@@ -4510,6 +4525,15 @@ export type Database = {
         Returns: Json;
       };
       record_email_queue: { Args: { p_org: string; p_kind: string; p_record: string }; Returns: Json };
+      // SMS-02: an SMS from the record card (the person's call, invoker) and the card's list of them (definer, readers)
+      record_sms_send: { Args: { p_org: string; p_kind: string; p_record: string; p_template: string }; Returns: Json };
+      record_sms_queue: { Args: { p_org: string; p_kind: string; p_record: string }; Returns: Json };
+      // SMS-03: an inbound "הסר" reply (service_role only; no caller until the per-provider webhook is built)
+      sms_inbound_optout: { Args: { p_org: string; p_phone: string; p_body: string }; Returns: Json };
+      // SMS-01b: verifying the business's own phone as the SMS sender (code_issue: service_role, no caller yet)
+      sms_sender_verify_start: { Args: { p_org: string }; Returns: Json };
+      sms_sender_verify: { Args: { p_org: string; p_code: string }; Returns: Json };
+      sms_sender_code_issue: { Args: { p_job: string; p_lease: string }; Returns: Json };
       // BAL-04: the customer's statement link (migration statement_links)
       statement_link_create: { Args: { p_org: string; p_contact?: string | null; p_company?: string | null }; Returns: string };
       statement_link_revoke: { Args: { p_org: string; p_contact?: string | null; p_company?: string | null }; Returns: boolean };

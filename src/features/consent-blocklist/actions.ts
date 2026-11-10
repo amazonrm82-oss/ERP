@@ -8,7 +8,7 @@ import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, type FormState } from "@/lib/action-result";
 import { dbErrorMessage } from "@/lib/errors";
 
-import { BLOCKLIST_ADD_MAX, BLOCKLIST_CHANNELS, BLOCKLIST_NOTE_MAX, BLOCKLIST_REASONS, BLOCKLIST_REMOVED_REASONS, splitAddresses, type BlocklistChannel } from "./model";
+import { BLOCKLIST_ADD_MAX, BLOCKLIST_CHANNELS, BLOCKLIST_NOTE_MAX, BLOCKLIST_PERSON_REASONS, BLOCKLIST_REMOVED_REASONS, splitAddresses, type BlocklistChannel, type BlocklistReason } from "./model";
 import { consentBlocklistPath } from "./paths";
 import { blocklistAddResultSchema, blocklistFindSchema } from "./schema";
 
@@ -16,7 +16,7 @@ const NOT_ADMIN = "רק בעלים ומנהלי מערכת של עסק פעיל 
 
 const addSchema = z.object({
   channel: z.enum(BLOCKLIST_CHANNELS, { error: "יש לבחור ערוץ." }),
-  reason: z.enum(BLOCKLIST_REASONS, { error: "יש לבחור סיבה." }),
+  reason: z.enum(BLOCKLIST_PERSON_REASONS, { error: "יש לבחור סיבה." }),
   addresses: z
     .string()
     .max(40_000, { error: "הטקסט ארוך מדי." })
@@ -79,7 +79,7 @@ function addMessage(result: { added: number; existing: number; invalid: number[]
 export type BlocklistFindEntry = {
   id: string;
   channel: BlocklistChannel;
-  reason: (typeof BLOCKLIST_REASONS)[number];
+  reason: BlocklistReason;
   addedBy: string | null;
   createdAt: string;
   removedAt: string | null;

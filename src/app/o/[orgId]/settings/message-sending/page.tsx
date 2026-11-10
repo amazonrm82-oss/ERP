@@ -6,9 +6,10 @@ import { MeetingMessagesForm } from "@/features/message-sending/components/meeti
 import { MessageCapsForm } from "@/features/message-sending/components/message-caps-form";
 import { MessageUsageCard } from "@/features/message-sending/components/message-usage-card";
 import { SendingHoursForm } from "@/features/message-sending/components/sending-hours-form";
+import { SmsSenderForm } from "@/features/message-sending/components/sms-sender-form";
 import { RATE_PER_MINUTE, SHORT_DAY_UNTIL, windowText } from "@/features/message-sending/hours";
 import { MEETING_MESSAGE_TEXTS, MEETING_REMINDERS_FEATURE } from "@/features/message-sending/meeting-messages";
-import { getMeetingMessages, getMessageCaps, getMessageUsage, getSendingHours } from "@/features/message-sending/queries";
+import { getMeetingMessages, getMessageCaps, getMessageUsage, getSendingHours, getSmsSender } from "@/features/message-sending/queries";
 import { CHANNEL_LABELS, MESSAGE_CHANNELS } from "@/features/message-sending/usage";
 import { isAdminRole } from "@/features/settings/permissions";
 import { orgHasFeature } from "@/features/settings/queries";
@@ -27,12 +28,13 @@ export default async function MessageSendingSettingsPage({ params }: Props) {
   const { role, canWrite } = await getOrgContext(orgId);
   const admin = isAdminRole(role);
   const editable = admin && canWrite;
-  const [hours, caps, meetingMessages, meetingRemindersInPlan, usage] = await Promise.all([
+  const [hours, caps, meetingMessages, meetingRemindersInPlan, usage, smsSender] = await Promise.all([
     getSendingHours(orgId),
     getMessageCaps(orgId),
     getMeetingMessages(orgId),
     orgHasFeature(orgId, MEETING_REMINDERS_FEATURE),
     admin ? getMessageUsage(orgId) : Promise.resolve({ allowed: false } as const),
+    getSmsSender(orgId),
   ]);
 
   const rules = (
@@ -49,6 +51,11 @@ export default async function MessageSendingSettingsPage({ params }: Props) {
         </p>
         <p>
           כשהודעות השיווק מגיעות ל-80% מהתקרה החודשית, הבעלים ומנהלי המערכת מקבלים התראה. כשהתקרה מלאה הם מקבלים התראה, ושוב פעם ביום (לפי לוח השנה) כל עוד יש הודעות שמחכות.
+        </p>
+        <p>
+          {/* SMS (owner (210) ב): the plan's SMS quota covers every SMS to a customer; a verification code is never counted */}
+          מכסת ה-SMS של החבילה חלה על כל הודעת SMS ללקוח: מהכרטיס, מאוטומציות, אישורי ותזכורות פגישה והודעות כרטיסייה. כשהיא מלאה, ההודעות מחכות עד
+          החודש הבא או עד שהחבילה תוגדל, ושם אפשר גם לבטל אותן. קוד אימות לא נספר ויוצא תמיד.
         </p>
         <p className="text-ink-soft">
           קצב קבוע לכל עסק: עד {RATE_PER_MINUTE.email} אימיילים, {RATE_PER_MINUTE.sms} הודעות SMS ו-{RATE_PER_MINUTE.whatsapp} הודעות WhatsApp בדקה. מה
@@ -67,6 +74,7 @@ export default async function MessageSendingSettingsPage({ params }: Props) {
         {usageCard}
         <MessageCapsForm orgId={orgId} caps={caps} />
         <MeetingMessagesForm orgId={orgId} settings={meetingMessages} available={meetingRemindersInPlan} />
+        <SmsSenderForm orgId={orgId} sender={smsSender} />
         {rules}
       </div>
     );
@@ -82,6 +90,7 @@ export default async function MessageSendingSettingsPage({ params }: Props) {
             <Detail label={MEETING_MESSAGE_TEXTS.confirm} value={meetingMessages.confirm ? "פעיל" : "כבוי"} />
             <Detail label={MEETING_MESSAGE_TEXTS.day} value={meetingMessages.day ? "פעיל" : "כבוי"} />
             <Detail label={MEETING_MESSAGE_TEXTS.hour} value={meetingMessages.hour ? "פעיל" : "כבוי"} />
+            <Detail label="שם השולח ב-SMS" value={smsSender.effective ?? "שם השולח הכללי של המערכת"} />
             {admin
               ? MESSAGE_CHANNELS.map((channel) => {
                   const cap = caps[channel];

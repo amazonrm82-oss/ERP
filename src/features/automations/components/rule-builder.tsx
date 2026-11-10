@@ -9,6 +9,7 @@ import { FormError } from "@/components/ui/feedback";
 import { Checkbox, Select, SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { TextLink } from "@/components/ui/text-link";
+import { messageTemplatesPath } from "@/features/message-templates/paths";
 import { quoteTemplatesPath } from "@/features/quotes/paths";
 import type { FormState } from "@/lib/action-result";
 import { paths } from "@/lib/paths";
@@ -19,6 +20,7 @@ import { DEAL_NAME_MAX, defaultDealName, NOTE_BODY_MAX, openStagesOf } from "../
 import { DATE_TRIGGER_HOUR, DATE_TRIGGER_MAX_DAYS, dateTriggerChoices } from "../date-trigger";
 import { watchChoices, watchValues } from "../field-trigger";
 import { SCHEDULE_MINUTES, WEEKDAYS } from "../schedule-trigger";
+import { offeredSmsTemplates } from "../send-sms";
 import { conditionsPayload, fitConditions, type ConditionItem } from "../conditions";
 import { ACTION_LABELS, actionOffered, actionsFor, TASK_TYPES, TRIGGERS, triggerOffered, type ActionType, type Entity } from "../definitions";
 import type { Lookups } from "../queries";
@@ -58,6 +60,8 @@ function blankAction(type: ActionType): Draft {
       return { type, body: "" };
     case "create_quote":
       return { type, template_id: "", owner_id: "" };
+    case "send_sms":
+      return { type, template_id: "" };
   }
 }
 
@@ -588,6 +592,31 @@ function ActionFields({ orgId, entity, action, index, lookups, onChange }: Field
           hint={entity === "task" ? "ההערה נכתבת על הרשומות שהמשימה מקושרת אליהן, ומסומנת כהערה מאוטומציה." : "ההערה מסומנת כהערה מאוטומציה, ואינה נחשבת פעילות או קשר עם הלקוח."}
         />
       );
+    case "send_sms": {
+      // SMS-02: one SMS of an SMS template to the record (a deal: its contact); the queue judges consent and the pause
+      const templates = offeredSmsTemplates(lookups.smsTemplates ?? [], action.template_id);
+      return (
+        <div className="space-y-2">
+          {templates.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2">{pick(`תבנית SMS (פעולה ${n})`, "template_id", templates)}</div>
+          ) : (
+            <p className="text-sm text-ink-soft">
+              אין עדיין תבניות SMS פעילות בעסק.{" "}
+              <TextLink href={messageTemplatesPath(orgId)} target="_blank" className="font-medium">
+                לתבניות ההודעה
+                <span className="sr-only"> (נפתח בחלון חדש)</span>
+              </TextLink>{" "}
+              אחרי שמוסיפים, מרעננים את הדף ובוחרים תבנית.
+            </p>
+          )}
+          <p className="text-sm text-ink-soft">
+            {entity === "deal" ? "ההודעה נשלחת לאיש הקשר של העסקה, " : "ההודעה נשלחת "}
+            למספר הטלפון שברשומה, בשם השולח של העסק. הודעת שיווק יוצאת רק ללקוח שהסכים לקבל SMS, עם המילה ״פרסומת״ ושורת ההסרה. כשהשליחה ללקוחות
+            עצורה, ההודעה מחכה. עד שספק ה-SMS יחובר, ההודעות ממתינות בתור.
+          </p>
+        </div>
+      );
+    }
     case "create_quote": {
       // AUT-02 (rest): a draft quote on the deal or the contact, from one of the business's quote templates
       const templates = lookups.quoteTemplates ?? [];

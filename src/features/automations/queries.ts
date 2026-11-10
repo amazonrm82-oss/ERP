@@ -5,7 +5,12 @@ import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import type { FieldDefinition } from "@/features/custom-fields/types";
 import { listMembers, listTeams, orgHasFeature } from "@/features/settings/queries";
 import { listTags } from "@/features/tags/queries";
+import { canRecordPayments } from "@/features/permissions/keys";
+import { getMyPermissions } from "@/features/permissions/queries";
+import { getOrgContext } from "@/features/shell/queries";
 import { RECORD_TYPES } from "@/lib/record-types";
+
+import { SMS_AUTOMATION_TYPES } from "./send-sms";
 import { createClient } from "@/lib/supabase/server";
 import { must } from "@/lib/db-read";
 
@@ -27,11 +32,18 @@ export type Lookups = {
   payments?: boolean;
   // AUT-04: whether the plan has quotes / documents (their triggers are offered only then)
   quotes?: boolean;
+  // SMS-02 (review F1): whether the plan has the sms flag (the "send SMS" step is offered and saved only then)
+  sms?: boolean;
+  // SMS-02 review (2): whether the person records payments (a collection SMS step is saved only then)
+  canRecordPayments?: boolean;
   documents?: boolean;
   // AUT-02 (rest): the business's quote templates, for a "create quote" step (read only with the quotes flag)
   quoteTemplates?: Array<{ id: string; name: string }>;
   // AUT-03: the business's public forms, for an optional form on a "form submitted" trigger
   forms?: Array<{ id: string; name: string }>;
+  // SMS-02: the business's SMS templates of a type an automation may send (marketing, requested_document, collection), for a
+  // "send SMS" step; inactive ones too, so a saved rule still names its template (the builder offers active ones)
+  smsTemplates?: Array<{ id: string; name: string; messageType: string; isActive: boolean }>;
 };
 
 type ReadFailure = { message: string; code?: string | null };
@@ -47,21 +59,28 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
   let payments: boolean;
   let quotes: boolean;
   let documents: boolean;
+  let sms: boolean;
+  let recordsPayments: boolean;
   try {
-    const [[lead, contact, company, deal], hasPayments, hasQuotes, hasDocuments] = await Promise.all([
+    const [[lead, contact, company, deal], hasPayments, hasQuotes, hasDocuments, hasSms, context, granted] = await Promise.all([
       Promise.all((["lead", "contact", "company", "deal"] as const).map((type) => listFieldDefinitions(orgId, type))),
       orgHasFeature(orgId, "payments"),
       orgHasFeature(orgId, "quotes"),
       orgHasFeature(orgId, "documents"),
+      orgHasFeature(orgId, "sms"),
+      getOrgContext(orgId),
+      getMyPermissions(orgId),
     ]);
     fields = { lead, contact, company, deal };
     payments = hasPayments;
     quotes = hasQuotes;
     documents = hasDocuments;
+    sms = hasSms;
+    recordsPayments = canRecordPayments(context.role, granted);
   } catch (error) {
     return { data: null, error: { message: error instanceof Error ? error.message : "field definitions query failed" } };
   }
-  const [statuses, sources, pipelines, stages, tags, members, teams, reasons, terms, templates, forms] = await Promise.all([
+  const [statuses, sources, pipelines, stages, tags, members, teams, reasons, terms, templates, forms, smsTemplates] = await Promise.all([
     supabase.from("lead_statuses").select("id, name, kind").eq("organization_id", orgId).order("position"),
     supabase.from("lead_sources").select("id, name").eq("organization_id", orgId).eq("is_active", true).order("name"),
     supabase.from("pipelines").select("id, name").eq("organization_id", orgId).is("deleted_at", null).order("position"),
@@ -82,6 +101,14 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
       : Promise.resolve({ data: [] as Array<{ id: string; name: string }>, error: null }),
     // AUT-03: web forms only (a business card's or a site widget's form is not picked by name)
     supabase.from("forms").select("id, name").eq("organization_id", orgId).eq("kind", "form").order("name").order("id").limit(1000),
+    supabase
+      .from("message_templates")
+      .select("id, name, message_type, is_active")
+      .eq("organization_id", orgId)
+      .eq("channel", "sms")
+      .in("message_type", [...SMS_AUTOMATION_TYPES])
+      .order("name")
+      .order("id"),
   ]);
   if (reasons.error) {
     return { data: null, error: reasons.error };
@@ -91,6 +118,9 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
   }
   if (forms.error) {
     return { data: null, error: forms.error };
+  }
+  if (smsTemplates.error) {
+    return { data: null, error: smsTemplates.error };
   }
   return {
     data: {
@@ -110,8 +140,11 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
       payments,
       quotes,
       documents,
+      sms,
+      canRecordPayments: recordsPayments,
       quoteTemplates: templates.data ?? [],
       forms: forms.data ?? [],
+      smsTemplates: (smsTemplates.data ?? []).map((t) => ({ id: t.id, name: t.name, messageType: t.message_type, isActive: t.is_active })),
     },
     error: null,
   };

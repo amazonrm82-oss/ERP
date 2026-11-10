@@ -768,6 +768,19 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_record_email.sql",
       // SGN-01 redefines app.plan_key_defaults() of _meeting_customer_reminders.sql last (signatures and its monthly cap)
       "_document_templates.sql",
+      // SMS-01 adds org_message_settings.sms_sender_name and its column grants after _message_sending_hours.sql resets
+      // that table's grants (re-run so the grant comes back)
+      "_sms_a_sender.sql",
+      // SMS-02 redefines app.job_payload_ok() of _record_email.sql and app.run_automation_actions() of _source_attribution.sql
+      // last (an SMS from the record card or an automation)
+      "_sms_b_send.sql",
+      // SMS-03 review (5) redefines public.consent_blocklist_add_noted() of _consent_blocklist_note.sql last (SMS-reply
+      // entries are left out of the 100,000 cap)
+      "_sms_c_optout.sql",
+      // SMS-01b redefines app.job_payload_ok() and public.job_message_may_send() of _sms_b_send.sql last (the sender check)
+      "_sms_d_sender_check.sql",
+      // SMS-01b review (8) replaces the table select grant of org_message_settings (_message_sending_hours.sql) by column grants
+      "_sms_sender_approved_by_hidden.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

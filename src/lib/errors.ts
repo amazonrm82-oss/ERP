@@ -200,6 +200,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "limit:max_pdf_per_month": `הגעתם למכסת קובצי ה-PDF החודשית. הקישור להצעה, הצפייה והחתימה ממשיכים לעבוד. לפרטים פנו לתמיכה: ${SUPPORT_LINE}.`,
   "rate:pdf": "הופקו הרבה קובצי PDF בדקה האחרונה. נסו שוב בעוד דקה.",
   // per use; emails a business sends to its own customers (wave 3 provider layer)
+  // SMS (owner (210) ב): every SMS to a customer a month; over it they wait for the next month or a bigger plan
+  "limit:max_sms_per_month": `הגעתם למכסת הודעות ה-SMS של החבילה לחודש. הודעות SMS נוספות מחכות עד החודש הבא או עד שהחבילה תוגדל. לפרטים פנו לתמיכה: ${SUPPORT_LINE}.`,
   "limit:max_customer_emails_per_month": `הגעתם למכסת האימיילים ללקוחות לחודש. אפשר לשלוח את ההודעה כקישור (WhatsApp או העתקה). לפרטים פנו לתמיכה: ${SUPPORT_LINE}.`,
   "limit:max_customer_emails_per_day": `הגעתם למכסת האימיילים ללקוחות להיום. אפשר לשלוח את ההודעה כקישור (WhatsApp או העתקה). לפרטים פנו לתמיכה: ${SUPPORT_LINE}.`,
   // owner's pricing of 13 October 2026 (migration plan_pricing)
@@ -345,6 +347,12 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // SEG-03
   "campaign_cost:key": "בחרו מקור או כתבו שם קמפיין, כדי שנדע לאן לשייך את העלות.",
   "campaign_cost:vat": "רק עסק שגובה מע\"מ מסמן עלות כ\"כולל מע\"מ\". הורידו את הסימון ושמרו שוב.",
+  // SMS-01b (owner (211) א): a sender number is only the business's own phone
+  "sms_sender:not_own_phone": "מספר שולח יכול להיות רק מספר הטלפון של העסק, כפי שהוא רשום בפרטי העסק. אפשר גם שם באותיות באנגלית.",
+  // SMS-02 review (2): a send_sms step of a collection template is saved only by a payment recorder
+  "automation:sms_collection": "שלב SMS עם תבנית גבייה יכול לשמור רק מי שרושם תשלומים בעסק. בחרו תבנית אחרת או בקשו מבעלי העסק לשמור את הכלל.",
+  // SMS (owner (210) ב): not in the personal plan
+  "feature:sms": "שליחת SMS אינה כלולה בחבילה הנוכחית. בעלי העסק רואים את השימוש ב\"הגדרות > חבילה ושימוש\", ושם גם איך מגדילים את החבילה.",
   "feature:campaign_costs": "עלויות קמפיינים ודוח ההחזר על ההשקעה אינם כלולים בחבילה הנוכחית. בעלי העסק רואים את השימוש ב\"הגדרות > חבילה ושימוש\", ושם גם איך מגדילים את החבילה.",
   // PKG-01, PKG-02 (migrations punch_cards, punch_card_uses)
   "feature:signatures": "תבניות מסמך אינן כלולות בחבילה הנוכחית. בעלי העסק רואים את השימוש ב\"הגדרות > חבילה ושימוש\", ושם גם איך מגדילים את החבילה.",
@@ -516,6 +524,19 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "document_template:field": "בנוסח יש שדה שהמערכת לא מכירה לסוג הרשומה הזה. אפשר להשתמש רק בשדות שברשימה, כתובים בדיוק כך, למשל {שם מלא}.",
   "document_template:variant": VARIANT_PROBLEM_MESSAGES.variant,
   "document_template:neutral": VARIANT_PROBLEM_MESSAGES.neutral,
+  // SMS-02 (migration sms_b_send)
+  "record_sms:not_found": "הרשומה לא נמצאה, או שאין לכם גישה אליה. רעננו את הדף ונסו שוב.",
+  "record_sms:kind": "אפשר לשלוח SMS רק מכרטיס של ליד, איש קשר או עסקה.",
+  // raised as 42501: dbErrorMessage answers NO_PERMISSION before this map; kept here so the hint is named
+  "record_sms:not_permitted": NO_PERMISSION,
+  "record_sms:no_contact": "לעסקה אין איש קשר פעיל שאפשר לשלוח אליו. הוסיפו איש קשר לעסקה ונסו שוב.",
+  "record_sms:no_phone": "לרשומה אין מספר טלפון. הוסיפו מספר ונסו שוב.",
+  "record_sms:template": "התבנית לא נמצאה. רעננו את הדף ובחרו תבנית אחרת.",
+  "record_sms:channel": "אפשר לשלוח מכאן רק תבנית SMS.",
+  "record_sms:type": "את סוג ההודעה הזה המערכת שולחת לבד בזמן המתאים, ולא מכרטיס הרשומה. בחרו תבנית אחרת.",
+  "record_sms:not_sendable": "התבנית הזו לא תישלח כרגע. בדקו אותה במסך תבניות ההודעה.",
+  "record_sms:collection": "תבנית גבייה נשלחת רק על ידי מי שרושם תשלומים בעסק. בחרו תבנית אחרת.",
+  "record_sms:rate": "שלחתם הרבה הודעות SMS בשעה האחרונה. אפשר לשלוח עד 30 בשעה. נסו שוב מאוחר יותר.",
   // CAL-08 (migration meeting_types)
   "meeting_types:max": "אפשר לשמור עד 50 סוגי פגישה. מחקו סוג שלא בשימוש כדי להוסיף חדש.",
   "meeting_type:product": "השירות שנבחר כבר לא פעיל בקטלוג. בחרו שירות פעיל, או השאירו בלי שירות.",

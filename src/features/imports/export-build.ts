@@ -200,6 +200,9 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
 
 // tables whose clients may not select every column: the columns the export reads (else "*")
 export const EXPORT_COLUMNS: Partial<Record<ExportTableName, string>> = {
+  // SMS-01b review (8): who on the platform approved the SMS sender name is not selected by clients (column grants)
+  org_message_settings:
+    "id, organization_id, window_from, window_until, skip_rest_days, updated_by, created_at, updated_at, monthly_cap_email, monthly_cap_sms, monthly_cap_whatsapp, meeting_confirm, meeting_remind_day, meeting_remind_hour, sms_sender_name, sms_sender_verified_phone, sms_sender_verified_at, sms_sender_approved_at, sms_sender_rejected_at",
   // CNS-01: the address hash is not shown to anyone (column grants)
   consents:
     "id, organization_id, seq, lead_id, contact_id, subject_type, subject_id, channel, state, source, wording, wording_version, method, copied_from, import_job_id, cancels, lift_method, lift_note, recorded_by, created_at",

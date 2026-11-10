@@ -17,8 +17,11 @@ import {
   messageCapsSchema,
   SENDING_HOURS_FIELD_NAMES,
   sendingHoursSchema,
+  SMS_SENDER_FIELD_NAMES,
+  smsSenderSchema,
 } from "./schema";
 import { MESSAGE_CHANNELS } from "./usage";
+import { senderCheckMessage } from "@/features/messaging/sms-sender";
 
 const SAVE_FAILED = "לא הצלחנו לשמור. נסו שוב.";
 
@@ -32,6 +35,7 @@ type Values = {
   meeting_confirm?: boolean;
   meeting_remind_day?: boolean;
   meeting_remind_hour?: boolean;
+  sms_sender_name?: string | null;
 };
 
 /**
@@ -80,6 +84,38 @@ export async function saveMeetingMessagesAction(orgId: string, _prev: FormState,
   const parsed = meetingMessagesSchema.safeParse(pick(formData, MEETING_MESSAGE_FIELD_NAMES));
   if (!parsed.success) return invalid(parsed.error, formData);
   return saveSettings(orgId, parsed.data, formData);
+}
+
+/** SMS-01: the business's SMS sender name (empty = the platform account's default); the database checks the rule again. */
+export async function saveSmsSenderAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const parsed = smsSenderSchema.safeParse(pick(formData, SMS_SENDER_FIELD_NAMES));
+  if (!parsed.success) return invalid(parsed.error, formData);
+  return saveSettings(orgId, parsed.data, formData);
+}
+
+/** SMS-01b: sends a code to the business's own phone through the queue (public.sms_sender_verify_start, owners/admins). */
+export async function startSenderCheckAction(orgId: string): Promise<FormState> {
+  const context = await actionContext(orgId);
+  if (!context.ok) return context;
+  const { data, error } = await context.supabase.rpc("sms_sender_verify_start", { p_org: orgId });
+  if (error) return fail(dbErrorMessage(error, SAVE_FAILED));
+  const answer = senderCheckMessage(data);
+  if (!answer.ok) return fail(answer.message);
+  return { ok: true, message: "שלחנו קוד ב-SMS למספר של העסק. הקוד בתוקף עשר דקות. עד שספק ה-SMS יחובר, הקוד ממתין בתור." };
+}
+
+/** SMS-01b: checks the code the business typed (public.sms_sender_verify; 5 wrong codes, then a 30-minute cool-down). */
+export async function verifySenderCodeAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const context = await actionContext(orgId);
+  if (!context.ok) return context;
+  const code = String(formData.get("code") ?? "").replace(/[^0-9]/g, "");
+  if (!/^[0-9]{6}$/.test(code)) return fail("הקוד הוא שש ספרות.", { fieldErrors: { code: "הקוד הוא שש ספרות." } });
+  const { data, error } = await context.supabase.rpc("sms_sender_verify", { p_org: orgId, p_code: code });
+  if (error) return fail(dbErrorMessage(error, SAVE_FAILED));
+  const answer = senderCheckMessage(data);
+  if (!answer.ok) return fail(answer.message);
+  revalidatePath(messageSendingSettingsPath(orgId));
+  return { ok: true, message: "המספר אומת. הודעות SMS ייצאו ממנו." };
 }
 
 /**

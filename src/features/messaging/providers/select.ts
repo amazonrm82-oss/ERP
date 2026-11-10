@@ -1,14 +1,22 @@
 import { createFakeProvider } from "./fake";
+import { createInforuProvider } from "./inforu";
+import { createSms4FreeProvider } from "./sms4free";
 import { MESSAGE_CHANNELS, type MessageChannel, type MessagingProvider } from "./types";
 
 type Env = Record<string, string | undefined>;
 
 /**
- * MSG-01: the adapters, by provider code. Only "fake" exists (no real provider until the owner chooses one); a new
+ * MSG-01: the adapters, by provider code. Only "fake" sends (no real provider until the owner chooses one); a new
  * provider is one adapter file plus one line here, and no module changes. Each adapter says which channels it serves.
+ * SMS-01: InforU and SMS4Free are stubs (built: false): never chosen, whatever the env says, so the SMS channel's jobs
+ * wait in the queue unclaimed until a real adapter is written; even then, an adapter without its own env keys is none.
  */
-const ADAPTERS: Record<string, { channels: readonly MessageChannel[]; create(channel: MessageChannel): MessagingProvider }> = {
-  fake: { channels: MESSAGE_CHANNELS, create: (channel) => createFakeProvider({ channel }) },
+type Adapter = { channels: readonly MessageChannel[]; built: boolean; create(channel: MessageChannel, env: Env): MessagingProvider | null };
+
+const ADAPTERS: Record<string, Adapter> = {
+  fake: { channels: MESSAGE_CHANNELS, built: true, create: (channel) => createFakeProvider({ channel }) },
+  inforu: { channels: ["sms"], built: false, create: (_channel, env) => createInforuProvider(env) },
+  sms4free: { channels: ["sms"], built: false, create: (_channel, env) => createSms4FreeProvider(env) },
 };
 
 /** Adapters that may run only off Vercel or on a Vercel development environment. */
@@ -29,10 +37,10 @@ export function providerEnvKey(channel: MessageChannel): string {
 export function messagingProviderFor(channel: MessageChannel, env: Env = process.env): MessagingProvider | null {
   const name = (env[providerEnvKey(channel)]?.trim() || env.MESSAGING_PROVIDER?.trim() || "").toLowerCase();
   const adapter = name === "" ? undefined : Object.hasOwn(ADAPTERS, name) ? ADAPTERS[name] : undefined;
-  if (!adapter || !adapter.channels.includes(channel)) return null;
+  if (!adapter || !adapter.built || !adapter.channels.includes(channel)) return null;
   const vercel = env.VERCEL_ENV?.trim() ?? "";
   if (LOCAL_ONLY.has(name) && !(vercel === "" || vercel === "development")) return null;
-  return adapter.create(channel);
+  return adapter.create(channel, env);
 }
 
 /** Every channel's provider, read once per run. Channels without one are left out. */

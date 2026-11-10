@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import { DEFAULT_WINDOW_FROM, DEFAULT_WINDOW_UNTIL, shortTime, type SendingHours } from "./hours";
 import { parseMessageUsage, type MessageUsage } from "./usage";
+import { smsSenderState, type SmsSender } from "@/features/messaging/sms-sender";
 
 /** MSG-06: the business's sending hours; members read them, no row = 08:00-20:00 with rest days off. */
 export const getSendingHours = cache(async (orgId: string): Promise<SendingHours> => {
@@ -58,4 +59,26 @@ export const getMeetingMessages = cache(async (orgId: string): Promise<MeetingMe
     "meeting messages",
   );
   return { confirm: row?.meeting_confirm ?? false, day: row?.meeting_remind_day ?? false, hour: row?.meeting_remind_hour ?? false };
+});
+
+/** SMS-01 / SMS-01b: the business's SMS sender (null name = the platform account's default) and its state. */
+export const getSmsSender = cache(async (orgId: string): Promise<SmsSender> => {
+  const supabase = await createClient();
+  const [row, org] = await Promise.all([
+    supabase
+      .from("org_message_settings")
+      .select("sms_sender_name, sms_sender_verified_phone, sms_sender_approved_at, sms_sender_rejected_at")
+      .eq("organization_id", orgId)
+      .maybeSingle(),
+    supabase.from("organizations").select("phone").eq("id", orgId).maybeSingle(),
+  ]);
+  const settings = must(row, "sms sender");
+  const business = must(org, "sms sender business phone");
+  return smsSenderState({
+    name: settings?.sms_sender_name ?? null,
+    verifiedPhone: settings?.sms_sender_verified_phone ?? null,
+    approved: Boolean(settings?.sms_sender_approved_at),
+    rejected: Boolean(settings?.sms_sender_rejected_at),
+    businessPhone: business?.phone ?? null,
+  });
 });

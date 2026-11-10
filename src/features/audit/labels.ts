@@ -180,6 +180,7 @@ export const ACTION_LABELS: Record<string, string> = {
   import_consent_undo: "ביטול הסכמות לדיוור של ייבוא שבוטל",
   // CNS-06: counts, channel and codes only (never an address)
   consent_blocklist_add: "הוספה לרשימת החסימה לדיוור",
+  sms_sender_verified: "אימות מספר השולח ב-SMS",
   consent_blocklist_remove: "הסרה מרשימת החסימה לדיוור",
   // QUO-03: an owner or admin moved the next number of a series forward
   number_jump: "קפיצה קדימה במספור",

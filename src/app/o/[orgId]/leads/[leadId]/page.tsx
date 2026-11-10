@@ -4,6 +4,7 @@ import { RecordConsents } from "@/features/consents/components/record-consents";
 import { createdLineText } from "@/features/imports/history";
 import { ManualAutomationsButton } from "@/features/automations/components/manual-automations-button";
 import { SendEmailButton } from "@/features/record-email/components/send-email-button";
+import { SendSmsButton } from "@/features/record-sms/components/send-sms-button";
 import { FollowButton } from "@/features/followers/components/follow-button";
 import { getFollowState } from "@/features/followers/queries";
 import type { Metadata } from "next";
@@ -137,6 +138,20 @@ export default async function LeadPage({ params, searchParams }: Props) {
             {context.canWrite ? (
               <Suspense fallback={null}>
                 <SendEmailButton
+                  orgId={orgId}
+                  kind="lead"
+                  recordId={lead.id}
+                  userName={context.user.displayName}
+                  businessName={context.org.name}
+                  timeZone={context.org.timeZone}
+                  canManageTemplates={isAdminRole(context.role)}
+                />
+              </Suspense>
+            ) : null}
+            {/* SMS-02: an SMS to the customer from a template; its reads wait in Suspense too */}
+            {context.canWrite ? (
+              <Suspense fallback={null}>
+                <SendSmsButton
                   orgId={orgId}
                   kind="lead"
                   recordId={lead.id}

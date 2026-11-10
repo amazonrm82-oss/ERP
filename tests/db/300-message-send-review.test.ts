@@ -2,6 +2,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { addMember, asAdmin, asService, asUser, closePool, count, createOrg, createUser, insertLead } from "./helpers";
 
+// SMS-01b (final review (7)): on sms a verification code is only a sender check's (a check row of the business's own phone)
+const senderCheck = (org: string) =>
+  asAdmin(async (q) => (await q<{ id: string }>("insert into app.sms_sender_checks (organization_id, phone) values ($1, '+972520000000') returning id", [org])).rows[0].id);
+
 const KEY = "test-consent-key";
 
 type Claimed = { id: string; lease: string; organization_id: string };
@@ -150,7 +154,7 @@ describe("send check batch moves and caps after review (MSG-05, MSG-06)", () => 
     await fillBusinessRate(org, "sms", 30);
     const a = await enqueue(org, { channel: "sms", lead_id: lead, message_type: "marketing" });
     const job = await claimOne(a);
-    const code = await enqueue(org, { channel: "sms", lead_id: lead, message_type: "verification_code" });
+    const code = await enqueue(org, { channel: "sms", message_type: "verification_code", sender_check_id: await senderCheck(org) });
     const collection = await enqueue(org, { channel: "sms", lead_id: lead, message_type: "collection" });
     const reminder = await enqueue(org, { channel: "sms", lead_id: lead, message_type: "meeting_reminder" });
     const other = await enqueue(org, { channel: "sms", lead_id: lead, message_type: "marketing" });

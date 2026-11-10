@@ -36,7 +36,16 @@ const REVIEWED_MD5 = {
   // MSG-05/06 review (021175): every batch move goes through app.message_move_waiting (id order FOR UPDATE; never a job the
   // latest long pause covers; rate and cap moves marketing only; window and rate moves never a cap waiter); a cap waiter
   // carries app.jobs.cap_wait, cleared when its cap check passes; the 80% rule in bigint (rechecked: two independent reviews, 8 November 2026)
-  job_message_may_send: "66c56e9f8bc6c5db9afb045a5e7db386",
+  // SMS (owner (210) ב, 10 November 2026, scope (א2); migration _sms_b_send.sql): after MSG-05's marketing hold, every SMS that
+  // is not a verification code needs the plan's `sms` flag (else waits uncounted an hour, 'sms_off') and fits the month quota
+  // max_sms_per_month counted in app.sms_quota_months (else waits uncounted 15 minutes as cap_wait 'over_cap', with
+  // app.sms_quota_notify); counted once when the check says yes; every other line unchanged
+  // SMS-01b (owner (211) א; migration _sms_d_sender_check.sql): a job naming a sender check (payload sender_check_id) reads
+  // its phone from app.sms_sender_checks while the check is open (not verified, under 5 wrong codes, under an hour old);
+  // everything else as above; final review: sms_off waits as a cap waiter, a sender check is not held by HEB-09's pause
+  // 021202/021204 rechecked 10 November 2026 by an independent review: the sms flag/quota block and the sender-check branch
+  // only delay, never pass; verification_code exempt
+  job_message_may_send: "726e29b81669a1f1eb6d75f0006f9652",
 };
 
 // MSG-03: the trigger function that writes public.messages from the worker's path (see its test below)

@@ -1,0 +1,22 @@
+{
+  "_comment": "SMS-03, owner's answers (208) ב and (209) ב: the whole reply, after removing spaces, niqqud, punctuation and digits and folding Latin letters to small ones, must equal one of these (spaces removed too). The ONE list: src/features/messaging/sms-optout.ts reads it, the migration _sms_c_optout.sql mirrors it in app.sms_optout_words(), and tests/unit/sms-optout.test.ts and tests/db/322-sms-optout.test.ts compare them.",
+  "words": [
+    "הסר",
+    "הסרה",
+    "להסרה",
+    "הסירו",
+    "תסירו",
+    "הסר אותי",
+    "הסירו אותי",
+    "תסירו אותי",
+    "הפסק",
+    "הפסיקו",
+    "תפסיקו",
+    "לא לשלוח",
+    "אל תשלחו",
+    "הסר מרשימת התפוצה",
+    "stop",
+    "unsubscribe",
+    "remove"
+  ]
+}

@@ -2,6 +2,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { addMember, asAdmin, asService, asUser, closePool, count, createOrg, createUser, insertLead, pgError } from "./helpers";
 
+// SMS-01b (final review (7)): on sms a verification code is only a sender check's (a check row of the business's own phone)
+const senderCheck = (org: string) =>
+  asAdmin(async (q) => (await q<{ id: string }>("insert into app.sms_sender_checks (organization_id, phone) values ($1, '+972520000000') returning id", [org])).rows[0].id);
+
 const KEY = "test-consent-key";
 
 type Claimed = { id: string; lease: string; organization_id: string };
@@ -151,7 +155,7 @@ describe("sending hours and rate (MSG-06)", () => {
     // made after the claim: due, queued, not claimed
     const other = await enqueue(org, { channel: "sms", lead_id: lead, message_type: "marketing" });
     const paused = await enqueue(org, { channel: "email", lead_id: lead, message_type: "collection" });
-    const code = await enqueue(org, { channel: "sms", lead_id: lead, message_type: "verification_code" });
+    const code = await enqueue(org, { channel: "sms", message_type: "verification_code", sender_check_id: await senderCheck(org) });
     const reminder = await enqueue(org, { channel: "sms", lead_id: lead, message_type: "meeting_reminder" });
     await asAdmin((q) => q("update app.jobs set last_error = 'waiting:sending_paused' where id = $1", [paused]));
     expect(await maySend(job)).toEqual({ may_send: false, reason: "sending_hours", retry: true });
@@ -173,7 +177,7 @@ describe("sending hours and rate (MSG-06)", () => {
 
   it("(120) ג: a verification code always goes; a meeting reminder goes when its meeting is before the window opens", async () => {
     const open = await closedNow(org);
-    expect((await check(org, { channel: "sms", lead_id: lead, message_type: "verification_code" })).answer).toEqual({ may_send: true });
+    expect((await check(org, { channel: "sms", message_type: "verification_code", sender_check_id: await senderCheck(org) })).answer).toEqual({ may_send: true });
     const before = new Date(Math.min(open.getTime() - 60_000, Date.now() + 30 * 60_000));
     // the meeting starts before the window opens (and is still ahead): sent now
     if (before.getTime() > Date.now()) {

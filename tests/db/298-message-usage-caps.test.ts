@@ -108,7 +108,16 @@ describe("message usage and caps (MSG-05)", () => {
   it("(123) ב: a service message is counted but never held by the cap", async () => {
     await setCaps(org, { sms: 0 });
     for (const type of ["collection", "meeting_reminder", "requested_document", "verification_code"]) {
-      expect((await check(org, { channel: "sms", lead_id: lead, message_type: type })).answer, type).toEqual({ may_send: true });
+      // SMS-01b (final review (7)): on sms a verification code is only a sender check's (a check row of the business's phone)
+      const target =
+        type === "verification_code"
+          ? {
+              sender_check_id: await asAdmin(
+                async (q) => (await q<{ id: string }>("insert into app.sms_sender_checks (organization_id, phone) values ($1, '+972520000000') returning id", [org])).rows[0].id,
+              ),
+            }
+          : { lead_id: lead };
+      expect((await check(org, { channel: "sms", message_type: type, ...target })).answer, type).toEqual({ may_send: true });
     }
     expect(await usageOf(org, "sms")).toEqual({ marketing: 0, service: 4 });
   });

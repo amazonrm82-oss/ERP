@@ -46,13 +46,26 @@ export type OutgoingMessage = {
   // null = queued before types existed (judged as marketing)
   messageType: MessageType | null;
   purpose: MessagePurpose;
-  recordType: "lead" | "contact";
+  // SMS-01b: "sender_check" = the code that verifies the business's own sender number (recordId = the check's id; the
+  // adapter gets the code and the phone from public.sms_sender_code_issue, its own approved path, not built yet)
+  recordType: "lead" | "contact" | "sender_check";
   recordId: string;
   // EML-02: an email a person sent from a record's card: the template, the deal it was sent from (the record is then the
   // deal's contact), the record files and the content-library files to attach (told apart by their own payload keys) and
   // the person whose address is the reply-to. Ids only: a real adapter
   // reads the content through its own approved path. Absent on every other message.
   email?: RecordEmailParts;
+  // SMS-02: an SMS a person sent from a record's card or an automation queued: the template, the deal it was sent from
+  // (the record is then the deal's contact), and who queued it. Ids only; the sender name (SMS-01) and the text are read by
+  // a real adapter through its own approved path. Absent on every other message.
+  sms?: SmsParts;
+};
+
+export type SmsParts = {
+  templateId: string | null;
+  dealId: string | null;
+  sentByUserId: string | null;
+  automationId: string | null;
 };
 
 export type RecordEmailParts = {
