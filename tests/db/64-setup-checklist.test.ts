@@ -793,6 +793,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_signature_documents.sql",
       // the pasted erasure gives app.signature_pdf_drop() of _signature_documents.sql its body (listed for staleRestores)
       "_signature_pdf_erase.sql",
+      // app.audit_erase_core() of _signature_documents.sql, defined again unchanged (a transport fix of the hosted copy)
+      "_audit_erase_core_again.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

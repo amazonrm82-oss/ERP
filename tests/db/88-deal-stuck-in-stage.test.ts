@@ -108,6 +108,8 @@ const RERUN = [
   migrationFile("_signature_documents.sql"),
   // the pasted erasure gives app.signature_pdf_drop() of _signature_documents.sql its body
   migrationFile("_signature_pdf_erase.sql"),
+  // app.audit_erase_core() of _signature_documents.sql, defined again unchanged (a transport fix of the hosted copy)
+  migrationFile("_audit_erase_core_again.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

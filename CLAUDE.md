@@ -2772,13 +2772,13 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `document-locked-sections.json`) or filled values changed (`signature_document:locked_changed`) or that holds bidi or zero-width
   characters (`signature_document:invisible`). Counted against `max_signatures_per_month`. A purge detaches documents
   (`former_*_id`, `customer_deleted_at`; triggers `*_signature_documents_detach`, skipped while the business is deleted; read by
-  owners, admins and managers, the signature and PDF owners/admins only); `app.audit_erase_core` (last redefined in 021212) calls
+  owners, admins and managers, the signature and PDF owners/admins only); `app.audit_erase_core` (last redefined in 021212, defined again unchanged in 021214 to fix the hosted copy's transport) calls
   `app.signature_documents_erase` for every record type (by `people`, the `former_*` columns and a contact's deals), which empties the
   text, title, signer's details, timeline entries and notices, revokes the link and calls `app.signature_pdf_drop` (body in the pasted
   021213). `app.lead_retention_candidates` (last redefined in 021212) keeps a lead that holds or is named by a signed document.
   `app.document_templates_check` was last redefined in 021212 (locked sections). The files_select policy and the storage policy
   `record_files_delete` were last altered in 021212; `files_one_subject` counts ten columns. Tests 64 and 88 end with
-  `_signature_pdf_erase.sql`. Questions 234-235 built as (א); a document sent before 021212 has no `people` (none on hosted).
+  `_audit_erase_core_again.sql`. Questions 234-235 built as (א); a document sent before 021212 has no `people` (none on hosted).
 - In-app guide (UX-05, migration 021199; owner's answers 203 ב, 204 א, 205 א, 206 ב, 10 November 2026): `profiles.guide_tour_seen_at` (own column
   grant; null = the first-visit tour opens; never marked in a support session; replaying from the account menu "סיור במערכת" changes
   nothing). Texts are Markdown in `docs/help/` (articles, screens, tour; frontmatter checked by `tests/unit/in-app-guide.test.ts`),
