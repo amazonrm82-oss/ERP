@@ -417,7 +417,7 @@ begin
   perform pg_advisory_xact_lock(hashtextextended('meta_page:' || v_page, 0));
   select * into v_int from public.integrations i
    where i.organization_id = p_org and i.id = p_integration
-   for update skip locked;
+   for no key update skip locked;  -- only non-key columns change; KEY SHARE holders (arrival inserts, log lines) do not make it busy
   if not found then
     return 'busy';
   end if;

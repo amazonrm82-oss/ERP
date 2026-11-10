@@ -201,7 +201,23 @@ describe("test connection with the stored token (INT-01, owner (227) ב)", () =>
       await holder.end();
     }
     expect((await row(conn)).verified_at).toBeNull();
+    expect(await testLines(conn)).toEqual([]);
     expect(await finish(org, conn, got.lease!, "ok")).toBe("ok");
+  });
+
+  it("a KEY SHARE holder of the connection row (an arrival insert, a log line) does not make the test busy", async () => {
+    const conn = await makeConnection(owner, org, id());
+    const got = await claim(org, conn, owner.id);
+    const holder = new Client({ connectionString: TEST_DB_URL });
+    await holder.connect();
+    try {
+      await holder.query("begin");
+      await holder.query("select 1 from public.integrations where id = $1 for key share", [conn]);
+      expect(await finish(org, conn, got.lease!, "ok")).toBe("ok");
+      await holder.query("rollback");
+    } finally {
+      await holder.end();
+    }
   });
 
   it("a successful test clears secret_unreadable too (review finding 5)", async () => {
