@@ -164,6 +164,18 @@ and build this CRM here instead. The old code is preserved on the branch
    months by `app.purge_old_meta_lead_arrivals` (021182, pasted by hand by the owner on 9 November 2026, md5 checked against the local build; pg_cron `crm-meta-lead-arrivals-purge`). In the eslint
    allow-list. Plan key `meta_leads` (the plans of `lead_distribution`). The advisor's findings on `integration_secret_set`,
    `meta_lead_summary` and the four new app tables are expected.
+   In use (INT-01 test connection, owner 10 November 2026, answer (227) ב; migration `_integration_events.sql`, 021208; three
+   independent reviews): "test connection" of a Meta page with its stored token (`src/features/integrations/test-server.ts`, called
+   only by `testConnectionAction` in `src/features/integrations/actions.ts` after the person's own session is checked as an active
+   owner or admin who reads the connection under RLS; any other caller must keep that RLS read first, so the MFA and support-session
+   rules still apply). It calls only `public.integration_test_claim()` (the person checked again as an active owner/admin of a
+   writable business with `meta_leads`; a live connection per `app.meta_lead_connection_open`; 5 tests per connection in 10 minutes in
+   `app.integration_tests`, no IP; answers only that connection's ciphertext and page id with a 60 s lease) and
+   `public.integration_test_finish()` (the lease once; the connection row skip-locked, `busy` when held; writes only `verified_at` /
+   `last_error_code` under CAP-11's page-ownership rule copied from `meta_lead_finish`, a page verified elsewhere ending this
+   connection by its code; one log line `test_ok` / `test_failed:<code>`). The token is decrypted in memory (INT-02) for one
+   `checkPage` call within 10 s, and never logged, stored or returned. In the eslint allow-list. The advisor's findings on the two
+   functions are expected.
    In use (PRK-02, owner 26 October 2026, wave 3 use (3), migration 021147): the public privacy-request page
    (`src/features/privacy-requests/public-server.ts`, page `/f/privacy/<token>`, route `POST /api/forms/privacy/<token>`), which calls
    only `public.privacy_request_page()` (the business's display name `organizations.name`, logo and colour only) and
@@ -1908,6 +1920,19 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   procedure in DECISIONS.md (answer (146) ג: re-encrypt every secret and verify the count), approved as a new use when needed.
   Meta Lead Ads (CAP-11) is the first provider: `public.meta_lead_forms` (a Meta form's owner or team routing, one CRM form of kind
   `meta` each, synced by `app.meta_lead_forms_sync_form`, locked by `app.forms_meta_lock`), settings page `/settings/meta-leads`.
+- Integrations screen and sync log (INT-01, INT-03, migrations 021208 and 021209 pasted by hand; owner (226) ב, (227) ב, (228) ב):
+  `/settings/integrations` (owners/admins) lists the connections with "בדיקת החיבור" (hard rule 5, In use (INT-01 …)).
+  `public.integration_events` (one line per connection, kind (closed list) and code, folded per business day with `hits`; ids
+  and codes only; owners/admins read; no client writes) is written by definer triggers on `public.integrations` (state lines) and
+  `app.meta_lead_arrivals` (fetch outcomes, ONLY for a verified connection, so an unverified one sees no counts; the connection row
+  is taken `for key share skip locked` first and a busy row drops the line, accepted). A failure tells the active owners/admins once
+  per connection and business day (`app.integration_notice_days`). `integration_id` is a composite FK `on delete set null
+  (integration_id)` beside plain `connection_id`, so a deleted connection's lines stay (stamped `connection_deleted_at` by AFTER
+  DELETE trigger `integrations_events_deleted`, skipped while the business is deleted); pg_cron `crm-integration-events-purge`
+  (02:41 UTC) calls `app.purge_old_integration_events()`, which runs the pasted `app.integration_events_purge_rows` (live lines 12
+  months after `last_at`, deleted connections' 12 months after the delete). The token-expiry alert waits for the real Graph
+  adapter (226). Known (pinned, separate fix): `meta_lead_finish`'s lost-the-race branch raises `integration:taken` instead of
+  answering `refused`; the arrival then waits for the 3-day give-up.
 - Punch card alerts (PKG-03, migrations 021176-021178; owner (127)-(132), (137)-(142), (148); three independent reviews):
   `public.punch_card_alert_settings` (one row per business; `low_entries` 0..100 default 2, `expiry_days` 0..365 default 14, 0 = that
   alert off; `customer_messages` default false; members read; owners/admins of a writable business write through column grants; no
