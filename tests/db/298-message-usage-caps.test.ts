@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { addMember, asAdmin, asService, asUser, closePool, count, createOrg, createUser, insertLead, pgError } from "./helpers";
+import { addMember, asAdmin, asService, asUser, closePool, count, createOrg, createUser, insertLead, pgError, type Query } from "./helpers";
 
 const KEY = "test-consent-key";
 
@@ -196,12 +196,19 @@ describe("message usage and caps (MSG-05)", () => {
         ),
       );
       expect((await check(org, { channel: "email", lead_id: lead, message_type: "marketing" })).answer).toEqual({ may_send: true });
+      // The wait is greatest(start of the business's next day, now() + 1 minute): within the last minute before midnight in
+      // the business zone it is now() + 1 minute. The check's now() lies between these two reads, and the rule only grows.
+      const waitAt = (q: Query) =>
+        q<{ w: Date }>(
+          "select greatest(((now() at time zone 'Asia/Jerusalem')::date + 1)::timestamp at time zone 'Asia/Jerusalem', now() + interval '1 minute') as w",
+        ).then((r) => r.rows[0].w.getTime());
+      const earliest = await asAdmin(waitAt);
       const { id, answer } = await check(org, { channel: "email", lead_id: lead, message_type: "marketing" });
       expect(answer).toEqual({ may_send: false, reason: "day_quota", retry: true });
-      const tomorrow = await asAdmin(
-        async (q) => (await q<{ t: Date }>("select ((now() at time zone 'Asia/Jerusalem')::date + 1)::timestamp at time zone 'Asia/Jerusalem' as t")).rows[0].t,
-      );
-      expect((await jobOf(id)).next_run_at.toISOString()).toBe(tomorrow.toISOString());
+      const latest = await asAdmin(waitAt);
+      const waited = (await jobOf(id)).next_run_at.getTime();
+      expect(waited).toBeGreaterThanOrEqual(earliest);
+      expect(waited).toBeLessThanOrEqual(latest);
       expect(await notices(org, "אימיילים שיווקיים מחכים למחר")).toBe(2);
     } finally {
       await asAdmin((q) =>
