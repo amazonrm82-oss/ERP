@@ -10,11 +10,18 @@ import { ltr, type PdfBlock, type PdfDocument, type PdfLine, type PdfLogo } from
 import { checkSignaturePng, signedAtText, type SignatureProblem } from "@/features/quotes/signed-pdf";
 import { SIGNATURE_IMAGE, SIGNATURE_IMAGE_MAX } from "@/features/quotes/decision";
 
+import { TEXT_ERASED_LINE } from "./states";
+
 
 /** What a signed PDF is rendered from (public.signature_pdf_public / signature_pdf_allowed). */
 export type SignedDocumentSource = {
   title: string;
   body: string;
+  // (234) ב: a person's erasure changed the text after it was signed
+  textErased: boolean;
+  // delta review: the fingerprint of the text as the render read it, passed back when storing (the database refuses a
+  // render of a text that changed since); the PDF prints signature.fingerprint, the evidence of what was signed
+  textFingerprint: string;
   business: { name: string; taxId: string | null; phone: string | null; email: string | null };
   logoPath: string | null;
   color: string | null;
@@ -35,7 +42,12 @@ export type SignedDocumentSource = {
 const optional = (max: number) => z.string().max(max).nullable().optional();
 
 const sourceSchema = z.object({
-  document: z.object({ title: z.string().min(1).max(120), body: z.string().min(1).max(30000) }),
+  document: z.object({
+    title: z.string().min(1).max(120),
+    body: z.string().min(1).max(30000),
+    text_erased: z.boolean().optional(),
+    fingerprint: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+  }),
   business: z.object({ name: z.string().min(1).max(200), tax_id: optional(40), phone: optional(40), email: optional(254) }),
   brand: z.object({ logo: optional(300), color: optional(20) }),
   signature: z.object({
@@ -67,6 +79,8 @@ export function readSignedDocumentSource(raw: unknown): { source: SignedDocument
     source: {
       title: r.document.title,
       body: r.document.body,
+      textErased: r.document.text_erased === true,
+      textFingerprint: r.document.fingerprint ?? r.signature.fingerprint,
       business: { name: r.business.name, taxId: r.business.tax_id ?? null, phone: r.business.phone ?? null, email: r.business.email ?? null },
       logoPath: r.brand.logo ?? null,
       color: r.brand.color ?? null,
@@ -144,6 +158,7 @@ export function signedDocumentPdf(source: SignedDocumentSource, logo: PdfLogo | 
     meta: [{ text: "נחתם בידי הלקוח", bold: true, accent: true }],
     blocks: [
       ...bodyBlocks(source.body),
+      ...(source.textErased ? [{ kind: "paragraph" as const, text: TEXT_ERASED_LINE }] : []),
       { kind: "rule" },
       {
         kind: "signature",

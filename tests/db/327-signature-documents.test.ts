@@ -198,7 +198,7 @@ describe("documents for signature (SGN-02)", () => {
     const shown = await page(sent.token);
     expect(Object.keys(shown).sort()).toEqual(["brand", "built_with", "business", "document", "fingerprint", "time_zone"]);
     expect(shown.time_zone).toBe("Asia/Jerusalem");
-    expect(Object.keys(shown.document ?? {}).sort()).toEqual(["body", "expires_at", "sent_at", "signed_at", "status", "title"]);
+    expect(Object.keys(shown.document ?? {}).sort()).toEqual(["body", "expires_at", "sent_at", "signed_at", "status", "text_erased", "title"]);
     expect(Object.keys(shown.business ?? {}).sort()).toEqual(["name", "phone"]);
     expect(Object.keys(shown.brand ?? {}).sort()).toEqual(["color", "logo"]);
     expect(JSON.stringify(shown)).not.toMatch(UUID);
@@ -439,82 +439,193 @@ describe("documents for signature (SGN-02)", () => {
     expect(done.status).toBe("stored");
     return { fileId: done.file_id as string, path: first.path as string };
   };
-  // nothing personal is left anywhere on the document's side
-  const expectErased = async (docId: string, file: { fileId: string; path: string }, token: string, recordId: string, title: string) => {
-    const doc = await asAdmin((q) => one<{ body: string; title: string; erased_at: string | null }>(q, "select body, title, erased_at from public.signature_documents where id = $1", [docId]));
-    expect(doc.body).toBe("המסמך נמחק (מחיקת פרטיות)");
-    expect(doc.title).not.toBe(title);
-    expect(doc.erased_at).not.toBeNull();
-    const sig = await asAdmin((q) => one<Record<string, unknown>>(q, "select signer_name, signer_id_number, signature_image, ip, user_agent, erased_at from public.signature_signatures where document_id = $1", [docId]));
-    expect(sig).toMatchObject({ signer_name: null, signer_id_number: null, signature_image: null, ip: null, user_agent: null });
-    expect(sig.erased_at).not.toBeNull();
-    const entries = await asAdmin(async (q) => (await q<{ id: string; body: string }>("select id, body from public.activities where metadata ->> 'signature_document_id' = $1", [docId])).rows);
-    expect(entries.length).toBeGreaterThan(0);
-    expect(JSON.stringify(entries)).not.toContain(title);
-    const entryAudit = await asAdmin(async (q) => (await q<{ changes: unknown }>("select changes from public.audit_log where entity_type = 'activities' and entity_id = any ($1::uuid[])", [entries.map((e) => e.id)])).rows);
-    expect(JSON.stringify(entryAudit)).not.toContain(title);
-    const notices = await asAdmin(async (q) => (await q<{ body: string }>("select body from public.notifications where entity_id = $1 and title = 'מסמך נחתם בקישור'", [recordId])).rows);
-    expect(notices.length).toBeGreaterThan(0);
-    expect(JSON.stringify(notices)).not.toContain(title);
-    // the signed PDF (the pasted 021213): its row goes, its object waits for the orphan cleanup
+  // (234) ב: a contact with the values a document can name
+  const personContact = (first: string, last: string, extra: { phone?: string; email?: string; company?: string | null } = {}) =>
+    run(owner, async (q) =>
+      (
+        await one<{ id: string }>(
+          q,
+          "insert into public.contacts (organization_id, first_name, last_name, phone, email, company_id, owner_id) values ($1, $2, $3, $4, $5, $6, $7) returning id",
+          [org, first, last, extra.phone ?? null, extra.email ?? null, extra.company ?? null, owner.id],
+        )
+      ).id,
+    );
+  const purgeContact = async (contact: string) => {
+    await run(owner, (q) => q("update public.contacts set deleted_at = now() where id = $1", [contact]));
+    await run(owner, (q) => q("delete from public.contacts where id = $1", [contact]));
+  };
+  type DocRow = { status: string; title: string; body: string; content_sha256: string; erased_at: string | null };
+  const docRow = (id: string) => asAdmin((q) => one<DocRow>(q, "select status, title, body, content_sha256, erased_at from public.signature_documents where id = $1", [id]));
+  type SigRow = { signer_name: string | null; signer_id_number: string | null; signature_image: string | null; ip: string | null; user_agent: string | null; content_sha256: string; erased: boolean };
+  const sigRow = (id: string) =>
+    asAdmin((q) =>
+      one<SigRow>(q, "select signer_name, signer_id_number, signature_image, ip, user_agent, content_sha256, erased_at is not null as erased from public.signature_signatures where document_id = $1", [id]),
+    );
+  const ERASED = markdownLiteral("(נמחק)");
+  const pdfGone = async (file: { fileId: string; path: string }) => {
     expect(await asAdmin((q) => count(q, "select 1 from public.files where id = $1", [file.fileId]))).toBe(0);
     expect(await asAdmin((q) => count(q, "select 1 from app.orphan_files where storage_path = $1", [file.path]))).toBe(1);
-    // the link answers not found; no new PDF is made for it
-    await notFound(token);
-    const allowed = await run(owner, (q) => one<{ r: unknown }>(q, "select public.signature_pdf_allowed($1, $2) as r", [org, docId])).catch(() => null);
-    expect(allowed?.r ?? null).toBeNull();
-    const everything = await asAdmin(async (q) =>
-      JSON.stringify((await q("select d.*, s.* from public.signature_documents d left join public.signature_signatures s on s.document_id = d.id where d.id = $1", [docId])).rows),
-    );
-    for (const text of ["דנה כהן", "000000018", "198.51.100.7", "Agent/erase", title]) expect(everything, text).not.toContain(text);
   };
+  const remakeSource = (docId: string) =>
+    run(owner, async (q) => (await one<{ r: { document: { body: string }; signature: { fingerprint: string; signer_name: string } } | null }>(q, "select public.signature_pdf_allowed($1, $2) as r", [org, docId])).r);
 
-  it("review 1: a contact's erasure empties the documents of its deal (body, signature, timeline, notices, signed PDF)", async () => {
-    const contact = await newContact(member, org, "דנה");
-    const deal = await newDeal(member, contact);
+  it("(234) ב: a contact's own document is emptied as before (text, signature, signed PDF, link)", async () => {
+    const contact = await personContact("מיכל", "שמש", { phone: "052-7654321" });
+    const title = "הסכם שירות עם מיכל שמש";
+    const sent = await send(owner, org, contact, { title, extra: "בין העסק לבין מיכל שמש" });
+    const file = await signAndStore(sent.token, { name: "מיכל שמש" });
+    await purgeContact(contact);
+    await run(owner, (q) => q("select public.audit_erase_record($1, 'contacts', $2)", [org, contact]));
+    const doc = await docRow(sent.id);
+    expect(doc.body).toBe("המסמך נמחק (מחיקת פרטיות)");
+    expect(doc.erased_at).not.toBeNull();
+    expect(await sigRow(sent.id)).toMatchObject({ signer_name: null, signer_id_number: null, signature_image: null, ip: null, user_agent: null, erased: true });
+    await pdfGone(file);
+    await notFound(sent.token);
+  });
+
+  it("(234) ב: a contact's erasure keeps its deal's document: the person's values become (נמחק), the deal's customer loses the signature", async () => {
+    const contact = await personContact("דנה", "כהן", { phone: "050-1234567", email: "dana.k@example.com" });
+    const deal = await newDeal(owner, contact);
     const title = "חוזה עם דנה כהן 050-1234567";
-    const sent = await send(member, org, deal, { template: dealTemplate, type: "deal", title, extra: "חוזה בין העסק לבין דנה כהן, 050-1234567" });
+    const sent = await send(owner, org, deal, {
+      template: dealTemplate,
+      type: "deal",
+      title,
+      extra: "חוזה בין העסק לבין דנה כהן, 050-1234567, dana.k@example.com. דנה תקבל עותק. עדנה לא.",
+    });
     const people = await asAdmin(async (q) => (await one<{ p: string[] }>(q, "select people as p from public.signature_documents where id = $1", [sent.id])).p);
     expect(people).toContain(contact);
     const file = await signAndStore(sent.token);
-    // a person's own export reaches the object (the ZIP downloads it with the owner's session); a member does not
-    expect(await run(owner, (q) => count(q, "select 1 from storage.objects where bucket_id = 'record-files' and name = $1", [file.path]))).toBe(1);
-    expect(await run(member, (q) => count(q, "select 1 from storage.objects where bucket_id = 'record-files' and name = $1", [file.path]))).toBe(0);
+    const before = await docRow(sent.id);
 
-    await run(owner, (q) => q("update public.contacts set deleted_at = now() where id = $1", [contact]));
-    await run(owner, (q) => q("delete from public.contacts where id = $1", [contact]));
+    await purgeContact(contact);
     // the deal and its document stay until the erasure
-    expect(await asAdmin((q) => count(q, "select 1 from public.signature_documents where id = $1 and erased_at is null", [sent.id]))).toBe(1);
+    expect((await docRow(sent.id)).body).toBe(before.body);
     await run(owner, (q) => q("select public.audit_erase_record($1, 'contacts', $2)", [org, contact]));
-    await expectErased(sent.id, file, sent.token, deal, title);
-    // the deal itself is kept
+
+    const doc = await docRow(sent.id);
+    // the document stays: not emptied, still signed, the evidence of what was signed kept
+    expect(doc.erased_at).toBeNull();
+    expect(doc.status).toBe("signed");
+    expect(doc.content_sha256).toBe(before.content_sha256);
+    expect(doc.title).toBe("חוזה עם (נמחק) (נמחק)");
+    for (const text of ["דנה כהן", "050-1234567", "050\\-1234567", "dana.k@example.com", "dana.k@example"]) expect(doc.body, text).not.toContain(text);
+    // a lone first name is replaced in the deal's document (its template fills it); a longer word holding it is not
+    expect(doc.body).toContain(`${ERASED} תקבל עותק`);
+    expect(doc.body).toContain("עדנה לא.");
+    expect(doc.body).toContain("חוזה עבור עסקת שירות.");
+    // the deal's customer is the safe reading of the signer: the signature loses the person, keeps its fingerprint
+    const sig = await sigRow(sent.id);
+    expect(sig).toMatchObject({ signer_name: null, signer_id_number: null, signature_image: null, ip: null, user_agent: null, erased: true });
+    expect(sig.content_sha256).toBe(before.content_sha256);
+    // the signed PDF printed the old text: gone, and not made again (the signer was the person)
+    await pdfGone(file);
+    expect(await remakeSource(sent.id)).toBeNull();
+    // the timeline entries and the notices carry the new title only; the entries' audit holds nothing of the old
+    const entries = await asAdmin(async (q) => (await q<{ id: string; body: string }>("select id, body from public.activities where metadata ->> 'signature_document_id' = $1", [sent.id])).rows);
+    expect(entries.length).toBeGreaterThan(0);
+    expect(JSON.stringify(entries)).not.toContain("דנה כהן");
+    const entryAudit = await asAdmin(async (q) => (await q<{ changes: unknown }>("select changes from public.audit_log where entity_type = 'activities' and entity_id = any ($1::uuid[])", [entries.map((e) => e.id)])).rows);
+    expect(JSON.stringify(entryAudit)).not.toContain("דנה כהן");
+    const notices = await asAdmin(async (q) => (await q<{ body: string }>("select body from public.notifications where entity_id = $1 and title = 'מסמך נחתם בקישור'", [deal])).rows);
+    expect(notices.length).toBeGreaterThan(0);
+    for (const n of notices) expect(n.body).toBe("חוזה עם (נמחק) (נמחק)");
+    // the link still answers (the deal is alive): the page shows the document as signed
+    expect((await page(sent.token)).document?.status).toBe("signed");
     expect(await asAdmin((q) => count(q, "select 1 from public.deals where id = $1", [deal]))).toBe(1);
+
+    // idempotent: the erasure again, and the named step again, change nothing
+    const snapshot = async () =>
+      JSON.stringify([
+        await docRow(sent.id),
+        await sigRow(sent.id),
+        (await asAdmin((q) => q("select id, body from public.activities where metadata ->> 'signature_document_id' = $1 order by id", [sent.id]))).rows,
+      ]);
+    const once = await snapshot();
+    await asAdmin((q) => q("select app.audit_erase_core($1, 'contacts', $2, null)", [org, contact]));
+    const named = await asAdmin(async (q) => (await one<{ n: number }>(q, "select app.signature_documents_erase_named($1, 'contacts', $2, null, $3) as n", [org, contact, [deal]])).n);
+    expect(named).toBe(0);
+    expect(await snapshot()).toBe(once);
   });
 
-  it("review 1: a contact's erasure empties a company document it is named in", async () => {
+  it("(234) ב: a company's documents that name a contact stay; only a signature the contact gave loses its details", async () => {
     const companyTemplate = await newTemplate("company");
-    const company = await run(owner, async (q) => (await one<{ id: string }>(q, "insert into public.companies (organization_id, name, owner_id) values ($1, 'חברת החתימות', $2) returning id", [org, owner.id])).id);
-    const contact = await run(owner, async (q) =>
-      (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, company_id, owner_id) values ($1, 'דנה', $2, $3) returning id", [org, company, owner.id])).id,
+    const company = await run(owner, async (q) => (await one<{ id: string }>(q, "insert into public.companies (organization_id, name, owner_id) values ($1, 'חברת החתימות ב', $2) returning id", [org, owner.id])).id);
+    const contact = await personContact("דנה", "לוי", { phone: "054-1112223", company });
+    const byContact = await send(owner, org, company, { template: companyTemplate, type: "company", title: "הסכם חברה, חותמת דנה לוי", extra: "החותמת: דנה לוי, 054-1112223" });
+    const contactFile = await signAndStore(byContact.token, { name: "  דנה   לוי " });
+    const byOther = await send(owner, org, company, { template: companyTemplate, type: "company", title: "הסכם מסגרת", extra: "איש הקשר: דנה לוי. דנה מטפלת בחשבונות." });
+    const otherFile = await signAndStore(byOther.token, { name: "יוסי מזרחי", id: "000000026" });
+    const otherBefore = await docRow(byOther.id);
+    const waiting = await send(owner, org, company, { template: companyTemplate, type: "company", title: "נספח", extra: "לידי דנה לוי" });
+    const waitingBefore = await docRow(waiting.id);
+    expect((await asAdmin((q) => one<{ p: string[] }>(q, "select people as p from public.signature_documents where id = $1", [waiting.id]))).p).toContain(contact);
+    // another business's document with the same words is never touched
+    const otherTemplate = await run(outsider, async (q) =>
+      (await one<{ id: string }>(q, "insert into public.document_templates (organization_id, name, kind, record_type, body) values ($1, 'חברה אחרת', 'other', 'company', 'מסמך לחתימה') returning id", [otherOrg])).id,
     );
-    const title = "הסכם חברה, חותמת דנה כהן";
-    const sent = await send(owner, org, company, { template: companyTemplate, type: "company", title, extra: "הסכם עם החברה" });
-    const file = await signAndStore(sent.token);
-    await run(owner, (q) => q("update public.contacts set deleted_at = now() where id = $1", [contact]));
-    await run(owner, (q) => q("delete from public.contacts where id = $1", [contact]));
+    const otherCompany = await run(outsider, async (q) => (await one<{ id: string }>(q, "insert into public.companies (organization_id, name, owner_id) values ($1, 'חברה אחרת', $2) returning id", [otherOrg, outsider.id])).id);
+    const foreign = await send(outsider, otherOrg, otherCompany, { template: otherTemplate, type: "company", title: "הסכם עם דנה לוי", extra: "דנה לוי, 054-1112223" });
+    const foreignBefore = await asAdmin((q) => one<DocRow>(q, "select status, title, body, content_sha256, erased_at from public.signature_documents where id = $1", [foreign.id]));
+
+    await purgeContact(contact);
     await run(owner, (q) => q("select public.audit_erase_record($1, 'contacts', $2)", [org, contact]));
-    await expectErased(sent.id, file, sent.token, company, title);
+
+    // signed by the contact (the name matches): the text keeps the company's words, the signature loses the person
+    const a = await docRow(byContact.id);
+    expect(a.erased_at).toBeNull();
+    expect(a.status).toBe("signed");
+    expect(a.title).toBe("הסכם חברה, חותמת (נמחק)");
+    expect(a.body).toContain(`החותמת: ${ERASED}, ${ERASED}`);
+    expect(await sigRow(byContact.id)).toMatchObject({ signer_name: null, signer_id_number: null, erased: true });
+    await pdfGone(contactFile);
+    expect(await remakeSource(byContact.id)).toBeNull();
+
+    // signed by someone else: that signature stays; the person's full name goes, a lone first name stays (not a deal's
+    // document, where the template would have filled it); the PDF goes and an owner can make it again from the stored text
+    const b = await docRow(byOther.id);
+    expect(b.erased_at).toBeNull();
+    expect(b.status).toBe("signed");
+    expect(b.content_sha256).toBe(otherBefore.content_sha256);
+    expect(b.body).toContain(`איש הקשר: ${ERASED}. דנה מטפלת בחשבונות.`);
+    expect(await sigRow(byOther.id)).toMatchObject({ signer_name: "יוסי מזרחי", signer_id_number: "000000026", erased: false });
+    await pdfGone(otherFile);
+    const remake = await remakeSource(byOther.id);
+    expect(remake?.document.body).toBe(b.body);
+    expect(remake?.signature.fingerprint).toBe(otherBefore.content_sha256);
+    expect(remake?.signature.signer_name).toBe("יוסי מזרחי");
+
+    // not signed yet: the status and the link stay; the page shows the new text, and the customer signs it
+    const c = await docRow(waiting.id);
+    expect(c.status).toBe("sent");
+    expect(c.erased_at).toBeNull();
+    expect(c.body).toContain(`לידי ${ERASED}`);
+    expect(c.content_sha256).not.toBe(waitingBefore.content_sha256);
+    const shown = await page(waiting.token);
+    expect(shown.fingerprint).toBe(c.content_sha256);
+    expect(JSON.stringify(shown)).not.toContain("דנה לוי");
+    expect((await sign(waiting.token, { fingerprint: shown.fingerprint, name: "מנהל החברה" })).status).toBe("signed");
+
+    // the other business: unchanged
+    expect(await asAdmin((q) => one<DocRow>(q, "select status, title, body, content_sha256, erased_at from public.signature_documents where id = $1", [foreign.id]))).toEqual(foreignBefore);
   });
 
-  it("review 1: PRV-03's removal of a person reaches the documents of the person's deal", async () => {
-    const contact = await newContact(owner, org, "דנה");
+  it("(234) ב: PRV-03's removal of a person keeps the person's deal document, without the person", async () => {
+    const contact = await personContact("דנה", "אבירם");
     const deal = await newDeal(owner, contact, "עסקה כללית");
-    const title = "חוזה פרטי לדנה כהן";
-    const sent = await send(owner, org, deal, { template: dealTemplate, type: "deal", title, extra: "חוזה בין העסק לבין דנה כהן" });
-    const file = await signAndStore(sent.token);
+    const title = "חוזה פרטי לדנה אבירם";
+    const sent = await send(owner, org, deal, { template: dealTemplate, type: "deal", title, extra: "חוזה בין העסק לבין דנה אבירם" });
+    const file = await signAndStore(sent.token, { name: "דנה אבירם" });
     await asMfaUser(owner.id, (q) => q("select public.privacy_erase_person($1, 'contacts', $2, '[]'::jsonb, 'הלקוחה ביקשה', '{}'::jsonb, true)", [org, contact]));
     expect(await asAdmin((q) => count(q, "select 1 from public.contacts where id = $1", [contact]))).toBe(0);
-    await expectErased(sent.id, file, sent.token, deal, title);
+    const doc = await docRow(sent.id);
+    expect(doc.erased_at).toBeNull();
+    expect(doc.status).toBe("signed");
+    expect(doc.body).toContain(`חוזה בין העסק לבין ${ERASED}`);
+    expect(doc.body).not.toContain("אבירם");
+    expect(await sigRow(sent.id)).toMatchObject({ signer_name: null, erased: true });
+    await pdfGone(file);
   });
 
   it("review 2: the retention policy keeps a lead that holds a signed document", async () => {
@@ -714,7 +825,7 @@ describe("documents for signature (SGN-02)", () => {
     }
   });
 
-  it("review 3 and 4: `people` is not selectable; an erased document gets no new link and no cancel", async () => {
+  it("review 3 and 4: `people` is not selectable; an erased document gets no new link and no cancel; (234) ב a named one keeps its link", async () => {
     const contact = await newContact(member, org, "דנה");
     const deal = await newDeal(member, contact, "עסקה בלי חתימה");
     const sent = await send(member, org, deal, { template: dealTemplate, type: "deal" });
@@ -727,15 +838,234 @@ describe("documents for signature (SGN-02)", () => {
     expect(naming).toContain(sent.id);
     expect((await pgError(run(member, (q) => q("select public.signature_documents_naming($1, $2)", [org, [contact]])))).code).toBe("42501");
     expect((await pgError(run(outsider, (q) => q("select public.signature_documents_naming($1, $2)", [org, [contact]])))).code).toBe("42501");
-    // the contact is erased: the deal's unsigned document is emptied, and no one makes a new link for it or cancels it
+    // (234) ב: the contact is erased: the deal's unsigned document only names it, so it stays and keeps working
     await run(owner, (q) => q("update public.contacts set deleted_at = now() where id = $1", [contact]));
     await run(owner, (q) => q("delete from public.contacts where id = $1", [contact]));
     await run(owner, (q) => q("select public.audit_erase_record($1, 'contacts', $2)", [org, contact]));
-    expect(await asAdmin((q) => count(q, "select 1 from public.signature_documents where id = $1 and erased_at is not null", [sent.id]))).toBe(1);
+    expect(await asAdmin((q) => count(q, "select 1 from public.signature_documents where id = $1 and erased_at is null and status = 'sent'", [sent.id]))).toBe(1);
+    // the page still answers (and marks the first view)
+    expect((await page(sent.token)).document?.status).toBe("viewed");
+    // an emptied document (the person's own, detached by the purge, so no record to manage it from) gets no new link and no cancel
+    const own = await newContact(owner, org, "רותם");
+    const ownDoc = await send(owner, org, own);
+    await run(owner, (q) => q("update public.contacts set deleted_at = now() where id = $1", [own]));
+    await run(owner, (q) => q("delete from public.contacts where id = $1", [own]));
+    await run(owner, (q) => q("select public.audit_erase_record($1, 'contacts', $2)", [org, own]));
+    expect(await asAdmin((q) => count(q, "select 1 from public.signature_documents where id = $1 and erased_at is not null", [ownDoc.id]))).toBe(1);
     for (const sql of ["select public.signature_document_link($1, $2)", "select public.signature_document_cancel($1, $2)"]) {
-      expect((await pgError(run(member, (q) => q(sql, [org, sent.id])))).hint, sql).toBe("signature_document:closed");
+      expect((await pgError(run(owner, (q) => q(sql, [org, ownDoc.id])))).code, sql).toBe("42501");
     }
-    await notFound(sent.token);
+    await notFound(ownDoc.token);
+    // the deal's document is cancelled as any other
+    expect(await run(member, async (q) => (await one<{ r: boolean }>(q, "select public.signature_document_cancel($1, $2) as r", [org, sent.id])).r)).toBe(true);
   });
 
+
+  it("(235) ב: the list of documents without a record reads, with the person's session, what the policies allow", async () => {
+    const manager = await addMember(org, owner.id, "manager", "sg-manager-list");
+    const contact = await personContact("גל", "ברק");
+    const sent = await send(owner, org, contact, { title: "מסמך של רשומה שנמחקה" });
+    const file = await signAndStore(sent.token, { name: "גל ברק" });
+    await purgeContact(contact);
+    // the list's own query: detached documents of the business, newest deletion first
+    const listed = (u: U) =>
+      run(u, async (q) =>
+        (
+          await q<{ id: string }>(
+            "select id from public.signature_documents where organization_id = $1 and customer_deleted_at is not null order by customer_deleted_at desc, id",
+            [org],
+          )
+        ).rows.map((r) => r.id),
+      );
+    for (const u of [owner, admin, manager]) expect(await listed(u), u.email).toContain(sent.id);
+    for (const u of [member, viewer, outsider]) expect(await listed(u), u.email).not.toContain(sent.id);
+    // the signed PDF and the signature: owners and admins only
+    for (const u of [owner, admin]) expect(await run(u, (q) => count(q, "select 1 from public.files where id = $1", [file.fileId])), u.email).toBe(1);
+    expect(await run(manager, (q) => count(q, "select 1 from public.files where id = $1", [file.fileId]))).toBe(0);
+    expect(await run(manager, (q) => count(q, "select 1 from public.signature_signatures where document_id = $1", [sent.id]))).toBe(0);
+    // another business's list never holds it
+    expect(await run(outsider, (q) => count(q, "select 1 from public.signature_documents where organization_id = $1 and customer_deleted_at is not null", [otherOrg]))).toBe(0);
+  });
+
+  // ---------------------------------------------------------------------------------------------------------------------
+  // (234) ב, independent review
+  // ---------------------------------------------------------------------------------------------------------------------
+  const newCompany = (name: string) =>
+    run(owner, async (q) => (await one<{ id: string }>(q, "insert into public.companies (organization_id, name, owner_id) values ($1, $2, $3) returning id", [org, name, owner.id])).id);
+  const putObject = (path: string) =>
+    asAdmin(async (q) => {
+      await q("insert into storage.objects (bucket_id, name) values ('record-files', $1) on conflict do nothing", [path]);
+      await q("update storage.objects set metadata = jsonb_build_object('size', 1234::bigint, 'mimetype', 'application/pdf') where bucket_id = 'record-files' and name = $1", [path]);
+    });
+  const customerStore = (token: string, fingerprint: string, path: string | null) =>
+    asService(async (q) => (await one<{ r: { status: string; path?: string } }>(q, "select public.signature_pdf_public_store($1, 1234, $2, $3, $4) as r", [token, "b".repeat(64), path, fingerprint])).r);
+  const docFiles = (docId: string) => asAdmin((q) => count(q, "select 1 from public.files where signature_document_id = $1", [docId]));
+
+  it("(234) ב review 1: a PDF render started before the erasure is never kept; one made after it is, with the line", async () => {
+    const companyTemplate = await newTemplate("company");
+    const company = await newCompany("חברת הרינדור");
+    const contact = await personContact("אלה", "שקד", { company });
+    const sent = await send(owner, org, company, { template: companyTemplate, type: "company", title: "הסכם רינדור", extra: "נציגה: אלה שקד" });
+    const fingerprint = (await page(sent.token)).fingerprint as string;
+    expect((await sign(sent.token, { fingerprint, name: "יוסי מזרחי" })).status).toBe("signed");
+    // the customer's route got a path before the erasure
+    const first = await customerStore(sent.token, fingerprint, null);
+    expect(first.status).toBe("upload");
+    await purgeContact(contact);
+    await run(owner, (q) => q("select public.audit_erase_record($1, 'contacts', $2)", [org, contact]));
+    // the upload lands after it: refused (the render printed the old text; its path was handed to the cleanup), no file kept
+    await putObject(first.path as string);
+    expect((await customerStore(sent.token, fingerprint, first.path as string)).status).toBe("changed");
+    expect(await docFiles(sent.id)).toBe(0);
+    expect(await asAdmin((q) => count(q, "select 1 from app.signature_pdf_attempts where storage_path = $1 and done_at is not null", [first.path]))).toBe(1);
+    // an owner makes it again from the stored text: it carries the line, the original fingerprint, and is kept
+    const remade = await run(owner, async (q) =>
+      (await one<{ r: { document: { body: string; text_erased: boolean; fingerprint: string }; signature: { fingerprint: string } } }>(q, "select public.signature_pdf_allowed($1, $2) as r", [org, sent.id])).r,
+    );
+    expect(remade.document.text_erased).toBe(true);
+    expect(remade.document.body).not.toContain("אלה שקד");
+    // the PDF prints the evidence of what was signed; the store is asked with the fingerprint of the text it printed
+    expect(remade.signature.fingerprint).toBe(fingerprint);
+    expect(remade.document.fingerprint).not.toBe(fingerprint);
+    const staffStore = (path: string | null, fp = remade.document.fingerprint) =>
+      asService(async (q) => (await one<{ r: { status: string; path?: string } }>(q, "select public.signature_pdf_store($1, $2, $3, 1234, $4, $5, $6) as r", [org, sent.id, owner.id, "c".repeat(64), path, fp])).r);
+    // the old text's fingerprint (or the signature's, as an old caller passes) is refused
+    expect((await staffStore(null, fingerprint)).status).toBe("changed");
+    const again = await staffStore(null);
+    await putObject(again.path as string);
+    expect((await staffStore(again.path as string)).status).toBe("stored");
+    expect(await docFiles(sent.id)).toBe(1);
+
+    // the writer itself refuses an attempt issued at or before the text was changed (no lock, no abandon)
+    const other = await send(owner, org, company, { template: companyTemplate, type: "company", title: "הסכם שני" });
+    const fp = (await page(other.token)).fingerprint as string;
+    expect((await sign(other.token, { fingerprint: fp, name: "יוסי מזרחי" })).status).toBe("signed");
+    const issued = await customerStore(other.token, fp, null);
+    await asAdmin((q) => q("update public.signature_documents set text_erased_at = now() where id = $1", [other.id]));
+    await putObject(issued.path as string);
+    expect((await customerStore(other.token, fp, issued.path as string)).status).toBe("changed");
+    expect(await docFiles(other.id)).toBe(0);
+  });
+
+  it("(234) ב review 2: a signed document is rewritten only by values held when it was signed; the line shows", async () => {
+    const companyTemplate = await newTemplate("company");
+    const company = await newCompany("חברת הנוסח");
+    const contact = await personContact("שירה", "גל", { company });
+    const sent = await send(owner, org, company, { template: companyTemplate, type: "company", title: "הסכם נוסח", extra: "לא בתוקף בלי חתימת שירה גל. שירה." });
+    const fingerprint = (await page(sent.token)).fingerprint as string;
+    expect((await sign(sent.token, { fingerprint, name: "מנהלת החברה" })).status).toBe("signed");
+    // after signing the contact is renamed to a common word and back, and gets a new phone
+    await run(owner, (q) => q("update public.contacts set first_name = 'לא', last_name = null where id = $1", [contact]));
+    await run(owner, (q) => q("update public.contacts set first_name = 'שירה', last_name = 'גל', phone = '058-9998887' where id = $1", [contact]));
+    await purgeContact(contact);
+    await run(owner, (q) => q("select public.audit_erase_record($1, 'contacts', $2)", [org, contact]));
+    const doc = await asAdmin((q) => one<DocRow & { text_erased: boolean }>(q, "select status, title, body, content_sha256, erased_at, text_erased_at is not null as text_erased from public.signature_documents where id = $1", [sent.id]));
+    expect(doc.body).toContain(`לא בתוקף בלי חתימת ${ERASED}.`);
+    // a lone first name stays outside a deal's document
+    expect(doc.body).toContain("שירה.");
+    expect(doc.text_erased).toBe(true);
+    expect(doc.content_sha256).toBe(fingerprint);
+    // the customer's page says so; the signature (someone else's) stays
+    expect((await page(sent.token)).document?.text_erased).toBe(true);
+    expect(await sigRow(sent.id)).toMatchObject({ signer_name: "מנהלת החברה", erased: false });
+  });
+
+  it("(234) ב review 3: the signer is the deal's contact at signing even when the name differs, or by the ID number", async () => {
+    const contact = await personContact("נועה", "ברק");
+    const later = await personContact("אחר", "אחרון");
+    const deal = await newDeal(owner, contact, "עסקה של נועה");
+    const sent = await send(owner, org, deal, { template: dealTemplate, type: "deal", title: "חוזה עסקה", extra: "חוזה מול הלקוחה" });
+    const fingerprint = (await page(sent.token)).fingerprint as string;
+    expect((await sign(sent.token, { fingerprint, name: "נ. ב." })).status).toBe("signed");
+    // the deal moves to another contact before the purge, so the deal is not "the contact's deal at its purge"
+    await run(owner, (q) => q("update public.deals set contact_id = $2 where id = $1", [deal, later]));
+    await purgeContact(contact);
+    await run(owner, (q) => q("select public.audit_erase_record($1, 'contacts', $2)", [org, contact]));
+    expect(await sigRow(sent.id)).toMatchObject({ signer_name: null, erased: true });
+    expect((await docRow(sent.id)).erased_at).toBeNull();
+
+    // by the ID number: a company's document signed under another name with the contact's ID number
+    const companyTemplate = await newTemplate("company");
+    const company = await newCompany("חברת התעודה");
+    const holder = await run(owner, async (q) =>
+      (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, last_name, billing_tax_id, company_id, owner_id) values ($1, 'רז', 'אור', '000000018', $2, $3) returning id", [org, company, owner.id])).id,
+    );
+    const byId = await send(owner, org, company, { template: companyTemplate, type: "company", title: "טופס הצטרפות" });
+    const fp = (await page(byId.token)).fingerprint as string;
+    expect((await sign(byId.token, { fingerprint: fp, name: "מישהו אחר", id: "000000018" })).status).toBe("signed");
+    await purgeContact(holder);
+    await run(owner, (q) => q("select public.audit_erase_record($1, 'contacts', $2)", [org, holder]));
+    expect(await sigRow(byId.id)).toMatchObject({ signer_name: null, signer_id_number: null, erased: true });
+  });
+
+  it("(234) ב review 4-6: whole words, the maqaf, prefixes, phones, birth dates, and no silent cut", async () => {
+    const scrub = (text: string, needles: string[]) => asAdmin(async (q) => (await one<{ r: string }>(q, "select app.signature_scrub($1, $2, '(X)') as r", [text, needles])).r);
+    expect(await scrub("דנה־כהן", ["דנה"])).toBe("(X)־כהן");
+    expect(await scrub("דנהדנה", ["דנה"])).toBe("דנהדנה");
+    expect(await scrub("דנה דנה", ["דנה"])).toBe("(X) (X)");
+    expect(await scrub("ברון לוי", ["רון"])).toBe("ברון לוי");
+    expect(await scrub("ולדנה כהן.", ["דנה כהן"])).toBe("ול(X).");
+    expect(await scrub("עדנה", ["דנה"])).toBe("עדנה");
+    const values = await asAdmin(async (q) =>
+      (
+        await one<{ v: { names: string[]; details: string[] } }>(
+          q,
+          "select app.signature_person_values($1, 'contacts', gen_random_uuid(), $2::jsonb) as v",
+          [org, JSON.stringify({ full_name: "דנה  כהן", phone: "12", phone_e164: "+972501234567", email: "d@example.test", birth_date: "1990-05-04" })],
+        )
+      ).v,
+    );
+    expect(values.names).toEqual(expect.arrayContaining(["דנה  כהן", "דנה כהן"]));
+    expect(values.details).toEqual(expect.arrayContaining(["+972501234567", "d@example.test", "1990-05-04", "04.05.1990"]));
+    expect(values.details).not.toContain("12");
+    // a body that would pass the limit takes the plain marker, then is cut at a line with a line saying so
+    const long = await asAdmin(async (q) => (await one<{ r: string }>(q, "select app.signature_scrubbed_body(repeat(E'דנ שורה\\n', 3750), array['דנ']) as r")).r);
+    expect(long.length).toBeLessThanOrEqual(30000);
+    expect(long.endsWith("(המשך המסמך הוסר במחיקת פרטיות)")).toBe(true);
+    expect(long).not.toContain("דנ ");
+  });
+
+  it("(234) ב delta: a render that read the text before the erasure is refused even when it asks for its path after it", async () => {
+    const companyTemplate = await newTemplate("company");
+    const company = await newCompany("חברת הסדר");
+    const contact = await personContact("עדי", "פז", { company });
+    const sent = await send(owner, org, company, { template: companyTemplate, type: "company", title: "הסכם סדר", extra: "בנוכחות עדי פז" });
+    const fp = (await page(sent.token)).fingerprint as string;
+    expect((await sign(sent.token, { fingerprint: fp, name: "יוסי מזרחי" })).status).toBe("signed");
+    // 1. the source is read (staff), 2. the erasure commits, 3. the store is asked for a path, 4. an upload, 5. the store
+    const source = await run(owner, async (q) => (await one<{ r: { document: { fingerprint: string } } }>(q, "select public.signature_pdf_allowed($1, $2) as r", [org, sent.id])).r);
+    expect(source.document.fingerprint).toBe(fp);
+    await purgeContact(contact);
+    await run(owner, (q) => q("select public.audit_erase_record($1, 'contacts', $2)", [org, contact]));
+    const ask = (path: string | null) =>
+      asService(async (q) => (await one<{ r: { status: string; path?: string } }>(q, "select public.signature_pdf_store($1, $2, $3, 1234, $4, $5, $6) as r", [org, sent.id, owner.id, "d".repeat(64), path, source.document.fingerprint])).r);
+    const issued = await ask(null);
+    // refused already when the path is asked for: nothing to upload
+    expect(issued.status).toBe("changed");
+    expect(issued.path).toBeUndefined();
+    expect(await docFiles(sent.id)).toBe(0);
+    expect(await asAdmin((q) => count(q, "select 1 from app.signature_pdf_attempts where document_id = $1 and done_at is null", [sent.id]))).toBe(0);
+    // the customer's route, reading the source now, stores the new text
+    const now = await asService(async (q) => (await one<{ r: { document: { fingerprint: string; body: string } } }>(q, "select public.signature_pdf_public($1) as r", [sent.token])).r);
+    expect(now.document.body).not.toContain("עדי פז");
+    const first = await customerStore(sent.token, now.document.fingerprint, null);
+    expect(first.status).toBe("upload");
+    await putObject(first.path as string);
+    expect((await customerStore(sent.token, now.document.fingerprint, first.path as string)).status).toBe("stored");
+    expect(await docFiles(sent.id)).toBe(1);
+  });
+
+  it("(234) ב delta: renaming the person to a third party's name after signing never clears that party's signature", async () => {
+    const companyTemplate = await newTemplate("company");
+    const company = await newCompany("חברת השם");
+    const contact = await personContact("טל", "רון", { company });
+    const sent = await send(owner, org, company, { template: companyTemplate, type: "company", title: "הסכם שם", extra: "נחתם בידי יעל כץ" });
+    const fp = (await page(sent.token)).fingerprint as string;
+    expect((await sign(sent.token, { fingerprint: fp, name: "יעל כץ", id: "000000026" })).status).toBe("signed");
+    await run(owner, (q) => q("update public.contacts set first_name = 'יעל', last_name = 'כץ', billing_tax_id = '000000026' where id = $1", [contact]));
+    await purgeContact(contact);
+    await run(owner, (q) => q("select public.audit_erase_record($1, 'contacts', $2)", [org, contact]));
+    expect(await sigRow(sent.id)).toMatchObject({ signer_name: "יעל כץ", signer_id_number: "000000026", erased: false });
+    expect((await docRow(sent.id)).body).toContain("נחתם בידי יעל כץ");
+  });
 });

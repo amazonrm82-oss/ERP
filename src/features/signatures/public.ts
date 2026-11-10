@@ -34,6 +34,8 @@ const pageSchema = z.object({
     sent_at: at,
     signed_at: at.nullable(),
     expires_at: at.nullable(),
+    // (234) ב: signed, and a person's erasure changed its text since
+    text_erased: z.boolean().optional(),
   }),
   business: z.object({ name: text(200), phone: z.string().max(40).nullable() }),
   brand: z.object({ logo: z.string().max(300).nullable(), color: z.string().max(20).nullable() }),
@@ -69,6 +71,8 @@ export type PublicSignatureDocument = {
   timeZone: string;
   // what a signature must name; null once signed
   fingerprint: string | null;
+  // (234) ב: signed, and a person's erasure changed its text since
+  textErased: boolean;
 };
 
 export type StatusSignatureDocument = {
@@ -100,6 +104,7 @@ export function publicSignatureFrom(raw: unknown): PublicSignatureDocument | nul
     builtWith: p.built_with,
     timeZone: p.time_zone ?? "Asia/Jerusalem",
     fingerprint: p.fingerprint,
+    textErased: p.document.text_erased === true,
   };
 }
 

@@ -17,6 +17,12 @@ export const SIGNATURE_STATE_LABELS: Record<ShownSignatureState, string> = {
   expired: "פג תוקף",
 };
 
+/**
+ * (234) ב: a signed document whose text a person's erasure changed (signature_documents.text_erased_at) says so, on the
+ * customer's page, the staff screens and a PDF made again.
+ */
+export const TEXT_ERASED_LINE = "פרטים אישיים הוסרו מהמסמך אחרי החתימה (מחיקת פרטיות)";
+
 /** The shown state: an unsigned document past its last day reads "expired" (SGN-03 adds reminders). */
 export function shownSignatureState(doc: { status: SignatureStatus; expiresAt: string | null }, now: Date = new Date()): ShownSignatureState {
   if ((doc.status === "sent" || doc.status === "viewed") && doc.expiresAt && Date.parse(doc.expiresAt) <= now.getTime()) return "expired";

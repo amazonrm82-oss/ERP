@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { renderPdf } from "@/features/pdf/render";
 import { bodyBlocks, readSignedDocumentSource, signedDocumentPdf } from "@/features/signatures/pdf";
 import { publicSignatureFrom, signatureDateText, SIGN_WORDING, SIGN_WORDING_VERSION, signBodySchema, statusSignatureFrom } from "@/features/signatures/public";
-import { awaitsSignature, shownSignatureState, signatureLinkMessage, signatureWhatsappHref } from "@/features/signatures/states";
+import { awaitsSignature, shownSignatureState, signatureLinkMessage, signatureWhatsappHref, TEXT_ERASED_LINE } from "@/features/signatures/states";
 
 const MIGRATION = readFileSync(join(__dirname, "../../supabase/migrations/20261006021212_signature_documents.sql"), "utf8");
 
@@ -113,4 +113,37 @@ describe("SGN-02: documents for signature", () => {
     expect(signatureDateText("not a date", "Asia/Jerusalem")).toBe("");
   });
 
+});
+
+// (234) ב: a signed document whose text a person's erasure changed says so on the page and in a PDF made again
+describe("SGN-02 (234) ב: text changed by an erasure", () => {
+  it("prints the line in the PDF only when the source says so", () => {
+    const plain = readSignedDocumentSource(source());
+    const erased = readSignedDocumentSource(source({ document: { ...source().document, text_erased: true } }));
+    if (!("source" in plain) || !("source" in erased)) throw new Error("source");
+    expect(plain.source.textErased).toBe(false);
+    expect(erased.source.textErased).toBe(true);
+    // the store is asked with the text's own fingerprint when the source gives one, else the signature's (equal until an erasure)
+    expect(plain.source.textFingerprint).toBe("a".repeat(64));
+    const stamped = readSignedDocumentSource(source({ document: { ...source().document, fingerprint: "c".repeat(64) } }));
+    if (!("source" in stamped)) throw new Error("source");
+    expect(stamped.source.textFingerprint).toBe("c".repeat(64));
+    expect(stamped.source.signature.fingerprint).toBe("a".repeat(64));
+    expect(JSON.stringify(signedDocumentPdf(plain.source, null))).not.toContain(TEXT_ERASED_LINE);
+    const doc = signedDocumentPdf(erased.source, null);
+    const rule = doc.blocks.findIndex((b) => b.kind === "rule");
+    expect(doc.blocks[rule - 1]).toEqual({ kind: "paragraph", text: TEXT_ERASED_LINE });
+  });
+
+  it("reads the page's flag, false when absent", () => {
+    const base = {
+      document: { title: "חוזה", body: "טקסט", status: "signed", sent_at: "2026-11-10T08:00:00Z", signed_at: "2026-11-10T09:00:00Z", expires_at: null },
+      business: { name: "עסק", phone: null },
+      brand: { logo: null, color: null },
+      built_with: true,
+      fingerprint: null,
+    };
+    expect(publicSignatureFrom(base)?.textErased).toBe(false);
+    expect(publicSignatureFrom({ ...base, document: { ...base.document, text_erased: true } })?.textErased).toBe(true);
+  });
 });

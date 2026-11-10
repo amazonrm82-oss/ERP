@@ -78,7 +78,7 @@ export async function writeSignedDocumentPdfAsServer(input: { orgId: string; doc
     p_user: input.userId,
     p_size: bytes.length,
     p_sha256: sha256Hex(bytes),
-    p_fingerprint: input.source.signature.fingerprint,
+    p_fingerprint: input.source.textFingerprint,
   };
   return writeThrough(async (path) => service.rpc("signature_pdf_store", { ...args, p_path: path }), bytes, input.orgId);
 }
@@ -106,7 +106,7 @@ export async function storeSignedDocumentPdfForCustomer(token: string): Promise<
       return;
     }
     const bytes = await renderSignedDocumentPdf(read.source);
-    const args = { p_token: token, p_size: bytes.length, p_sha256: sha256Hex(bytes), p_fingerprint: read.source.signature.fingerprint };
+    const args = { p_token: token, p_size: bytes.length, p_sha256: sha256Hex(bytes), p_fingerprint: read.source.textFingerprint };
     const stored = await writeThrough(async (path) => service.rpc("signature_pdf_public_store", { ...args, p_path: path }), bytes, null);
     if (!stored.ok) void serverLog("error", "signature.pdf_not_stored", { reason: stored.message === STORAGE_FULL ? "storage_full" : "not_stored" });
   } catch (err) {

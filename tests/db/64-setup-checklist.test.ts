@@ -797,6 +797,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_audit_erase_core_again.sql",
       // the CAP-11 race fix redefines public.meta_lead_finish() of _meta_lead_ads.sql last (a lost race answers 'refused')
       "_meta_lead_finish_race.sql",
+      // SGN-02 (234) ב redefines app.audit_erase_core() and app.signature_documents_erase() last (named documents keep their
+      // text but the person's values)
+      "_signature_erase_named.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

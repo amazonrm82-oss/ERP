@@ -31,6 +31,7 @@ import { privacyRequestsPath } from "@/features/privacy-requests/paths";
 import { meetingTypesPath } from "@/features/meeting-types/paths";
 import { priceListsPath } from "@/features/price-lists/paths";
 import { detachedQuotesPath, quoteDesignPath, quoteTemplatesPath } from "@/features/quotes/paths";
+import { detachedSignatureDocumentsPath } from "@/features/signatures/paths";
 import { productListsSettingsPath } from "@/features/products/paths";
 import { siteWidgetSettingsPath } from "@/features/site-widgets/paths";
 import { metaLeadsSettingsPath } from "@/features/meta-leads/paths";
@@ -146,6 +147,10 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         // QUO-07: kept quotes whose deal and contact were purged; owners, admins and managers by role read them
         ...(access.keptQuotes ?? access.admin
           ? [{ href: detachedQuotesPath(orgId), label: "הצעות של לקוחות שנמחקו", description: "הצעות שנשלחו ונשארו אחרי שהלקוח נמחק לצמיתות", icon: FormIcon }]
+          : []),
+        // SGN-02 (235) ב: documents for signature whose record was purged; the same readers
+        ...(access.keptQuotes ?? access.admin
+          ? [{ href: detachedSignatureDocumentsPath(orgId), label: "מסמכים ללא רשומה", description: "מסמכים לחתימה שנשארו אחרי שהרשומה שלהם נמחקה לצמיתות", icon: FormIcon }]
           : []),
         ...(access.priceLists
           ? [{ href: priceListsPath(orgId), label: "מחירונים", description: "מחירים אחרים או הנחות לחלק מהמוצרים, לתקופה מסוימת", icon: TagIcon }]

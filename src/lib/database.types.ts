@@ -2633,6 +2633,8 @@ export type SignatureDocumentRow = {
   former_deal_id: string | null;
   customer_deleted_at: string | null;
   erased_at: string | null;
+  // (234) ב: when a person's erasure first changed its text (server only)
+  text_erased_at: string | null;
   created_at: string;
   updated_at: string;
 };
