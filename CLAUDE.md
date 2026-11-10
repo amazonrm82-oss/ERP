@@ -961,6 +961,19 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   (186). Nothing is written before taking (187): every write path keeps the old rule. The waiting list shows offered leads only on
   "כל מה שאני רואה" with "ללא אחראי"; the menu entry links there and is hidden from viewers (190). When UX-01's side panel is built it
   joins the same functions (213). Advisor findings on the four public definers are expected.
+- Lead side panel (UX-01, no migration; owner's answers 214 ב with nine changes, 215 ב, 216 ב, 217 א, 218 א, 10 November 2026):
+  `src/features/lead-peek/` over the shared `SidePanel` (`src/components/ui/side-panel.tsx`, in the design gallery): from 768px a
+  non-modal panel at the end of the screen (the list stays active; another lead replaces the content; the open row is marked;
+  ↑↓ and Esc), below it a modal bottom sheet. Opened by `?peek=<id>` (an id only; the list's other parameters kept) from the leads
+  table, cards and board, "לידים שמחכים" and My day; a second click on the open lead's name opens the full page. Everything goes
+  through the user's session and existing actions: status through `moveRecord`, owner through `inlineEditAction`, "התקשרתי" (ענה with
+  an optional note / לא ענה / לחזור ב… = a call task with reminder, default the next working day 10:00 with "בעוד שעה / מחר / בעוד
+  שבוע" / לא רלוונטי with an active reason first), note and task through the lead page's own forms. "מה ביקש": requested product,
+  "כמות" by label else the first active field, the next active field, the message; empty hidden. Timeline items link to
+  `#entry-<id>` on the full page. A lead seen only through SPD-01's rule reads through `unowned_lead` / `unowned_lead_timeline` (213):
+  read-only, "לקחתי", and call/WhatsApp/email that run `take_lead` first and stop with a message when someone else took it (216 ב).
+  The menu's "לידים שמחכים" shows only to who can write (`!context.canWrite`). Follow-ups: the business-chosen "פאנל צד" group in
+  `card_layouts`; the contact and deal panels (phase 2).
 - Response time (SPD-06, migrations 0114, 0117): `app.response_target_minutes(org)` is the target (60, owner's decision, until
   CAP-10 reads an org setting whose initial value is 60; labels come from the returned value, `src/features/reports/response-target.ts`); `report_response_time` rows carry `within_target`; `public.report_response_breakdown()` (security invoker) returns
   `target_minutes`, `by_source`, `by_hour` (hour of arrival in the org's time zone). Uncontacted leads have minutes = null;
