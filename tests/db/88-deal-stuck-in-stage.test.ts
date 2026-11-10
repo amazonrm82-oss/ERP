@@ -85,6 +85,8 @@ const RERUN = [
   // app.message_type_fields() of _punch_card_notice_messages.sql and app.seed_punch_card_message_templates() of
   // _punch_card_alert_answers.sql last (the meeting's id and location; the punch card seed reads its own marks only)
   migrationFile("_meeting_customer_reminders.sql"),
+  // EML-02 redefines app.job_payload_ok() of _meeting_customer_reminders.sql last (an email from the record card)
+  migrationFile("_record_email.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

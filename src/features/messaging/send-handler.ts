@@ -1,6 +1,13 @@
 import type { ClaimedJob, JobHandler } from "@/features/jobs/registry";
 
-import { isMessageChannel, isMessageType, messagePurpose, type MessageChannel, type MessagingProvider } from "./providers/types";
+import {
+  isMessageChannel,
+  isMessageType,
+  messagePurpose,
+  type MessageChannel,
+  type MessagingProvider,
+  type RecordEmailParts,
+} from "./providers/types";
 
 /** The answer of public.job_message_may_send: never an address or a name. */
 export type MaySendAnswer = { may_send: true } | { may_send: false; reason: string };
@@ -15,6 +22,24 @@ function parseAnswer(data: unknown): MaySendAnswer | null {
   return null;
 }
 
+const isId = (value: unknown): value is string => typeof value === "string" && value.length > 0;
+
+/**
+ * EML-02: the ids of an email sent from a record's card (app.job_payload_ok holds their shape); undefined when the job
+ * carries none of them, so every other message is handed over exactly as before.
+ */
+export function recordEmailParts(payload: Record<string, unknown>): RecordEmailParts | undefined {
+  const { template_id: template, deal_id: deal, file_ids: files, library_file_ids: library, reply_to_user_id: replyTo } = payload;
+  if (deal === undefined && files === undefined && library === undefined && replyTo === undefined) return undefined;
+  return {
+    templateId: isId(template) ? template : null,
+    dealId: isId(deal) ? deal : null,
+    fileIds: Array.isArray(files) ? files.filter(isId) : [],
+    libraryFileIds: Array.isArray(library) ? library.filter(isId) : [],
+    replyToUserId: isId(replyTo) ? replyTo : null,
+  };
+}
+
 function target(job: ClaimedJob) {
   const channel = job.payload.channel;
   const lead = job.payload.lead_id;
@@ -24,7 +49,8 @@ function target(job: ClaimedJob) {
   // CNS-07: a job queued before types existed has none and counts as marketing, as in the database's send check
   if (given !== undefined && !isMessageType(given)) return null;
   const messageType = given ?? null;
-  const kind = { channel, messageType, purpose: messagePurpose(messageType) };
+  const email = channel === "email" ? recordEmailParts(job.payload) : undefined;
+  const kind = { channel, messageType, purpose: messagePurpose(messageType), ...(email ? { email } : {}) };
   if (typeof lead === "string" && contact === undefined) return { ...kind, recordType: "lead" as const, recordId: lead };
   if (typeof contact === "string" && lead === undefined) return { ...kind, recordType: "contact" as const, recordId: contact };
   return null;

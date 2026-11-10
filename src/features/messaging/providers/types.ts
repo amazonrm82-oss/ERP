@@ -48,6 +48,19 @@ export type OutgoingMessage = {
   purpose: MessagePurpose;
   recordType: "lead" | "contact";
   recordId: string;
+  // EML-02: an email a person sent from a record's card: the template, the deal it was sent from (the record is then the
+  // deal's contact), the record files and the content-library files to attach (told apart by their own payload keys) and
+  // the person whose address is the reply-to. Ids only: a real adapter
+  // reads the content through its own approved path. Absent on every other message.
+  email?: RecordEmailParts;
+};
+
+export type RecordEmailParts = {
+  templateId: string | null;
+  dealId: string | null;
+  fileIds: string[];
+  libraryFileIds: string[];
+  replyToUserId: string | null;
 };
 
 /**

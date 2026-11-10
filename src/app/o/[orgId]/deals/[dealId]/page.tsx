@@ -1,6 +1,9 @@
+import { Suspense } from "react";
+
 import { getOrgTerms } from "@/features/terminology/queries";
 import { createdLineText } from "@/features/imports/history";
 import { ManualAutomationsButton } from "@/features/automations/components/manual-automations-button";
+import { SendEmailButton } from "@/features/record-email/components/send-email-button";
 import { byGender } from "@/features/terminology/terms";
 import { FollowButton } from "@/features/followers/components/follow-button";
 import { getFollowState } from "@/features/followers/queries";
@@ -190,6 +193,21 @@ export default async function DealPage({ params, searchParams }: Props) {
             <PrintButton />
             <FollowButton orgId={orgId} subject={{ kind: "deal", id: deal.id }} state={follow} />
             {context.canWrite ? <ManualAutomationsButton orgId={orgId} entity="deal" recordId={deal.id} /> : null}
+            {/* EML-02: an email to the customer from a template, with the record's and the library's files; its reads wait in
+                Suspense so the page renders first */}
+            {context.canWrite ? (
+              <Suspense fallback={null}>
+                <SendEmailButton
+                  orgId={orgId}
+                  kind="deal"
+                  recordId={deal.id}
+                  userName={context.user.displayName}
+                  businessName={context.org.name}
+                  timeZone={context.org.timeZone}
+                  canManageTemplates={isAdminRole(context.role)}
+                />
+              </Suspense>
+            ) : null}
           </>
         }
       />
