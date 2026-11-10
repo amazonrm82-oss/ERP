@@ -2615,13 +2615,14 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   job its re-checked file paths, filled body and reply-to (shape in the migration header); its own In use line then. Interim
   lead choices: library files only with marketing templates (question 198), collection needs the plan keys (question 199). The advisor's
   finding on `record_email_queue` is expected.
-- In-app guide (UX-05, migration 021199; owner's questions 203-206 open, built on (א)): `profiles.guide_tour_seen_at` (own column
+- In-app guide (UX-05, migration 021199; owner's answers 203 ב, 204 א, 205 א, 206 ב, 10 November 2026): `profiles.guide_tour_seen_at` (own column
   grant; null = the first-visit tour opens; never marked in a support session; replaying from the account menu "סיור במערכת" changes
   nothing). Texts are Markdown in `docs/help/` (articles, screens, tour; frontmatter checked by `tests/unit/in-app-guide.test.ts`),
   generated into `src/features/guide/content.generated.ts`, which only server code imports: `guide.ts` is server-only and the client
   reads the rules from `tour.ts` (a unit test follows every `"use client"` file's imports). The tour skips the leads step while leads
   are off; every main screen header carries a "?" to `/o/[org]/help/<screen>`. The business frame reads the profile once
-  (`src/features/profile/frame-fields.ts`: theme, what's new, tour). Draft texts are never in the public `/help`.
+  (`src/features/profile/frame-fields.ts`: theme, what's new, tour). Draft texts are never in the public `/help`; inside the
+  app they carry a visible "טיוטה" badge (`draftLabel`, `tour.ts`). The command palette offers "סיור במערכת" (same replay event).
 - Public roadmap (TRU-01, migration 021197; owner's answer 192, 9 November 2026; two reviews): `app.roadmap_items` and
   `app.roadmap_votes` (schema app, RLS on, no grants), written only by `platform_add/update_roadmap_item` (owner/support, aal2,
   logged `roadmap.add|update`); `platform_list_roadmap_items` answers `{items, total}` (newest 500; linked support request ids only to
