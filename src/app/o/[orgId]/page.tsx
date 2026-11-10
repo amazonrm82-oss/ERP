@@ -8,6 +8,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { EmptyState, FormError } from "@/components/ui/feedback";
 import { BoardIcon, CalendarIcon, CheckSquareIcon, InboxIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
+import { ScreenHelp } from "@/features/guide/components/screen-help";
 import { calendarPath } from "@/features/calendar/range";
 import { tomorrowPath } from "@/features/calendar/tomorrow";
 import { idleText, meetingSpanText, quoteEndsSoonText, quoteWaitText, teamTaskDue, teamTasksMoreText } from "@/features/home/my-day";
@@ -151,7 +152,12 @@ export default async function HomePage({ params }: Props) {
         title="היום שלי"
         description={`שלום ${firstName}, ${formatDate(new Date().toISOString())}.`}
         // GAP-11: the day on paper
-        actions={<PrintButton />}
+        actions={
+          <>
+            <PrintButton />
+            <ScreenHelp orgId={orgId} screen="home" />
+          </>
+        }
       />
       {/* setup, device and weekly cleanup prompts are for the screen only (GAP-11) */}
       <div className="print:hidden">

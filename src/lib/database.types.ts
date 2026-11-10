@@ -797,6 +797,8 @@ export type ProfileRow = {
   theme: string | null;
   // USR-12: the date of the newest "what's new" entry this person has seen; null = never opened
   whats_new_seen_on: string | null;
+  // UX-05: when this person finished or skipped the first-visit tour; null = never seen
+  guide_tour_seen_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -3132,6 +3134,7 @@ export type Database = {
           signature?: string | null;
           theme?: string | null;
           whats_new_seen_on?: string | null;
+          guide_tour_seen_at?: string | null;
         }
       >;
       memberships: Table<

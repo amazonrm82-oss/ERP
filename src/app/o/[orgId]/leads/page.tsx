@@ -7,6 +7,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/feedback";
 import { PlusIcon, InboxIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
+import { ScreenHelp } from "@/features/guide/components/screen-help";
 import { inlineEditing } from "@/features/inline-edit/server";
 import { activeReasonNames } from "@/features/disqualify-reasons/queries";
 import { LeadCards } from "@/features/leads/components/lead-cards";
@@ -153,6 +154,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
               סגמנטים
             </ButtonLink>
             {newLeadButton}
+            <ScreenHelp orgId={orgId} screen="leads" />
           </>
         }
       />

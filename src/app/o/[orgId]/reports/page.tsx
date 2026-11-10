@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ButtonLink } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
 import { PageHeader } from "@/components/ui/page-header";
+import { ScreenHelp } from "@/features/guide/components/screen-help";
 import { canSeeCleanup } from "@/features/data-quality/cleanup";
 import { cleanupPath, toCompletePath } from "@/features/data-quality/paths";
 import { documentsPath } from "@/features/documents/paths";
@@ -82,6 +83,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ orgId:
                 תשלומים
               </ButtonLink>
             ) : null}
+            <ScreenHelp orgId={orgId} screen="reports" />
           </span>
         }
       />

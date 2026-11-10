@@ -126,11 +126,14 @@ describe("theme choice (USR-07)", () => {
   });
 
   it("the business shell's theme read never throws: a failed read is by the device", () => {
+    // UX-05: the shell reads the profile once (getFrameProfile), theme included
     const shell = readFileSync(new URL("../../src/app/o/[orgId]/layout.tsx", import.meta.url), "utf8");
-    const fn = shell.slice(shell.indexOf("async function profileThemeForNewDevice"));
+    expect(shell).toMatch(/getFrameProfile\(user\.id, hasThemeCookie\)/);
+    const fn = readFileSync(new URL("../../src/features/profile/frame-fields.ts", import.meta.url), "utf8");
     expect(fn).not.toMatch(/must\(/);
-    expect(fn).toMatch(/return error \? "system"/);
-    expect(fn).toMatch(/catch \{\s*return "system";/);
+    expect(fn).toMatch(/return frameProfileFrom\(error \? null : data, hasThemeCookie\)/);
+    expect(fn).toMatch(/catch \{\s*return frameProfileFrom\(null, hasThemeCookie\);/);
+    expect(fn).toMatch(/if \(!row\) return \{ syncTheme: hasThemeCookie \? null : "system"/);
   });
 
   it("the root layout renders the pick on <html> and the script in <head>", () => {

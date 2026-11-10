@@ -66,8 +66,18 @@ describe("personal profile (USR-01)", () => {
         )
       ).rows.map((r) => r.column_name),
     );
-    // USR-07 adds theme (light, dark or by the device); USR-12 the date of the newest "what's new" entry seen
-    expect(grants).toEqual(["avatar_url", "full_name", "locale", "phone", "signature", "theme", "timezone", "whats_new_seen_on", "working_hours"]);
+    // USR-07 adds theme (light, dark or by the device); USR-12 the date of the newest "what's new" entry seen; UX-05 the tour mark
+    expect(grants).toEqual(["avatar_url", "full_name", "guide_tour_seen_at", "locale", "phone", "signature", "theme", "timezone", "whats_new_seen_on", "working_hours"]);
+  });
+
+  it("UX-05: a person marks their own tour as seen, never someone else's", async () => {
+    expect(await update(owner, owner, "guide_tour_seen_at = now()")).toBe(1);
+    expect((await profile(owner.id)).guide_tour_seen_at).not.toBeNull();
+    expect(await update(colleague, owner, "guide_tour_seen_at = null")).toBe(0);
+    expect(await update(outsider, owner, "guide_tour_seen_at = null")).toBe(0);
+    expect((await profile(owner.id)).guide_tour_seen_at).not.toBeNull();
+    expect(await update(owner, owner, "guide_tour_seen_at = null")).toBe(1);
+    expect((await profile(owner.id)).guide_tour_seen_at).toBeNull();
   });
 
   it("working hours must have the exact shape", async () => {

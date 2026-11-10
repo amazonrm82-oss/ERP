@@ -4,30 +4,18 @@ import Link from "next/link";
 import { useId, useMemo, useState } from "react";
 
 import { SearchIcon } from "@/components/ui/icons";
-import { paths } from "@/lib/paths";
 
-type Entry = { slug: string; title: string; summary: string; text: string };
+import { queryWords, searchHelp, type HelpSearchEntry } from "../search";
 
-// Hebrew search: ignore niqqud, geresh and final-letter forms, so "לידים" finds "ליד".
-function normalize(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[֑-ׇ]/g, "")
-    .replace(/[׳״"'`]/g, "")
-    .replace(/ך/g, "כ")
-    .replace(/ם/g, "מ")
-    .replace(/ן/g, "נ")
-    .replace(/ף/g, "פ")
-    .replace(/ץ/g, "צ");
-}
-
-/** Search box over the help articles. Every word typed must appear in the article. */
-export function HelpSearch({ entries }: { entries: Entry[] }) {
+/**
+ * Search box over the help articles (public /help and the center inside the app). Every word typed must appear in the
+ * article; Hebrew is folded like every other search (searchHelp). `articleBase` is the address the articles live under.
+ */
+export function HelpSearch({ entries, articleBase }: { entries: HelpSearchEntry[]; articleBase: string }) {
   const [query, setQuery] = useState("");
   const inputId = useId();
-  const index = useMemo(() => entries.map((e) => ({ ...e, haystack: normalize(e.text) })), [entries]);
-  const words = normalize(query).split(/\s+/).filter(Boolean);
-  const results = words.length ? index.filter((e) => words.every((w) => e.haystack.includes(w))) : [];
+  const words = queryWords(query);
+  const results = useMemo(() => searchHelp(entries, query), [entries, query]);
 
   return (
     <div>
@@ -53,7 +41,7 @@ export function HelpSearch({ entries }: { entries: Entry[] }) {
             <ul className="divide-y divide-line rounded-lg border border-line">
               {results.map((r) => (
                 <li key={r.slug}>
-                  <Link href={paths.helpArticle(r.slug)} className="block px-4 py-3 hover:bg-canvas">
+                  <Link href={`${articleBase}/${r.slug}`} className="block px-4 py-3 hover:bg-canvas">
                     <span className="block font-medium text-accent-strong">{r.title}</span>
                     <span className="block text-sm text-ink-soft">{r.summary}</span>
                   </Link>

@@ -13,6 +13,8 @@ export type HelpArticle = {
   title: string;
   summary: string;
   body: HelpBlock[];
+  // UX-05: a placeholder text written by Claude Code for the owner to rewrite (docs/help, "draft: true"); never public
+  draft?: boolean;
 };
 
 export const CATEGORY_LABELS: Record<HelpCategory, string> = {

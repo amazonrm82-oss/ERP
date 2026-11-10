@@ -108,6 +108,9 @@ export const paths = {
   adminRoadmap: "/admin/roadmap",
   // USR-12: what's new, and the support request form
   whatsNew: (orgId: string) => `/o/${orgId}/whats-new`,
+  // UX-05: the help center inside the business (the same articles as the public /help)
+  orgHelp: (orgId: string) => `/o/${orgId}/help`,
+  orgHelpArticle: (orgId: string, slug: string) => `/o/${orgId}/help/${slug}`,
   support: (orgId: string) => `/o/${orgId}/support`,
 } as const;
 

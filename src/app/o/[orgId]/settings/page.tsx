@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { ForwardIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
+import { ScreenHelp } from "@/features/guide/components/screen-help";
 import { conversionMapSettingsPath } from "@/features/conversion-map/paths";
 import { conversionMapNeedsFix } from "@/features/conversion-map/queries";
 import { TARGET_REMOVED_REMINDER } from "@/features/conversion-map/rules";
@@ -30,7 +31,11 @@ export default async function SettingsPage({ params }: Props) {
 
   return (
     <>
-      <PageHeader title="הגדרות" description="הגדרות העסק. ההגדרות האישיות שלכם נמצאות ב&quot;החשבון שלי&quot; בתפריט המשתמש." />
+      <PageHeader
+        title="הגדרות"
+        description="הגדרות העסק. ההגדרות האישיות שלכם נמצאות ב&quot;החשבון שלי&quot; בתפריט המשתמש."
+        actions={<ScreenHelp orgId={orgId} screen="settings" />}
+      />
       {mappingNeedsFix ? (
         <p role="note" className="mb-6 flex flex-wrap items-center gap-2 rounded-md bg-warning-soft px-3 py-2.5 text-sm text-warning">
           {TARGET_REMOVED_REMINDER}

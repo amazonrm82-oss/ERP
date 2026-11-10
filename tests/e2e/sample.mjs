@@ -114,6 +114,8 @@ export const CALENDAR_WEEK = "2026-10-12";
 
 async function seed(orgId, email) {
   const [{ id: me }] = await sql("select id from auth.users where email = $1", [email]);
+  // UX-05: the photographing owner has seen the first-visit tour, so it never lands in a screenshot
+  await sql("update public.profiles set guide_tour_seen_at = now() where id = $1", [me]);
   const statuses = await sql("select id, name from public.lead_statuses where organization_id = $1 order by position", [orgId]);
   const sources = await sql("select id from public.lead_sources where organization_id = $1 order by created_at", [orgId]);
   const [pipeline] = await sql("select id from public.pipelines where organization_id = $1 order by position limit 1", [orgId]);

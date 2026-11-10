@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/feedback";
 import { TextField } from "@/components/ui/field";
 import { SearchIcon, CheckSquareIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
+import { ScreenHelp } from "@/features/guide/components/screen-help";
 import { inlineEditing } from "@/features/inline-edit/server";
 import { resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
@@ -222,7 +223,11 @@ export default async function TasksPage({ params, searchParams }: Props) {
 
   return (
     <>
-      <PageHeader title="משימות" description={`${formatNumber(openCount)} משימות פתוחות.`} />
+      <PageHeader
+        title="משימות"
+        description={`${formatNumber(openCount)} משימות פתוחות.`}
+        actions={<ScreenHelp orgId={orgId} screen="tasks" />}
+      />
 
       <TasksNav orgId={orgId} showAll={showAll} table={false} />
 
@@ -400,7 +405,7 @@ async function TasksTableView({ orgId, context, query, showAll }: { orgId: strin
 
   return (
     <>
-      <PageHeader title="משימות" />
+      <PageHeader title="משימות" actions={<ScreenHelp orgId={orgId} screen="tasks" />} />
       <TasksNav orgId={orgId} showAll={showAll} table />
       <SavedViewsBar
         orgId={orgId}

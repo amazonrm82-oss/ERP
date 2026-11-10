@@ -13,10 +13,12 @@ import { withOrdersPlan } from "@/features/modules/modules";
 import { getOrgModules } from "@/features/modules/queries";
 import { getOrgTerms } from "@/features/terminology/queries";
 import { SystemBanners } from "@/features/system-banners/components/system-banners";
-import { getWhatsNewUnread } from "@/features/whats-new/queries";
+import { GuideTour } from "@/features/guide/components/guide-tour";
+import { ReplayTourButton } from "@/features/guide/components/replay-tour-button";
+import { tourSteps } from "@/features/guide/guide";
+import { getFrameProfile } from "@/features/profile/frame-fields";
 import { ThemeSync } from "@/features/theme/components/theme-sync";
-import { choiceFromProfile, THEME_COOKIE } from "@/features/theme/theme";
-import { createClient } from "@/lib/supabase/server";
+import { THEME_COOKIE } from "@/features/theme/theme";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
 import { GlobalSearch } from "@/features/search/components/global-search";
 import { NotificationBell } from "@/features/notifications/components/notification-bell";
@@ -99,25 +101,26 @@ export default async function OrgLayout({ children, params }: Props) {
       </div>
     );
   }
-  const [notifications, unread, branding, trialEnd, syncTheme, terms, storedModules, quickSale, whatsNewUnread] = await Promise.all([
+  const hasThemeCookie = (await cookies()).has(THEME_COOKIE);
+  const [notifications, unread, branding, trialEnd, frame, terms, storedModules, quickSale] = await Promise.all([
     listNotifications(org.id, user.id, 8),
     countUnread(org.id, user.id),
     getOrgBranding(org.id),
     getTrialEndNotice(org.id),
-    profileThemeForNewDevice(user.id),
+    // USR-07, USR-12, UX-05: the theme for a new device, the "what's new" dot and the tour, in one read of the profile
+    getFrameProfile(user.id, hasThemeCookie),
     // FLD-10: the business's own words in the menu and the "+" menu
     getOrgTerms(org.id),
     // LEAD-08: a switched-off module leaves the menu and the "+" menu
     getOrgModules(org.id),
     // GAP-08: the quick sale in the "+" menu, for whoever records payments
     context.canWrite ? quickSaleOffered(org.id) : Promise.resolve(false),
-    // USR-12: the dot on "what's new"
-    getWhatsNewUnread(user.id),
   ]);
   // ORD-01: orders show only while the plan holds them too; asked only when the business switched them on, and a failed
   // read hides them (the menu never breaks the page)
   const ordersInPlan = storedModules.orders ? await orgHasFeature(org.id, "orders").catch(() => false) : false;
   const modules = withOrdersPlan(storedModules, ordersInPlan);
+  const { syncTheme, whatsNewUnread, tourSeenAt } = frame;
   // BIL-08: while the business is in the trial-end transition its line says what comes next
   const notice = trialEnd ? trialEndBannerText(trialEnd) : ORG_STATUS_NOTICES[org.status];
 
@@ -126,6 +129,8 @@ export default async function OrgLayout({ children, params }: Props) {
       {syncTheme ? <ThemeSync choice={syncTheme} /> : null}
       {/* USR-08: the app's shortcuts open in this business next time */}
       <RememberOrg orgId={org.id} />
+      {/* UX-05: the first-visit tour; the account menu opens it again */}
+      <GuideTour orgId={org.id} steps={tourSteps(terms, modules)} seenAt={tourSeenAt} support={context.supportUntil !== null} />
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:start-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-surface focus:px-4 focus:py-2 focus:shadow"
@@ -172,11 +177,12 @@ export default async function OrgLayout({ children, params }: Props) {
             links={[
               { href: paths.settingsAccount(org.id), label: "החשבון שלי" },
               { href: paths.home, label: "החלפת עסק" },
-              { href: paths.help, label: "מרכז עזרה" },
+              { href: paths.orgHelp(org.id), label: "מרכז עזרה" },
               { href: paths.whatsNew(org.id), label: "מה חדש", dot: whatsNewUnread },
               { href: paths.support(org.id), label: "פנייה לתמיכה" },
             ]}
           >
+            <ReplayTourButton />
             {context.role === "viewer" ? null : (
               <div className="border-b border-line pb-1.5">
                 <AvailabilityToggle key={String(context.isAvailable)} orgId={org.id} userId={user.id} available={context.isAvailable} />
@@ -229,23 +235,10 @@ export default async function OrgLayout({ children, params }: Props) {
         modules={modules}
         extra={[
           { href: paths.notifications(org.id), label: "התראות" },
-          { href: paths.help, label: "מרכז עזרה" },
+          { href: paths.orgHelp(org.id), label: "מרכז עזרה" },
           { href: paths.home, label: "החלפת עסק" },
         ]}
       />
     </div>
   );
-}
-
-/** USR-07: a device with no theme cookie yet takes the person's choice from the profile (one read, then the cookie). */
-async function profileThemeForNewDevice(userId: string) {
-  if ((await cookies()).has(THEME_COOKIE)) return null;
-  // cosmetic: a failed read falls back to "by the device" quietly and never takes the business shell down
-  try {
-    const supabase = await createClient();
-    const { data, error } = await supabase.from("profiles").select("theme").eq("id", userId).maybeSingle();
-    return error ? "system" : choiceFromProfile(data?.theme);
-  } catch {
-    return "system";
-  }
 }

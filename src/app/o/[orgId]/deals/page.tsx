@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/feedback";
 import { TextField } from "@/components/ui/field";
 import { PlusIcon, SearchIcon, BoardIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
+import { ScreenHelp } from "@/features/guide/components/screen-help";
 import { BoardFilters } from "@/features/deals/components/board-filters";
 import { DealsBoard } from "@/features/deals/components/deals-board";
 import { activeLossReasons, listLossReasons } from "@/features/deal-loss-reasons/queries";
@@ -217,7 +218,12 @@ export default async function DealsPage({ params, searchParams }: Props) {
             ? `תהליך המכירה "${board.pipeline.name}": ${formatNumber(openCount)} ${deal.plural} ${byGender(deal, "פתוחים", "פתוחות")} בשווי ${formatMoney(openTotal)}.`
             : `תהליך המכירה "${board.pipeline.name}"`
         }
-        actions={newDealButton}
+        actions={
+          <>
+            {newDealButton}
+            <ScreenHelp orgId={orgId} screen="deals" />
+          </>
+        }
       />
 
       <ViewNav orgId={orgId} pipelineId={board.pipeline.id} pipelines={pipelines} table={false} />
@@ -389,7 +395,16 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
 
   return (
     <>
-      <PageHeader title={deal.plural} description={`תהליך המכירה "${pipeline.name}"`} actions={headerActions} />
+      <PageHeader
+        title={deal.plural}
+        description={`תהליך המכירה "${pipeline.name}"`}
+        actions={
+          <>
+            {headerActions}
+            <ScreenHelp orgId={orgId} screen="deals" />
+          </>
+        }
+      />
       <ViewNav orgId={orgId} pipelineId={pipeline.id} pipelines={pipelines} table />
       <SavedViewsBar
         orgId={orgId}

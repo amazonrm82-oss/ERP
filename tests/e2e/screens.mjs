@@ -38,6 +38,8 @@ if (!state) {
   await page.context().close();
   await writeFile(stateFile, JSON.stringify(state));
 }
+// UX-05: a sample made before the tour existed gets the same mark as a new one (createSample), so no shot shows the tour
+await sql("update public.profiles set guide_tour_seen_at = coalesce(guide_tour_seen_at, now()) where email = $1", [state.email]);
 
 const SCREENS = await sampleScreens(state.orgId);
 const names = only.length ? only : Object.keys(SCREENS);

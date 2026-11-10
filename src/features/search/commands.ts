@@ -58,7 +58,7 @@ export function buildCommands(orgId: string, terms: OrgTerms, modules: OrgModule
   // the places of the user menu and the phone's "עוד" sheet
   commands.push(
     { key: "nav:notifications", group: "navigate", label: "התראות", hint: null, href: paths.notifications(orgId), keywords: [...NAVIGATE_WORDS, "notifications"] },
-    { key: "nav:help", group: "navigate", label: "מרכז עזרה", hint: null, href: paths.help, keywords: [...NAVIGATE_WORDS, "עזרה", "help"] },
+    { key: "nav:help", group: "navigate", label: "מרכז עזרה", hint: null, href: paths.orgHelp(orgId), keywords: [...NAVIGATE_WORDS, "עזרה", "help"] },
     { key: "nav:switch", group: "navigate", label: "החלפת עסק", hint: null, href: paths.home, keywords: [...NAVIGATE_WORDS, "עסקים"] },
   );
   commands.push({

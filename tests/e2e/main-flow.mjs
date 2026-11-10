@@ -107,9 +107,21 @@ async function confirmationLink(email) {
   throw new Error(`no confirmation email for ${email}`);
 }
 
+// UX-05: the first-visit tour opens by itself for a new person; skip it whenever it shows, as a person would, and wait for
+// the "seen" mark to be saved, so a next page load does not open it again
+const tourSkip = (page) => page.getByRole("button", { name: "דילוג על הסיור" });
+async function skipTourWhenShown(page) {
+  await page.addLocatorHandler(tourSkip(page), async (button) => {
+    const saved = page.waitForResponse((r) => r.request().method() === "POST" && Boolean(r.request().headers()["next-action"]), { timeout: 10000 }).catch(() => null);
+    await button.click();
+    await saved;
+  });
+}
+
 async function newPage(width) {
   const context = await browser.newContext({ viewport: { width, height: 800 }, locale: "he-IL" });
   const page = await context.newPage();
+  await skipTourWhenShown(page);
   page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
   page.on("console", (m) => m.type() === "error" && errors.push(`console: ${m.text()}`));
   return page;
@@ -200,6 +212,26 @@ try {
   await owner.getByRole("heading", { name: "הקמת העסק עוד לא הסתיימה" }).waitFor({ state: "detached", timeout: 15000 });
   console.log("org:", orgUrl);
   await shot(owner, "02-home-360");
+
+  step("first-visit tour: skipped once, it stays closed after a reload; the account menu opens it again (UX-05)");
+  await owner.removeLocatorHandler(tourSkip(owner));
+  await owner.reload();
+  await owner.getByRole("heading", { name: "היום שלי" }).waitFor();
+  await owner.waitForLoadState("networkidle");
+  if (await tourSkip(owner).isVisible()) throw new Error("the tour opened again after it was skipped");
+  await owner.getByRole("button", { name: /רונית בעלים/ }).click();
+  await owner.getByRole("button", { name: "סיור במערכת" }).click();
+  await owner.getByText("שלב 1 מתוך 5").waitFor();
+  await owner.getByRole("button", { name: "הבא", exact: true }).click();
+  await owner.getByText("שלב 2 מתוך 5").waitFor();
+  await tourSkip(owner).click();
+  await owner.getByText("שלב 2 מתוך 5").waitFor({ state: "hidden" });
+  // the "?" of the screen: three lines and the way to the help center inside the app
+  await owner.getByRole("button", { name: "עזרה: היום שלי" }).click();
+  await owner.getByRole("link", { name: "למרכז העזרה" }).click();
+  await owner.waitForURL(/\/o\/[0-9a-f-]{36}\/help\/my-day$/, { timeout: 15000 });
+  await owner.goto(orgUrl);
+  await skipTourWhenShown(owner);
 
   step("landing page: public for visitors, straight into the app when signed in (LND-01, LND-06)");
   {

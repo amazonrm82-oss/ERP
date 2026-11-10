@@ -74,7 +74,10 @@ async function sql(text, params = []) {
 
 async function newPage() {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: "he-IL" });
-  return context.newPage();
+  const page = await context.newPage();
+  // UX-05: the first-visit tour opens by itself for a new person; skip it whenever it shows, as a person would
+  await page.addLocatorHandler(page.getByRole("button", { name: "דילוג על הסיור" }), (button) => button.click());
+  return page;
 }
 
 async function expectText(page, text, timeout = 15000) {

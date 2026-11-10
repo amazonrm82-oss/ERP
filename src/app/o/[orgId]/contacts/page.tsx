@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/feedback";
 import { SelectField, TextField } from "@/components/ui/field";
 import { PlusIcon, SearchIcon, UsersIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
+import { ScreenHelp } from "@/features/guide/components/screen-help";
 import { ContactsTable } from "@/features/contacts/components/contacts-table";
 import { getCreditNumbers } from "@/features/allocations/queries";
 import { getDebtNumbers } from "@/features/balances/queries";
@@ -139,6 +140,7 @@ export default async function ContactsPage({ params, searchParams }: Props) {
               </ButtonLink>
             ) : null}
             {newContactButton}
+            <ScreenHelp orgId={orgId} screen="contacts" />
           </>
         }
       />
