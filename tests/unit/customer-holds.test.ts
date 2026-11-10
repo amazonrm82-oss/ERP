@@ -23,6 +23,6 @@ describe("customer holds (COL-05)", () => {
     expect(isActiveHoldClash({ ...clash, message: 'duplicate key value violates unique constraint "customer_holds_company_active"' })).toBe(true);
     expect(isActiveHoldClash({ ...clash, message: 'duplicate key value violates unique constraint "accounting_documents_number_once"' })).toBe(false);
     expect(isActiveHoldClash({ code: "42501", message: "customer_holds_contact_active" })).toBe(false);
-    expect(dbErrorMessage({ code: "P0001", hint: "customer_hold:exists", message: "" })).toBe('הלקוח כבר מסומן "לא למכור עד הסדרת חוב".');
+    expect(dbErrorMessage({ code: "P0001", hint: "customer_hold:exists", message: "" })).toBe('הלקוח כבר מסומן "לא למכור עד הסדרת חוב". רעננו את הדף כדי לראות את הסימון.');
   });
 });

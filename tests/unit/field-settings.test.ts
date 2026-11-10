@@ -62,7 +62,7 @@ describe("custom field settings (FLD-07)", () => {
     expect(dbErrorMessage({ code: "23505" })).toBe("כבר קיימת רשומה כזו.");
     // a race: the constraint answers without a hint
     const bare = { code: "23505", message: 'duplicate key value violates unique constraint "custom_unique_values_value"', details: "Key (...)=(...) already exists." };
-    expect(dbErrorMessage(bare)).toBe("אחד הערכים כבר קיים ברשומה אחרת, והשדה מוגדר כייחודי.");
+    expect(dbErrorMessage(bare)).toBe("אחד הערכים כבר קיים ברשומה אחרת, והשדה מוגדר כייחודי. בדקו את הערך, או חפשו את הרשומה הקיימת.");
     expect(isUniqueFieldClash(bare)).toBe(true);
     expect(isUniqueFieldClash({ code: "23505", message: "other" })).toBe(false);
   });

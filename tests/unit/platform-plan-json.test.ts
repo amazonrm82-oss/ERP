@@ -41,6 +41,6 @@ describe("plan and override JSON typed by platform staff", () => {
   });
 
   it("the hidden-plan refusal has its own Hebrew message", () => {
-    expect(dbErrorMessage({ code: "P0001", message: "this plan is no longer offered", hint: "plan:hidden" })).toBe("החבילה הזו לא זמינה יותר לבחירה.");
+    expect(dbErrorMessage({ code: "P0001", message: "this plan is no longer offered", hint: "plan:hidden" })).toBe("החבילה הזו לא זמינה יותר לבחירה. בחרו חבילה אחרת.");
   });
 });

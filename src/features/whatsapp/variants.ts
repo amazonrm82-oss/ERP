@@ -24,7 +24,7 @@ export type VariantProblem = "variant" | "neutral";
 
 // the same texts answer the database's hints whatsapp_template:variant / whatsapp_template:neutral (src/lib/errors.ts)
 export const VARIANT_PROBLEM_MESSAGES: Record<VariantProblem, string> = {
-  neutral: "בכל נוסח לפי מגדר צריך לכתוב גם נוסח ניטרלי (ניטרלי: …). הוא נשלח כשהמגדר לא ידוע.",
+  neutral: "בנוסח לפי מגדר חסר נוסח ניטרלי, שנשלח כשהמגדר לא ידוע. הוסיפו אותו בתוך הסוגריים, אחרי \"ניטרלי:\".",
   variant: "נוסח לפי מגדר לא כתוב נכון. כותבים כך: {זכר: … | נקבה: … | ניטרלי: …}, כל אפשרות פעם אחת, ובלי סוגריים בתוך סוגריים חוץ משדות כמו {שם פרטי}.",
 };
 
