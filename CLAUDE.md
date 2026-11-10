@@ -176,6 +176,29 @@ and build this CRM here instead. The old code is preserved on the branch
    connection by its code; one log line `test_ok` / `test_failed:<code>`). The token is decrypted in memory (INT-02) for one
    `checkPage` call within 10 s, and never logged, stored or returned. In the eslint allow-list. The advisor's findings on the two
    functions and on `app.integration_tests` / `app.integration_notice_days` are expected.
+   In use (CNS-09 / CNS-10, owner 10 November 2026, answers (225) א, (229) א, (230) ב, (231) ב, (232) א, (233) ב; migrations
+   021210 and 021211 pasted by hand; one independent review and three delta reviews): the customer's preferences page and unsubscribe
+   link (`src/features/preferences/public-server.ts`; pages `/f/prefs/<token>` and `/f/unsub/<token>`, which only read; routes
+   `POST /api/forms/prefs/<token>` and `POST /api/forms/unsub/<token>`, the latter also taking RFC 8058 one-click posts; a GET there only
+   redirects 303 to the page), which call only `public.consent_preferences_public()` (business display name, logo, colour, built-with,
+   and the link's own channel with its state and can_turn_on; never a name, phone, email or id) and `public.consent_preferences_submit()`
+   (modes unsubscribe, unsubscribe_all, preferences). An unsubscribe always adds the address to the blocklist for that channel (server
+   reason `unsubscribe_link`, hash only, outside the owners' cap) and writes the ordinary withdrawn consent on records holding it; such
+   an entry stops marketing only (`app.consent_service_blocked` ignores it). Turning on is only for the link's own channel while the
+   record's current address hashes to the token's, and only when `app.consent_preference_relist_ok` holds (every opt-out since the last
+   "in" was the person's own, no erasure, only link entries on that channel, nothing waiting for a hash); it marks those link entries
+   removed (`resubscribed`) and writes `granted`, source `preferences`, wording `prefs-draft-1`. A stronger entry (an owner's add, an SMS
+   reply, a waiting entry hashed by the backfill) supersedes a link entry (`superseded`) and `consent_blocklist_remove` brings the link
+   entry back when the stronger one is removed. One link per lead/contact and channel (`app.consent_preference_links`); every token kept
+   as its SHA-256 with the HMAC of its address (`app.consent_preference_tokens`, deleted after 24 months by the pasted
+   `app.purge_old_preference_tokens`, pg_cron `crm-preference-token-purge` through `app.run_preference_token_purge`, a no-op without it);
+   a new token per message; an older token only unsubscribes its own channel and address; a link is made only with `consent_hash_key`.
+   One not-found rule: unknown token or deleted business; unsubscribing works in a suspended, cancelled or read-only business. Limits
+   after the lookup: 120 per link, then 60 per sender (keyed IP hash, scope `preferences`, scoped per link) in 10 minutes, shared by views
+   and writes; OPS-02 shared guard first. Never framed, no-referrer, always light, generic previews. Lock order: record FOR KEY SHARE,
+   link counter, blocklist lock. Staff: `public.consent_preference_link_create` (owners/admins, audited `consent_link` without the
+   token). `public.consent_preference_link_for_job(job, lease)` (service_role, lease-bound, refuses service types) has NO CALLER YET;
+   the future sender needs its own "In use" line. In the eslint allow-list.
    In use (PRK-02, owner 26 October 2026, wave 3 use (3), migration 021147): the public privacy-request page
    (`src/features/privacy-requests/public-server.ts`, page `/f/privacy/<token>`, route `POST /api/forms/privacy/<token>`), which calls
    only `public.privacy_request_page()` (the business's display name `organizations.name`, logo and colour only) and
@@ -1098,6 +1121,14 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   **Senders (CNS-07 and every marketing send) judge only by `app.consent_suppressed(org, channel, address)`, never by a record's
   consent state or its card**: the blocklist and an opt-out or erasure of the same address on another record are not in the
   record's own state.
+- Unsubscribe link and preferences (CNS-09/CNS-10, migrations 021210 and 021211 pasted by hand; hard rule 5, In use (CNS-09 …)): the
+  consent history walk is `app.consent_register_walk` (state and the "own unsubscribe" tally; `app.consent_register_state` and
+  `app.consent_preference_relist_ok` read it, so the read rule and the write check cannot drift; every source but `preferences` keeps
+  its 020985 answer). Blocklist removal reasons are now added_by_mistake | person_consented | other | resubscribed | superseded (the
+  last two server-only; the menu offers `BLOCKLIST_PERSON_REMOVED_REASONS`). `app.consent_state_of`, `app.consent_prepare`,
+  `app.consent_service_blocked`, `app.consent_blocklist_backfill`, `public.consent_blocklist_remove`, `public.consent_blocklist_add_noted`
+  and `public.sms_inbound_optout` were last redefined in 021210; tests 64 and 88 end with `_consent_preference_links.sql`. The stored
+  token hashes are one more set of HMACs the `consent_hash_key` replacement procedure must recompute.
 - Awaiting double opt-in (CAP-07 follow-up, migration 020975; owner 26 October 2026, answer 3): a public-form tick on a locked address
   (opt-out, erasure block, blocklist) writes `consents.state = 'awaiting_confirmation'` (source 'form' only, `consents_awaiting_form`;
   one per record, channel and day in the org zone; `method` = "טופס: <form name>" from the transaction setting `app.intake_form_id`
