@@ -30,7 +30,7 @@ describe("locked sections of a document template (224)", () => {
   });
 
   it("the migration mirrors the markers", () => {
-    const migration = readFileSync(join(__dirname, "../../supabase/migrations/20261006021208_signature_documents.sql"), "utf8");
+    const migration = readFileSync(join(__dirname, "../../supabase/migrations/20261006021212_signature_documents.sql"), "utf8");
     expect(migration).toContain("v_mark ~ '^:::[ \\t]*נעול$'");
     expect(migration).toContain("v_mark = ':::'");
     expect(migration).toContain("if v_sections > 20 then");

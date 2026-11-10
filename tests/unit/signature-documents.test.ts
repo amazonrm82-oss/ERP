@@ -8,7 +8,7 @@ import { bodyBlocks, readSignedDocumentSource, signedDocumentPdf } from "@/featu
 import { publicSignatureFrom, signatureDateText, SIGN_WORDING, SIGN_WORDING_VERSION, signBodySchema, statusSignatureFrom } from "@/features/signatures/public";
 import { awaitsSignature, shownSignatureState, signatureLinkMessage, signatureWhatsappHref } from "@/features/signatures/states";
 
-const MIGRATION = readFileSync(join(__dirname, "../../supabase/migrations/20261006021208_signature_documents.sql"), "utf8");
+const MIGRATION = readFileSync(join(__dirname, "../../supabase/migrations/20261006021212_signature_documents.sql"), "utf8");
 
 const source = (extra: Record<string, unknown> = {}) => ({
   document: { title: "הסכם שירות", body: "**הסכם שירות**\n\nנערך בין העסק לבין דנה כהן.\n- סעיף ראשון\n1. סעיף ממוספר" },
