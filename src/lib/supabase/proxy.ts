@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { isTransientAuthError, logSessionCheckThrow } from "@/lib/auth-transient";
+import { REQUEST_ID_HEADER, requestIdFor } from "@/lib/request-id";
 import { PATH_HEADER } from "@/features/theme/theme";
 import { contentSecurityPolicy, isEmbeddablePublicPath, makeNonce } from "@/lib/csp";
 import type { Database } from "@/lib/database.types";
@@ -67,10 +68,14 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     isDev: process.env.NODE_ENV === "development",
     publicForm: isEmbeddablePublicPath(request.nextUrl.pathname),
   });
+  // OPS-06: one id per request for the server log lines (Vercel's x-vercel-id when valid, else a new one); always set
+  // here, so a visitor's own x-crm-request-id never counts
+  const requestId = requestIdFor(request.headers);
   // the request as the page sees it: the current cookies, plus the policy
   const next = () => {
     const headers = new Headers(request.headers);
     headers.set("content-security-policy", csp);
+    headers.set(REQUEST_ID_HEADER, requestId);
     // USR-07: the root layout keeps customer-facing pages light; set here, so a visitor's own header never counts
     headers.set(PATH_HEADER, request.nextUrl.pathname);
     const res = NextResponse.next({ request: { headers } });
@@ -125,7 +130,7 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   } catch (error) {
     isSignedIn = false;
     authUnavailable = isTransientAuthError(error);
-    logSessionCheckThrow("proxy", error);
+    logSessionCheckThrow("proxy", error, requestId);
   }
 
   if (authUnavailable) {

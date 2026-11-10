@@ -11,6 +11,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { isWidgetToken, widgetFormPath } from "./paths";
 import { publicWidgetFrom, type PublicWidget } from "./public";
 import { widgetScript } from "./script";
+import { serverLog } from "@/lib/log-server";
 
 // SPD-07: the site widget, in the approved pattern for public secret-link pages (owner, 13 October 2026; hard rule 5):
 // the server reads only through public.site_widget_public() and sends the form only through public.site_widget_submit()
@@ -129,7 +130,7 @@ export async function handleWidgetSubmit(request: Request, token: string): Promi
     if (error.code === "P0002") return json(404, { ok: false, message: MESSAGES.notFound });
     if (error.hint === "rate_limited") return rateLimitedJson({ ok: false, message: MESSAGES.rateLimited });
     if (error.code === "22023") return json(400, { ok: false, message: /email/i.test(error.message) ? MESSAGES.email : MESSAGES.missing });
-    console.error("site_widget_submit failed", error.code, error.message);
+    await serverLog("error", "site_widget.submit_failed", { code: error.code, error: error.message });
     return json(500, { ok: false, message: MESSAGES.error });
   }
   // spam is answered like the rest

@@ -14,6 +14,7 @@ import { PRODUCT_INPUT, PRODUCT_INVALID, productInput } from "./product";
 import { HONEYPOT_FIELD, STARTED_AT_FIELD, type IntakeField } from "./fields";
 import { INACTIVE_FORM_TEXT, readPublicForm } from "./public-form";
 import { checkSubmission, wrongField, type RawValues } from "./public-validate";
+import { serverLog } from "@/lib/log-server";
 
 export type IntakeKind = "form" | "webhook";
 
@@ -276,7 +277,7 @@ export async function handleIntake(request: Request, token: string, kind: Intake
     if (error.code === "22023" || error.code === "23514") return respond(400, { ok: false, message: MESSAGES.invalid, field: wrongField(error.message) });
     if (error.code === "P0001" && error.hint === "rate_limited") return rateLimited();
     if (error.code === "P0001") return respond(403, { ok: false, message: MESSAGES.unavailable });
-    console.error("intake_submit failed", error.code, error.message);
+    await serverLog("error", "intake.submit_failed", { code: error.code, error: error.message });
     return respond(500, { ok: false, message: MESSAGES.error });
   }
 

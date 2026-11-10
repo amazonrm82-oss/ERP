@@ -4,17 +4,41 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { redactPublicPath, requestErrorLine } from "@/lib/request-error-log";
+import { logRecord } from "@/lib/log";
+import { redactPublicPath, requestErrorFields, type RequestErrorContext, type RequestErrorInfo } from "@/lib/request-error-log";
 
-// FXC-13: the server log line of a captured error carries the code shown on the error screen, and nothing private.
+// FXC-13 / OPS-06: the structured server line of a captured error carries the code shown on the error screen, the
+// request id, and nothing private.
+const record = (error: unknown, request: RequestErrorInfo, context: RequestErrorContext) => {
+  const rest = { ...logRecord("error", "request.error", requestErrorFields(error, request, context)) };
+  delete rest.time;
+  return rest;
+};
+const requestErrorLine = (error: unknown, request: RequestErrorInfo, context: RequestErrorContext) => JSON.stringify(record(error, request, context));
+
 describe("server log line of a request error", () => {
   const jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1MSJ9.c2lnbmF0dXJlLXZhbHVl";
 
-  it("names the code (digest) the user sees, the route, the kind of request and the error", () => {
+  it("names the code (digest) the user sees, the route, the kind of request, the error and the request id", () => {
     const error = Object.assign(new Error("lead statuses query failed: timeout"), { digest: "2817364519" });
-    expect(requestErrorLine(error, { path: "/o/abc/leads", method: "GET" }, { routePath: "/o/[orgId]/leads", routeType: "render", renderSource: "react-server-components" })).toBe(
-      "[error] code=2817364519 route=/o/[orgId]/leads type=render/react-server-components GET /o/abc/leads Error: lead statuses query failed: timeout",
-    );
+    expect(
+      record(
+        error,
+        { path: "/o/abc/leads", method: "GET", headers: { "x-crm-request-id": "fra1::abc-123", cookie: "sb=secret" } },
+        { routePath: "/o/[orgId]/leads", routeType: "render", renderSource: "react-server-components" },
+      ),
+    ).toEqual({
+      level: "error",
+      event: "request.error",
+      request_id: "fra1::abc-123",
+      digest: "2817364519",
+      route: "/o/[orgId]/leads",
+      route_type: "render/react-server-components",
+      method: "GET",
+      path: "/o/abc/leads",
+      error_name: "Error",
+      error: "lead statuses query failed: timeout",
+    });
   });
 
   it("drops the query string and redacts token-like text in the message", () => {
@@ -22,13 +46,14 @@ describe("server log line of a request error", () => {
     const line = requestErrorLine(error, { path: `/o/abc/files/x?token=${jwt}&email=dana@example.com`, method: "POST" }, { routeType: "action" });
     expect(line).not.toContain(jwt.slice(0, 8));
     expect(line).not.toContain("dana@example.com");
-    expect(line).toContain("POST /o/abc/files/x ");
-    expect(line).toContain("route=? type=action");
+    expect(line).toContain('"path":"/o/abc/files/x"');
+    expect(line).toContain('"route":"?","route_type":"action"');
   });
 
   it("copes with an error without a digest, and with a thrown non-error", () => {
-    expect(requestErrorLine(new TypeError("boom"), { path: "/", method: "GET" }, {})).toBe("[error] code=none route=? type=? GET / TypeError: boom");
-    expect(requestErrorLine("text", { path: "/x", method: "GET" }, {})).toBe("[error] code=none route=? type=? GET /x string");
+    expect(record(new TypeError("boom"), { path: "/", method: "GET" }, {})).toMatchObject({ digest: "none", route: "?", route_type: "?", error_name: "TypeError", error: "boom", request_id: null });
+    expect(record("text", { path: "/x", method: "GET" }, {})).toMatchObject({ digest: "none", path: "/x", error_name: "string" });
+    expect(record("text", { path: "/x", method: "GET" }, {})).not.toHaveProperty("error");
   });
 
   it("hides the secret token of every public link's path, and keeps the rest of the path", () => {
@@ -70,7 +95,7 @@ describe("server log line of a request error", () => {
       expect(redactPublicPath(path), path).toBe(shown);
       const line = requestErrorLine(new Error("boom"), { path: `${path}?utm_source=qr`, method: "GET" }, {});
       expect(line, path).not.toContain(t);
-      expect(line, path).toContain(`GET ${shown} `);
+      expect(line, path).toContain(`"path":"${shown}"`);
     }
   });
 

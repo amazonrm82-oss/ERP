@@ -8,6 +8,7 @@ import { sessionCheck } from "@/lib/auth";
 import { SUPPORT_LINE } from "@/lib/support";
 import { isUuid } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
+import { serverLog } from "@/lib/log-server";
 
 type Context = { params: Promise<{ orgId: string; fileId: string }> };
 
@@ -61,7 +62,7 @@ export async function GET(request: NextRequest, { params }: Context) {
     const bytes = new Uint8Array(await object.data.arrayBuffer());
     if (!matchesFingerprint(bytes, file.sha256)) {
       // review M1: reported and logged, never replaced automatically
-      console.error(`[${file.order_id ? "ORD-05" : "QUO-06"}] stored PDF failed its SHA-256 check: org ${orgId}, file ${fileId}`);
+      await serverLog("error", "files.pdf_fingerprint_mismatch", { kind: file.order_id ? "order" : "quote", org_id: orgId, file_id: fileId });
       return new NextResponse(`${file.order_id ? DAMAGED_ORDER_PDF_MESSAGE : DAMAGED_PDF_MESSAGE} (${SUPPORT_LINE}).`, {
         status: 409,
         headers: { "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8" },

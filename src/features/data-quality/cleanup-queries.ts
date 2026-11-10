@@ -3,6 +3,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 
 import { CLEANUP_LIST_LIMIT, cleanupLoadMessage, cleanupSchema, type CleanupAnswer } from "./cleanup";
+import { serverLog } from "@/lib/log-server";
 
 export type CleanupRead = { ok: true; answer: CleanupAnswer } | { ok: false; message: string };
 
@@ -15,12 +16,12 @@ export async function getCleanupSuggestions(orgId: string, limit = CLEANUP_LIST_
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("cleanup_suggestions", { p_org: orgId, p_limit: limit });
   if (error) {
-    console.error(`cleanup suggestions failed: ${error.code ?? "unknown"}`);
+    await serverLog("error", "cleanup_suggestions.read_failed", { org_id: orgId, code: error.code ?? "unknown" });
     return { ok: false, message: cleanupLoadMessage(error) };
   }
   const parsed = cleanupSchema.safeParse(data);
   if (!parsed.success) {
-    console.error("cleanup suggestions: unexpected shape");
+    await serverLog("error", "cleanup_suggestions.shape", { org_id: orgId });
     return { ok: false, message: cleanupLoadMessage(null) };
   }
   return { ok: true, answer: parsed.data };

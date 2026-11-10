@@ -11,6 +11,7 @@ import { parseCondition } from "./conditions";
 import { parseOptionColors } from "./status-colors";
 import { parseFieldUsage } from "./usage";
 import { isFieldType, isLinkTarget, type FieldDefinition, type FieldObject } from "./types";
+import { serverLog } from "@/lib/log-server";
 
 /** Custom field definitions of one object type, in order. Active ones only unless asked. */
 export async function listFieldDefinitions(
@@ -75,7 +76,7 @@ export async function getFieldUsage(orgId: string, objectType: FieldObject): Pro
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("custom_field_usage", { p_org: orgId, p_object: objectType });
   if (error) {
-    console.error(`custom field usage read failed: ${error.code ?? ""}`);
+    await serverLog("error", "custom_fields.usage_read_failed", { org_id: orgId, code: error.code });
     return null;
   }
   return parseFieldUsage(data);

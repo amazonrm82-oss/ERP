@@ -1,3 +1,5 @@
+import { logEvent } from "@/lib/log";
+
 import { redactJobError, type ClaimedJob, type JobRegistry, parseClaimed, type ProviderReceipt } from "./registry";
 
 /** What public.finish_job answered; null when the call itself failed. */
@@ -18,10 +20,11 @@ export type QueueCalls = {
  */
 export type RunSummary = { claimed: number; done: number; failed: number; ended: number; released: number; unconfirmed: number };
 
-/** One redacted line: the job id and the answer only, never the payload or an error text. */
-export type RunLog = (line: string) => void;
+/** One redacted line (OPS-06 structured): what, the job id, kind, business and the answer only, never the payload or an error text. */
+export type RunLogEntry = { what: string; job_id: string; kind: string; org_id: string; answer: string };
+export type RunLog = (entry: RunLogEntry) => void;
 
-const defaultLog: RunLog = (line) => console.error(line);
+const defaultLog: RunLog = (entry) => logEvent("error", "jobs.finish_not_recorded", entry);
 
 /**
  * Claims batches of the registered kinds and runs each job's handler, one job at a time, until the queue is empty or the
@@ -58,7 +61,7 @@ export async function runJobs(
     }
     if (!expected.includes(answer)) {
       summary.unconfirmed += 1;
-      log(`[jobs] ${what} not recorded: job ${job.id} kind ${job.kind} answer ${answer ?? "error"}`);
+      log({ what, job_id: job.id, kind: job.kind, org_id: job.organization_id, answer: answer ?? "error" });
     }
   };
 
@@ -77,7 +80,7 @@ export async function runJobs(
             answer = null;
           }
           if (answer === "released") summary.released += 1;
-          else log(`[jobs] hand-back not recorded: job ${left.id} kind ${left.kind} answer ${answer ?? "error"}`);
+          else log({ what: "hand-back", job_id: left.id, kind: left.kind, org_id: left.organization_id, answer: answer ?? "error" });
         }
         return summary;
       }
@@ -91,7 +94,7 @@ export async function runJobs(
         const outcome = await handler(job);
         if (outcome.status === "done") {
           summary.done += 1;
-          await report(job, true, null, false, ["done"], "success after the work was done", outcome.receipt);
+          await report(job, true, null, false, ["done"], "success", outcome.receipt);
         } else if (outcome.status === "failed") {
           summary.failed += 1;
           await report(job, false, redactJobError(outcome.error), outcome.final === true, ["failed", "dead"], "failure", outcome.receipt);
@@ -107,7 +110,7 @@ export async function runJobs(
           if (answer === "released") summary.released += 1;
           else {
             summary.unconfirmed += 1;
-            log(`[jobs] hand-back not recorded: job ${job.id} kind ${job.kind} answer ${answer ?? "error"}`);
+            log({ what: "hand-back", job_id: job.id, kind: job.kind, org_id: job.organization_id, answer: answer ?? "error" });
           }
         } else {
           summary.ended += 1;

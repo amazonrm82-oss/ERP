@@ -30,6 +30,7 @@ import {
 import { signaturePng } from "./signed-pdf";
 import { storeSignedQuotePdfForCustomer } from "./signed-pdf-server";
 import { markNotFound } from "@/lib/public-not-found";
+import { serverLog } from "@/lib/log-server";
 
 // QUO-08: the customer's page of a sent quote, in the approved pattern for secret-link pages (owner, 8 October 2026;
 // CLAUDE.md hard rule 5): the server reads only through public.quote_public() (security definer, service_role only),
@@ -85,7 +86,7 @@ export async function getPublicQuoteFingerprint(token: string, shownNumber: stri
   if (!service) return null;
   const { data, error } = await service.rpc("quote_public_version", { p_token: token });
   if (error) {
-    if (error.code !== "P0002") console.error("quote_public_version failed", error.code, error.message);
+    if (error.code !== "P0002") await serverLog("error", "quote_public.version_failed", { code: error.code, error: error.message });
     return null;
   }
   return publicVersionFingerprint(data, shownNumber);
@@ -101,7 +102,7 @@ export async function getPublicQuotePdfAsSent(token: string, shownNumber: string
   if (!service) return false;
   const { data, error } = await service.rpc("quote_public_version", { p_token: token });
   if (error) {
-    if (error.code !== "P0002") console.error("quote_public_version failed", error.code, error.message);
+    if (error.code !== "P0002") await serverLog("error", "quote_public.version_failed", { code: error.code, error: error.message });
     return false;
   }
   return publicVersionPdfAsSent(data, shownNumber);
@@ -160,7 +161,7 @@ export async function handleQuoteDecision(request: Request, token: string): Prom
   });
   if (error) {
     if (error.code === "P0002") return markNotFound(reply(404, { ok: false, message: NOT_FOUND }));
-    console.error("quote_public_answer failed", error.code, error.message);
+    await serverLog("error", "quote_public.answer_failed", { code: error.code, error: error.message });
     return reply(500, { ok: false, message: "משהו השתבש. נסו שוב בעוד רגע." });
   }
   const status = (data as { status?: unknown } | null)?.status;
@@ -210,7 +211,7 @@ export async function handleQuoteQuestion(request: Request, token: string): Prom
   });
   if (error) {
     if (error.code === "P0002") return markNotFound(questionReply(404, { ok: false, message: NOT_FOUND }));
-    console.error("quote_public_question failed", error.code, error.message);
+    await serverLog("error", "quote_public.question_failed", { code: error.code, error: error.message });
     return questionReply(500, { ok: false, message: "משהו השתבש. נסו שוב בעוד רגע." });
   }
   const status = (data as { status?: unknown } | null)?.status;

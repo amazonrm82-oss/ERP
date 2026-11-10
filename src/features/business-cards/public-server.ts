@@ -9,6 +9,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { buildVCard, vcardDisposition } from "@/lib/vcard";
 
 import { publicCardFrom, type PublicCard } from "./public";
+import { serverLog } from "@/lib/log-server";
 
 // BIZ-02: the public business card, in the approved pattern for secret-link pages (owner, 13 October 2026; hard
 // rule 5): the server reads only through public.business_card_public() and sends the form only through
@@ -100,7 +101,7 @@ export async function handleCardSubmit(request: Request, token: string): Promise
     if (error.code === "P0002") return json(404, { ok: false, message: MESSAGES.notFound });
     if (error.hint === "rate_limited") return rateLimitedJson({ ok: false, message: MESSAGES.rateLimited });
     if (error.code === "22023") return json(400, { ok: false, message: /email/i.test(error.message) ? MESSAGES.email : MESSAGES.missing });
-    console.error("business_card_submit failed", error.code, error.message);
+    await serverLog("error", "business_card.submit_failed", { code: error.code, error: error.message });
     return json(500, { ok: false, message: MESSAGES.error });
   }
   // spam is answered like the rest

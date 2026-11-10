@@ -1,9 +1,11 @@
-import { redactLogText } from "@/lib/auth-transient";
+import type { LogFields } from "@/lib/log";
+import { redactLogText } from "@/lib/log-redact";
+import { requestIdOf } from "@/lib/request-id";
 
 // FXC-13: one server log line per error Next.js captures, keyed by the same digest the error screen shows as
 // "קוד שגיאה לתמיכה". Only what helps find the cause: the digest, the route, the kind of request, the method, the path
-// without its query (a query can carry a token or personal details), and the error's name and redacted message.
-// Never headers, cookies or the body.
+// without its query (a query can carry a token or personal details), the error's name and redacted message, and (OPS-06)
+// the request id. Never other headers, cookies or the body.
 
 // Public secret-link pages and routes carry their token in the path (CLAUDE.md hard rule 5): the segment after one of
 // these prefixes is a secret, and the log shows "[token]" instead. Longest prefixes first. Every other path stays
@@ -56,22 +58,31 @@ export function redactPublicPath(path: string): string {
   return path;
 }
 
-export type RequestErrorInfo = { path: string; method: string };
+export type RequestErrorInfo = { path: string; method: string; headers?: Record<string, string | string[] | undefined> };
 export type RequestErrorContext = { routePath?: string; routeType?: string; renderSource?: string };
 
-export function requestErrorLine(error: unknown, request: RequestErrorInfo, context: RequestErrorContext): string {
+/**
+ * The fields of the structured line (OPS-06, src/lib/log.ts) for a captured error: the digest the user sees as the
+ * support code, the route, the kind of request, the method, the path without its query and with a public link's token
+ * hidden, the error's name and redacted message, and the request id the proxy set. Nothing else of the request.
+ */
+export function requestErrorFields(error: unknown, request: RequestErrorInfo, context: RequestErrorContext): LogFields {
   const digest =
     typeof error === "object" && error !== null && "digest" in error && typeof (error as { digest: unknown }).digest === "string"
       ? (error as { digest: string }).digest
       : "none";
-  const name = error instanceof Error ? error.name : typeof error;
-  const message = error instanceof Error ? redactLogText(error.message).slice(0, 300) : "";
-  const path = redactPublicPath(request.path.split("?")[0]).slice(0, 200);
-  return [
-    `[error] code=${digest}`,
-    `route=${context.routePath ?? "?"}`,
-    `type=${context.routeType ?? "?"}${context.renderSource ? `/${context.renderSource}` : ""}`,
-    `${request.method} ${path}`,
-    `${name}${message ? `: ${message}` : ""}`,
-  ].join(" ");
+  const header = (name: string) => {
+    const value = request.headers?.[name];
+    return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
+  };
+  return {
+    request_id: requestIdOf({ get: header }),
+    digest,
+    route: context.routePath ?? "?",
+    route_type: `${context.routeType ?? "?"}${context.renderSource ? `/${context.renderSource}` : ""}`,
+    method: request.method,
+    path: request.path,
+    error_name: error instanceof Error ? error.name : typeof error,
+    error: error instanceof Error ? redactLogText(error.message) : undefined,
+  };
 }

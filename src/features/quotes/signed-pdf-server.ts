@@ -11,6 +11,7 @@ import type { QuoteDocumentData } from "./design-server";
 import { isQuotePdfPath, sha256Hex } from "./pdf-fingerprint";
 import { publicQuoteFrom, QUOTE_LINK_TOKEN } from "./public";
 import { quoteSignedPdfDocument, readSignature, signedPdfBillingFrom, signedQuotePdfFileName, type QuoteSignature } from "./signed-pdf";
+import { serverLog } from "@/lib/log-server";
 
 // QUO-09 signed PDF (owner, 1 November 2026, answers (3) א and (33) ב; CLAUDE.md hard rule 5, QUO-06's pattern): the server
 // alone writes an accepted quote's signed PDF, with the service key, through two service_role functions and nothing else:
@@ -100,7 +101,7 @@ export async function storeSignedQuotePdfForCustomer(token: string): Promise<voi
     if (!service) return;
     const { data, error } = await service.rpc("quote_signed_pdf_public", { p_token: token });
     if (error) {
-      console.error("QUO-09 signed PDF: the source read failed", error.code);
+      await serverLog("error", "quote_signed_pdf.source_read_failed", { code: error.code });
       return;
     }
     const raw = data as Record<string, unknown> | null;
@@ -109,12 +110,12 @@ export async function storeSignedQuotePdfForCustomer(token: string): Promise<voi
     const read = readSignature(raw.signature);
     if ("problem" in read) {
       // one line with the reason code (shape|format|header|size|data), never the token or the signature
-      console.error("QUO-09 signed PDF: the stored signature was refused", read.problem);
+      await serverLog("error", "quote_signed_pdf.signature_refused", { reason: read.problem });
       return;
     }
     const signature = read.signature;
     if (!page || page.quote.status !== "accepted") {
-      console.error("QUO-09 signed PDF: the source had another shape");
+      await serverLog("error", "quote_signed_pdf.source_shape");
       return;
     }
     // owner (38) ב: the customer's own billing details, as the PDF as sent prints them
@@ -138,8 +139,8 @@ export async function storeSignedQuotePdfForCustomer(token: string): Promise<voi
       p_fingerprint: signature.fingerprint,
     };
     const stored = await writeThrough(async (path) => service.rpc("quote_signed_pdf_public_store", { ...args, p_path: path }), bytes, null);
-    if (!stored.ok) console.error("QUO-09 signed PDF: not stored", stored.busy ? "busy" : "failed");
+    if (!stored.ok) await serverLog("error", "quote_signed_pdf.not_stored", { answer: stored.busy ? "busy" : "failed" });
   } catch (err) {
-    console.error("QUO-09 signed PDF: failed", err instanceof Error ? err.name : "error");
+    await serverLog("error", "quote_signed_pdf.failed", { error_name: err instanceof Error ? err.name : "error" });
   }
 }

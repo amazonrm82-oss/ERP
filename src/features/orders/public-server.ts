@@ -7,6 +7,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 import { ORDER_ACCEPT_WORDING_VERSION, ORDER_LINK_TOKEN, publicOrderFrom, statusOrderFrom, type PublicOrder, type StatusPublicOrder } from "./public";
 import { markNotFound } from "@/lib/public-not-found";
+import { serverLog } from "@/lib/log-server";
 
 // ORD-05 (owner, 20 October 2026): the customer's page of a numbered order, in the approved pattern for secret-link pages
 // (CLAUDE.md hard rule 5): the server reads only through public.order_public() and decides only through
@@ -86,7 +87,7 @@ export async function handleOrderDecision(request: Request, token: string): Prom
   });
   if (error) {
     if (error.code === "P0002") return markNotFound(reply(404, { ok: false, message: NOT_FOUND }));
-    console.error("order_public_decide failed", error.code, error.message);
+    await serverLog("error", "order_public.decide_failed", { code: error.code, error: error.message });
     return reply(500, { ok: false, message: "משהו השתבש. נסו שוב בעוד רגע." });
   }
   const status = (data as { status?: unknown } | null)?.status;

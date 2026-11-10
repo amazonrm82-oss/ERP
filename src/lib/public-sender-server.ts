@@ -7,6 +7,7 @@ import { clientIp, keyedIpHash } from "@/lib/keyed-ip-hash";
 import { isMarkedNotFound } from "@/lib/public-not-found";
 import { RATE_LIMITED_TEXT, rateLimitedJson, rateLimitedText } from "@/lib/public-rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
+import { serverLog } from "@/lib/log-server";
 
 // OPS-02, owner's answers (40) ב and (42) ד (2 November 2026): the secret-link pages (quote, order, statement, the personal
 // booking-manage link) and their routes share ONE limit per sender against guessing links: 120 "not found" answers in 10
@@ -31,7 +32,7 @@ export async function publicSenderAllowed(requestHeaders: Headers): Promise<bool
   if (!service) return true;
   const { data, error } = await service.rpc("public_sender_check", { p_sender: sender });
   if (error) {
-    console.error("[OPS-02] public_sender_check failed", error.code);
+    await serverLog("error", "public_sender.check_failed", { code: error.code });
     return true;
   }
   return data !== false;
@@ -44,7 +45,7 @@ export async function recordPublicMiss(requestHeaders: Headers): Promise<void> {
   const service = createServiceClient();
   if (!service) return;
   const { error } = await service.rpc("public_sender_miss", { p_sender: sender });
-  if (error) console.error("[OPS-02] public_sender_miss failed", error.code);
+  if (error) await serverLog("error", "public_sender.miss_failed", { code: error.code });
 }
 
 /**

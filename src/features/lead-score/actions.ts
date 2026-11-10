@@ -12,6 +12,7 @@ import type { createClient } from "@/lib/supabase/server";
 import { leadScoreSettingsPath } from "./paths";
 import { getScoreLookups } from "./queries";
 import { parseRule } from "./rules";
+import { serverLog } from "@/lib/log-server";
 
 // LEAD-05: owners and admins manage the score rules; RLS refuses everyone else (0 rows / 42501).
 // After a change the scores are recomputed: one batch at once (a small business sees them right
@@ -23,7 +24,7 @@ async function recomputeNow(supabase: Supabase, orgId: string) {
   // a failure here is not the user's problem: the background job does the same within a minute
   const { error } = await supabase.rpc("lead_scores_refresh", { p_org: orgId });
   if (error) {
-    console.error("lead score recompute failed", error.message);
+    await serverLog("error", "lead_score.recompute_failed", { code: error.code, error: error.message });
   }
 }
 

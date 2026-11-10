@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createHmac } from "node:crypto";
+import { logEvent } from "@/lib/log";
 
 // FXS-11 (owner, 13 October 2026): a public page keeps a sender's IP only as a keyed hash, made with the server's
 // secret INTAKE_IP_HASH_SECRET, and only for its rate-limit window (the database clears it: crm-form-ip-hashes,
@@ -30,7 +31,8 @@ export function keyedIpHash(ip: string | null, scope: IpHashScope, ...parts: str
     // once per scope and process, so a busy page does not flood the log
     if (!missingLogged.has(scope)) {
       missingLogged.add(scope);
-      console.error(`[FXS-11 ${scope}] INTAKE_IP_HASH_SECRET is not set: no IP hash kept, only the per-page rate limits apply`);
+      // no IP hash kept, only the per-page rate limits apply (a sync helper, once per process: no request id)
+      logEvent("error", "ip_hash.secret_missing", { scope, reason: "INTAKE_IP_HASH_SECRET_not_set" });
     }
     return null;
   }

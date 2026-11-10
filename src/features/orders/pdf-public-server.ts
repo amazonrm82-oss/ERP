@@ -8,6 +8,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 import { ORDER_LINK_TOKEN } from "./public";
 import { markNotFound } from "@/lib/public-not-found";
+import { serverLog } from "@/lib/log-server";
 
 // ORD-05 PDF (owner, 1 November 2026, answer (1) ב; CLAUDE.md hard rule 5, QUO-06's pattern): the customer downloads the
 // stored PDF of the order their link opens. The route calls only public.order_public_pdf (security definer, service_role
@@ -32,7 +33,7 @@ export async function handleOrderPdfDownload(request: Request, token: string): P
   });
   if (error) {
     if (error.code === "P0002") return markNotFound(text(404, NOT_FOUND));
-    console.error("order_public_pdf failed", error.code, error.message);
+    await serverLog("error", "order_public.pdf_failed", { code: error.code, error: error.message });
     return text(500, "משהו השתבש. נסו שוב בעוד רגע.");
   }
   const answer = publicPdfAnswerFrom(data);
@@ -45,7 +46,7 @@ export async function handleOrderPdfDownload(request: Request, token: string): P
   const bytes = new Uint8Array(await object.data.arrayBuffer());
   if (!matchesFingerprint(bytes, answer.sha256)) {
     // never the token in the log; never replaced automatically (QUO-06 review M1)
-    console.error(`[ORD-05] stored order PDF failed its SHA-256 check on the customer's link: ${answer.path}`);
+    await serverLog("error", "order_public.pdf_fingerprint_mismatch", { object_path: answer.path });
     return text(409, UNAVAILABLE);
   }
   return new Response(bytes, { status: 200, headers: { ...pdfHeaders(answer.name, bytes.length), "X-Robots-Tag": "noindex" } });

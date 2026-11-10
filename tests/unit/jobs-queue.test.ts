@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { runJobsRoute } from "@/features/jobs/run-server";
 import { createRegistry, JOB_KINDS, parseClaimed, redactJobError, type ClaimedJob, type JobHandler } from "@/features/jobs/registry";
-import { runJobs, type FinishAnswer, type QueueCalls } from "@/features/jobs/runner";
+import { runJobs, type FinishAnswer, type QueueCalls, type RunLogEntry } from "@/features/jobs/runner";
 import { clearFakeSentMessages, createFakeProvider, FAKE_SENT_KEPT, fakeSentMessages } from "@/features/messaging/providers/fake";
 import { messagingProvider } from "@/features/messaging/providers/select";
 import { createSendHandler } from "@/features/messaging/send-handler";
@@ -160,7 +160,7 @@ describe("OPS-04: the runner", () => {
   };
   const quiet = () => {
     const lines: string[] = [];
-    return { lines, log: (line: string) => lines.push(line) };
+    return { lines, log: (entry: RunLogEntry) => void lines.push(JSON.stringify(entry)) };
   };
 
   it("claims nothing when no kind is ready", async () => {
@@ -219,8 +219,8 @@ describe("OPS-04: the runner", () => {
       const summary = await runJobs(queue, createRegistry({ "message.send": handler }), { log });
       expect(summary).toMatchObject({ done: 1, unconfirmed: 1 });
       expect(lines).toHaveLength(1);
-      expect(lines[0]).toContain("job a");
-      expect(lines[0]).toContain(answer === "stale" ? "answer stale" : "answer error");
+      expect(lines[0]).toContain('"job_id":"a"');
+      expect(lines[0]).toContain(answer === "stale" ? '"answer":"stale"' : '"answer":"error"');
       expect(lines[0]).not.toMatch(/dani|example|lead_id|channel/);
     }
   });

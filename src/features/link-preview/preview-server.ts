@@ -4,6 +4,7 @@ import { keyedIpHash } from "@/lib/keyed-ip-hash";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { botPreviewFrom, type BotPreviewState, type PreviewKind } from "./bot-preview";
+import { serverLog } from "@/lib/log-server";
 
 // WAB-05 follow-up (owner, 27 October 2026, answer (1) ב; CLAUDE.md hard rule 5): the preview a messaging app's fetcher gets
 // for a customer page, in the approved pattern for secret-link pages. The server calls ONLY public.link_preview_public()
@@ -26,7 +27,7 @@ export async function getBotPreview(kind: PreviewKind, token: string, ip: string
   });
   if (error) {
     // a preview is never worth an error page: log one redacted line and answer the generic preview
-    console.error(`[WAB-05 preview] link_preview_public failed: ${error.code ?? "?"}`);
+    await serverLog("error", "link_preview.read_failed", { code: error.code ?? "?" });
     return "not-configured";
   }
   return botPreviewFrom(data);

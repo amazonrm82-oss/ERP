@@ -11,6 +11,7 @@ import {
   type Subprocessor,
 } from "@/features/platform/subprocessors";
 import { createServiceClient } from "@/lib/supabase/service";
+import { logEvent } from "@/lib/log";
 
 /**
  * ADM-01 (owner, 26 October 2026, answer (ב)): the public subprocessors page reads the live list with the service key,
@@ -34,5 +35,6 @@ const readCached = unstable_cache(
 /** The live list, or null when it cannot be read (the page then shows the static list of the legal version). */
 // a failure is logged once per back-off window (a missing service key shows up in the logs), never with a secret or a body
 export const readPublicSubprocessors = withBackoff(readCached, PUBLIC_READ_BACKOFF_MS, Date.now, (error) => {
-  console.error(publicReadFailureLine(error));
+  // logEvent, not serverLog: the page may be prerendered, where reading the request headers is not allowed
+  logEvent("error", "subprocessors.read_failed", { details: publicReadFailureLine(error) });
 });

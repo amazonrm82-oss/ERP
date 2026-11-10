@@ -11,6 +11,8 @@ type Props = { error: Error & { digest?: string }; retry: () => void };
 export function ErrorState({ error, retry }: Props) {
   const unavailable = isAuthUnavailableDigest(error.digest);
   useEffect(() => {
+    // browser code: the error goes to the browser's console, never to the server log (OPS-06)
+    // eslint-disable-next-line no-console, no-restricted-globals
     console.error(error);
   }, [error]);
 

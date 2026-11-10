@@ -28,6 +28,7 @@ import {
   type SkippedBlocks,
 } from "./blocks";
 import { calendarPath } from "./range";
+import { serverLog } from "@/lib/log-server";
 
 // GAP-07: blocking time in the calendar, with the user's session; RLS and the meetings rules decide (0 rows = not
 // permitted or gone). A block belongs to the person who makes it. A weekly series of blocks (owner, 18 October 2026)
@@ -66,7 +67,7 @@ async function restDaysOf(supabase: Client, orgId: string, spans: SeriesSpan[], 
     .eq("organization_id", orgId)
     .maybeSingle();
   if (error) {
-    console.error("[GAP-07 block series] rest-day check skipped, a read failed:", error.code, error.message);
+    await serverLog("warn", "calendar.block_rest_day_check_skipped", { code: error.code, error: error.message });
     return [];
   }
   return blockRestDays(spans, calendarSettingsFromRow(data), zone);

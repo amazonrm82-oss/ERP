@@ -7,6 +7,7 @@ import { isTimeZone, readWorkingHours } from "@/features/profile/working-hours";
 import type { Database } from "@/lib/database.types";
 
 import { conflictReport, mergeConflictReports, type ConflictPerson, type ConflictReport, type Span } from "./conflicts";
+import { serverLog } from "@/lib/log-server";
 
 type Client = SupabaseClient<Database>;
 
@@ -57,7 +58,7 @@ export async function meetingConflicts(supabase: Client, orgId: string, { span, 
       .eq("id", typeId)
       .maybeSingle();
     if (error) {
-      console.error("[CAL-05 meeting conflicts] check skipped, a read failed:", error.code, error.message);
+      await serverLog("warn", "meetings.conflict_check_skipped", { org_id: orgId, code: error.code, error: error.message });
       return null;
     }
     before ??= type?.buffer_before_minutes ?? 0;
@@ -73,7 +74,7 @@ export async function meetingConflicts(supabase: Client, orgId: string, { span, 
   // advisory: a check that cannot be made must not block the save, but it must show in the logs
   const readError = busyRead.error ?? profilesRead.error ?? settingsRead.error;
   if (readError) {
-    console.error("[CAL-05 meeting conflicts] check skipped, a read failed:", readError.code, readError.message);
+    await serverLog("warn", "meetings.conflict_check_skipped", { org_id: orgId, code: readError.code, error: readError.message });
     return null;
   }
 

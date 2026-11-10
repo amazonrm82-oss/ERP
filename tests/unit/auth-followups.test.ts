@@ -40,6 +40,13 @@ describe("the second-step screen's session check", () => {
   });
 });
 
+/** A structured line without its time. */
+const fields = (line: string): Record<string, unknown> => {
+  const rest = { ...JSON.parse(line) as Record<string, unknown> };
+  delete rest.time;
+  return rest;
+};
+
 describe("a session check that throws is logged, without cookies or tokens", () => {
   let logged: string[];
   beforeEach(() => {
@@ -58,9 +65,10 @@ describe("a session check that throws is logged, without cookies or tokens", () 
   it("the helper writes the tag, the error's name and message", () => {
     logSessionCheckThrow("proxy", new TypeError("boom"));
     logSessionCheckThrow("readSession", "not an error");
-    expect(logged).toEqual([
-      "[auth:proxy] session check threw; treated as unavailable: TypeError: boom",
-      "[auth:readSession] session check threw; treated as unavailable: string",
+    // OPS-06: one structured line each
+    expect(logged.map(fields)).toEqual([
+      { level: "error", event: "auth.session_check_threw", request_id: null, where: "proxy", error_name: "TypeError", error: "boom" },
+      { level: "error", event: "auth.session_check_threw", request_id: null, where: "readSession", error_name: "string" },
     ]);
   });
 
@@ -82,8 +90,8 @@ describe("a session check that throws is logged, without cookies or tokens", () 
       expect(line).not.toContain(jwt.slice(0, 8));
       for (const part of jwt.split(".")) expect(line).not.toContain(part.slice(0, 12));
     }
-    expect(logged[0]).toMatch(/^\[auth:proxy\] session check threw; treated as unavailable: SyntaxError: /);
-    expect(logged[1]).toBe("[auth:readSession] session check threw; treated as unavailable: Error: refresh failed for token [redacted] at /auth/v1/token");
+    expect(fields(logged[0])).toMatchObject({ event: "auth.session_check_threw", where: "proxy", error_name: "SyntaxError" });
+    expect(fields(logged[1])).toMatchObject({ where: "readSession", error_name: "Error", error: "refresh failed for token [redacted] at /auth/v1/token" });
     // ordinary words and short values stay readable
     expect(redactLogText('Unexpected token "x" at position 3')).toBe('Unexpected token "…" at position 3');
     expect(redactLogText("fetch failed: ECONNRESET")).toBe("fetch failed: ECONNRESET");
@@ -94,8 +102,7 @@ describe("a session check that throws is logged, without cookies or tokens", () 
     const { sessionCheck } = await import("@/lib/auth");
     expect(await sessionCheck()).toMatchObject({ ok: false, unavailable: true });
     expect(logged).toHaveLength(1);
-    expect(logged[0]).toContain("[auth:readSession]");
-    expect(logged[0]).toContain("TypeError: Cannot read properties of undefined");
+    expect(fields(logged[0])).toMatchObject({ where: "readSession", error_name: "TypeError", error: "Cannot read properties of undefined" });
     expect(logged.join("\n")).not.toContain(SECRET);
   });
 
@@ -108,7 +115,9 @@ describe("a session check that throws is logged, without cookies or tokens", () 
     const response = await updateSession(request);
     expect(response.headers.get("location")).toBeNull();
     expect(logged).toHaveLength(1);
-    expect(logged[0]).toContain("[auth:proxy]");
+    // the line carries the request id the proxy gave this request
+    expect(fields(logged[0])).toMatchObject({ where: "proxy", error_name: "TypeError", error: "fetch failed" });
+    expect(fields(logged[0]).request_id).toMatch(/^[0-9a-f-]{36}$/);
     expect(logged.join("\n")).not.toContain(SECRET);
   });
 

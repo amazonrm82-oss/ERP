@@ -10,6 +10,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { bookingManageFrom, confirmationFrom, MANAGE_TOKEN, publicBookingFrom, type BookingManage, type PublicBooking } from "./public";
 import { BOOKING_ANSWER_MAX } from "./schema";
 import { markNotFound } from "@/lib/public-not-found";
+import { serverLog } from "@/lib/log-server";
 
 // CAL-10: the public booking page, in the approved pattern for secret-link pages (owner, 8 October 2026; hard rule 5):
 // the server reads and books only through public.booking_page_public() / public.booking_submit() (security definer,
@@ -132,7 +133,7 @@ export async function handleBooking(request: Request, token: string): Promise<Re
     if (error.hint === "booking:unavailable") return json(403, { ok: false, message: MESSAGES.unavailable });
     const fieldError = error.hint ? FIELD_ERRORS[error.hint] : undefined;
     if (fieldError) return json(400, { ok: false, message: fieldError.message, field: fieldError.field });
-    console.error("booking_submit failed", error.code, error.message);
+    await serverLog("error", "booking.submit_failed", { code: error.code, error: error.message });
     return json(500, { ok: false, message: MESSAGES.error });
   }
   // a time taken meanwhile, or one the page never offered, is answered (not raised) so the attempt stays counted
@@ -220,7 +221,7 @@ export async function handleBookingManage(request: Request, token: string): Prom
     if (error.hint === "booking:too_late") return manageJson(409, { ok: false, message: MESSAGES.tooLate, tooLate: true });
     if (error.hint === "booking:confirm_closed") return manageJson(409, { ok: false, message: MESSAGES.confirmClosed });
     if (error.hint === "booking:unavailable") return manageJson(403, { ok: false, message: MESSAGES.unavailable });
-    console.error("booking_manage failed", error.code, error.message);
+    await serverLog("error", "booking.manage_failed", { code: error.code, error: error.message });
     return manageJson(500, { ok: false, message: MESSAGES.error });
   }
   const status = data && typeof data === "object" && !Array.isArray(data) ? (data as { status?: unknown }).status : null;
@@ -229,7 +230,7 @@ export async function handleBookingManage(request: Request, token: string): Prom
   if (status === "slot_taken" || status === "invalid_time") return manageJson(409, { ok: false, message: MESSAGES.slotTaken, slotTaken: true });
   const confirmation = confirmationFrom(data);
   if (!confirmation) {
-    console.error("booking_manage_change answered without a booking");
+    await serverLog("error", "booking.manage_change_no_booking");
     return manageJson(500, { ok: false, message: MESSAGES.error });
   }
   return manageJson(200, { ok: true, confirmation });

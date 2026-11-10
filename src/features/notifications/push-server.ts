@@ -7,6 +7,7 @@ import webpush from "web-push";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { pushPayload, type ClaimedNotification } from "./push-payload";
+import { serverLog } from "@/lib/log-server";
 
 /** The settings Web Push needs on the server, or null when any is missing. */
 function pushConfig() {
@@ -87,7 +88,7 @@ export async function dispatchPush(request: Request): Promise<Response> {
             if (status === 404 || status === 410) {
               gone.add(s.id);
             } else {
-              console.error("push send failed", status ?? (err as Error).message);
+              await serverLog("error", "push.send_failed", status ? { status } : { error: (err as Error).message });
             }
           }
         });

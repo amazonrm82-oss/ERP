@@ -6,11 +6,13 @@ import { backgroundJobsReady, createBackgroundTokenSource, createUserClient } fr
 import { AGREEMENT_VERSION } from "@/features/legal/agreement";
 import { createSendHandler } from "@/features/messaging/send-handler";
 import { messagingProviders } from "@/features/messaging/providers/select";
+import { logEvent } from "@/lib/log";
+import { requestIdOf } from "@/lib/request-id";
 import { bearerSecretMatches } from "@/lib/shared-secret";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { createRegistry, type ClaimedJob } from "./registry";
-import { runJobs, type QueueCalls, type RunSummary } from "./runner";
+import { runJobs, type QueueCalls, type RunLog, type RunSummary } from "./runner";
 
 const json = (status: number, body: Record<string, unknown>) =>
   Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -121,12 +123,15 @@ export async function runJobsRoute(request: Request): Promise<Response> {
 
   try {
     const startedAt = Date.now();
-    const messages = await runJobs(calls(undefined, Object.keys(providers)), registry);
+    // OPS-06: the run's lines carry the request id the proxy set
+    const requestId = requestIdOf(request.headers);
+    const log: RunLog = (entry) => logEvent("error", "jobs.finish_not_recorded", { ...entry, request_id: requestId });
+    const messages = await runJobs(calls(undefined, Object.keys(providers)), registry, { log });
     // what the messages left of the run's time; a background job that does not fit waits for the next run
     const left = 50_000 - (Date.now() - startedAt);
     const jobs: RunSummary =
       left > 5_000 && backgroundRegistry.kinds.length > 0
-        ? await runJobs(calls(BACKGROUND_LEASE_SECONDS, undefined), backgroundRegistry, { batch: 1, budgetMs: Math.min(left, BACKGROUND_RUN_BUDGET_MS) })
+        ? await runJobs(calls(BACKGROUND_LEASE_SECONDS, undefined), backgroundRegistry, { batch: 1, budgetMs: Math.min(left, BACKGROUND_RUN_BUDGET_MS), log })
         : { claimed: 0, done: 0, failed: 0, ended: 0, released: 0, unconfirmed: 0 };
     const summary: RunSummary = {
       claimed: messages.claimed + jobs.claimed,

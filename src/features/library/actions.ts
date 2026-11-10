@@ -12,6 +12,7 @@ import { pick } from "@/lib/validation";
 
 import { libraryPath } from "./paths";
 import { LIBRARY_ITEM_FIELDS, libraryCategorySchema, libraryFileItemSchema, libraryLinkSchema } from "./schema";
+import { serverLog } from "@/lib/log-server";
 
 // LIB-01: the content library, with the user's session (RLS decides): owners, admins and managers of a writable business
 // write items and their files; owners and admins manage the categories. A file item's file goes through the one upload
@@ -148,7 +149,7 @@ async function dropUpload(supabase: Extract<Awaited<ReturnType<typeof actionCont
   if (row) {
     const { error: removeError } = await supabase.storage.from(FILES_BUCKET).remove([row.storage_path]);
     // the object stays; the row below still goes, and the orphan cleanup removes the object at night
-    if (removeError) console.error(`[LIB-01] could not remove a refused upload's object: org ${orgId}, file ${fileId}`);
+    if (removeError) await serverLog("error", "library.upload_object_remove_failed", { org_id: orgId, file_id: fileId });
   }
   const { error } = await supabase.from("files").delete().eq("organization_id", orgId).eq("id", fileId);
   return error ? dbErrorMessage(error) : null;

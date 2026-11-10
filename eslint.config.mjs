@@ -139,6 +139,21 @@ const eslintConfig = defineConfig([
     files: serviceKeyAllowList.ignores.filter((file) => file !== BACKGROUND_WORKER),
     rules: { "no-restricted-imports": ["error", { patterns: [tokenSourcePattern] }] },
   },
+  // OPS-06: server code logs only through the structured logger (src/lib/log.ts). A browser file that must write to the
+  // browser's console says so with an eslint-disable comment and its reason.
+  {
+    files: ["src/**/*.ts", "src/**/*.tsx", "src/**/*.js", "src/**/*.mjs"],
+    ignores: ["src/lib/log.ts"],
+    rules: {
+      "no-console": "error",
+      "no-restricted-globals": ["error", { name: "console", message: "Log through src/lib/log.ts (OPS-06)." }],
+      "no-restricted-properties": [
+        "error",
+        { object: "process", property: "stdout", message: "Log through src/lib/log.ts (OPS-06)." },
+        { object: "process", property: "stderr", message: "Log through src/lib/log.ts (OPS-06)." },
+      ],
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

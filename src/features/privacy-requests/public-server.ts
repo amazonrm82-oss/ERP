@@ -8,6 +8,7 @@ import { RATE_LIMITED_TEXT, rateLimitedJson } from "@/lib/public-rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { PRIVACY_LINK_TOKEN, privacyPageFrom, publicRequestSchema, type PrivacyPage } from "./model";
+import { serverLog } from "@/lib/log-server";
 
 // PRK-02: the public privacy-request page, in the approved pattern (owner, 26 October 2026, hard rule 5 wave 3 use (3)): the
 // page reads only through public.privacy_request_page() (the business's display name and brand) and the form sends only
@@ -101,7 +102,7 @@ export async function handlePrivacySubmit(request: Request, token: string): Prom
   if (error) {
     if (error.code === "P0002") return json(404, { ok: false, message: MESSAGES.notFound });
     if (error.code === "22023") return json(400, { ok: false, message: MESSAGES.invalid });
-    console.error("privacy_request_submit failed", error.code);
+    await serverLog("error", "privacy_request.submit_failed", { code: error.code });
     return json(500, { ok: false, message: MESSAGES.error });
   }
   if (data && typeof data === "object" && !Array.isArray(data) && (data as { rate_limited?: unknown }).rate_limited === true) {

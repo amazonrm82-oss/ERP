@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import { GOAL_METRIC_KEYS, GOAL_PERIODS, GOAL_SCOPES, type GoalMetric } from "@/features/goals/metrics";
 import { SUPPORT_LINE } from "@/lib/support-phone";
+import { serverLog } from "@/lib/log-server";
 
 const count = z.number().int().nonnegative();
 const amount = z.number();
@@ -700,7 +701,7 @@ export async function withReportShape<T>(run: () => Promise<T>): Promise<{ ok: t
   } catch (error) {
     if (error instanceof ReportShapeError) {
       // paths and issue codes only: no customer values in the log
-      console.error(`report shape mismatch in ${error.report}: ${error.details}`);
+      await serverLog("error", "report.shape_mismatch", { report: error.report, details: error.details });
       return { ok: false, message: error.message };
     }
     throw error;
