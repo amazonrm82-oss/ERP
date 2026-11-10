@@ -7,8 +7,9 @@ import { dbErrorMessage } from "@/lib/errors";
 import { zonedIso } from "@/lib/format";
 
 import { CUSTOM_PREFIX } from "./fields";
-import { companyFound, findCompanies, findDeals, findPeople, LinkLookupFailed, linkMessage, loadOwners, orgTimeZone, ownerOf, personLookupKey, type Found, type Owners } from "./link-lookups";
+import { companyFound, findCompanies, findDeals, findPeople, LinkLookupFailed, linkMessage, loadOwners, orgTimeZone, ownerMatch, personLookupKey, type Found, type Owners } from "./link-lookups";
 import type { RowOutcome } from "./server";
+import { OWNER_LEFT_EMPTY } from "./list-names";
 import { DEFAULT_DUE_TIME, parseTaskRow, type ParsedTaskRow } from "./task-rows";
 
 // IMP-03: importing tasks. Writes with the user's session; tasks have column-level grants (TASK-04)
@@ -39,7 +40,9 @@ export async function loadTaskLookups(ctx: TaskImportContext): Promise<TaskLooku
   }
 }
 
-type Prepared = { row: number; parsed: ParsedTaskRow; values: Omit<TaskInsert, "organization_id"> };
+type Prepared = { row: number; parsed: ParsedTaskRow; values: Omit<TaskInsert, "organization_id">; warning: string | null };
+
+const withNote = (row: Prepared, status: "ok" | "created"): RowOutcome => (row.warning ? { row: row.row, status, warning: row.warning } : { row: row.row, status });
 
 function rawCells(mapping: string[], cells: string[]): Record<string, string> {
   const raw: Record<string, string> = {};
@@ -57,12 +60,14 @@ function prepare(ctx: TaskImportContext, look: TaskLookups, cells: string[], row
   const values: Omit<TaskInsert, "organization_id"> = { ...parsed.values };
   // the due time is the business's wall clock (as in the task form)
   if (parsed.dueDate) values.due_at = zonedIso(parsed.dueDate, `${parsed.dueTime ?? DEFAULT_DUE_TIME}:00`, look.timeZone);
+  // CHN-05 (245) ג: an owner who is not one active member is left empty with a note; the row is still imported
+  let warning: string | null = null;
   if (parsed.owner) {
-    const owner = ownerOf(look.owners, parsed.owner);
-    if (!owner.ok) return owner.message;
-    values.owner_id = owner.id;
+    const owner = ownerMatch(look.owners, parsed.owner);
+    if (typeof owner === "string") warning = OWNER_LEFT_EMPTY(parsed.owner, owner === "ambiguous");
+    else values.owner_id = owner.id;
   }
-  return { row, parsed, values };
+  return { row, parsed, values, warning };
 }
 
 /** Validates and writes one chunk. With jobId null it is a dry run (the preview): nothing is written. */
@@ -112,7 +117,7 @@ export async function processTaskChunk(
   }
 
   if (!jobId) {
-    for (const row of ready) outcomes.push({ row: row.row, status: "ok" });
+    for (const row of ready) outcomes.push(withNote(row, "ok"));
     return { outcomes: outcomes.sort((a, b) => a.row - b.row), stopped: null };
   }
 
@@ -121,7 +126,7 @@ export async function processTaskChunk(
   if (ready.length) {
     const { error } = await ctx.supabase.from("tasks").insert(ready.map(insertRow));
     if (!error) {
-      for (const row of ready) outcomes.push({ row: row.row, status: "created" });
+      for (const row of ready) outcomes.push(withNote(row, "created"));
     } else {
       // one row at a time: a link the database refuses, or a bad row, fails alone
       for (const row of ready) {
@@ -130,7 +135,7 @@ export async function processTaskChunk(
           continue;
         }
         const { error: rowError } = await ctx.supabase.from("tasks").insert(insertRow(row));
-        if (!rowError) outcomes.push({ row: row.row, status: "created" });
+        if (!rowError) outcomes.push(withNote(row, "created"));
         else if (rowError.code === "P0001" && /^(limit|feature):/.test(rowError.hint ?? "")) {
           stopped = dbErrorMessage(rowError, "הגעתם למגבלת החבילה.");
           outcomes.push({ row: row.row, status: "failed", message: stopped });

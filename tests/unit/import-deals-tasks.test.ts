@@ -7,7 +7,7 @@ import { parseTaskRow } from "@/features/imports/task-rows";
 import { cellText } from "@/features/imports/cell-text";
 import { customCellValue } from "@/features/imports/record-cells";
 import { normalizeDate } from "@/features/imports/server";
-import { ownerOf, type Owners } from "@/features/imports/link-lookups";
+import { ownerMatch, type Owners } from "@/features/imports/link-lookups";
 
 /** What read-excel-file makes of an Excel serial: UTC, floored to the millisecond. */
 const excelDate = (serial: number) => new Date(Math.floor((serial - 25569) * 86_400_000));
@@ -49,11 +49,12 @@ describe("owner by email or name", () => {
     ["דנה כהן", null],
     ["יוסי", "u2"],
   ]);
-  it("two members with the same name is an error, never the last one", () => {
-    expect(ownerOf(owners, " Dana@X.co.il ")).toEqual({ ok: true, id: "u1" });
-    expect(ownerOf(owners, "יוסי")).toEqual({ ok: true, id: "u2" });
-    expect(ownerOf(owners, "דנה כהן")).toMatchObject({ ok: false, message: expect.stringMatching(/כמה משתמשים/) });
-    expect(ownerOf(owners, "אף אחד")).toMatchObject({ ok: false, message: expect.stringMatching(/לא נמצא/) });
+  it("two members with the same name is ambiguous, never the last one (CHN-05: the row then gets no owner)", () => {
+    expect(ownerMatch(owners, " Dana@X.co.il ")).toEqual({ id: "u1" });
+    expect(ownerMatch(owners, "יוסי")).toEqual({ id: "u2" });
+    expect(ownerMatch(owners, "דנה כהן")).toBe("ambiguous");
+    expect(ownerMatch(owners, "דנה   כהן")).toBe("ambiguous");
+    expect(ownerMatch(owners, "אף אחד")).toBe("missing");
   });
 });
 

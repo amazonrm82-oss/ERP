@@ -27,7 +27,7 @@ describe("CHN-05 presets", () => {
         const keys = new Set(IMPORT_TARGETS[entity].map((t) => t.key));
         const seen = new Set<string>();
         for (const [to] of preset) {
-          if (to === "list" || to === "skip") continue;
+          if (to === "skip") continue;
           expect(keys.has(to), `${system.key} ${entity} ${to}`).toBe(true);
           expect(seen.has(to), `${system.key} ${entity} ${to} twice`).toBe(false);
           seen.add(to);
@@ -54,7 +54,7 @@ describe("CHN-05 presets", () => {
         const headers = preset.map(([, names]) => names[0]);
         const { mapping, marks } = presetMapping(headers, system.key, entity, IMPORT_TARGETS[entity]);
         preset.forEach(([to], i) => {
-          if (to === "list" || to === "skip") {
+          if (to === "skip") {
             expect(mapping[i], `${system.key} ${entity} ${headers[i]}`).toBe("");
             expect(marks[i]).toBe(to);
           } else {
@@ -75,10 +75,17 @@ describe("CHN-05 presets", () => {
     expect(presetMapping(outlook, "outlook", "lead", IMPORT_TARGETS.lead).mapping).toEqual(["", "first_name", "last_name", "company_name", "job_title", "", "phone", "email"]);
     const hubspotDeals = ["Record ID", "Deal Name", "Deal Stage", "Close Date", "Deal owner", "Amount", "Pipeline", "Create Date"];
     const hub = presetMapping(hubspotDeals, "hubspot", "deal", IMPORT_TARGETS.deal);
-    expect(hub.mapping).toEqual(["", "name", "", "expected_close_date", "", "amount", "", "original_created_on"]);
-    expect(hub.marks).toEqual(["skip", "preset", "list", "preset", "list", "preset", "list", "preset"]);
+    // CHN-05 (245) ג: owner, pipeline and stage are mapped; missing names are shown before the import runs
+    expect(hub.mapping).toEqual(["", "name", "stage", "expected_close_date", "owner", "amount", "pipeline", "original_created_on"]);
+    expect(hub.marks).toEqual(["skip", "preset", "preset", "preset", "preset", "preset", "preset", "preset"]);
     const salesforce = ["Id", "FirstName", "LastName", "Company", "Title", "Phone", "MobilePhone", "Email", "Status", "OwnerId"];
-    expect(presetMapping(salesforce, "salesforce", "lead", IMPORT_TARGETS.lead).mapping).toEqual(["", "first_name", "last_name", "company_name", "job_title", "", "phone", "email", "", ""]);
+    // Salesforce's owner is an id (OwnerId): never mapped; the status is
+    expect(presetMapping(salesforce, "salesforce", "lead", IMPORT_TARGETS.lead).mapping).toEqual(["", "first_name", "last_name", "company_name", "job_title", "", "phone", "email", "status", ""]);
+    // a contact has no status or source: the preset keeps those columns away from the synonym match
+    const zohoContacts = ["First Name", "Lead Status", "Lead Source", "Contact Owner"];
+    const zoho = presetMapping(zohoContacts, "zoho", "contact", IMPORT_TARGETS.contact);
+    expect(zoho.mapping).toEqual(["first_name", "", "", "owner"]);
+    expect(zoho.marks).toEqual(["preset", "skip", "skip", "preset"]);
   });
 
   it("takes the first header of an entry the file has (mobile before work)", () => {
@@ -127,7 +134,6 @@ describe("CHN-05 presets", () => {
       expect(s.checked).toBe(false);
     }
     expect(presetMarkText("preset", "HubSpot")).toContain("HubSpot");
-    expect(presetMarkText("list", "HubSpot")).toContain("לא מולא");
     expect(presetMarkText("skip", "HubSpot")).toContain("HubSpot");
     expect(presetMarkText(null, "HubSpot")).toBeNull();
   });

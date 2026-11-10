@@ -35,7 +35,9 @@ import { COUNTRY_UNKNOWN, foreignNumberKey, importCountry } from "./country";
 import { CUSTOM_PREFIX, type DuplicateModeKey, type RecordImportEntity as ImportEntityKey } from "./fields";
 import { importOpening, OPENING_ROW_SKIPPED, openingFailure, type ImportOpening } from "./opening-balance";
 import { importNote, NOTE_FAILED, NOTE_ROW_SKIPPED, ORIGINAL_DATE_ON_UPDATE, originalCreatedOn, type ImportNote } from "./history";
-import { orgTimeZone } from "./link-lookups";
+import { LinkLookupFailed, loadOwners, orgTimeZone, ownerMatch, type Owners } from "./link-lookups";
+import { OWNER_LEFT_EMPTY } from "./list-names";
+import { nameKey } from "./record-cells";
 
 type Client = SupabaseClient<Database>;
 
@@ -68,7 +70,7 @@ type Lookups = {
   statuses: Map<string, string>;
   defaultStatus: string | null;
   sources: Map<string, string>;
-  owners: Map<string, string>;
+  owners: Owners;
   // leads: the ids of the "not relevant" statuses and the names of the active reasons (RVW-9)
   disqualified?: Set<string>;
   reasons?: Set<string>;
@@ -86,6 +88,7 @@ export const REASON_NOT_ON_LIST = (reason: string) => `הסיבה "${reason}" ל
 export const REASON_NEEDED_TO_DISQUALIFY = 'כדי להעביר ליד קיים ל"לא רלוונטי" צריך סיבה מרשימת הסיבות.';
 export const REASON_LIST_EMPTY = 'כדי להעביר ליד קיים ל"לא רלוונטי" צריך סיבה, אבל רשימת הסיבות ריקה. אפשר להוסיף סיבות בהגדרות, בעמוד "סיבות לליד לא רלוונטי".';
 export const NO_PERMISSION_TO_UPDATE = "אין הרשאה לעדכן את הרשומה הקיימת.";
+export const OWNERS_UNREADABLE = "לא הצלחנו לקרוא את רשימת המשתמשים, כדי לשייך אחראים. נסו שוב.";
 export const REASONS_UNREADABLE = "לא הצלחנו לקרוא את רשימת הסיבות ללידים לא רלוונטיים. נסו שוב.";
 
 const key = (text: string) => text.trim().toLowerCase();
@@ -112,29 +115,29 @@ export function normalizeDate(value: string): string {
 
 async function loadLookups(ctx: ImportContext): Promise<Lookups> {
   const { supabase, orgId } = ctx;
-  const [statuses, sources, reasons, members, timeZone] = await Promise.all([
+  const [statuses, sources, reasons, owners, timeZone] = await Promise.all([
     ctx.entity === "lead" ? supabase.from("lead_statuses").select("id, name, is_default, kind").eq("organization_id", orgId) : Promise.resolve({ data: [] }),
     ctx.entity === "lead" ? supabase.from("lead_sources").select("id, name").eq("organization_id", orgId) : Promise.resolve({ data: [] }),
     ctx.entity === "lead" ? supabase.from("disqualify_reasons").select("name").eq("organization_id", orgId).eq("is_active", true) : Promise.resolve({ data: [], error: null }),
-    supabase.from("memberships").select("user_id").eq("organization_id", orgId).eq("status", "active").neq("role", "viewer"),
+    // CHN-05 (245) ג: the deals' and tasks' owner rule; a failed read stops the import rather than leave every owner empty
+    ctx.mapping.includes("owner")
+      ? loadOwners(supabase, orgId).catch((error: unknown) => {
+          if (error instanceof LinkLookupFailed) throw new ImportStopped(OWNERS_UNREADABLE);
+          throw error;
+        })
+      : Promise.resolve<Owners>(new Map()),
     orgTimeZone(supabase, orgId),
   ]);
-  const ids = (members.data ?? []).map((m) => m.user_id);
-  const { data: profiles } = ids.length ? await supabase.from("profiles").select("id, full_name, email").in("id", ids) : { data: [] };
-  const owners = new Map<string, string>();
-  for (const p of profiles ?? []) {
-    if (p.email) owners.set(key(p.email), p.id);
-    if (p.full_name) owners.set(key(p.full_name), p.id);
-  }
   // without the list every reason would be dropped as "not on the list": stop rather than guess (FXC-02)
   if (reasons.error) throw new ImportStopped(REASONS_UNREADABLE);
   const statusRows = (statuses.data ?? []) as Array<{ id: string; name: string; is_default?: boolean; kind?: string }>;
   return {
     disqualified: new Set(statusRows.filter((s) => s.kind === "disqualified").map((s) => s.id)),
     reasons: new Set(((reasons.data ?? []) as Array<{ name: string }>).map((r) => r.name)),
-    statuses: new Map(statusRows.map((s) => [key(s.name), s.id])),
+    // CHN-05: names are compared as the wizard's check of missing names compares them (spaces folded)
+    statuses: new Map(statusRows.map((s) => [nameKey(s.name), s.id])),
     defaultStatus: statusRows.find((s) => s.is_default)?.id ?? statusRows[0]?.id ?? null,
-    sources: new Map(((sources.data ?? []) as Array<{ id: string; name: string }>).map((s) => [key(s.name), s.id])),
+    sources: new Map(((sources.data ?? []) as Array<{ id: string; name: string }>).map((s) => [nameKey(s.name), s.id])),
     owners,
     today: zoneDate(new Date(), timeZone),
   };
@@ -233,12 +236,12 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
     if (!parsed.success) return firstIssue(parsed.error);
     Object.assign(values, parsed.data);
     if (raw.status) {
-      const status = lookups.statuses.get(key(raw.status));
-      if (!status) return `אין סטטוס בשם "${raw.status}".`;
+      const status = lookups.statuses.get(nameKey(raw.status));
+      if (!status) return `אין סטטוס בשם "${raw.status}". אפשר להוסיף אותו בהגדרות ולייבא שוב.`;
       values.status_id = status;
     }
     if (raw.source) {
-      const source = lookups.sources.get(key(raw.source));
+      const source = lookups.sources.get(nameKey(raw.source));
       if (!source) return `אין מקור בשם "${raw.source}". אפשר להוסיף אותו בהגדרות ולייבא שוב.`;
       values.source_id = source;
     }
@@ -309,10 +312,11 @@ function prepareRow(ctx: ImportContext, lookups: Lookups, cells: string[], row: 
     name = parsed.data.name;
   }
 
+  // CHN-05 (245) ג: an owner who is not one active member is left empty with a note; the row is still imported
   if (raw.owner) {
-    const owner = lookups.owners.get(key(raw.owner));
-    if (!owner) return `לא נמצא משתמש פעיל "${raw.owner}" (לפי אימייל או שם).`;
-    values.owner_id = owner;
+    const owner = ownerMatch(lookups.owners, raw.owner);
+    if (typeof owner === "string") warning = joinWarnings(warning, OWNER_LEFT_EMPTY(raw.owner, owner === "ambiguous"));
+    else values.owner_id = owner.id;
   }
 
   // GAP-12: the original creation date and the note; a cell that is not a valid day is reported, never guessed

@@ -12,6 +12,8 @@ import { paths } from "@/lib/paths";
 import { productsPath } from "@/features/products/paths";
 
 import { consentsUndoneText } from "./consent";
+import { LIST_CELL_MAX, MAX_DISTINCT_VALUES, NAMES_ASK_ADMIN, type CreatedNames, type ListCells, type MissingNames } from "./list-names";
+import { checkListNames, createListNames } from "./list-names-server";
 import { openingsUndoneText } from "./opening-balance";
 import { ProductImportStopped, processProductChunk } from "./product-server";
 import {
@@ -31,6 +33,55 @@ import {
 import { ImportStopped, processChunk, type RowOutcome } from "./server";
 
 const UNDO_DAYS = 7;
+
+// CHN-05 (245) ג: the file's distinct names of the list columns, as the wizard collected them
+const listName = z.string().max(LIST_CELL_MAX * 2);
+const listCellsSchema = z.object({
+  statuses: z.array(listName).max(MAX_DISTINCT_VALUES),
+  sources: z.array(listName).max(MAX_DISTINCT_VALUES),
+  owners: z.array(listName).max(MAX_DISTINCT_VALUES),
+  stages: z.array(z.object({ pipeline: listName.nullable(), stage: listName })).max(MAX_DISTINCT_VALUES),
+  truncated: z.boolean(),
+});
+
+/**
+ * CHN-05 (245) ג: which status, source and stage names of the file the business lacks, which owners are not one active
+ * member, and whether the caller may create the names (owners and admins; the settings pages' rule).
+ */
+export async function checkImportNamesAction(
+  orgId: string,
+  input: { entity: string; cells: ListCells },
+): Promise<ActionResult<{ missing: MissingNames; canCreate: boolean }>> {
+  const entity = entitySchema.safeParse(input?.entity);
+  const cells = listCellsSchema.safeParse(input?.cells);
+  if (!entity.success || !cells.success || entity.data === "product") return fail(INVALID_ARGS);
+  const context = await actionContext(orgId);
+  if (!context.ok) return context;
+  const [missing, role] = await Promise.all([
+    checkListNames(context.supabase, orgId, entity.data, cells.data),
+    myRole(context.supabase, orgId, context.user.id),
+  ]);
+  if (typeof missing === "string") return fail(missing);
+  return ok({ missing, canCreate: role === "owner" || role === "admin" });
+}
+
+/** CHN-05 (245) ג: creates the missing names before the import runs (owners and admins only; never a user or a sales process). */
+export async function createImportNamesAction(orgId: string, input: { entity: string; cells: ListCells }): Promise<ActionResult<CreatedNames>> {
+  const entity = entitySchema.safeParse(input?.entity);
+  const cells = listCellsSchema.safeParse(input?.cells);
+  if (!entity.success || !cells.success || entity.data === "product") return fail(INVALID_ARGS);
+  const context = await actionContext(orgId);
+  if (!context.ok) return context;
+  const role = await myRole(context.supabase, orgId, context.user.id);
+  if (role !== "owner" && role !== "admin") return fail(NAMES_ASK_ADMIN);
+  const result = await createListNames(context.supabase, orgId, entity.data, cells.data);
+  if (typeof result === "string") return fail(result);
+  if (result.created > 0) {
+    revalidatePath(paths.settingsLeads(orgId));
+    revalidatePath(paths.settingsPipelines(orgId));
+  }
+  return ok(result);
+}
 
 type Supabase = Extract<Awaited<ReturnType<typeof actionContext>>, { ok: true }>["supabase"];
 

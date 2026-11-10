@@ -153,7 +153,7 @@ export function resolveStage(
   const own = stages.filter((s) => s.pipelineId === pipeline.id).sort((a, b) => a.position - b.position);
   const stage = stageName ? own.find((s) => nameKey(s.name) === nameKey(stageName)) : (own.find((s) => s.kind === "open") ?? own[0]);
   if (!stage) {
-    return stageName ? `אין שלב בשם "${stageName}" בתהליך המכירה "${pipeline.name}". שלב חדש לא נוצר בייבוא.` : `בתהליך המכירה "${pipeline.name}" אין שלבים.`;
+    return stageName ? `אין שלב בשם "${stageName}" בתהליך המכירה "${pipeline.name}". אפשר להוסיף אותו בהגדרות ולייבא שוב.` : `בתהליך המכירה "${pipeline.name}" אין שלבים.`;
   }
   return { pipelineId: pipeline.id, stageId: stage.id, kind: stage.kind };
 }

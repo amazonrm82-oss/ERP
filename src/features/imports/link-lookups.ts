@@ -52,12 +52,16 @@ export async function loadOwners(supabase: Client, orgId: string): Promise<Owner
   return owners;
 }
 
-/** The owner a cell names (email or full name); two members with that name is an error, never a guess. */
-export function ownerOf(owners: Owners, cell: string): { ok: true; id: string } | { ok: false; message: string } {
-  const found = owners.get(cell.trim().toLowerCase());
-  if (found === undefined) return { ok: false, message: `לא נמצא משתמש פעיל "${cell}" (לפי אימייל או שם).` };
-  if (found === null) return { ok: false, message: `יש כמה משתמשים בשם "${cell}". כתבו את האימייל של האחראי.` };
-  return { ok: true, id: found };
+/**
+ * The owner a cell names (email or full name; spaces folded, without case); two members with that name is
+ * "ambiguous", never a guess. CHN-05 (245) ג: either way the import leaves the owner empty with a note.
+ */
+export function ownerMatch(owners: Owners, cell: string): { id: string } | "missing" | "ambiguous" {
+  const exact = cell.trim().toLowerCase();
+  const found = owners.has(exact) ? owners.get(exact) : owners.get(cell.trim().replace(/\s+/g, " ").toLowerCase());
+  if (found === undefined) return "missing";
+  if (found === null) return "ambiguous";
+  return { id: found };
 }
 
 /** Leads or contacts by email or phone (a contact's further phones and emails count too, CON-01). */

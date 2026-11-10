@@ -4,11 +4,10 @@
 // starting point the person sees and changes: every column it filled is marked in the wizard, and the rest of the
 // file goes through the ordinary synonym match (`suggestMapping`). Nothing is applied silently.
 //
-// Three kinds of entries:
-//   - a target key: the column's values can be taken as they are (names, phones, emails, dates, amounts);
-//   - "list": the values must match a name the business already has (owner, status, source, pipeline, stage),
-//     and a name that is not there fails the row; the preset leaves it unmapped and says so, so the person
-//     adds the names in settings first, or maps it knowingly;
+// Two kinds of entries:
+//   - a target key: the column goes to that field. Owner, status, source, pipeline and stage are mapped too (owner's
+//     answer (245) ג, 10 November 2026): before the import runs the wizard lists the names the business does not have
+//     yet, and owners and admins may create them (`list-names.ts`); an owner that is not a member stays empty;
 //   - "skip": a known column of that system that has no place here (an internal id, an honorific), kept away
 //     from the synonym match, which would otherwise guess it (Outlook's "Title" is "Mr.", not a job title).
 //
@@ -19,7 +18,7 @@
 import { suggestMapping, type ImportEntityKey, type ImportTarget } from "./fields";
 
 export type PresetEntity = Extract<ImportEntityKey, "lead" | "contact" | "company" | "deal">;
-type Entry = readonly [to: string | "list" | "skip", headers: readonly string[]];
+type Entry = readonly [to: string | "skip", headers: readonly string[]];
 type Preset = Partial<Record<PresetEntity, readonly Entry[]>>;
 
 export type SourceSystem = { key: string; label: string; checked: boolean; note: string | null; preset: Preset };
@@ -55,8 +54,8 @@ const HUBSPOT_PEOPLE: readonly Entry[] = [
   ["email", ["Email"]],
   ["job_title", ["Job Title"]],
   ["original_created_on", ["Create Date"]],
-  ["list", ["Contact owner", "Lead Status", "Original Source", "Lifecycle Stage"]],
-  ["skip", ["Record ID", "Last Activity Date"]],
+  ["owner", ["Contact owner"]],
+  ["skip", ["Record ID", "Last Activity Date", "Lifecycle Stage"]],
 ];
 
 // Salesforce Data Export (API field names).
@@ -68,7 +67,6 @@ const SALESFORCE_PEOPLE: readonly Entry[] = [
   ["job_title", ["Title"]],
   ["original_created_on", ["CreatedDate"]],
   ["import_note", ["Description"]],
-  ["list", ["Status", "LeadSource"]],
   ["skip", ["Id", "OwnerId", "AccountId", "CreatedById", "LastModifiedById", "LastModifiedDate", "IsDeleted", "Salutation", "Name"]],
 ];
 
@@ -81,7 +79,7 @@ const ZOHO_PEOPLE: readonly Entry[] = [
   ["job_title", ["Title"]],
   ["original_created_on", ["Created Time"]],
   ["import_note", ["Description"]],
-  ["list", ["Lead Owner", "Contact Owner", "Lead Source", "Lead Status"]],
+  ["owner", ["Lead Owner", "Contact Owner"]],
   ["skip", ["Record Id", "Salutation", "Modified Time", "Created By", "Modified By"]],
 ];
 
@@ -93,8 +91,8 @@ const PIPEDRIVE_PEOPLE: readonly Entry[] = [
   ["phone", ["Person - Phone - Mobile", "Person - Phone - Work", "Person - Phone"]],
   ["email", ["Person - Email - Work", "Person - Email"]],
   ["original_created_on", ["Person - Person created"]],
-  ["list", ["Person - Owner", "Person - Label"]],
-  ["skip", ["Person - ID"]],
+  ["owner", ["Person - Owner"]],
+  ["skip", ["Person - ID", "Person - Label"]],
 ];
 
 /** The systems offered, in the order of the choice. */
@@ -125,8 +123,8 @@ export const SOURCE_SYSTEMS: readonly SourceSystem[] = [
     checked: false,
     note: null,
     preset: {
-      lead: [...HUBSPOT_PEOPLE, ["company_name", ["Company Name"]]],
-      contact: [...HUBSPOT_PEOPLE, ["company", ["Company Name"]]],
+      lead: [...HUBSPOT_PEOPLE, ["company_name", ["Company Name"]], ["status", ["Lead Status"]], ["source", ["Original Source"]]],
+      contact: [...HUBSPOT_PEOPLE, ["company", ["Company Name"]], ["skip", ["Lead Status", "Original Source"]]],
       company: [
         ["name", ["Company name"]],
         ["phone", ["Phone Number"]],
@@ -135,7 +133,7 @@ export const SOURCE_SYSTEMS: readonly SourceSystem[] = [
         ["address_line", ["Street Address"]],
         ["country", ["Country/Region"]],
         ["original_created_on", ["Create Date"]],
-        ["list", ["Company owner"]],
+        ["owner", ["Company owner"]],
         ["skip", ["Record ID", "Last Activity Date"]],
       ],
       deal: [
@@ -143,7 +141,9 @@ export const SOURCE_SYSTEMS: readonly SourceSystem[] = [
         ["amount", ["Amount"]],
         ["expected_close_date", ["Close Date"]],
         ["original_created_on", ["Create Date"]],
-        ["list", ["Pipeline", "Deal Stage", "Deal owner"]],
+        ["pipeline", ["Pipeline"]],
+        ["stage", ["Deal Stage"]],
+        ["owner", ["Deal owner"]],
         ["skip", ["Record ID", "Last Activity Date"]],
       ],
     },
@@ -154,8 +154,8 @@ export const SOURCE_SYSTEMS: readonly SourceSystem[] = [
     checked: false,
     note: "בייצוא של Salesforce האחראי מופיע כמזהה, ולכן הוא לא מיובא.",
     preset: {
-      lead: [...SALESFORCE_PEOPLE, ["company_name", ["Company"]]],
-      contact: [...SALESFORCE_PEOPLE, ["birth_date", ["Birthdate"]]],
+      lead: [...SALESFORCE_PEOPLE, ["company_name", ["Company"]], ["status", ["Status"]], ["source", ["LeadSource"]]],
+      contact: [...SALESFORCE_PEOPLE, ["birth_date", ["Birthdate"]], ["skip", ["Status", "LeadSource"]]],
       company: [
         ["name", ["Name"]],
         ["phone", ["Phone"]],
@@ -171,7 +171,8 @@ export const SOURCE_SYSTEMS: readonly SourceSystem[] = [
         ["amount", ["Amount"]],
         ["expected_close_date", ["CloseDate"]],
         ["original_created_on", ["CreatedDate"]],
-        ["list", ["StageName", "LeadSource"]],
+        ["stage", ["StageName"]],
+        ["source", ["LeadSource"]],
         ["skip", ["Id", "OwnerId", "AccountId", "CreatedById", "LastModifiedById", "LastModifiedDate", "IsDeleted", "Probability"]],
       ],
     },
@@ -182,8 +183,8 @@ export const SOURCE_SYSTEMS: readonly SourceSystem[] = [
     checked: false,
     note: null,
     preset: {
-      lead: [...ZOHO_PEOPLE, ["company_name", ["Company"]]],
-      contact: [...ZOHO_PEOPLE, ["company", ["Account Name"]], ["birth_date", ["Date of Birth"]]],
+      lead: [...ZOHO_PEOPLE, ["company_name", ["Company"]], ["status", ["Lead Status"]], ["source", ["Lead Source"]]],
+      contact: [...ZOHO_PEOPLE, ["company", ["Account Name"]], ["birth_date", ["Date of Birth"]], ["skip", ["Lead Status", "Lead Source"]]],
       company: [
         ["name", ["Account Name"]],
         ["phone", ["Phone"]],
@@ -193,7 +194,7 @@ export const SOURCE_SYSTEMS: readonly SourceSystem[] = [
         ["country", ["Billing Country"]],
         ["original_created_on", ["Created Time"]],
         ["import_note", ["Description"]],
-        ["list", ["Account Owner"]],
+        ["owner", ["Account Owner"]],
         ["skip", ["Record Id", "Modified Time", "Created By", "Modified By"]],
       ],
       deal: [
@@ -203,7 +204,10 @@ export const SOURCE_SYSTEMS: readonly SourceSystem[] = [
         ["company", ["Account Name"]],
         ["original_created_on", ["Created Time"]],
         ["import_note", ["Description"]],
-        ["list", ["Deal Owner", "Stage", "Pipeline", "Lead Source"]],
+        ["owner", ["Deal Owner"]],
+        ["stage", ["Stage"]],
+        ["pipeline", ["Pipeline"]],
+        ["source", ["Lead Source"]],
         ["skip", ["Record Id", "Contact Name", "Probability (%)", "Modified Time", "Created By", "Modified By"]],
       ],
     },
@@ -220,8 +224,8 @@ export const SOURCE_SYSTEMS: readonly SourceSystem[] = [
         ["name", ["Organization - Name"]],
         ["address_line", ["Organization - Address"]],
         ["original_created_on", ["Organization - Organization created"]],
-        ["list", ["Organization - Owner", "Organization - Label"]],
-        ["skip", ["Organization - ID"]],
+        ["owner", ["Organization - Owner"]],
+        ["skip", ["Organization - ID", "Organization - Label"]],
       ],
       deal: [
         ["name", ["Deal - Title"]],
@@ -229,7 +233,9 @@ export const SOURCE_SYSTEMS: readonly SourceSystem[] = [
         ["expected_close_date", ["Deal - Expected close date"]],
         ["company", ["Deal - Organization"]],
         ["original_created_on", ["Deal - Deal created"]],
-        ["list", ["Deal - Owner", "Deal - Pipeline", "Deal - Stage"]],
+        ["owner", ["Deal - Owner"]],
+        ["pipeline", ["Deal - Pipeline"]],
+        ["stage", ["Deal - Stage"]],
         ["skip", ["Deal - ID", "Deal - Contact person", "Deal - Currency", "Deal - Status"]],
       ],
     },
@@ -247,8 +253,8 @@ export function presetFor(key: string | null | undefined, entity: ImportEntityKe
   return (system.preset as Record<string, readonly Entry[] | undefined>)[entity] ?? null;
 }
 
-/** How a column got its choice: by the preset, recognised but left for the person, or not by the preset. */
-export type PresetMark = "preset" | "list" | "skip" | null;
+/** How a column got its choice: by the preset, recognised as a column not imported, or not by the preset. */
+export type PresetMark = "preset" | "skip" | null;
 
 /** Header text as a preset compares it: case, spaces, and the punctuation exports differ in. */
 export function normalizeHeader(text: string): string {
@@ -281,7 +287,7 @@ export function presetMapping(
 
   if (preset) {
     for (const [to, names] of preset) {
-      if (to === "list" || to === "skip") {
+      if (to === "skip") {
         const wanted = new Set(names.map(normalizeHeader));
         normalized.forEach((h, i) => {
           if (h && marks[i] === null && wanted.has(h)) marks[i] = to;
@@ -316,7 +322,6 @@ export function presetMapping(
 /** The line under a column the preset handled. */
 export function presetMarkText(mark: PresetMark, systemLabel: string): string | null {
   if (mark === "preset") return `מולא לפי ${systemLabel}. אפשר לשנות.`;
-  if (mark === "list") return "לא מולא: הערכים צריכים להתאים לשמות שכבר יש אצלכם (משתמשים, סטטוסים, מקורות או שלבים). אפשר לבחור שדה אחרי שבדקתם.";
   if (mark === "skip") return `עמודה של ${systemLabel} שלא מייבאים.`;
   return null;
 }

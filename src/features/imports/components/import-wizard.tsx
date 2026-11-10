@@ -19,7 +19,7 @@ import { orderBackgroundImportAction, submitBackgroundImportAction } from "@/fea
 import { BACKGROUND_IMPORT_MIN_ROWS, JOB_FILES_BUCKET, type BackgroundSource } from "@/features/background/rules";
 import { createClient } from "@/lib/supabase/client";
 
-import { finishImportAction, importChunkAction, previewImportAction, startImportAction } from "../actions";
+import { checkImportNamesAction, createImportNamesAction, finishImportAction, importChunkAction, previewImportAction, startImportAction } from "../actions";
 import {
   CHUNK_SIZE,
   CUSTOM_PREFIX,
@@ -52,6 +52,8 @@ import { mapsOpeningBalance, OPENING_HINTS, OPENING_KEYS } from "../opening-bala
 import { columnValues } from "../new-field";
 import { moreRowsText, warnedRowsTitle } from "../wording";
 import { presetFor, presetMapping, presetMarkText, sourceSystem, SOURCE_SYSTEMS, type PresetMark } from "../source-systems";
+import { collectListCells, creatableCount, MAX_CREATED_NAMES, mapsListColumn, NAMES_CREATED, type CreatedNames, type MissingNames } from "../list-names";
+import { hasMissingNames, MissingNamesPanel } from "./missing-names";
 import { NewFieldForm } from "./new-field-form";
 
 type CustomField = { key: string; label: string };
@@ -169,6 +171,10 @@ export function ImportWizard({
   const [consentMethod, setConsentMethod] = useState("");
   const [consentNote, setConsentNote] = useState("");
   const [consentTotals, setConsentTotals] = useState<ConsentTotals>({ written: 0, locked: 0 });
+  // CHN-05 (245) ג: the file's names the business lacks, whether this person may create them, the box, and what was made
+  const [names, setNames] = useState<{ missing: MissingNames; canCreate: boolean } | null>(null);
+  const [createNames, setCreateNames] = useState(false);
+  const [namesResult, setNamesResult] = useState<CreatedNames | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const fileId = useId();
 
@@ -199,19 +205,46 @@ export function ImportWizard({
     if (!sheet) return;
     setError(null);
     setBusy(true);
-    const result = await previewImportAction(orgId, { entity, mode, mapping, rows: sheet.rows.slice(0, PREVIEW_ROWS) });
+    const listed = mapsListColumn(entity, mapping);
+    const [result, checked] = await Promise.all([
+      previewImportAction(orgId, { entity, mode, mapping, rows: sheet.rows.slice(0, PREVIEW_ROWS) }),
+      listed ? checkImportNamesAction(orgId, { entity, cells: collectListCells(entity, mapping, sheet.rows) }) : Promise.resolve(null),
+    ]);
     setBusy(false);
     if (!result.ok) {
       setError(result.message);
       return;
     }
+    if (checked && !checked.ok) {
+      setError(checked.message);
+      return;
+    }
+    setNames(checked?.data ?? null);
+    setCreateNames(false);
+    setNamesResult(null);
     setPreview(result.data ?? []);
     setStep("preview");
+  }
+
+  /** CHN-05 (245) ג: when the box is ticked, the missing names are created first; false = stop (the error is shown). */
+  async function createMissingNames(): Promise<boolean> {
+    if (!sheet || !names || !willCreate) return true;
+    setBusy(true);
+    const created = await createImportNamesAction(orgId, { entity, cells: collectListCells(entity, mapping, sheet.rows) }).catch(() => null);
+    setBusy(false);
+    if (!created || !created.ok) {
+      setError(created && !created.ok ? created.message : "לא הצלחנו ליצור את השמות החסרים. נסו שוב.");
+      return false;
+    }
+    setNamesResult(created.data ?? null);
+    setCreateNames(false);
+    return true;
   }
 
   async function run() {
     if (!sheet) return;
     setError(null);
+    if (!(await createMissingNames())) return;
     const start = await startImportAction(orgId, {
       entity,
       mode,
@@ -269,6 +302,7 @@ export function ImportWizard({
   async function runInBackground() {
     if (!sheet) return;
     setError(null);
+    if (!(await createMissingNames())) return;
     setBusy(true);
     try {
       const order = await orderBackgroundImportAction(orgId, { entity, mode, fileName: sheet.fileName, totalRows: sheet.rows.length });
@@ -331,6 +365,9 @@ export function ImportWizard({
     setConsentMethod("");
     setConsentNote("");
     setConsentTotals({ written: 0, locked: 0 });
+    setNames(null);
+    setCreateNames(false);
+    setNamesResult(null);
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -354,6 +391,8 @@ export function ImportWizard({
   // CHN-05: the preset applies only when the system has one for the object being imported
   const chosenSystem = presetFor(system, entity) ? sourceSystem(system) : null;
   const presetCount = marks.filter((m) => m === "preset").length;
+  // CHN-05 (245) ג: the names are created only by an owner or admin who ticked the box, and only up to the cap
+  const willCreate = Boolean(names?.canCreate && createNames && creatableCount(names.missing) > 0 && creatableCount(names.missing) <= MAX_CREATED_NAMES);
 
   function chooseEntity(next: ImportEntityKey) {
     setEntity(next);
@@ -510,7 +549,8 @@ export function ImportWizard({
               {entity === "deal" ? (
                 <>
                   <p className="mt-1 text-ink-soft">
-                    תהליך המכירה והשלב נמצאים לפי השם. שם שלא קיים הוא שגיאה בשורה, ושלב חדש לא נוצר. בלי עמודת שלב {terms.deal.theSingular}{" "}
+                    תהליך המכירה והשלב נמצאים לפי השם. לפני הייבוא נראה אילו שלבים חסרים, ובעלים ומנהלי מערכת יכולים ליצור אותם. תהליך מכירה חסר לא נוצר, והשורה שלו לא
+                    מיובאת. בלי עמודת שלב {terms.deal.theSingular}{" "}
                     {byGender(terms.deal, "נכנס", "נכנסת")} לשלב הפתוח הראשון.
                   </p>
                   <p className="mt-1 text-ink-soft">
@@ -632,6 +672,9 @@ export function ImportWizard({
             </table>
           </div>
           <p className="text-sm text-ink-soft">מספרי השורות הם כמו בקובץ (שורה 1 היא הכותרות). שורות עם שגיאה לא ייובאו, ובסוף אפשר להוריד אותן לתיקון.</p>
+          {hasMissingNames(names?.missing ?? null) && names ? (
+            <MissingNamesPanel missing={names.missing} canCreate={names.canCreate} create={createNames} onCreate={setCreateNames} />
+          ) : null}
           <div className="flex flex-wrap gap-2">
             <Button onClick={run} disabled={missingDeclaration || busy}>ייבוא {formatNumber(sheet.rows.length)} שורות</Button>
             {/* owner (163) ב: only when duplicates are skipped or updated */}
@@ -682,6 +725,26 @@ export function ImportWizard({
               <p>הסכמות שנרשמו: {formatNumber(consentTotals.written)}.</p>
               {/* CNS-06 answer 3: the addresses whose "מאשר" the register kept out */}
               {consentTotals.locked > 0 ? <p>{consentsLockedText(consentTotals.locked)}</p> : null}
+            </div>
+          ) : null}
+          {namesResult ? (
+            <div className="space-y-1 text-md">
+              <p>{NAMES_CREATED(namesResult.created)}</p>
+              {namesResult.failed.length > 0 ? (
+                <ul className="list-disc space-y-0.5 ps-5 text-ink-soft">
+                  {namesResult.failed.map((f, i) => (
+                    <li key={i}>
+                      {f.name ? (
+                        <>
+                          <bdi>{f.name}</bdi>: {f.message}
+                        </>
+                      ) : (
+                        f.message
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
           ) : null}
           {stopped ? <p role="alert" className="text-danger">{stopped}</p> : null}

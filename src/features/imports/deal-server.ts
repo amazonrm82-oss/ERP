@@ -14,7 +14,8 @@ import { readAllPages } from "@/lib/paged-read";
 import { closedAtForRow, parseDealRow, resolveStage, type PipelineRef, type StageRef } from "./deal-rows";
 import { CUSTOM_PREFIX } from "./fields";
 import { importNote, originalCreatedOn, type ImportNote } from "./history";
-import { companyFound, findCompanies, findPeople, LinkLookupFailed, linkMessage, loadOwners, orgTimeZone, ownerOf, personLookupKey, type Owners } from "./link-lookups";
+import { companyFound, findCompanies, findPeople, LinkLookupFailed, linkMessage, loadOwners, orgTimeZone, ownerMatch, personLookupKey, type Owners } from "./link-lookups";
+import { OWNER_LEFT_EMPTY } from "./list-names";
 import { customCellValue, nameKey, type PersonKey } from "./record-cells";
 import { recordNotes, type RowOutcome } from "./server";
 
@@ -130,10 +131,13 @@ function prepare(ctx: DealImportContext, look: DealLookups, cells: string[], row
     original_created_on: original.date,
   };
   if (closed.closedAt) values.closed_at = closed.closedAt;
+  // CHN-05 (245) ג: an owner who is not one active member is left empty with a note; the row is still imported
   if (deal.owner) {
-    const owner = ownerOf(look.owners, deal.owner);
-    if (!owner.ok) return owner.message;
-    values.owner_id = owner.id;
+    const owner = ownerMatch(look.owners, deal.owner);
+    if (typeof owner === "string") {
+      const note = OWNER_LEFT_EMPTY(deal.owner, owner === "ambiguous");
+      warning = warning ? `${warning} ${note}` : note;
+    } else values.owner_id = owner.id;
   }
   if (deal.source) {
     const source = look.sources.get(nameKey(deal.source));
