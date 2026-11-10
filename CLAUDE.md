@@ -328,12 +328,12 @@ npm run stack:start    # local Supabase stack (Docker); the CLI is pinned to 2.1
 npm run test:e2e       # browser flow; needs `npm run stack:start` + `npm run dev` on the local stack
 node scripts/policy-mutation-sweep.mjs   # slow; proves the tests catch every weakened policy
 node tests/e2e/screens.mjs <dir> [screen ...]   # local: 360px + 1280px shots of the main screens with sample data (DSN-14)
-node tests/visual/run.mjs compare|update [--dry]   # DSN-18 screenshot comparison (34 shots); baselines come from CI only
+node tests/visual/run.mjs compare|update [--dry]   # DSN-18 screenshot comparison (36 shots); baselines come from CI only
 ```
 
 All four of `lint`, `typecheck`, `build`, `test:db` must pass before a change is called done.
 Nothing is merged without the browser flow (`test:e2e`) passing on the local stack (owner, 29 October 2026).
-Since DSN-18 (2 November 2026) job `e2e` also compares 34 screenshots (16 main screens + the gallery, 360 and 1280) with
+Since DSN-18 (2 November 2026) job `e2e` also compares 36 screenshots (16 main screens + the gallery, 360 and 1280, and the open lead panel sheet at 360x640 and 390x844) with
 `tests/visual/baseline/` (0.1% of pixels, tolerance 24/255; changing text masked by `tests/visual/stabilize.mjs`); a change fails `e2e`, so
 `promote` waits. No baseline = compare nothing and upload the shots. Refresh: Actions, CI, Run workflow with `screenshots = update`, then
 commit the artifact's `actual/*.png` into `tests/visual/baseline/`; never commit baselines made on this machine (`tests/visual/README.md`).
@@ -981,7 +981,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `#entry-<id>` on the full page. A lead seen only through SPD-01's rule reads through `unowned_lead` / `unowned_lead_timeline` (213):
   read-only, "לקחתי", and call/WhatsApp/email that run `take_lead` first and stop with a message when someone else took it (216 ב).
   The menu's "לידים שמחכים" shows only to who can write (`!context.canWrite`). Follow-ups: the business-chosen "פאנל צד" group in
-  `card_layouts`; the contact and deal panels (phase 2).
+  `card_layouts`; the contact and deal panels (phase 2). Phone fix (owner 10 November 2026): `src/components/ui/sheet.tsx` is the ONLY bottom sheet (the bottom bar's "עוד", every `Dialog variant="sheet"`, `SidePanel` below md): one handle and rise, closed by Esc, a tap outside, X or a drag of the handle (through the same close request, so `FormGuard` still asks); heights `content` (up to 85%) and `tall` (fixed 88dvh, `--mx-sheet-viewport` fallback), only the body scrolls. A new bottom sheet uses it. The leads screen below md: one search row, status/tag/segments inside "סינון ותצוגה", waiting leads and "?" in the "…" menu, "מגע אחרון" relative (`src/lib/relative-time.ts`, full date in title).
 - Response time (SPD-06, migrations 0114, 0117): `app.response_target_minutes(org)` is the target (60, owner's decision, until
   CAP-10 reads an org setting whose initial value is 60; labels come from the returned value, `src/features/reports/response-target.ts`); `report_response_time` rows carry `within_target`; `public.report_response_breakdown()` (security invoker) returns
   `target_minutes`, `by_source`, `by_hour` (hour of arrival in the org's time zone). Uncontacted leads have minutes = null;
