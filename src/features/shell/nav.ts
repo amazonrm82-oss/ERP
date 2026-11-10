@@ -10,6 +10,7 @@ import {
   HomeIcon,
   InboxIcon,
   OrderIcon,
+  PhoneIcon,
   QuoteIcon,
   SettingsIcon,
   TagIcon,
@@ -21,7 +22,7 @@ import { ordersPath } from "@/features/orders/paths";
 import { productsPath } from "@/features/products/paths";
 import { quickSalePath } from "@/features/quick-sale/paths";
 import { quotesPath } from "@/features/quotes/paths";
-import { DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
+import { DEFAULT_TERMS, type OrgTerms, waitingPlural } from "@/features/terminology/terms";
 import { paths } from "@/lib/paths";
 
 export type NavItem = {
@@ -33,16 +34,27 @@ export type NavItem = {
   exact?: boolean;
   // one of the four destinations of the phone bottom bar; the rest are under "עוד"
   mobile: boolean;
+  // paths below `href` that belong to another entry, so this one does not light up there
+  except?: string[];
 };
 
 /**
  * FLD-10: leads, contacts and deals carry the business's own words (today's words by default).
  * LEAD-08: a switched-off module is left out; with leads off, contacts take their place in the phone bottom bar.
  */
-export function navItems(orgId: string, terms: OrgTerms = DEFAULT_TERMS, modules: OrgModules = DEFAULT_MODULES): NavItem[] {
+export function navItems(
+  orgId: string,
+  terms: OrgTerms = DEFAULT_TERMS,
+  modules: OrgModules = DEFAULT_MODULES,
+  // SPD-01 (owner (190) ב): a viewer takes no lead, so the waiting leads leave a viewer's menu
+  options: { viewer?: boolean } = {},
+): NavItem[] {
   const items: NavItem[] = [
     { key: "home", label: "בית", href: paths.org(orgId), icon: HomeIcon, exact: true, mobile: true },
-    { key: "leads", label: terms.lead.plural, href: paths.leads(orgId), icon: InboxIcon, mobile: true },
+    { key: "leads", label: terms.lead.plural, href: paths.leads(orgId), icon: InboxIcon, mobile: true, except: [paths.leadsWaiting(orgId)] },
+    // SPD-01 (owner, 9 November 2026): the leads nobody answered yet, with the count of those nobody owns; under "עוד" on a phone
+    // SPD-01 (lead's interim choice): the counter counts leads nobody owns, which the "everything I see" tab lists
+    { key: "waiting", label: waitingPlural(terms.lead), href: `${paths.leadsWaiting(orgId)}?who=all`, icon: PhoneIcon, mobile: false },
     { key: "contacts", label: terms.contact.plural, href: paths.contacts(orgId), icon: UsersIcon, mobile: !modules.leads },
     { key: "companies", label: "חברות", href: paths.companies(orgId), icon: BuildingIcon, mobile: false },
     { key: "deals", label: terms.deal.plural, href: paths.deals(orgId), icon: BoardIcon, mobile: true },
@@ -59,12 +71,12 @@ export function navItems(orgId: string, terms: OrgTerms = DEFAULT_TERMS, modules
     { key: "reports", label: "דוחות", href: paths.reports(orgId), icon: ChartIcon, mobile: false },
     { key: "settings", label: "הגדרות", href: paths.settings(orgId), icon: SettingsIcon, mobile: false },
   ];
-  return items.filter((item) => moduleOn(item.key, modules));
+  return items.filter((item) => moduleOn(item.key, modules) && !(options.viewer && item.key === "waiting"));
 }
 
 /** LEAD-08: whether a menu or "+" entry belongs to a module the business switched off (ORD-01: orders also need the plan). */
 function moduleOn(key: string, modules: OrgModules): boolean {
-  if (key === "leads" || key === "lead") return modules.leads;
+  if (key === "leads" || key === "lead" || key === "waiting") return modules.leads;
   if (key === "companies" || key === "company") return modules.companies;
   if (key === "orders" || key === "order") return modules.orders;
   return true;
@@ -97,5 +109,15 @@ export function createItems(
 }
 
 export function isActive(pathname: string, item: NavItem): boolean {
-  return item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`);
+  const under = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  // an entry may carry a query (the waiting leads' tab); the path alone decides
+  const href = item.href.split("?")[0];
+  if (item.exact) return pathname === href;
+  return under(href) && !(item.except ?? []).some(under);
+}
+
+/** SPD-01: the counter next to a menu entry ("99+" past 99); null when there is nothing to show. */
+export function navCountText(count: number | null | undefined): string | null {
+  if (count === null || count === undefined || !Number.isFinite(count) || count <= 0) return null;
+  return count > 99 ? "99+" : String(Math.floor(count));
 }

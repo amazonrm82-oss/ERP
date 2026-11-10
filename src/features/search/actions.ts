@@ -82,6 +82,7 @@ export async function commandsAction(orgId: string): Promise<Command[]> {
     const modules = withOrdersPlan(storedModules, ordersInPlan);
     return buildCommands(orgId, terms, modules, {
       canWrite,
+      viewer: role === "viewer",
       settings: settingsAccessFor({ role, canWrite, canDelete, priceLists, punchCards, granted }),
     });
   } catch {

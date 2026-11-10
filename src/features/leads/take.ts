@@ -76,6 +76,16 @@ export function takenLeadsFilter(viewer: WaitingViewer): string | null {
   return parts.join(",");
 }
 
+/**
+ * SPD-01 completion (owner, 9 November 2026): whether "לקחתי" is offered on a lead (its page, the list row, the
+ * board card). The rule of public.take_lead() as the screen knows it: someone who writes in the business (not a
+ * viewer, not a support session, a writable business: OrgContext.canWrite), a lead with no owner, in an open
+ * status (not converted, not closed; leads in the bin are not shown). The database still decides.
+ */
+export function takeOffered(lead: { ownerId: string | null; statusKind: string | null | undefined }, canWrite: boolean): boolean {
+  return canWrite && lead.ownerId === null && lead.statusKind === "open";
+}
+
 /** The line on a waiting lead that someone took; null when nobody pressed "לקחתי". */
 export function takenLabel(lead: { takenAt: string | null; ownerId: string | null; ownerName: string | null }, viewerId: string): string | null {
   if (!lead.takenAt || !lead.ownerId) return null;

@@ -17,6 +17,8 @@ import type { Sort } from "@/lib/sort";
 
 import { leadDisplayName, statusTone } from "../display";
 import type { LeadListItem, LeadSourceOption, LeadStatusOption } from "../queries";
+import { takeOffered } from "../take";
+import { TakeLeadButton } from "./take-lead-button";
 
 type Props = {
   orgId: string;
@@ -42,10 +44,12 @@ type Props = {
   whatsapp?: WhatsappListContext | null;
   // SEG-01: static segments for the bulk "add to segment"; null for someone who does not write segments
   segments?: Array<{ value: string; label: string }> | null;
+  // SPD-01: whether the viewer writes in the business, so a lead nobody owns offers "לקחתי" on its row
+  canWrite?: boolean;
 };
 
 /** Leads as a table, with the columns the user chose. */
-export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, fields, sort, sortHref, editing, tags, reasons, completeness, whatsapp = null, segments = null }: Props) {
+export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, fields, sort, sortHref, editing, tags, reasons, completeness, whatsapp = null, segments = null, canWrite = false }: Props) {
   const statusById = new Map(statuses.map((status) => [status.id, status]));
   // "converted" is set only by the conversion
   const statusOptions = statuses
@@ -100,6 +104,10 @@ export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, 
                 </Link>
               </InlineEdit>
               {lead.companyName && !columns.some((c) => c.key === "company") ? <span className="block text-sm text-ink-soft">{lead.companyName}</span> : null}
+              {/* SPD-01: a lead nobody has goes to the first one who takes it */}
+              {takeOffered({ ownerId: lead.ownerId, statusKind: statusById.get(lead.statusId)?.kind }, canWrite) ? (
+                <TakeLeadButton orgId={orgId} leadId={lead.id} leadName={leadDisplayName(lead)} size="sm" className="mt-1.5" />
+              ) : null}
             </div>
           </div>
         )}

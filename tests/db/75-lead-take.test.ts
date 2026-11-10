@@ -176,16 +176,23 @@ describe("take a lead (SPD-01)", () => {
     expect((await pgError(take(boss, frozen, frozenLead))).code).toBe("42501");
   });
 
-  it("a member who may not see the lead cannot take it ('own' visibility)", async () => {
+  it("'own' visibility: a member takes an unowned lead (owner (186) א), but not one of a team they are not in", async () => {
     const boss = await createUser("take-own-boss");
     const closed = await createOrg(boss.id, "עסק פרטי");
     const member = await addMember(closed, boss.id, "member", "take-own-member");
     await asAdmin((q) => q("update public.organizations set record_visibility = 'own' where id = $1", [closed]));
+    const team = await asUser(boss.id, async (q) =>
+      (await q<{ id: string }>("insert into public.teams (organization_id, name) values ($1, 'צוות אחר') returning id", [closed])).rows[0].id,
+    );
+    const teamLead = await insertLead(boss.id, closed, { team_id: team });
     const lead = await insertLead(boss.id, closed, {});
-    await asAdmin((q) => q("update public.leads set owner_id = null where id = $1", [lead]));
-    expect((await pgError(take(member, closed, lead))).code).toBe("42501");
-    // the owner sees everything and may take it
-    expect(await take(boss, closed, lead)).toEqual({ ok: true, result: "taken" });
+    await asAdmin((q) => q("update public.leads set owner_id = null where id = any($1)", [[lead, teamLead]]));
+    // a team's unowned lead is its team's: the member does not see it, so cannot take it
+    expect((await pgError(take(member, closed, teamLead))).code).toBe("42501");
+    // an unowned lead with no team is every writer's to take (SPD-01 completion, migration 021206)
+    expect(await take(member, closed, lead)).toEqual({ ok: true, result: "taken" });
+    // the owner sees everything and may take the team's
+    expect(await take(boss, closed, teamLead)).toEqual({ ok: true, result: "taken" });
   });
 
   it("taking marks the taker's notifications about the lead as read", async () => {

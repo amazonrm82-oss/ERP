@@ -4307,6 +4307,25 @@ export type Database = {
       send_test_notification: { Args: { p_org: string }; Returns: Json };
       // SPD-01: "I took it": { ok: true, result: 'taken' | 'acknowledged' } | { ok: false, reason: 'taken', owner_name } | { ok: false, reason: 'closed' }
       take_lead: { Args: { p_org: string; p_lead: string }; Returns: Json };
+      // SPD-01 (owner (212) ב): a lead nobody owns offered to the caller to take (null when not offered), its timeline, the waiting
+      // list's offered rows and the menu's counter (up to 100)
+      unowned_lead: { Args: { p_org: string; p_lead: string }; Returns: Json };
+      unowned_lead_timeline: { Args: { p_org: string; p_lead: string }; Returns: Json };
+      unowned_leads_waiting: {
+        Args: { p_org: string; p_limit?: number };
+        Returns: Array<{
+          id: string;
+          full_name: string | null;
+          email: string | null;
+          phone: string | null;
+          phone_e164: string | null;
+          company_name: string | null;
+          source_id: string | null;
+          team_id: string | null;
+          created_at: string;
+        }>;
+      };
+      unowned_leads_waiting_count: { Args: { p_org: string }; Returns: number };
       // TASK-07: the first team member to take a team task becomes its owner; {ok, owner_id} or {ok:false, reason: taken|closed|lead}
       take_task: { Args: { p_org: string; p_task: string }; Returns: Json };
       // FLD-05: adds an industry template's missing lists; { added: {...counts}, limits: ["limit:<key>"] }

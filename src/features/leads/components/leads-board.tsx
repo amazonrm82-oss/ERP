@@ -17,7 +17,9 @@ import { moveAsk } from "@/features/record-move/ask";
 import { moveRecordAction } from "@/features/record-move/actions";
 
 import type { LeadBoard, LeadBoardCard } from "../queries";
+import { takeOffered } from "../take";
 import { LeadStatusMenu } from "./lead-status-menu";
+import { TakeLeadButton } from "./take-lead-button";
 
 const columnRule: Record<LeadStatusKind, string> = {
   open: "border-t-accent",
@@ -213,6 +215,10 @@ export function LeadsBoard({ orgId, board, canWrite, reasons }: Props) {
                               </p>
                             ) : null}
                             {card.ownerName ? <p className="mt-0.5 text-sm text-ink-soft">{card.ownerName}</p> : null}
+                            {/* SPD-01: a lead nobody has goes to the first one who takes it */}
+                            {takeOffered({ ownerId: card.ownerId, statusKind: status.kind }, canWrite) ? (
+                              <TakeLeadButton orgId={orgId} leadId={card.id} leadName={nameOf(card)} size="sm" className="mt-2" />
+                            ) : null}
                             {canWrite ? (
                               <LeadStatusMenu
                                 key={card.statusId}

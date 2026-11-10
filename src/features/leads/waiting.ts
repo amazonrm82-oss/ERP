@@ -43,6 +43,8 @@ export async function getWaitingLeads(
   orgId: string,
   ownerId: string | null,
   viewer?: { id: string; role: WaitingViewer["role"] },
+  // SPD-01 (owner (212) ב): also the unowned leads offered to take that the viewer does not read; only the waiting screen
+  options: { offered?: boolean } = {},
 ): Promise<{ leads: WaitingLead[]; truncated: boolean }> {
   const supabase = await createClient();
   const takenFilter = viewer
@@ -73,25 +75,7 @@ export async function getWaitingLeads(
     const batch = must(await query.order("created_at", { ascending: true }).order("id", { ascending: true }).range(scanned, scanned + BATCH - 1), "waiting leads") ?? [];
     scanned += batch.length;
     if (batch.length > 0) {
-      // a lead can have many activities: page through them, or past 1,000 rows answered leads would show as waiting (RVW-2)
-      const { rows: answered } = await readAllPages(
-        async (from, to) =>
-          must(
-            await supabase
-              .from("activities")
-              .select("lead_id")
-              .eq("organization_id", orgId)
-              .in("lead_id", batch.map((row) => row.id))
-              .in("type", [...CONTACT_TYPES])
-              .not("created_by", "is", null)
-              // a private note is not an answer: otherwise a lead would be waiting for some people and not others
-              .eq("is_private", false)
-              .order("id", { ascending: true })
-              .range(from, to),
-            "lead activities",
-          ) ?? [],
-      );
-      const answeredIds = new Set(answered.map((row) => row.lead_id));
+      const answeredIds = await answeredLeadIds(supabase, orgId, batch.map((row) => row.id));
       waiting.push(...batch.filter((row) => !answeredIds.has(row.id)));
     }
     if (batch.length < BATCH) {
@@ -100,6 +84,13 @@ export async function getWaitingLeads(
     }
   }
 
+  // SPD-01 (owner (186)-(188), (212) ב): the leads nobody owns that this person may take, also when they do not read them
+  const offered = options.offered ? await offeredLeads(supabase, orgId) : [];
+  const known = new Set(waiting.map((row) => row.id));
+  for (const row of offered) {
+    if (!known.has(row.id)) waiting.push({ ...row, owner_id: null, taken_at: null });
+  }
+  waiting.sort((x, y) => (x.created_at === y.created_at ? (x.id < y.id ? -1 : 1) : x.created_at < y.created_at ? -1 : 1));
   const shown = waiting.slice(0, MAX_SHOWN);
   const owners = await getUserNames(shown.map((row) => row.owner_id));
   const sourceName = new Map((sources ?? []).map((s) => [s.id, s.name]));
@@ -116,7 +107,7 @@ export async function getWaitingLeads(
       takenAt: row.taken_at,
       createdAt: row.created_at,
     })),
-    truncated: !exhausted || waiting.length > MAX_SHOWN,
+    truncated: !exhausted || waiting.length > MAX_SHOWN || offered.length >= MAX_SHOWN,
   };
 }
 
@@ -134,4 +125,56 @@ async function overseenTeams(orgId: string, userId: string): Promise<string[]> {
   if (managedIds.size === 0) return [];
   const chain = must(teams, "teams").map((team) => ({ id: team.id, parentTeamId: team.parent_team_id }));
   return chain.filter((team) => managesTeamChain(team.id, chain, managedIds)).map((team) => team.id);
+}
+
+type Client = Awaited<ReturnType<typeof createClient>>;
+
+/**
+ * The leads among `ids` someone answered: a contact entry a person logged that is not a private note (the
+ * waiting screen's rule, SPD-02). A lead can have many activities: paged, or past 1,000 rows answered leads
+ * would show as waiting (RVW-2).
+ */
+async function answeredLeadIds(supabase: Client, orgId: string, ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const { rows } = await readAllPages(
+    async (from, to) =>
+      must(
+        await supabase
+          .from("activities")
+          .select("lead_id")
+          .eq("organization_id", orgId)
+          .in("lead_id", ids)
+          .in("type", [...CONTACT_TYPES])
+          .not("created_by", "is", null)
+          // a private note is not an answer: otherwise a lead would be waiting for some people and not others
+          .eq("is_private", false)
+          .order("id", { ascending: true })
+          .range(from, to),
+        "lead activities",
+      ) ?? [],
+  );
+  return new Set(rows.map((row) => row.lead_id).filter((id): id is string => id !== null));
+}
+
+/**
+ * SPD-01 (owner, 9 November 2026, answer (189) ב): the counter next to "לידים שמחכים" in the menu: open,
+ * unconverted, not imported leads nobody owns that the viewer is offered to take (app.unowned_lead_visible: every writer,
+ * a team's lead its team and the managers above) and that nobody answered yet by the waiting screen's rule. One call
+ * (public.unowned_leads_waiting_count), counted in the database up to 100, so the menu shows "99+" past 99.
+ */
+export async function countUnownedLeads(orgId: string): Promise<number> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("unowned_leads_waiting_count", { p_org: orgId });
+  if (error) throw new Error(`unowned leads count failed: ${error.message}`);
+  return Math.min(data ?? 0, 100);
+}
+
+/**
+ * SPD-01 (owner (212) ב): the unowned leads nobody answered that the viewer is offered to take, also those the business's
+ * record visibility does not show them (public.unowned_leads_waiting, oldest first, at most 200).
+ */
+async function offeredLeads(supabase: Client, orgId: string) {
+  const { data, error } = await supabase.rpc("unowned_leads_waiting", { p_org: orgId, p_limit: MAX_SHOWN });
+  if (error) throw new Error(`offered leads failed: ${error.message}`);
+  return data ?? [];
 }

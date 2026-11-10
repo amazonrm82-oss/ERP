@@ -38,7 +38,8 @@ export default async function WaitingLeadsPage({ params, searchParams }: Props) 
   const term = (await getOrgTerms(orgId)).lead;
   const showAll = (await searchParams).who === "all";
   const { leads, truncated } = showAll
-    ? await getWaitingLeads(orgId, null, { id: context.user.id, role: context.role })
+    ? // SPD-01 (lead's interim choice): the leads nobody owns that this person may take show on this tab only
+      await getWaitingLeads(orgId, null, { id: context.user.id, role: context.role }, { offered: true })
     : await getWaitingLeads(orgId, context.user.id);
   // FLD-07: a lead from a public form whose unique field holds a value another record holds
   const clashes = new Map<string, UniqueClash[]>();

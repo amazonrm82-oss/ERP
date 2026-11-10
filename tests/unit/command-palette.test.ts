@@ -14,6 +14,7 @@ const ORG = "11111111-1111-4111-8111-111111111111";
 const access = (role: "owner" | "admin" | "manager" | "member" | "viewer", canWrite = role !== "viewer", granted: string[] = []): CommandAccess => ({
   canWrite,
   settings: settingsAccessFor({ role, canWrite, canDelete: canWrite && ["owner", "admin", "manager"].includes(role), priceLists: false, granted }),
+  viewer: role === "viewer",
 });
 
 const labels = (list: { label: string }[]) => list.map((c) => c.label);
@@ -66,6 +67,9 @@ describe("command palette (REC-09)", () => {
     expect(settings).not.toContain("יומן ביקורת");
     expect(settings).not.toContain("סל מחזור");
     expect(settings).toContain("החשבון שלי");
+    // SPD-01 (owner (190) ב): the waiting leads are offered to writers only
+    expect(viewer.some((c) => c.key === "nav:waiting")).toBe(false);
+    expect(ownerCommands.some((c) => c.key === "nav:waiting")).toBe(true);
   });
 
   it("a member with the automations permission (PRM-01) is offered the automations", () => {

@@ -52,7 +52,8 @@ function query(table: string) {
   return builder;
 }
 
-vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ from: query }) }));
+// SPD-01 (owner (212) ב): the offered unowned leads come from public.unowned_leads_waiting; none here
+vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ from: query, rpc: async () => ({ data: [], error: null }) }) }));
 vi.mock("@/features/shell/queries", () => ({ getUserNames: async () => new Map() }));
 
 describe("waiting leads: a private note is not an answer (RVW-30)", () => {

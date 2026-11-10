@@ -16,6 +16,8 @@ export async function takeLeadAction(orgId: string, leadId: string): Promise<Act
   const answer = await takeLead(context.supabase, orgId, leadId);
   if (!answer.ok) return fail(answer.message);
   revalidatePath(paths.leadsWaiting(orgId));
+  // SPD-01: the list and the board offer it too
+  revalidatePath(paths.leads(orgId));
   revalidatePath(paths.lead(orgId, leadId));
   revalidatePath(paths.leadRespond(orgId, leadId));
   return answer.outcome.ok ? { ok: true, message: takeMessage(answer.outcome) } : fail(takeMessage(answer.outcome));

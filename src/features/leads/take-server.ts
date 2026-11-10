@@ -8,6 +8,7 @@ import { must } from "@/lib/db-read";
 import { dbErrorMessage, GENERIC_ERROR } from "@/lib/errors";
 import { createClient } from "@/lib/supabase/server";
 
+import { getUnownedLead } from "./queries";
 import { parseTakeOutcome, type TakeOutcome } from "./take";
 
 export type TakeAnswer = { ok: true; outcome: TakeOutcome } | { ok: false; message: string };
@@ -42,6 +43,8 @@ export type RespondLead = {
   takenAt: string | null;
   createdAt: string;
   converted: boolean;
+  // SPD-01 (owner (187) ב, (212) ב): read only because it is offered to take (public.unowned_lead): only "לקחתי"
+  takeOnly: boolean;
 };
 
 /** The lead for the short screen a new-lead push opens, read with the user's session; null when gone or not visible. */
@@ -57,7 +60,7 @@ export async function getRespondLead(orgId: string, leadId: string): Promise<Res
       .maybeSingle(),
     "lead",
   );
-  if (!lead) return null;
+  if (!lead) return getOfferedLead(orgId, leadId);
   const [source, owners] = await Promise.all([
     lead.source_id
       ? supabase.from("lead_sources").select("name").eq("organization_id", orgId).eq("id", lead.source_id).maybeSingle().then((r) => must(r, "lead source"))
@@ -79,5 +82,33 @@ export async function getRespondLead(orgId: string, leadId: string): Promise<Res
     takenAt: lead.taken_at,
     createdAt: lead.created_at,
     converted: lead.converted_at !== null,
+    takeOnly: false,
+  };
+}
+
+/** SPD-01: the short screen of a lead nobody owns that this person does not read but is offered to take. */
+async function getOfferedLead(orgId: string, leadId: string): Promise<RespondLead | null> {
+  const lead = await getUnownedLead(orgId, leadId);
+  if (!lead) return null;
+  const supabase = await createClient();
+  const source = lead.source_id
+    ? must(await supabase.from("lead_sources").select("name").eq("organization_id", orgId).eq("id", lead.source_id).maybeSingle(), "lead source")
+    : null;
+  return {
+    id: lead.id,
+    name: lead.full_name || lead.company_name || lead.phone || lead.email || "ליד ללא שם",
+    fullName: lead.full_name,
+    gender: lead.gender,
+    companyName: lead.full_name ? lead.company_name : null,
+    phone: lead.phone,
+    phoneE164: lead.phone_e164,
+    message: lead.message,
+    sourceName: source?.name ?? null,
+    ownerId: null,
+    ownerName: null,
+    takenAt: null,
+    createdAt: lead.created_at,
+    converted: false,
+    takeOnly: true,
   };
 }

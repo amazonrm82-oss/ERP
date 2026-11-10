@@ -18,6 +18,8 @@ export type CommandAccess = {
   /** may create records (the "+" menu): not a viewer, not a read-only business */
   canWrite: boolean;
   settings: SettingsAccess;
+  // SPD-01 (owner (190) ב): the waiting leads are not offered to a viewer
+  viewer?: boolean;
 };
 
 const CREATE_WORDS = ["חדש", "חדשה", "יצירה", "ליצור", "הוספה", "להוסיף", "new"];
@@ -45,7 +47,7 @@ export function buildCommands(orgId: string, terms: OrgTerms, modules: OrgModule
       });
     }
   }
-  for (const item of navItems(orgId, terms, modules)) {
+  for (const item of navItems(orgId, terms, modules, { viewer: access.viewer ?? false })) {
     commands.push({
       key: `nav:${item.key}`,
       group: "navigate",

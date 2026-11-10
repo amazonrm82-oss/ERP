@@ -4,7 +4,7 @@ import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 
 import { managesTeamChain } from "@/features/activities/schema";
-import { isOwnTakeRequest, parseTakeOutcome, TAKE_HEADER, takeMessage, takenLabel, takenLeadsFilter } from "@/features/leads/take";
+import { isOwnTakeRequest, parseTakeOutcome, TAKE_HEADER, takeMessage, takenLabel, takenLeadsFilter, takeOffered } from "@/features/leads/take";
 import { LEAD_PUSH_ACTIONS, pushPayload, type ClaimedNotification } from "@/features/notifications/push-payload";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
@@ -92,6 +92,17 @@ describe("take outcome (SPD-01)", () => {
     expect(isOwnTakeRequest(h({ "sec-fetch-site": "same-origin" }))).toBe(false);
     expect(isOwnTakeRequest(h({ [TAKE_HEADER]: "1", "sec-fetch-site": "cross-site" }))).toBe(false);
     expect(isOwnTakeRequest(h({ [TAKE_HEADER]: "1", "sec-fetch-site": "same-site" }))).toBe(false);
+  });
+
+  it("'לקחתי' is offered to a writer on an open lead nobody owns, and nowhere else", () => {
+    expect(takeOffered({ ownerId: null, statusKind: "open" }, true)).toBe(true);
+    // a viewer, a support session or a read-only business
+    expect(takeOffered({ ownerId: null, statusKind: "open" }, false)).toBe(false);
+    // someone's lead, a converted or a "not relevant" one, an unknown status
+    expect(takeOffered({ ownerId: LEAD, statusKind: "open" }, true)).toBe(false);
+    expect(takeOffered({ ownerId: null, statusKind: "converted" }, true)).toBe(false);
+    expect(takeOffered({ ownerId: null, statusKind: "disqualified" }, true)).toBe(false);
+    expect(takeOffered({ ownerId: null, statusKind: undefined }, true)).toBe(false);
   });
 });
 

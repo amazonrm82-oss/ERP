@@ -12,15 +12,41 @@ import { cn } from "@/lib/cn";
 import type { OrgModules } from "@/features/modules/modules";
 import type { OrgTerms } from "@/features/terminology/terms";
 
-import { isActive, navItems } from "../nav";
+import { isActive, navCountText, navItems } from "../nav";
+
+// SPD-01: counters next to menu entries, by entry key (the waiting leads nobody owns)
+type NavCounts = Partial<Record<string, number | null>>;
+
+function NavCount({ count, className }: { count: number | null | undefined; className?: string }) {
+  const text = navCountText(count);
+  if (!text) return null;
+  return (
+    <span className={cn("rounded-full bg-accent px-1.5 text-caption font-semibold text-on-accent tabular-nums", className)}>
+      <span aria-hidden="true">{text}</span>
+      <span className="sr-only">{`, ${text} בלי אחראי`}</span>
+    </span>
+  );
+}
 
 /** Fixed sidebar navigation (start side: right in RTL). Desktop and tablet. */
-export function SidebarNav({ orgId, terms, modules }: { orgId: string; terms?: OrgTerms; modules?: OrgModules }) {
+export function SidebarNav({
+  orgId,
+  terms,
+  modules,
+  counts = {},
+  viewer = false,
+}: {
+  orgId: string;
+  terms?: OrgTerms;
+  modules?: OrgModules;
+  counts?: NavCounts;
+  viewer?: boolean;
+}) {
   const pathname = usePathname();
   return (
     <nav aria-label="ניווט ראשי">
       <ul className="space-y-0.5">
-        {navItems(orgId, terms, modules).map((item) => {
+        {navItems(orgId, terms, modules, { viewer }).map((item) => {
           const active = isActive(pathname, item);
           return (
             <li key={item.key}>
@@ -33,7 +59,8 @@ export function SidebarNav({ orgId, terms, modules }: { orgId: string; terms?: O
                 )}
               >
                 <item.icon className={cn("size-5 shrink-0", active ? "text-accent" : "text-ink-soft")} />
-                {item.label}
+                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                <NavCount count={counts[item.key]} />
               </Link>
             </li>
           );
@@ -50,13 +77,28 @@ type ExtraLink = { href: string; label: string };
  * opens a sheet with everything else, so no screen is reachable only through
  * the user menu.
  */
-export function BottomNav({ orgId, extra, terms, modules }: { orgId: string; extra: ExtraLink[]; terms?: OrgTerms; modules?: OrgModules }) {
+export function BottomNav({
+  orgId,
+  extra,
+  terms,
+  modules,
+  counts = {},
+  viewer = false,
+}: {
+  orgId: string;
+  extra: ExtraLink[];
+  terms?: OrgTerms;
+  modules?: OrgModules;
+  counts?: NavCounts;
+  viewer?: boolean;
+}) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
-  const all = navItems(orgId, terms, modules);
+  const all = navItems(orgId, terms, modules, { viewer });
   const items = all.filter((item) => item.mobile);
   const rest = all.filter((item) => !item.mobile);
   const moreActive = rest.some((item) => isActive(pathname, item));
+  const restCount = rest.reduce((sum, item) => sum + Math.max(0, counts[item.key] ?? 0), 0);
   const cell = "flex min-h-14 w-full flex-col items-center justify-center gap-0.5 px-1 text-xs";
 
   return (
@@ -87,7 +129,11 @@ export function BottomNav({ orgId, extra, terms, modules }: { orgId: string; ext
             onClick={() => setMoreOpen(true)}
             className={cn(cell, moreActive ? "font-semibold text-accent-strong" : "text-ink-soft")}
           >
-            <MoreIcon className="size-5.5" />
+            <span className="relative">
+              <MoreIcon className="size-5.5" />
+              {/* SPD-01: what waits under "עוד" (the leads nobody owns) shows on the button too */}
+              <NavCount count={restCount} className="absolute -top-1.5 -end-3" />
+            </span>
             <span>עוד</span>
           </button>
         </li>
@@ -108,7 +154,8 @@ export function BottomNav({ orgId, extra, terms, modules }: { orgId: string; ext
                   )}
                 >
                   <item.icon className={cn("size-5 shrink-0", active ? "text-accent" : "text-ink-soft")} />
-                  {item.label}
+                  <span className="min-w-0 flex-1">{item.label}</span>
+                  <NavCount count={counts[item.key]} />
                 </Link>
               </li>
             );

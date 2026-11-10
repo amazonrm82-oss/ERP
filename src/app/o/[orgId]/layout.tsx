@@ -10,6 +10,7 @@ import { getOrgBranding } from "@/features/branding/queries";
 import { SendingPauseBanner } from "@/features/sending-pause/components/sending-pause-banner";
 import { RememberOrg } from "@/features/shortcuts/components/remember-org";
 import { withOrdersPlan } from "@/features/modules/modules";
+import { countUnownedLeads } from "@/features/leads/waiting";
 import { getOrgModules } from "@/features/modules/queries";
 import { getOrgTerms } from "@/features/terminology/queries";
 import { SystemBanners } from "@/features/system-banners/components/system-banners";
@@ -102,7 +103,7 @@ export default async function OrgLayout({ children, params }: Props) {
     );
   }
   const hasThemeCookie = (await cookies()).has(THEME_COOKIE);
-  const [notifications, unread, branding, trialEnd, frame, terms, storedModules, quickSale] = await Promise.all([
+  const [notifications, unread, branding, trialEnd, frame, terms, storedModules, quickSale, unownedLeads] = await Promise.all([
     listNotifications(org.id, user.id, 8),
     countUnread(org.id, user.id),
     getOrgBranding(org.id),
@@ -115,12 +116,15 @@ export default async function OrgLayout({ children, params }: Props) {
     getOrgModules(org.id),
     // GAP-08: the quick sale in the "+" menu, for whoever records payments
     context.canWrite ? quickSaleOffered(org.id) : Promise.resolve(false),
+    // SPD-01: the leads nobody owns, next to "לידים שמחכים", for who can take them; a failed read shows no counter
+    context.canWrite ? countUnownedLeads(org.id).catch(() => null) : Promise.resolve(null),
   ]);
   // ORD-01: orders show only while the plan holds them too; asked only when the business switched them on, and a failed
   // read hides them (the menu never breaks the page)
   const ordersInPlan = storedModules.orders ? await orgHasFeature(org.id, "orders").catch(() => false) : false;
   const modules = withOrdersPlan(storedModules, ordersInPlan);
   const { syncTheme, whatsNewUnread, tourSeenAt } = frame;
+  const navCounts = { waiting: modules.leads ? unownedLeads : null };
   // BIL-08: while the business is in the trial-end transition its line says what comes next
   const notice = trialEnd ? trialEndBannerText(trialEnd) : ORG_STATUS_NOTICES[org.status];
 
@@ -146,7 +150,7 @@ export default async function OrgLayout({ children, params }: Props) {
           </Link>
         </div>
         <div className="flex-1 overflow-y-auto px-3 py-2">
-          <SidebarNav orgId={org.id} terms={terms} modules={modules} />
+          <SidebarNav orgId={org.id} terms={terms} modules={modules} counts={navCounts} viewer={context.role === "viewer"} />
         </div>
       </aside>
 
@@ -233,6 +237,8 @@ export default async function OrgLayout({ children, params }: Props) {
         orgId={org.id}
         terms={terms}
         modules={modules}
+        counts={navCounts}
+        viewer={context.role === "viewer"}
         extra={[
           { href: paths.notifications(org.id), label: "התראות" },
           { href: paths.orgHelp(org.id), label: "מרכז עזרה" },

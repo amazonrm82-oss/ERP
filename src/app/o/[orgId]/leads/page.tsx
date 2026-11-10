@@ -221,7 +221,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
         <LeadsBoard orgId={orgId} board={board} canWrite={canWrite} reasons={reasons} />
       ) : leads.length > 0 ? (
         <>
-          <LeadCards orgId={orgId} leads={leads} statuses={lookups.statuses} showScore={shownColumns.some((c) => c.key === "score")} className="md:hidden" whatsapp={whatsappListContext(context)} />
+          <LeadCards orgId={orgId} leads={leads} statuses={lookups.statuses} showScore={shownColumns.some((c) => c.key === "score")} className="md:hidden" whatsapp={whatsappListContext(context)} canWrite={canWrite} />
           <div className="hidden md:block">
             <LeadsTable
               orgId={orgId}
@@ -239,6 +239,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
               completeness={completeness}
               whatsapp={whatsappListContext(context)}
               segments={segmentOptions}
+              canWrite={canWrite}
             />
           </div>
         </>

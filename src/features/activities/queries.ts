@@ -84,23 +84,13 @@ const isResponsePass = (activity: { type: string; metadata: Json }) =>
 
 export const TIMELINE_LIMIT = 100;
 
-/**
- * Timeline of a record: pinned entries first, then newest first (100 entries at most).
- * REC-06: with a filter, only activities of those types (pinned ones still on top).
- */
-export async function getTimeline(
-  orgId: string,
-  subject: TimelineSubject,
-  filter?: TimelineFilter,
-  types: ReadonlyArray<ActivityTypeOption> = [],
-  // FLD-10 part three: the business's words in the entries the app draws
-  terms: OrgTerms = DEFAULT_TERMS,
-): Promise<TimelineItem[]> {
-  const supabase = await createClient();
+const TIMELINE_COLUMNS = "id, type, body, metadata, occurred_at, created_by, created_at, is_pinned, is_private, activity_type_id";
 
+async function readTimelineRows(orgId: string, subject: TimelineSubject, filter?: TimelineFilter) {
+  const supabase = await createClient();
   let query = supabase
     .from("activities")
-    .select("id, type, body, metadata, occurred_at, created_by, created_at, is_pinned, is_private, activity_type_id")
+    .select(TIMELINE_COLUMNS)
     .eq("organization_id", orgId)
     .eq(SUBJECT_COLUMN[subject.kind], subject.id);
   // the type lists are constants (TIMELINE_FILTERS), never text from the URL
@@ -118,6 +108,29 @@ export async function getTimeline(
   if (error) {
     throw new Error(`timeline query failed: ${error.message}`);
   }
+  return activities;
+}
+
+/** A timeline entry as read from public.activities (TIMELINE_COLUMNS). */
+export type TimelineRow = Awaited<ReturnType<typeof readTimelineRows>>[number];
+
+/**
+ * Timeline of a record: pinned entries first, then newest first (100 entries at most).
+ * REC-06: with a filter, only activities of those types (pinned ones still on top).
+ */
+export async function getTimeline(
+  orgId: string,
+  subject: TimelineSubject,
+  filter?: TimelineFilter,
+  types: ReadonlyArray<ActivityTypeOption> = [],
+  // FLD-10 part three: the business's words in the entries the app draws
+  terms: OrgTerms = DEFAULT_TERMS,
+  // SPD-01 (owner (212) ב): entries already read by public.unowned_lead_timeline for a lead offered to take; the
+  // names around them are still read with the user's session
+  rows?: TimelineRow[],
+): Promise<TimelineItem[]> {
+  const supabase = await createClient();
+  const activities = rows ?? (await readTimelineRows(orgId, subject, filter));
 
   // Names behind the ids that system events carry in their metadata.
   const needsStatuses = activities.some((a) => a.type === "status_change");

@@ -2,6 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 
+import type { TimelineRow } from "@/features/activities/queries";
 import { requestedProductNames } from "@/features/requested-product/queries";
 import { getUserNames } from "@/features/shell/queries";
 import type { Json, LeadStatusKind } from "@/lib/database.types";
@@ -199,10 +200,49 @@ export async function getLead(orgId: string, leadId: string) {
   return data;
 }
 
+/** SPD-01 (owner (212) ב): a lead offered to take, as the take-only page and the short screen show it. */
+export type UnownedLead = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  phone: string | null;
+  phone_e164: string | null;
+  company_name: string | null;
+  source_id: string | null;
+  status_id: string;
+  message: string | null;
+  created_at: string;
+  original_created_on: string | null;
+  last_contacted_at: string | null;
+  gender: string | null;
+};
+
+/**
+ * SPD-01 (owner, 9 and 10 November 2026, (186)-(188), (212) ב): an open lead nobody owns that the viewer does not
+ * read under the business's record visibility but is offered to take (public.unowned_lead, the rule
+ * app.unowned_lead_visible). Null when it is not offered. Only the lead page and the short screen read it.
+ */
+export async function getUnownedLead(orgId: string, leadId: string): Promise<UnownedLead | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("unowned_lead", { p_org: orgId, p_lead: leadId });
+  if (error) throw new Error(`unowned lead query failed: ${error.message}`);
+  return (data as UnownedLead | null) ?? null;
+}
+
+export type UnownedLeadFile = { id: string; name: string; mime_type: string; size_bytes: number; created_at: string; activity_id: string | null };
+
+/** The same lead's timeline (no private notes) and its files' names, for the take-only page. */
+export async function getUnownedLeadTimeline(orgId: string, leadId: string): Promise<{ activities: TimelineRow[]; files: UnownedLeadFile[] } | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("unowned_lead_timeline", { p_org: orgId, p_lead: leadId });
+  if (error) throw new Error(`unowned lead timeline query failed: ${error.message}`);
+  return (data as { activities: TimelineRow[]; files: UnownedLeadFile[] } | null) ?? null;
+}
+
 // how many leads a board column shows; the column header has the exact count
 export const LEAD_COLUMN_LIMIT = 50;
 
-export type LeadBoardCard = { id: string; fullName: string | null; companyName: string | null; phone: string | null; statusId: string; ownerName: string | null };
+export type LeadBoardCard = { id: string; fullName: string | null; companyName: string | null; phone: string | null; statusId: string; ownerId: string | null; ownerName: string | null };
 export type LeadBoard = {
   // every status a lead can be moved to by hand ("converted" is set by the conversion)
   statuses: LeadStatusOption[];
@@ -256,6 +296,7 @@ export async function getLeadBoard(orgId: string, options: { search: string; tag
         companyName: row.company_name,
         phone: row.phone,
         statusId: row.status_id,
+        ownerId: row.owner_id,
         ownerName: row.owner_id ? (owners.get(row.owner_id) ?? null) : null,
       })),
     ),

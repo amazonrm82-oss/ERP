@@ -45,6 +45,8 @@ export default async function RespondLeadPage({ params, searchParams }: Props) {
   const subject = { kind: "lead" as const, id: lead.id };
   const mine = lead.ownerId === context.user.id;
   const canTake = context.canWrite && !lead.converted && (lead.ownerId === null || (mine && lead.takenAt === null));
+  // SPD-01 (owner (187) ב): a lead this person reads only as an unowned lead to take: only "לקחתי", no call or chat
+  const takeOnly = lead.takeOnly;
   // read once per request on the server; the clock runs on in the browser
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
@@ -90,40 +92,47 @@ export default async function RespondLeadPage({ params, searchParams }: Props) {
             {state}
           </p>
 
-          <div className="flex flex-col gap-2">
-            {canTake ? <TakeLeadButton orgId={orgId} leadId={lead.id} leadName={lead.name} /> : null}
-            {tel && context.canWrite ? (
-              <CallLogButton tel={tel} orgId={orgId} subject={subject} name={lead.name} wide autoStart={act === "call"} />
-            ) : tel ? (
-              <a href={tel} className={buttonClasses("secondary", "md", "w-full")} aria-label={`חיוג אל ${lead.name}`}>
-                <PhoneIcon className="size-5 text-accent" />
-                חיוג
-              </a>
-            ) : null}
-            {whatsapp && lead.phoneE164 && context.canWrite ? (
-              <WhatsappButton
-                phoneE164={lead.phoneE164}
-                orgId={orgId}
-                subject={subject}
-                name={lead.name}
-                values={recordTemplateValues({ fullName: lead.fullName, gender: lead.gender }, context)}
-                wide
-                autoStart={act === "whatsapp"}
-              />
-            ) : whatsapp ? (
-              <a
-                href={whatsapp}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={buttonClasses("secondary", "md", "w-full")}
-                aria-label={`WhatsApp אל ${lead.name} (נפתח בחלון חדש)`}
-              >
-                <ChatIcon className="size-5 text-accent" />
-                <span dir="ltr">WhatsApp</span>
-              </a>
-            ) : null}
-            {!tel && !whatsapp ? <p className="text-sm text-ink-soft">לליד הזה אין מספר טלפון.</p> : null}
-          </div>
+          {takeOnly ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-sm">כדי לטפל בליד, קחו אותו קודם</p>
+              {canTake ? <TakeLeadButton orgId={orgId} leadId={lead.id} leadName={lead.name} /> : null}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {canTake ? <TakeLeadButton orgId={orgId} leadId={lead.id} leadName={lead.name} /> : null}
+              {tel && context.canWrite ? (
+                <CallLogButton tel={tel} orgId={orgId} subject={subject} name={lead.name} wide autoStart={act === "call"} />
+              ) : tel ? (
+                <a href={tel} className={buttonClasses("secondary", "md", "w-full")} aria-label={`חיוג אל ${lead.name}`}>
+                  <PhoneIcon className="size-5 text-accent" />
+                  חיוג
+                </a>
+              ) : null}
+              {whatsapp && lead.phoneE164 && context.canWrite ? (
+                <WhatsappButton
+                  phoneE164={lead.phoneE164}
+                  orgId={orgId}
+                  subject={subject}
+                  name={lead.name}
+                  values={recordTemplateValues({ fullName: lead.fullName, gender: lead.gender }, context)}
+                  wide
+                  autoStart={act === "whatsapp"}
+                />
+              ) : whatsapp ? (
+                <a
+                  href={whatsapp}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={buttonClasses("secondary", "md", "w-full")}
+                  aria-label={`WhatsApp אל ${lead.name} (נפתח בחלון חדש)`}
+                >
+                  <ChatIcon className="size-5 text-accent" />
+                  <span dir="ltr">WhatsApp</span>
+                </a>
+              ) : null}
+              {!tel && !whatsapp ? <p className="text-sm text-ink-soft">לליד הזה אין מספר טלפון.</p> : null}
+            </div>
+          )}
 
           <Link href={paths.lead(orgId, lead.id)} className="text-sm font-medium text-accent underline underline-offset-4 hover:text-accent-strong">
             לכרטיס הליד המלא

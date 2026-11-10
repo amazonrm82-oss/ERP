@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { DEFAULT_MODULES, withOrdersPlan } from "@/features/modules/modules";
 import { orderPath, ordersPath } from "@/features/orders/paths";
-import { createItems, isActive, navItems } from "@/features/shell/nav";
+import { createItems, isActive, navCountText, navItems } from "@/features/shell/nav";
 import { quotePath, quotesPath } from "@/features/quotes/paths";
 
 const ORG = "11111111-1111-4111-8111-111111111111";
@@ -19,6 +19,26 @@ describe("main menu", () => {
 
   it("the phone bottom bar keeps its four places", () => {
     expect(navItems(ORG).filter((entry) => entry.mobile).map((entry) => entry.key)).toEqual(["home", "leads", "deals", "tasks"]);
+  });
+
+  it("SPD-01: the waiting leads have their own entry after the leads, under 'עוד', with a capped counter", () => {
+    const items = navItems(ORG);
+    const waiting = items.find((entry) => entry.key === "waiting")!;
+    expect(waiting).toMatchObject({ label: "לידים שמחכים", href: `/o/${ORG}/leads/waiting?who=all`, mobile: false });
+    expect(items.indexOf(waiting)).toBe(items.findIndex((entry) => entry.key === "leads") + 1);
+    // the waiting screen lights its own entry, not the leads entry; a lead's page still lights the leads entry
+    const leads = items.find((entry) => entry.key === "leads")!;
+    expect(isActive(`/o/${ORG}/leads/waiting`, waiting)).toBe(true);
+    expect(isActive(`/o/${ORG}/leads/waiting`, leads)).toBe(false);
+    expect(isActive(`/o/${ORG}/leads/22222222-2222-4222-8222-222222222222`, leads)).toBe(true);
+    expect(isActive(`/o/${ORG}/leads/22222222-2222-4222-8222-222222222222`, waiting)).toBe(false);
+    // owner (190) ב: a viewer takes no lead, so the entry leaves a viewer's menu (the bottom bar keeps its places)
+    expect(navItems(ORG, undefined, undefined, { viewer: true }).map((entry) => entry.key)).not.toContain("waiting");
+    expect(navItems(ORG, undefined, undefined, { viewer: true }).filter((entry) => entry.mobile).map((entry) => entry.key)).toEqual(["home", "leads", "deals", "tasks"]);
+    // LEAD-08: leads switched off take the entry with them
+    expect(navItems(ORG, undefined, { ...DEFAULT_MODULES, leads: false }).map((entry) => entry.key)).not.toContain("waiting");
+    expect([navCountText(null), navCountText(0), navCountText(-1), navCountText(Number.NaN)]).toEqual([null, null, null, null]);
+    expect([navCountText(1), navCountText(99), navCountText(100)]).toEqual(["1", "99", "99+"]);
   });
 
   it("keys and links are unique", () => {

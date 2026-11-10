@@ -39,8 +39,11 @@ import { getCardLayout } from "@/features/card-layout/queries";
 import { LeadDetailsCard } from "@/features/leads/components/lead-details-card";
 import { activeReasonNames } from "@/features/disqualify-reasons/queries";
 import { LeadStatusForm } from "@/features/leads/components/lead-status-form";
+import { TakeLeadButton } from "@/features/leads/components/take-lead-button";
 import { leadDisplayName, statusTone } from "@/features/leads/display";
-import { getLead, getLeadLookups } from "@/features/leads/queries";
+import { TakeOnlyLead } from "@/features/leads/components/take-only-lead";
+import { getLead, getLeadLookups, getUnownedLead } from "@/features/leads/queries";
+import { takeOffered } from "@/features/leads/take";
 import { getRequestedProduct, requestedProductEnabled } from "@/features/requested-product/queries";
 import { utmValues } from "@/features/leads/schema";
 import { orgHasFeature } from "@/features/settings/queries";
@@ -97,7 +100,11 @@ export default async function LeadPage({ params, searchParams }: Props) {
     getOrgTerms(orgId),
   ]);
   if (!lead) {
-    notFound();
+    // SPD-01 (owner (186)-(188), (212) ב): an open lead nobody owns, offered to this person to take although the business's
+    // record visibility does not show it to them: read it, take it, nothing else
+    const unowned = await getUnownedLead(orgId, leadId);
+    if (!unowned) notFound();
+    return <TakeOnlyLead orgId={orgId} lead={unowned} statuses={lookups.statuses} sources={lookups.sources} terms={terms} canWrite={canWrite} />;
   }
   // FLD-06 part B: the names of the record links and files this record holds, as this viewer may read them
   const fields = await withFieldRefs(orgId, fieldDefs, [lead.custom_fields]);
@@ -166,6 +173,13 @@ export default async function LeadPage({ params, searchParams }: Props) {
         }
       />
       <div className="mb-5 print:hidden">
+        {/* SPD-01: a lead nobody has goes to the first one who takes it */}
+        {takeOffered({ ownerId: lead.owner_id, statusKind: status?.kind }, canWrite) ? (
+          <div className="mb-4 flex flex-col gap-2 rounded-lg border border-line bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-ink-soft">אין אחראי עדיין. מי שלוקח ראשון הופך לאחראי.</p>
+            <TakeLeadButton orgId={orgId} leadId={lead.id} leadName={name} size="sm" className="sm:items-end" />
+          </div>
+        ) : null}
         <ContactActions phone={lead.phone} phoneE164={lead.phone_e164} email={lead.email} saveHref={paths.vcard(orgId, "lead", lead.id)}
           callLog={context.canWrite ? { orgId, subject: { kind: "lead", id: lead.id }, name } : undefined}
           whatsappLog={
