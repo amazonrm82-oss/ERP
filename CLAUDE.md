@@ -2615,6 +2615,18 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   job its re-checked file paths, filled body and reply-to (shape in the migration header); its own In use line then. Interim
   lead choices: library files only with marketing templates (question 198), collection needs the plan keys (question 199). The advisor's
   finding on `record_email_queue` is expected.
+- Document templates (SGN-01, migration 021200; owner (67) ג, (200) א, (201) ב, (202) ב; independent review): plan key
+  `signatures` (personal off; basic, pro, business on) and `max_signatures_per_month` (0 / 20 / 100 / no cap; counted by SGN-02,
+  nothing counts it yet); `app.plan_key_defaults` was last redefined in 021200. `public.document_templates` (managed list: members
+  read; owners/admins of a writable business write; audited; 50 per business, hint `document_templates:max`; name, kind
+  contract|service_agreement|joining_form|health_declaration|other, record_type lead|contact|company|deal, body cleaned Markdown
+  rendered only through `NoteText`, is_active; server-only `draft_wording` and `key`). Definer guard `app.document_templates_guard`
+  (outsider guard first): without the key a person may only switch a template off (nothing else changed) or delete it; adding,
+  editing and switching on raise `feature:signatures`. Three DRAFT defaults (service agreement, contract, joining form) are seeded
+  for every business by `app.seed_document_templates` (setting `app.document_template_seed` AND the server-only key; the setting
+  alone is never trusted); no health declaration is seeded until PRV-05. Merge fields are a closed list per record type,
+  `app.document_merge_fields` = `src/features/document-templates/fields.ts` (hint `document_template:field`); HEB-01 blocks hold.
+  Nothing is filled, sent or signed yet (SGN-02). Page `/settings/document-templates`.
 - In-app guide (UX-05, migration 021199; owner's answers 203 ב, 204 א, 205 א, 206 ב, 10 November 2026): `profiles.guide_tour_seen_at` (own column
   grant; null = the first-visit tour opens; never marked in a support session; replaying from the account menu "סיור במערכת" changes
   nothing). Texts are Markdown in `docs/help/` (articles, screens, tour; frontmatter checked by `tests/unit/in-app-guide.test.ts`),
