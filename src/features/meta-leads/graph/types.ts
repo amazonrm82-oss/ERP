@@ -33,4 +33,9 @@ export type MetaGraphProvider = {
   code: string;
   fetchLead(leadId: string, pageToken: string, pageId: string): Promise<GraphLeadResult>;
   checkPage(pageId: string, pageToken: string): Promise<GraphPageResult>;
+  // FOLLOW-UP (INT-03, owner 10 November 2026, answer (226) ב): the "token about to expire" notice is built WITH the real
+  // adapter, not before: it reads the token's expiry from Graph (`GET /debug_token`, `data.expires_at` / `data_access_expires_at`;
+  // 0 = never), keeps only the date on the connection (server only), and tells the business's active owners and admins once
+  // per connection a few days before it, through the same path as INT-03's failure notice (app.integration_failure_notice /
+  // app.integration_event_log). The fake provider has no expiry, so nothing is built or faked now.
 };

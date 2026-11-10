@@ -590,6 +590,25 @@ export type IntegrationRow = {
 };
 export type IntegrationWrite = { name?: string; status?: string; config?: Json };
 
+// INT-03: the sync log of a connection (owners/admins read; written only by the definer triggers on integrations and on
+// the Meta arrivals). kind is a closed list; fetch outcomes are one line per connection, kind, code and business day (hits)
+export type IntegrationEventRow = {
+  id: string;
+  organization_id: string;
+  // null once the connection is deleted (owner (228) ב); connection_id keeps its id
+  integration_id: string | null;
+  connection_id: string;
+  provider: string;
+  // server only: when the connection was deleted; its lines are kept 12 months from then (owner (228) ב)
+  connection_deleted_at: string | null;
+  kind: string;
+  code: string | null;
+  day: string;
+  hits: number;
+  created_at: string;
+  last_at: string;
+};
+
 // CAP-11: which Meta lead form of a page goes to whom (meta_form_id null = the page's default row, "every other form");
 // each row owns an intake form of kind 'meta'. Owners/admins only
 export type MetaLeadFormRow = {
@@ -3891,6 +3910,7 @@ export type Database = {
         MetaLeadFormWrite & { organization_id: string; integration_id: string; meta_form_id?: string | null; name: string },
         MetaLeadFormWrite
       >;
+      integration_events: ReadOnlyTable<IntegrationEventRow>;
       integrations: Table<IntegrationRow, { organization_id: string; provider: string; external_id?: string | null; name: string; config?: Json }, IntegrationWrite>;
       // SPD-07: owners and admins only; column grants (token made by the database; the form by the widget's trigger)
       site_widgets: Table<SiteWidgetRow, SiteWidgetWrite & { organization_id: string; name: string }, SiteWidgetWrite>;
@@ -4274,6 +4294,8 @@ export type Database = {
       meta_lead_receive: { Args: { p_page_id: string; p_leads: Json }; Returns: Json };
       meta_lead_claim: { Args: { p_limit?: number; p_ids?: string[] | null }; Returns: Json };
       meta_lead_finish: { Args: { p_arrival: string; p_lease: string; p_lead?: Json | null; p_error?: string | null }; Returns: string };
+      integration_test_claim: { Args: { p_org: string; p_integration: string; p_user: string }; Returns: Json };
+      integration_test_finish: { Args: { p_org: string; p_integration: string; p_lease: string; p_result: string }; Returns: string };
       meta_lead_summary: { Args: { p_org: string }; Returns: Json };
       // SPD-07: the site widget's display settings and its short form (service_role only)
       site_widget_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };

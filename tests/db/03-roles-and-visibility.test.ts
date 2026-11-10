@@ -2871,6 +2871,24 @@ describe("provider connections by role", () => {
     const removed = await asUser(people.admin.id, async (q) => (await q("delete from public.meta_lead_forms where organization_id = $1 and name = 'טופס admin'", [org])).rowCount);
     expect(removed).toBe(1);
   });
+
+  // INT-03: the connections' sync log follows the connection; nobody writes it
+  it("owners and admins read a connection's sync log; nobody else sees it, and no role writes it", async () => {
+    for (const role of ["owner", "admin", "manager", "member", "viewer"]) {
+      const seen = await asUser(people[role].id, (q) => count(q, "select 1 from public.integration_events where organization_id = $1", [org]));
+      if (role === "owner" || role === "admin") expect(seen, role).toBeGreaterThan(0);
+      else expect(seen, role).toBe(0);
+    }
+    const conn = (await asUser(people.owner.id, (q) => q<{ id: string }>("select id from public.integrations where organization_id = $1 limit 1", [org]))).rows[0].id;
+    for (const role of ["owner", "admin", "manager", "member", "viewer"]) {
+      expect((await pgError(asUser(people[role].id, (q) => q("update public.integration_events set hits = 9 where organization_id = $1", [org])))).code, role).toBe("42501");
+      expect((await pgError(asUser(people[role].id, (q) => q("delete from public.integration_events where organization_id = $1", [org])))).code, role).toBe("42501");
+      expect(
+        (await pgError(asUser(people[role].id, (q) => q("insert into public.integration_events (organization_id, integration_id, connection_id, provider, kind, day) values ($1, $2, $2, 'meta_lead_ads', 'created', current_date)", [org, conn])))).code,
+        role,
+      ).toBe("42501");
+    }
+  });
 });
 
 // TASK-06: checklist templates are a managed list (owners and admins write, everyone reads); a task's steps follow the

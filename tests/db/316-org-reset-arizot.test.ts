@@ -40,6 +40,8 @@ const KEPT = new Set([
   "public.checklist_templates", "public.completeness_settings", "public.consent_blocklist", "public.contact_relation_types",
   "public.conversion_field_maps", "public.customer_status_settings", "public.deal_contact_roles", "public.deal_loss_reasons",
   "public.disqualify_reasons", "public.document_templates", "public.field_definitions", "public.forms", "public.goals", "public.integrations",
+  // INT-03 (after the script): a kept connection keeps its sync log; the script does not know the table
+  "public.integration_events",
   "public.lead_distribution_settings", "public.lead_response_settings", "public.lead_routing_rules", "public.lead_score_rules",
   "public.lead_sources", "public.lead_statuses", "public.library_categories", "public.library_items", "public.meeting_types",
   "public.message_templates", "public.meta_lead_forms", "public.number_sequences", "public.org_bank_details",
@@ -51,7 +53,7 @@ const KEPT = new Set([
   "public.site_widgets", "public.tags", "public.whatsapp_templates",
   "app.automation_rule_runs", "app.automation_run_months", "app.automation_scan_cursors", "app.booking_page_closures",
   "app.calendar_feeds", "app.cleanup_suggestion_weeks", "app.collection_reminder_turns", "app.consent_blocklist_pending",
-  "app.dormant_backfills", "app.integration_secrets", "app.job_cancel_counts", "app.lead_retention_settings",
+  "app.dormant_backfills", "app.integration_notice_days", "app.integration_secrets", "app.integration_tests", "app.job_cancel_counts", "app.lead_retention_settings",
   "app.lead_rotation_clock", "app.lead_rotation_passes", "app.lead_score_queue", "app.message_cap_holds",
   "app.message_cap_notices", "app.message_refusal_notices", "app.message_send_rate", "app.message_usage_days",
   "app.meta_lead_notice_days", "app.org_activation", "app.org_suspensions", "app.pdf_months", "app.platform_assignments",

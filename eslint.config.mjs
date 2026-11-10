@@ -87,6 +87,9 @@ const serviceKeyAllowList = {
     "src/features/orders/pdf-public-server.ts",
     // CAP-11 (owner, 4 November 2026, answer (126) א): the Meta Lead Ads webhook and its sweep
     "src/features/meta-leads/webhook-server.ts",
+    // INT-01 (owner, 10 November 2026, answer (227) ב): "test connection" with the stored token
+    // (public.integration_test_claim, public.integration_test_finish), after the owner's or admin's session was checked
+    "src/features/integrations/test-server.ts",
     // ADM-01 (owner, 26 October 2026, answer (ב)): the public subprocessors page (public.subprocessors_public_page)
     "src/features/legal/subprocessors-public-server.ts",
     // OPS-02 (owner, 2 November 2026, answers (40) ב, (42) ד): the secret-link pages' shared per-sender limit of "not found"

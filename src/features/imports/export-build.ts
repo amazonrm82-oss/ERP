@@ -80,6 +80,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "site_widgets", file: "site_widgets.csv" },
   // INT-02: provider connections (no secret: the ciphertext is in schema app and never exported)
   { table: "integrations", file: "integrations.csv" },
+  // INT-03: the connections' sync log (kinds and codes only; nothing of a lead or a token)
+  { table: "integration_events", file: "integration_events.csv" },
   // CAP-11: which Meta lead form goes to whom (the arrivals are in schema app, ids only, not exported)
   { table: "meta_lead_forms", file: "meta_lead_forms.csv" },
   // TASK-06

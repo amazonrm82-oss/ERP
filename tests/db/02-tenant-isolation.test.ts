@@ -495,6 +495,8 @@ describe("tenant isolation", () => {
     "site_widgets",
     // INT-02
     "integrations",
+    // INT-03: the connection's sync log (its "created" line is written by the trigger when A's connection is made)
+    "integration_events",
     // CAP-11
     "meta_lead_forms",
     // TASK-06
@@ -750,6 +752,8 @@ describe("tenant isolation", () => {
       qr_codes: "name = name",
       site_widgets: "name = name",
       integrations: "name = name",
+      // no client write grant at all (definer triggers write): a permission error is the expected outcome
+      integration_events: "hits = hits",
       meta_lead_forms: "name = name",
       goals: "target = target",
       product_categories: "name = name",
@@ -937,6 +941,7 @@ describe("tenant isolation", () => {
       ["insert into public.qr_codes (organization_id, name, target_kind, target_url) values ($1, 'x', 'url', 'https://a.example.com/')", [orgA]],
       ["insert into public.site_widgets (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.integrations (organization_id, provider, external_id, name) values ($1, 'meta_lead_ads', '777000999', 'x')", [orgA]],
+      ["insert into public.integration_events (organization_id, integration_id, connection_id, provider, kind, day) values ($1, $2, $2, 'meta_lead_ads', 'created', current_date)", [orgA, ids.integrationA]],
       ["insert into public.meta_lead_forms (organization_id, integration_id, meta_form_id, name) values ($1, $2, '555000999', 'x')", [orgA, ids.integrationA]],
       ["insert into public.goals (organization_id, scope, period, period_start, metric, target) values ($1, 'org', 'month', '2026-11-01', 'won_deals', 1)", [orgA]],
       ["insert into public.product_categories (organization_id, name) values ($1, 'x')", [orgA]],
@@ -1084,6 +1089,7 @@ describe("tenant isolation", () => {
       ["qr_codes", "name = 'HACKED'", "name = 'HACKED'"],
       ["site_widgets", "name = 'HACKED'", "name = 'HACKED'"],
       ["integrations", "name = 'HACKED'", "name = 'HACKED'"],
+      ["integration_events", "hits = 777", "hits = 777"],
       ["meta_lead_forms", "name = 'HACKED'", "name = 'HACKED'"],
       ["task_checklist_items", "done = true", "done"],
       ["checklist_templates", "name = 'HACKED'", "name = 'HACKED'"],

@@ -47,6 +47,11 @@ import { getSupabaseEnv } from "@/lib/env";
  *   public.meta_lead_claim() (which answers the page token's ciphertext, decrypted on the
  *   server with PROVIDER_SECRETS_KEY for one Graph API call) and public.meta_lead_finish()
  *   (the lead through intake_submit);
+ * - "test connection" of a Meta page with its stored token (src/features/integrations/test-server.ts;
+ *   INT-01, owner 10 November 2026, answer (227) ב), inside an owner's or admin's request AFTER their own session
+ *   was checked: it calls only public.integration_test_claim() (the person checked again, 5 tests per connection
+ *   in 10 minutes, the ciphertext and page id of that one connection) and public.integration_test_finish()
+ *   (only verified_at / last_error_code and one log line, under CAP-11's page-ownership rule);
  * - the public secret-link pages (owner's approved pattern: one service_role-only
  *   definer function per action that checks the token; no table access):
  *   - the personal calendar feed (src/features/calendar-feed/feed-server.ts):

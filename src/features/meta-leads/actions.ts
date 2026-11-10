@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { encryptSecret } from "@/features/integrations/crypto";
 import { currentSecretKey } from "@/features/integrations/keys-server";
+import { integrationsSettingsPath } from "@/features/integrations/paths";
 import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
@@ -33,6 +34,12 @@ function graphMessage(code: GraphErrorCode): string {
   if (code === "token_invalid") return "פייסבוק לא קיבלה את הטוקן. העתיקו טוקן חדש של הדף ונסו שוב.";
   if (code === "not_found") return "לא מצאנו את הדף בפייסבוק. בדקו את מזהה הדף.";
   return "פייסבוק לא ענתה כרגע. נסו שוב בעוד כמה דקות.";
+}
+
+/** INT-01: the integrations screen shows the same connections. */
+function revalidateMeta(orgId: string) {
+  revalidatePath(metaLeadsSettingsPath(orgId));
+  revalidatePath(integrationsSettingsPath(orgId));
 }
 
 type Supabase = Extract<Awaited<ReturnType<typeof actionContext>>, { ok: true }>["supabase"];
@@ -102,7 +109,7 @@ export async function connectPageAction(orgId: string, _prev: FormState, formDat
     await supabase.from("integrations").delete().eq("organization_id", orgId).eq("id", integrationId);
     return fail(problem, { values: values(formData) });
   }
-  revalidatePath(metaLeadsSettingsPath(orgId));
+  revalidateMeta(orgId);
   return { ok: true, message: "הדף חובר. כשהליד הראשון ממנו ייקלט, החיבור יאומת והלידים יוצגו כאן." };
 }
 
@@ -130,7 +137,7 @@ export async function replaceTokenAction(orgId: string, integrationId: string, _
   if (!check.ok) return fail(graphMessage(check.code));
   const problem = await storeToken(supabase, orgId, row.id, row.external_id, parsed.data.token);
   if (problem) return fail(problem);
-  revalidatePath(metaLeadsSettingsPath(orgId));
+  revalidateMeta(orgId);
   return { ok: true, message: "הטוקן החדש נשמר. הלידים שחיכו יימשכו בדקות הקרובות." };
 }
 
@@ -146,7 +153,7 @@ export async function setConnectionStatusAction(orgId: string, integrationId: st
     .select("id");
   if (error) return fail(dbErrorMessage(error));
   if (data.length === 0) return fail(NOT_FOUND_OR_FORBIDDEN);
-  revalidatePath(metaLeadsSettingsPath(orgId));
+  revalidateMeta(orgId);
   return ok();
 }
 
@@ -157,7 +164,7 @@ export async function deleteConnectionAction(orgId: string, integrationId: strin
   const { data, error } = await context.supabase.from("integrations").delete().eq("organization_id", orgId).eq("id", integrationId).select("id");
   if (error) return fail(dbErrorMessage(error));
   if (data.length === 0) return fail(NOT_FOUND_OR_FORBIDDEN);
-  revalidatePath(metaLeadsSettingsPath(orgId));
+  revalidateMeta(orgId);
   return ok();
 }
 
@@ -196,7 +203,7 @@ export async function saveFormMappingAction(
       return fail(message, { values: formValues(formData) });
     }
   }
-  revalidatePath(metaLeadsSettingsPath(orgId));
+  revalidateMeta(orgId);
   return { ok: true, message: "ההגדרות נשמרו." };
 }
 
@@ -207,6 +214,6 @@ export async function deleteFormMappingAction(orgId: string, rowId: string): Pro
   const { data, error } = await context.supabase.from("meta_lead_forms").delete().eq("organization_id", orgId).eq("id", rowId).select("id");
   if (error) return fail(dbErrorMessage(error));
   if (data.length === 0) return fail(NOT_FOUND_OR_FORBIDDEN);
-  revalidatePath(metaLeadsSettingsPath(orgId));
+  revalidateMeta(orgId);
   return ok();
 }
