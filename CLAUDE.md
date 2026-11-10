@@ -2608,7 +2608,8 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   business's one vote per item through `public.roadmap_vote` (`app.membership_role`; closed or deleted business refused,
   `roadmap:closed`; done items `roadmap:done`); only counts and the caller's own vote go out, never which business voted, never a
   support request's text. The public page `/help/roadmap` is a static list in `src/features/roadmap/public-items.ts` (five items,
-  status only, no dates, "הסדר והזמנים עשויים להשתנות"); changing that list needs the owner's approval; no service key.
+  status only, no dates, "הסדר והזמנים עשויים להשתנות"); changing that list needs the owner's approval; no service key. The advisor's findings on the five
+  definer RPCs and the two app tables are expected.
 - Imports (migration 0012): `import_jobs` plus `import_job_id` on leads/contacts/companies (guarded:
   only a running job of the same user and type, set on insert, never changed). `emit_event` marks such
   inserts `origin: 'import'`; `process_outbox` skips origins `automation` and `import`;
