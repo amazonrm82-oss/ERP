@@ -4,8 +4,9 @@ import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } fr
 
 import { Button, IconButton } from "@/components/ui/button";
 import { CloseIcon } from "@/components/ui/icons";
+import { restoreFocus, Sheet, type SheetHeight } from "@/components/ui/sheet";
 import { cn } from "@/lib/cn";
-import { focusIsLost, focusLanding, setDialogLanding, type FocusLanding, type FocusNode } from "@/lib/focus-rescue";
+import { focusLanding, setDialogLanding, type FocusNode } from "@/lib/focus-rescue";
 
 type DialogProps = {
   open: boolean;
@@ -15,8 +16,10 @@ type DialogProps = {
   children?: ReactNode;
   // the buttons at the bottom
   footer?: ReactNode;
-  // "sheet": slides up from the bottom of a phone screen; a centred window from sm up
+  // "sheet": the app's one bottom sheet (Sheet) on a phone screen; a centred window from sm up
   variant?: "dialog" | "sheet";
+  // a sheet's height on a phone: to its content (default) or 88% of the screen
+  height?: SheetHeight;
   className?: string;
 };
 
@@ -83,14 +86,35 @@ export function LeaveDialog({ onStay, onLeave }: { onStay: () => void; onLeave: 
   );
 }
 
-function DialogFrame({
+function DialogFrame(props: DialogProps & { dialogRef?: RefObject<HTMLDialogElement | null> }) {
+  if (props.variant === "sheet") {
+    const { open, onClose, title, description, children, footer, height, className, dialogRef } = props;
+    return (
+      <Sheet
+        open={open}
+        onClose={onClose}
+        title={title}
+        description={description}
+        footer={footer}
+        footerClassName="flex flex-wrap justify-end gap-2"
+        height={height}
+        className={className}
+        dialogRef={dialogRef}
+      >
+        {children}
+      </Sheet>
+    );
+  }
+  return <WindowFrame {...props} />;
+}
+
+function WindowFrame({
   open,
   onClose,
   title,
   description,
   children,
   footer,
-  variant = "dialog",
   className,
   dialogRef,
 }: DialogProps & { dialogRef?: RefObject<HTMLDialogElement | null> }) {
@@ -133,13 +157,11 @@ function DialogFrame({
       }}
       className={cn(
         "m-auto max-h-[85dvh] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-lg border border-line bg-surface p-0 text-ink shadow-xl backdrop:bg-brand/60",
-        variant === "sheet" && "mx-sheet max-sm:mb-0 max-sm:w-full max-sm:max-w-none max-sm:rounded-b-none max-sm:pb-[env(safe-area-inset-bottom)]",
         className,
       )}
     >
       {open ? (
         <div className="flex flex-col">
-          {variant === "sheet" ? <span aria-hidden="true" className="mx-auto mt-2 h-1 w-10 rounded-full bg-line-strong sm:hidden" /> : null}
           <div className="flex items-start justify-between gap-3 px-4 pt-3 sm:px-5">
             <div className="min-w-0 pt-2">
               <h2 id={titleId} className="text-lead font-semibold">
@@ -159,16 +181,4 @@ function DialogFrame({
       ) : null}
     </dialog>
   );
-}
-
-function restoreFocus(target: HTMLElement | null, dialog: HTMLDialogElement, landing: FocusLanding | null) {
-  const active = document.activeElement;
-  // only when focus was lost (the body, a removed element) or is still inside the closed window
-  if (!focusIsLost(active as FocusNode | null, document.body as unknown as FocusNode) && !(active && dialog.contains(active))) return;
-  if (target?.isConnected) {
-    target.focus();
-    return;
-  }
-  // the opener went away with its row: the next row, else the previous one, else the page's main heading
-  (landing?.() as HTMLElement | null)?.focus();
 }

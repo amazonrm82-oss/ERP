@@ -10,6 +10,7 @@ import { BarList, ChartBar, Meter } from "@/components/ui/chart";
 import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Calendar, DateField } from "@/components/ui/date-picker";
 import { Dialog, LeaveDialog } from "@/components/ui/dialog";
+import { Sheet, type SheetHeight } from "@/components/ui/sheet";
 import { SidePanel } from "@/components/ui/side-panel";
 import { EmptyState, FormError, FormNotice } from "@/components/ui/feedback";
 import { Checkbox, SelectField, Switch, TextareaField, TextField } from "@/components/ui/field";
@@ -76,6 +77,7 @@ function GalleryBody({ theme }: { theme: "light" | "dark" }) {
   const [on, setOn] = useState(true);
   const [dialog, setDialog] = useState<"dialog" | "sheet" | null>(null);
   const [panel, setPanel] = useState(false);
+  const [sheet, setSheet] = useState<SheetHeight | null>(null);
   const [items, setItems] = useState(["חדש", "בטיפול", "נסגר"]);
   const [day, setDay] = useState("2026-10-09");
   const p = (name: string) => `${theme}-${name}`;
@@ -193,6 +195,12 @@ function GalleryBody({ theme }: { theme: "light" | "dark" }) {
           <Button variant="secondary" onClick={() => setPanel(true)}>
             פתיחת פאנל צד
           </Button>
+          <Button variant="secondary" onClick={() => setSheet("content")}>
+            גיליון לפי התוכן
+          </Button>
+          <Button variant="secondary" onClick={() => setSheet("tall")}>
+            גיליון גבוה
+          </Button>
           <Popover
             label="התראות"
             triggerLabel="התראות"
@@ -233,6 +241,29 @@ function GalleryBody({ theme }: { theme: "light" | "dark" }) {
         >
           <TextField label="שם" name={p("dialog-name")} />
         </Dialog>
+        {/* the app's one bottom sheet ("עוד", every sheet dialog, the side panel on a phone): to its content, or 88% */}
+        <Sheet
+          open={sheet !== null}
+          onClose={() => setSheet(null)}
+          height={sheet ?? "content"}
+          title={sheet === "tall" ? "גיליון גבוה" : "גיליון לפי התוכן"}
+          description="גוררים את הידית למטה, Escape או לחיצה מחוץ לגיליון סוגרים אותו."
+          footer={
+            <Button variant="secondary" onClick={() => setSheet(null)}>
+              סגירה
+            </Button>
+          }
+        >
+          {sheet === "tall" ? (
+            <div className="space-y-3 text-md">
+              {Array.from({ length: 12 }, (_, i) => (
+                <p key={i}>שורה {i + 1}: בטלפון הגיליון הגבוה תופס 88% מהמסך, והתוכן נגלל בתוכו.</p>
+              ))}
+            </div>
+          ) : (
+            <p className="text-md">בטלפון הגיליון נפתח לגובה התוכן שלו, כמו &quot;עוד&quot; בסרגל התחתון.</p>
+          )}
+        </Sheet>
         {/* UX-01: beside the page on a computer (the page stays active), a sheet on a phone */}
         <SidePanel
           open={panel}

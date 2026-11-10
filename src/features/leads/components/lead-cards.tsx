@@ -1,8 +1,8 @@
 import { RecordCards } from "@/components/record-cards";
 import { Badge } from "@/components/ui/badge";
-import { formatDate } from "@/lib/format";
 import { listWhatsappLog, type WhatsappListContext } from "@/features/whatsapp/templates";
 import { paths } from "@/lib/paths";
+import { fullDateTimeText, relativeTimeText } from "@/lib/relative-time";
 
 import { leadDisplayName, statusTone } from "../display";
 import type { LeadListItem, LeadStatusOption } from "../queries";
@@ -22,10 +22,14 @@ type Props = {
   canWrite?: boolean;
   // UX-01: a card opens the side panel (?peek=<id>) instead of the full page
   hrefFor?: (id: string) => string;
+  // "מגע אחרון" reads as a relative time ("לפני 3 שעות") in the business's zone, measured from this moment
+  timeZone?: string;
+  now?: Date;
 };
 
 /** Leads on a phone (FXU-02): name, status, company and owner, with call / WhatsApp. */
-export function LeadCards({ orgId, leads, statuses, showScore, className, whatsapp = null, canWrite = false, hrefFor }: Props) {
+export function LeadCards({ orgId, leads, statuses, showScore, className, whatsapp = null, canWrite = false, hrefFor, timeZone, now }: Props) {
+  const at = now ?? new Date();
   const statusById = new Map(statuses.map((status) => [status.id, status]));
   return (
     <RecordCards
@@ -41,7 +45,9 @@ export function LeadCards({ orgId, leads, statuses, showScore, className, whatsa
           details: [
             lead.companyName,
             lead.ownerName ? `אחראי: ${lead.ownerName}` : null,
-            lead.lastContactedAt ? `מגע אחרון: ${formatDate(lead.lastContactedAt)}` : null,
+            lead.lastContactedAt
+              ? { text: `מגע אחרון: ${relativeTimeText(lead.lastContactedAt, at, timeZone)}`, title: fullDateTimeText(lead.lastContactedAt, timeZone) }
+              : null,
             showScore && lead.score !== undefined ? `ציון: ${lead.score}` : null,
           ],
           phone: lead.phone,

@@ -26,31 +26,36 @@ export function ScreenHelpPopover({ orgId, help }: { orgId: string; help: Resolv
       label={`עזרה: ${help.title}`}
       align="end"
     >
-      {(close) => (
-        <div className="space-y-3 p-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="font-semibold">{help.title}</p>
-            {/* owner (203) ב: a placeholder text says so until the owner rewrites it */}
-            {draftLabel(help.draft) ? <Badge tone="warning">{draftLabel(help.draft)}</Badge> : null}
-          </div>
-          <ul className="list-disc space-y-1.5 ps-5 text-md">
-            {help.lines.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-          <div className="flex flex-wrap gap-x-4 gap-y-2 border-t border-line pt-3 text-md">
-            {help.video ? (
-              <a href={help.video} target="_blank" rel="noopener noreferrer" className="text-accent-strong underline underline-offset-4">
-                סרטון קצר על המסך
-                <span className="sr-only"> (נפתח בחלון חדש)</span>
-              </a>
-            ) : null}
-            <Link href={paths.orgHelpArticle(orgId, help.article)} onClick={close} className="text-accent-strong underline underline-offset-4">
-              למרכז העזרה
-            </Link>
-          </div>
-        </div>
-      )}
+      {(close) => <ScreenHelpBody orgId={orgId} help={help} onLeave={close} className="p-4" />}
     </Popover>
+  );
+}
+
+/** The help itself: the "?" popover's content, also the help part of a screen's "…" menu on a phone (UX-01 phone fixes). */
+export function ScreenHelpBody({ orgId, help, onLeave, className }: { orgId: string; help: ResolvedScreenHelp; onLeave?: () => void; className?: string }) {
+  return (
+    <div className={["space-y-3", className].filter(Boolean).join(" ")}>
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="font-semibold">{help.title}</p>
+        {/* owner (203) ב: a placeholder text says so until the owner rewrites it */}
+        {draftLabel(help.draft) ? <Badge tone="warning">{draftLabel(help.draft)}</Badge> : null}
+      </div>
+      <ul className="list-disc space-y-1.5 ps-5 text-md">
+        {help.lines.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+      <div className="flex flex-wrap gap-x-4 gap-y-2 border-t border-line pt-3 text-md">
+        {help.video ? (
+          <a href={help.video} target="_blank" rel="noopener noreferrer" className="text-accent-strong underline underline-offset-4">
+            סרטון קצר על המסך
+            <span className="sr-only"> (נפתח בחלון חדש)</span>
+          </a>
+        ) : null}
+        <Link href={paths.orgHelpArticle(orgId, help.article)} onClick={onLeave} className="text-accent-strong underline underline-offset-4">
+          למרכז העזרה
+        </Link>
+      </div>
+    </div>
   );
 }

@@ -1,8 +1,10 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 import { ContactActions } from "@/components/contact-actions";
 import type { WhatsappLog } from "@/features/whatsapp/templates";
+
+export type RecordCardDetail = { text: string; title: string };
 
 export type RecordCard = {
   id: string;
@@ -10,8 +12,8 @@ export type RecordCard = {
   title: string;
   // a status badge, first on the second line
   badge?: ReactNode;
-  // short facts after it: company, city, owner
-  details: Array<string | null>;
+  // short facts after it: company, city, owner; a fact with a title shows it on hover (a relative time's full date)
+  details: Array<string | RecordCardDetail | null>;
   phone: string | null;
   phoneE164: string | null;
   // WA-01 follow-up: the WhatsApp templates for someone who can write (listWhatsappLog)
@@ -34,7 +36,18 @@ export function RecordCards({ label, cards, className }: { label: string; cards:
             <span className="block truncate font-medium text-ink">{card.title}</span>
             <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-soft">
               {card.badge}
-              {card.details.some(Boolean) ? <span className="min-w-0 truncate">{card.details.filter(Boolean).join(" · ")}</span> : null}
+              {card.details.some(Boolean) ? (
+                <span className="min-w-0 truncate">
+                  {card.details
+                    .filter((detail): detail is string | RecordCardDetail => Boolean(detail))
+                    .map((detail, index) => (
+                      <Fragment key={index}>
+                        {index > 0 ? " · " : null}
+                        {typeof detail === "string" ? detail : <span title={detail.title}>{detail.text}</span>}
+                      </Fragment>
+                    ))}
+                </span>
+              ) : null}
             </span>
           </Link>
           <ContactActions phone={card.phone} phoneE164={card.phoneE164} email={null} compact={{ name: card.title }} whatsappLog={card.whatsappLog} />

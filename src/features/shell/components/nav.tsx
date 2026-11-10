@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
-import { Dialog } from "@/components/ui/dialog";
+import { Sheet } from "@/components/ui/sheet";
 import { MoreIcon } from "@/components/ui/icons";
 
 import { cn } from "@/lib/cn";
@@ -138,7 +138,7 @@ export function BottomNav({
           </button>
         </li>
       </ul>
-      <Dialog open={moreOpen} onClose={() => setMoreOpen(false)} title="עוד" variant="sheet">
+      <Sheet open={moreOpen} onClose={() => setMoreOpen(false)} title="עוד">
         <ul className="-mx-2">
           {rest.map((item) => {
             const active = isActive(pathname, item);
@@ -170,7 +170,7 @@ export function BottomNav({
             </li>
           ))}
         </ul>
-      </Dialog>
+      </Sheet>
     </nav>
   );
 }

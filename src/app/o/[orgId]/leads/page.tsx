@@ -8,12 +8,13 @@ import { EmptyState } from "@/components/ui/feedback";
 import { PlusIcon, InboxIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { ScreenHelp } from "@/features/guide/components/screen-help";
+import { ScreenMoreMenu } from "@/features/guide/components/screen-more-menu";
 import { inlineEditing } from "@/features/inline-edit/server";
 import { activeReasonNames } from "@/features/disqualify-reasons/queries";
 import { LeadPeek } from "@/features/lead-peek/components/lead-peek";
 import { peekLinks } from "@/features/lead-peek/model";
 import { LeadCards } from "@/features/leads/components/lead-cards";
-import { LeadFilters } from "@/features/leads/components/lead-filters";
+import { LeadFilters, LeadPhoneFilters } from "@/features/leads/components/lead-filters";
 import { LeadsBoard } from "@/features/leads/components/leads-board";
 import { getScoreNumbers } from "@/features/data-quality/queries";
 import { LeadsTable } from "@/features/leads/components/leads-table";
@@ -153,18 +154,31 @@ export default async function LeadsPage({ params, searchParams }: Props) {
         description={`${lead.plural} שעוד לא סוננו. כשמתאים, ממירים ל${contact.singular} ול${deal.singular}.`}
         actions={
           <>
-            <ButtonLink href={paths.leadsWaiting(orgId)} variant="secondary">
-              {waitingPlural(lead)}
-            </ButtonLink>
-            <ButtonLink href={segmentsPath(orgId)} variant="secondary">
-              סגמנטים
-            </ButtonLink>
+            {/* a phone keeps one main button: the waiting leads and the "?" go into "…", segments into "סינון ותצוגה" */}
+            <span className="hidden md:contents">
+              <ButtonLink href={paths.leadsWaiting(orgId)} variant="secondary">
+                {waitingPlural(lead)}
+              </ButtonLink>
+              <ButtonLink href={segmentsPath(orgId)} variant="secondary">
+                סגמנטים
+              </ButtonLink>
+            </span>
             {newLeadButton}
-            <ScreenHelp orgId={orgId} screen="leads" />
+            <span className="hidden md:contents">
+              <ScreenHelp orgId={orgId} screen="leads" />
+            </span>
+            <span className="contents md:hidden">
+              <ScreenMoreMenu orgId={orgId} screen="leads" links={[{ href: paths.leadsWaiting(orgId), label: waitingPlural(lead) }]} />
+            </span>
           </>
         }
       />
       <ListTools active={(filter.tree ? 1 : 0) + (statusId ? 1 : 0) + (tagId ? 1 : 0)}>
+        {/* the phone's status and tag filter and the segments link (hidden from md up, where they stay where they were) */}
+        <LeadPhoneFilters orgId={orgId} statuses={lookups.statuses} tags={tags} search={search} statusId={statusId ?? ""} tagId={tagId ?? ""} board={boardView} />
+        <ButtonLink href={segmentsPath(orgId)} variant="secondary" className="self-start md:hidden">
+          סגמנטים
+        </ButtonLink>
         <SavedViewsBar
           orgId={orgId}
           objectType="lead"
@@ -227,7 +241,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
         <LeadsBoard orgId={orgId} board={board} canWrite={canWrite} reasons={reasons} peek={peek.rows} />
       ) : leads.length > 0 ? (
         <>
-          <LeadCards orgId={orgId} hrefFor={peekFor} leads={leads} statuses={lookups.statuses} showScore={shownColumns.some((c) => c.key === "score")} className="md:hidden" whatsapp={whatsappListContext(context)} canWrite={canWrite} />
+          <LeadCards orgId={orgId} hrefFor={peekFor} leads={leads} statuses={lookups.statuses} showScore={shownColumns.some((c) => c.key === "score")} className="md:hidden" whatsapp={whatsappListContext(context)} canWrite={canWrite} timeZone={context.org.timeZone} />
           <div className="hidden md:block">
             <LeadsTable
               orgId={orgId}

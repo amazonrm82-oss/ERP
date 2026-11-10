@@ -2,7 +2,8 @@
 
 Every push photographs the main screens and the design gallery (`/admin/design`) at 360px and 1280px
 and compares them with the baselines in `tests/visual/baseline/`. An unexpected change in appearance
-fails the CI job `e2e`, so `promote` does not move `production`.
+fails the CI job `e2e`, so `promote` does not move `production`. Since the UX-01 phone fix it also photographs the
+lead side panel open as the phone's bottom sheet at 360x640 and 390x844 (`SHEET_SHOTS`, the screen as shown).
 
 בכל דחיפה מצולמים המסכים הראשיים וגלריית העיצוב ברוחב 360 ו-1280, ומושווים לתמונות הבסיס
 שב-`tests/visual/baseline/`. שינוי לא צפוי במראה מכשיל את `e2e`, ולכן `production` לא מתקדם.
@@ -15,7 +16,7 @@ fails the CI job `e2e`, so `promote` does not move `production`.
 | `compare.mjs` | the comparison (pure, unit-tested in `tests/unit/visual-compare.test.ts`) |
 | `png.mjs` | a small PNG reader/writer, so no package is needed |
 | `stabilize.mjs` | what is masked or frozen before a shot |
-| `baseline/<screen>-<width>.png` | the baselines, made by CI on the runner |
+| `baseline/<screen>-<width>.png` | the baselines, made by CI on the runner (`lead-peek-sheet-<w>x<h>.png` for the phone sheet) |
 | `../e2e/sample.mjs` | the sample business (shared with `tests/e2e/screens.mjs`, DSN-14) |
 
 ## Running it locally / הרצה מקומית

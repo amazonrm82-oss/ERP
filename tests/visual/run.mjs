@@ -28,6 +28,14 @@ export const SCREEN_NAMES = [
   "companies", "setup", "settings", "settings-business", "login", "onboarding", "design-gallery",
 ];
 
+// UX-01 phone fix (owner's iPhone test, 10 November 2026): the lead side panel open as the phone's bottom sheet, at
+// two phone sizes, photographed as the screen shows it (not the full page: the sheet covers the page).
+export const SHEET_SHOTS = [
+  { name: "lead-peek-sheet", width: 360, height: 640 },
+  { name: "lead-peek-sheet", width: 390, height: 844 },
+];
+const sheetShotName = (shot) => `${shot.name}-${shot.width}x${shot.height}.png`;
+
 // Extra things hidden on one screen when masking text is not enough (CSS selectors).
 // Add one here, with the reason, rather than raising a threshold.
 const HIDE = {};
@@ -43,11 +51,11 @@ async function pngs(dir) {
   return existsSync(dir) ? (await readdir(dir)).filter((n) => n.endsWith(".png")).sort() : [];
 }
 
-const shotNames = SCREEN_NAMES.flatMap((s) => WIDTHS.map((w) => `${s}-${w}.png`));
+const shotNames = [...SCREEN_NAMES.flatMap((s) => WIDTHS.map((w) => `${s}-${w}.png`)), ...SHEET_SHOTS.map(sheetShotName)];
 
 if (dry) {
   const plan = planComparison(await pngs(BASELINE), shotNames);
-  console.log(`mode: ${mode}; ${shotNames.length} shots (${SCREEN_NAMES.length} screens x ${WIDTHS.join("/")}px)`);
+  console.log(`mode: ${mode}; ${shotNames.length} shots (${SCREEN_NAMES.length} screens x ${WIDTHS.join("/")}px + ${SHEET_SHOTS.length} phone sheets)`);
   console.log(`baseline: ${BASELINE}`);
   if (plan.seed) console.log("no baseline yet: compare would only hand over fresh shots");
   console.log(`compare: ${plan.pairs.length}, new: ${plan.added.length}, gone: ${plan.removed.length}`);
@@ -69,9 +77,9 @@ const browser = await chromium.launch({
   args: ["--disable-gpu", "--force-color-profile=srgb", "--font-render-hinting=none", "--disable-lcd-text"],
 });
 
-async function newPage(width) {
+async function newPage(width, height = 800) {
   const context = await browser.newContext({
-    viewport: { width, height: 800 },
+    viewport: { width, height },
     deviceScaleFactor: 1,
     locale: "he-IL",
     timezoneId: "Asia/Jerusalem",
@@ -81,15 +89,15 @@ async function newPage(width) {
   return context.newPage();
 }
 
-async function photograph(page, name, width) {
+async function photograph(page, name, width, { file: fileName, fullPage = true } = {}) {
   await page.waitForLoadState("networkidle");
   await page.evaluate(() => document.fonts.ready.then(() => true));
   await page.evaluate(stabilizePage, { css: STABLE_CSS, patterns: MASK_PATTERNS, mask: MASK, hide: HIDE[name] ?? [] });
   // two frames: the masked text is laid out before the picture is taken
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-  const file = join(OUT, "actual", `${name}-${width}.png`);
+  const file = join(OUT, "actual", fileName ?? `${name}-${width}.png`);
   // caret: "initial": the caret is already hidden by STABLE_CSS, injected after hydration
-  await page.screenshot({ path: file, fullPage: true, animations: "disabled", caret: "initial" });
+  await page.screenshot({ path: file, fullPage, animations: "disabled", caret: "initial" });
   return file;
 }
 
@@ -130,6 +138,20 @@ for (const width of WIDTHS) {
     await take();
     takers.set(`${name}-${width}.png`, take);
   }
+}
+
+// the phone sheet: the leads list with the first sample lead's panel open (?peek=)
+const peekLead = paths.lead.split("/").pop();
+for (const shot of SHEET_SHOTS) {
+  const owner = await newPage(shot.width, shot.height);
+  await signIn(owner, sample.email);
+  const take = async () => {
+    await owner.goto(`${APP}${paths.leads}?peek=${peekLead}`);
+    await owner.locator("dialog[data-side-panel][open]").waitFor();
+    return photograph(owner, shot.name, shot.width, { file: sheetShotName(shot), fullPage: false });
+  };
+  await take();
+  takers.set(sheetShotName(shot), take);
 }
 
 const summary = [];

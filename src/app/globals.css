@@ -180,14 +180,48 @@ dialog[open] {
 dialog[open]::backdrop {
   animation: mx-fade 160ms ease-out;
 }
-/* the phone sheet slides up from the bottom edge */
+/* the phone sheet (Sheet, src/components/ui/sheet.tsx) slides up from the bottom edge, below its own breakpoint */
 @media (max-width: 39.99rem) {
   dialog.mx-sheet[open] {
     animation: mx-rise 200ms ease-out;
   }
 }
+@media (max-width: 47.99rem) {
+  dialog.mx-sheet[data-sheet-below="md"][open] {
+    animation: mx-rise 200ms ease-out;
+  }
+}
 .mx-toast {
   animation: mx-pop 160ms ease-out;
+}
+
+/* A tall sheet (UX-01 side panel on a phone; owner's iPhone test and "גיליון אחד בטלפון", 10 November 2026) stands at
+   88% of the VISIBLE screen whatever it holds: dvh follows Safari's address bar, and a browser without dvh gets the
+   window's inner height from sheet.tsx. A fixed height (not only a max) keeps the flex body from collapsing to the
+   header in Safari; the body scrolls inside, the footer stays at the sheet's bottom. */
+@media (max-width: 39.99rem) {
+  dialog.mx-sheet[data-sheet-height="tall"][data-sheet-below="sm"] {
+    height: 88dvh;
+    max-height: 88dvh;
+  }
+  @supports not (height: 1dvh) {
+    dialog.mx-sheet[data-sheet-height="tall"][data-sheet-below="sm"] {
+      height: calc(var(--mx-sheet-viewport, 640px) * 0.88);
+      max-height: calc(var(--mx-sheet-viewport, 640px) * 0.88);
+    }
+  }
+}
+@media (max-width: 47.99rem) {
+  dialog.mx-sheet[data-sheet-height="tall"][data-sheet-below="md"] {
+    height: 88dvh;
+    max-height: 88dvh;
+  }
+  @supports not (height: 1dvh) {
+    dialog.mx-sheet[data-sheet-height="tall"][data-sheet-below="md"] {
+      height: calc(var(--mx-sheet-viewport, 640px) * 0.88);
+      max-height: calc(var(--mx-sheet-viewport, 640px) * 0.88);
+    }
+  }
 }
 
 /* Charts (DSN-13): an "alert" bar is striped too, so it does not rely on its colour alone. */
