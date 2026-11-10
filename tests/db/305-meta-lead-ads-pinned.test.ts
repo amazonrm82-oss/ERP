@@ -15,9 +15,13 @@ afterAll(closePool);
 // Re-review (N1-N3): re-pinned after the ended-connection rule (app.meta_lead_connection_open) in receive and claim, the
 // verified-first order of receive, finish's lock order (page lock, then its own row skip locked) and token_invalid keeping
 // the arrivals; end_connection now skips rows another transaction holds.
+// Race fix (_meta_lead_finish_race.sql, 10 November 2026; reviewed independently on 10 November 2026): meta_lead_finish's
+// lost-the-race branch no longer calls app.meta_lead_end_connection on its own connection (its status move raised
+// integration:taken); it sets last_error_code page_taken + last_error_at, refuses the connection's pending arrivals
+// (skip locked) and answers 'refused'. Nothing else in the function changed; the lead still goes only through intake_submit.
 const REVIEWED_MD5: Record<string, string> = {
   "public.meta_lead_claim": "c82b03ef48e6520bdf4e6e1c80f1de32",
-  "public.meta_lead_finish": "494fc5576fc6932426dcac1903fb0e63",
+  "public.meta_lead_finish": "80d7a98fa4e2b865663261381d0139b6",
   "public.meta_lead_receive": "b75e59d41a3beb6507bf9cdaf20eabcc",
 };
 const REVIEWED_HELPER_MD5: Record<string, string> = {

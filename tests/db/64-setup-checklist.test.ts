@@ -795,6 +795,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_signature_pdf_erase.sql",
       // app.audit_erase_core() of _signature_documents.sql, defined again unchanged (a transport fix of the hosted copy)
       "_audit_erase_core_again.sql",
+      // the CAP-11 race fix redefines public.meta_lead_finish() of _meta_lead_ads.sql last (a lost race answers 'refused')
+      "_meta_lead_finish_race.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
