@@ -766,6 +766,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_meeting_customer_reminders.sql",
       // EML-02 redefines app.job_payload_ok() of _meeting_customer_reminders.sql last (an email from the record card)
       "_record_email.sql",
+      // SGN-01 redefines app.plan_key_defaults() of _meeting_customer_reminders.sql last (signatures and its monthly cap)
+      "_document_templates.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

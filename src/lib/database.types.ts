@@ -1157,6 +1157,23 @@ export type MessageTemplateRow = {
   updated_at: string;
 };
 
+// SGN-01: the business's document templates (migration document_templates). kind and record_type are closed lists
+// (DOCUMENT_KINDS, DOCUMENT_RECORD_TYPES); body is REC-04's cleaned Markdown; draft_wording is server only.
+export type DocumentTemplateRow = {
+  id: string;
+  organization_id: string;
+  name: string;
+  kind: string;
+  record_type: string;
+  body: string;
+  is_active: boolean;
+  draft_wording: boolean;
+  // server only: the seed's marker of a default (its kind code), null on a person's template
+  key: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // CON-02: the contact and company types an organization offers (migration record_types)
 export type RecordTypeObject = "contact" | "company";
 export type RecordTypeOptionRow = {
@@ -3195,6 +3212,12 @@ export type Database = {
         WhatsappTemplateRow,
         { organization_id: string; name: string; body: string; position?: number },
         { name?: string; body?: string; position?: number }
+      >;
+      // SGN-01: the organization and draft_wording are fixed (column-level grants)
+      document_templates: Table<
+        DocumentTemplateRow,
+        { organization_id: string; name: string; kind?: string; record_type: string; body: string; is_active?: boolean },
+        { name?: string; kind?: string; record_type?: string; body?: string; is_active?: boolean }
       >;
       // MSG-02: the organization is fixed (column-level update grant)
       message_templates: Table<

@@ -44,6 +44,7 @@ import { punchCardSettingsPath } from "@/features/punch-cards/paths";
 import { distributionSettingsPath } from "@/features/lead-distribution/paths";
 import { whatsappTemplatesPath } from "@/features/whatsapp/paths";
 import { messageTemplatesPath } from "@/features/message-templates/paths";
+import { documentTemplatesPath } from "@/features/document-templates/paths";
 import { checklistTemplatesPath } from "@/features/task-checklists/paths";
 import { activityTypesPath } from "@/features/activity-types/paths";
 import { modulesSettingsPath } from "@/features/modules/paths";
@@ -195,6 +196,8 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
               { href: whatsappTemplatesPath(orgId), label: "תבניות WhatsApp", description: "הודעות מוכנות שנפתחות מכרטיס הרשומה", icon: ChatIcon },
               // MSG-02
               { href: messageTemplatesPath(orgId), label: "תבניות הודעה", description: "נוסחים משותפים לאימייל, SMS ו-WhatsApp, עם שדות מיזוג", icon: ChatIcon },
+              // SGN-01
+              { href: documentTemplatesPath(orgId), label: "תבניות מסמך", description: "חוזה, הסכם שירות, טופס הצטרפות: נוסחים עם שדות מהרשומה", icon: FormIcon },
               // TASK-06
               { href: checklistTemplatesPath(orgId), label: "תבניות רשימת תיוג", description: "רשימות שלבים קבועות שנכנסות למשימה, כמו קליטת לקוח", icon: CheckSquareIcon },
               // TASK-08

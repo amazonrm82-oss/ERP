@@ -87,6 +87,7 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "checklist_templates", file: "checklist_templates.csv" },
   // MSG-02
   { table: "message_templates", file: "message_templates.csv" },
+  { table: "document_templates", file: "document_templates.csv" },
   { table: "pipelines", file: "pipelines.csv" },
   { table: "stages", file: "stages.csv" },
   { table: "lead_statuses", file: "lead_statuses.csv" },

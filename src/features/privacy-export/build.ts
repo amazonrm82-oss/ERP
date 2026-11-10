@@ -152,6 +152,7 @@ export const PERSON_EXPORT_LEFT_OUT: Readonly<Record<string, string>> = {
   payment_allocations: "ids and amounts between payments and documents; the payments and documents are in",
   opening_credit_allocations: "ids and amounts of credit offsets against documents; the documents are in",
   message_templates: "the business's shared message texts (MSG-02); not about any person",
+  document_templates: "the business's document texts (SGN-01); not about any person, nothing filled is stored",
 };
 
 /** README.txt, with the files that were left out (over the size cap, or not readable). */

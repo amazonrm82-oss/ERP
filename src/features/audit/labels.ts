@@ -60,6 +60,7 @@ export const ENTITY_LABELS: Record<string, string> = {
   whatsapp_templates: "תבנית WhatsApp",
   // MSG-02
   message_templates: "תבנית הודעה",
+  document_templates: "תבנית מסמך",
   // GOL-01
   goals: "יעד",
   // CON-02

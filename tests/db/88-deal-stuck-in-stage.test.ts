@@ -87,6 +87,8 @@ const RERUN = [
   migrationFile("_meeting_customer_reminders.sql"),
   // EML-02 redefines app.job_payload_ok() of _meeting_customer_reminders.sql last (an email from the record card)
   migrationFile("_record_email.sql"),
+  // SGN-01 redefines app.plan_key_defaults() of _meeting_customer_reminders.sql last (signatures and its monthly cap)
+  migrationFile("_document_templates.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

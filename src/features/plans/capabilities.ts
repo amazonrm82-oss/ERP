@@ -62,6 +62,8 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "meta_leads", label: "לידים מפייסבוק ואינסטגרם", built: true },
   // CAL-12 (owner, 9 November 2026, answer (178) ב): the plans that hold lead_distribution
   { feature: "meeting_reminders", label: "אישור ותזכורות פגישה ללקוח ב-SMS ובאימייל", built: true },
+  // SGN-01 (owner, 3 November 2026, answer (67) ג): basic and up; templates are built, sending and signing (SGN-02) are not
+  { feature: "signatures", label: "תבניות מסמך וחתימה דיגיטלית", built: false },
   { feature: "orders", label: "מודול הזמנות", built: true },
   { feature: "api", label: "API ו-webhooks", built: false },
   { feature: "custom_reports", label: "דוחות מותאמים", built: false },

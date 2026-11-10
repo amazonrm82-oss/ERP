@@ -39,7 +39,7 @@ const KEPT = new Set([
   "public.activity_types", "public.automations", "public.booking_pages", "public.business_cards", "public.card_layouts",
   "public.checklist_templates", "public.completeness_settings", "public.consent_blocklist", "public.contact_relation_types",
   "public.conversion_field_maps", "public.customer_status_settings", "public.deal_contact_roles", "public.deal_loss_reasons",
-  "public.disqualify_reasons", "public.field_definitions", "public.forms", "public.goals", "public.integrations",
+  "public.disqualify_reasons", "public.document_templates", "public.field_definitions", "public.forms", "public.goals", "public.integrations",
   "public.lead_distribution_settings", "public.lead_response_settings", "public.lead_routing_rules", "public.lead_score_rules",
   "public.lead_sources", "public.lead_statuses", "public.library_categories", "public.library_items", "public.meeting_types",
   "public.message_templates", "public.meta_lead_forms", "public.number_sequences", "public.org_bank_details",
