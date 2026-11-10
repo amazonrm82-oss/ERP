@@ -35,6 +35,17 @@ export function tourProgress(index: number, length: number): string {
   return `שלב ${index + 1} מתוך ${length}`;
 }
 
+/**
+ * UX-05, owner (203) ב: a help text Claude Code wrote as a placeholder ("draft: true" in docs/help/) carries a small visible
+ * label until the owner rewrites it and removes the line. The label is a word, not a colour, so it reads the same to a
+ * screen reader and in print. Null = no label.
+ */
+export const DRAFT_LABEL = "טיוטה";
+
+export function draftLabel(draft: boolean | undefined): string | null {
+  return draft === true ? DRAFT_LABEL : null;
+}
+
 export type ResolvedTourStep = Omit<TourStep, "title" | "body"> & { title: string; body: string[] };
 
-export type ResolvedScreenHelp = { title: string; lines: [string, string, string]; article: string; video: string | null };
+export type ResolvedScreenHelp = { title: string; lines: [string, string, string]; article: string; video: string | null; draft: boolean };

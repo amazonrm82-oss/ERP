@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 
+import { Badge } from "@/components/ui/badge";
 import { Popover } from "@/components/ui/popover";
 import { iconButtonClasses } from "@/components/ui/button";
 import { paths } from "@/lib/paths";
 
-import type { ResolvedScreenHelp } from "../tour";
+import { draftLabel, type ResolvedScreenHelp } from "../tour";
 
 /**
  * UX-05 (ב): the "?" button of a main screen. Three short lines about the screen, the screen's video when one exists
@@ -27,7 +28,11 @@ export function ScreenHelpPopover({ orgId, help }: { orgId: string; help: Resolv
     >
       {(close) => (
         <div className="space-y-3 p-4">
-          <p className="font-semibold">{help.title}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-semibold">{help.title}</p>
+            {/* owner (203) ב: a placeholder text says so until the owner rewrites it */}
+            {draftLabel(help.draft) ? <Badge tone="warning">{draftLabel(help.draft)}</Badge> : null}
+          </div>
           <ul className="list-disc space-y-1.5 ps-5 text-md">
             {help.lines.map((line) => (
               <li key={line}>{line}</li>

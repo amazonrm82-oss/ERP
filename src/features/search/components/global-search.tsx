@@ -8,6 +8,8 @@ import { CloseIcon, SearchIcon } from "@/components/ui/icons";
 
 import { commandsAction, searchAction, type SearchGroup, type SearchHit } from "../actions";
 import { COMMAND_GROUP_LABELS, matchCommands, type Command, type CommandGroup } from "../command-match";
+import { TOUR_REPLAY_EVENT } from "@/features/guide/tour";
+
 import { isSearchShortcut } from "../shortcut";
 
 const GROUP_LABELS: Record<SearchGroup, string> = {
@@ -20,10 +22,10 @@ const GROUP_LABELS: Record<SearchGroup, string> = {
 
 type Section = CommandGroup | SearchGroup;
 // REC-09: actions and places first, then the records
-const SECTION_ORDER: Section[] = ["create", "navigate", "settings", "leads", "contacts", "companies", "deals", "notes"];
+const SECTION_ORDER: Section[] = ["create", "navigate", "help", "settings", "leads", "contacts", "companies", "deals", "notes"];
 const SECTION_LABELS: Record<Section, string> = { ...COMMAND_GROUP_LABELS, ...GROUP_LABELS };
 
-type Item = { key: string; section: Section; title: string; subtitle: string | null; href: string };
+type Item = { key: string; section: Section; title: string; subtitle: string | null; href: string; action?: Command["action"] };
 
 /**
  * Search everything from the top bar. Opens with the button or Ctrl+K (Cmd+K).
@@ -113,7 +115,10 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
 
   function go(item: Item) {
     close();
-    router.push(item.href);
+    // UX-05 (206): the tour opens in place, exactly like the account menu's "סיור במערכת" (it lives in the business
+    // frame); focus is back on the search button first, so the tour's window gives it back there
+    if (item.action === "tour") window.dispatchEvent(new Event(TOUR_REPLAY_EVENT));
+    else router.push(item.href);
   }
 
   const typed = query.trim();
@@ -122,7 +127,7 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
   const shown: Item[] = useMemo(() => {
     if (typed.length < 2) return [];
     const items: Item[] = [
-      ...matched.map((c) => ({ key: c.key, section: c.group, title: c.label, subtitle: c.hint, href: c.href })),
+      ...matched.map((c) => ({ key: c.key, section: c.group, title: c.label, subtitle: c.hint, href: c.href, action: c.action })),
       ...hits.map((h) => ({ key: h.key, section: h.group, title: h.title, subtitle: h.subtitle, href: h.href })),
     ];
     return SECTION_ORDER.flatMap((section) => items.filter((item) => item.section === section));

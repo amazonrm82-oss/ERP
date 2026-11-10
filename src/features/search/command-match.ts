@@ -3,7 +3,7 @@
 
 import { searchNorm } from "@/lib/search-norm";
 
-export type CommandGroup = "create" | "navigate" | "settings";
+export type CommandGroup = "create" | "navigate" | "help" | "settings";
 
 export type Command = {
   key: string;
@@ -12,6 +12,12 @@ export type Command = {
   /** a short line under the label (a settings section's description) */
   hint: string | null;
   href: string;
+  /**
+   * UX-05 (206): a command that opens something in place instead of navigating. "tour" replays the first-visit tour the
+   * way the account menu's "סיור במערכת" does (TOUR_REPLAY_EVENT; it never marks the tour seen). `href` then stays a
+   * plain fallback (the help center) and is not followed by the palette.
+   */
+  action?: "tour";
   /** more words that find it: synonyms, today's word when the business uses another one */
   keywords: string[];
 };
@@ -19,6 +25,7 @@ export type Command = {
 export const COMMAND_GROUP_LABELS: Record<CommandGroup, string> = {
   create: "פעולות",
   navigate: "מעבר למסך",
+  help: "עזרה",
   settings: "הגדרות",
 };
 

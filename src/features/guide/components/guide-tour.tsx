@@ -3,11 +3,12 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 
 import { markGuideTourSeenAction } from "../actions";
-import { TOUR_REPLAY_EVENT, tourMarksSeen, tourProgress, tourStartsByItself, tourStepAfter, type ResolvedTourStep } from "../tour";
+import { draftLabel, TOUR_REPLAY_EVENT, tourMarksSeen, tourProgress, tourStartsByItself, tourStepAfter, type ResolvedTourStep } from "../tour";
 
 type Props = {
   orgId: string;
@@ -57,6 +58,8 @@ export function GuideTour({ orgId, steps, seenAt, support }: Props) {
   const step = steps[index];
   if (!step) return null;
   const last = index === steps.length - 1;
+  // owner (203) ב: a placeholder step says so until the owner rewrites it
+  const draft = draftLabel(step.draft);
 
   return (
     <Dialog
@@ -89,6 +92,11 @@ export function GuideTour({ orgId, steps, seenAt, support }: Props) {
         </>
       }
     >
+      {draft ? (
+        <p className="mb-3">
+          <Badge tone="warning">{draft}</Badge>
+        </p>
+      ) : null}
       <div className="space-y-2 text-md">
         {step.body.map((p) => (
           <p key={p}>{p}</p>

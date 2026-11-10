@@ -226,8 +226,18 @@ try {
   await owner.getByText("שלב 2 מתוך 5").waitFor();
   await tourSkip(owner).click();
   await owner.getByText("שלב 2 מתוך 5").waitFor({ state: "hidden" });
+  // owner (206) ב: the command palette opens the same tour; (203) ב: a draft step carries the "טיוטה" label
+  await owner.keyboard.press("Control+k");
+  await owner.getByRole("combobox", { name: /חיפוש רשומות/ }).fill("סיור");
+  await owner.getByRole("option", { name: "סיור במערכת" }).waitFor({ timeout: 15000 });
+  await owner.getByRole("combobox", { name: /חיפוש רשומות/ }).press("Enter");
+  await owner.getByText("שלב 1 מתוך 5").waitFor();
+  await owner.getByRole("dialog").getByText("טיוטה", { exact: true }).waitFor();
+  await tourSkip(owner).click();
+  await owner.getByText("שלב 1 מתוך 5").waitFor({ state: "hidden" });
   // the "?" of the screen: three lines and the way to the help center inside the app
   await owner.getByRole("button", { name: "עזרה: היום שלי" }).click();
+  await owner.getByText("טיוטה", { exact: true }).waitFor();
   await owner.getByRole("link", { name: "למרכז העזרה" }).click();
   await owner.waitForURL(/\/o\/[0-9a-f-]{36}\/help\/my-day$/, { timeout: 15000 });
   await owner.goto(orgUrl);

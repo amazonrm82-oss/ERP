@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+import { Badge } from "@/components/ui/badge";
+import { draftLabel } from "@/features/guide/tour";
+
 import { articleText, CATEGORY_LABELS, type HelpArticle, type HelpCategory } from "../types";
 import { HelpBody } from "./help-body";
 import { HelpSearch } from "./help-search";
@@ -32,6 +35,8 @@ export function HelpIndex({ articles, base }: { articles: HelpArticle[]; base: s
                   <li key={a.slug}>
                     <Link href={`${base}/${a.slug}`} className="block rounded-md py-2 text-accent-strong underline-offset-4 hover:underline">
                       {a.title}
+                      {/* owner (203) ב: only inside the app; the public center never lists a draft (204) */}
+                      {draftLabel(a.draft) ? <Badge tone="warning" className="ms-2 align-middle">{draftLabel(a.draft)}</Badge> : null}
                     </Link>
                   </li>
                 ))}
@@ -59,6 +64,11 @@ export function HelpArticleView({ article, articles, base }: { article: HelpArti
           <span>{CATEGORY_LABELS[article.category]}</span>
         </nav>
         <h1 className="mt-3 text-3xl font-semibold leading-tight">{article.title}</h1>
+        {draftLabel(article.draft) ? (
+          <p className="mt-2">
+            <Badge tone="warning">{draftLabel(article.draft)}</Badge>
+          </p>
+        ) : null}
         <p className="mt-2 text-lg text-ink-soft">{article.summary}</p>
         <HelpBody blocks={article.body} />
       </article>

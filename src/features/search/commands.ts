@@ -61,6 +61,17 @@ export function buildCommands(orgId: string, terms: OrgTerms, modules: OrgModule
     { key: "nav:help", group: "navigate", label: "מרכז עזרה", hint: null, href: paths.orgHelp(orgId), keywords: [...NAVIGATE_WORDS, "עזרה", "help"] },
     { key: "nav:switch", group: "navigate", label: "החלפת עסק", hint: null, href: paths.home, keywords: [...NAVIGATE_WORDS, "עסקים"] },
   );
+  // UX-05 (206): the tour, as in the account menu. The menu shows it to everyone in the business frame (a support session
+  // too: a replay never marks anything), so the palette does the same.
+  commands.push({
+    key: "help:tour",
+    group: "help",
+    label: "סיור במערכת",
+    hint: null,
+    href: paths.orgHelp(orgId),
+    action: "tour",
+    keywords: ["סיור", "הדרכה", "מדריך", "עזרה", "tour", "help"],
+  });
   commands.push({
     key: "settings:account",
     group: "settings",

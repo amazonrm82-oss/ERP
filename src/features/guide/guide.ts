@@ -12,7 +12,7 @@ import type { OrgTerms, TermForms } from "@/features/terminology/terms";
 import type { ResolvedScreenHelp, ResolvedTourStep } from "./tour";
 
 // the state rules live in tour.ts (client-safe); re-exported so server code and tests have one import
-export { TOUR_REPLAY_EVENT, tourMarksSeen, tourProgress, tourStartsByItself, tourStepAfter, type ResolvedScreenHelp, type ResolvedTourStep } from "./tour";
+export { DRAFT_LABEL, draftLabel, TOUR_REPLAY_EVENT, tourMarksSeen, tourProgress, tourStartsByItself, tourStepAfter, type ResolvedScreenHelp, type ResolvedTourStep } from "./tour";
 
 const TERM_TOKEN = /\{(lead|deal|contact)\.(singular|plural|theSingular|thePlural|newOne)\}/g;
 
@@ -39,5 +39,6 @@ export function screenHelp(screen: HelpScreen, terms: OrgTerms, screens: ScreenH
     lines: [fillTerms(a, terms), fillTerms(b, terms), fillTerms(c, terms)],
     article: help.article,
     video: help.video && videoUrlOk(help.video) ? help.video : null,
+    draft: help.draft,
   };
 }
