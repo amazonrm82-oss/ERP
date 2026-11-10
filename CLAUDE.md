@@ -2601,6 +2601,19 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   only the request itself (text, page, business, requester) and no record of the business; opening any business record still needs a
   session; each request is logged once per staff member (`app.support_request_reads`, one `support_request.read` entry, id only).
   Email to the support team waits for an email provider (owner (48)).
+- Email from the record card (EML-02, migration 021198; owner's answers 193-197, 9 November 2026; two reviews): whoever reads the
+  record and writes in the business (the activities_insert rule; HEB-08 deputies included) sends through `public.record_email_send`
+  (invoker) over `app.record_email_enqueue` (definer, granted to authenticated for that wrapper, re-checks everything itself): the
+  record's own email (a deal's live readable contact), a business email template sendable now (`requested_document`; `collection`
+  only with `app.can_record_payments` and the keys collection, documents, payments; any marketing template; never a meeting
+  reminder), up to 5 confirmed record files (not on someone else's private note) and, with marketing templates only, current
+  files of active and valid content-library items (`library_file_ids`); 10 MB; 30 emails per person per hour across businesses
+  (`jobs_record_email_sender_idx`). It queues an OPS-04 `message.send` job with ids only (`app.job_payload_ok`, last redefined
+  there, keeps CAL-12's `meeting_id`); consent, HEB-09, sending hours and caps are the queue's own checks. `public.record_email_queue`
+  lists a card's own emails (waiting|sent|not_sent with consent|paused|other; no address, no code; viewers and non-readers get []).
+  No provider sends yet (fake). Owner (195) א approved, for when a provider is chosen, one service_role definer that hands a locked
+  job its re-checked file paths, filled body and reply-to (shape in the migration header); its own In use line then. Interim
+  lead choices: library files only with marketing templates (question 198), collection needs the plan keys (question 199).
 - Public roadmap (TRU-01, migration 021197; owner's answer 192, 9 November 2026; two reviews): `app.roadmap_items` and
   `app.roadmap_votes` (schema app, RLS on, no grants), written only by `platform_add/update_roadmap_item` (owner/support, aal2,
   logged `roadmap.add|update`); `platform_list_roadmap_items` answers `{items, total}` (newest 500; linked support request ids only to
