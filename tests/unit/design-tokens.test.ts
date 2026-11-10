@@ -75,6 +75,17 @@ describe.each([
   });
 });
 
+// Owner's answer 240 (ב): in dark the logo sits on a light plate; its navy (the brand colour) must stand out from it
+// (3:1, non-text), and the plate from the dark card and page. In light the plate is transparent.
+describe("logo plate", () => {
+  it("is transparent in light", () => {
+    expect(light["--color-logo-plate"]).toBe("transparent");
+  });
+  it.each(["brand", "surface", "canvas"])("dark plate against %s: 3:1 or more", (other) => {
+    expect(contrast(resolve(dark, "--color-logo-plate"), resolve(dark, `--color-${other}`))).toBeGreaterThanOrEqual(3);
+  });
+});
+
 it("contrast is computed as WCAG defines it", () => {
   expect(contrast("#000000", "#ffffff")).toBeCloseTo(21, 1);
 });
