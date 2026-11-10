@@ -29,6 +29,10 @@ export type PersonExport = {
 
 class ReadError extends Error {}
 
+// SGN-02: every column a client may select (column grants: never the server-only `people`)
+const SIGNATURE_DOCUMENT_COLUMNS =
+  "id, organization_id, lead_id, contact_id, company_id, deal_id, template_id, title, body, status, sent_by, sent_at, viewed_at, signed_at, cancelled_at, cancelled_by, expires_at, content_sha256, former_lead_id, former_contact_id, former_company_id, former_deal_id, customer_deleted_at, erased_at, created_at, updated_at";
+
 function check<T>(result: { data: T | null; error: { message: string } | null }, what: string): T {
   if (result.error) throw new ReadError(`${what}: ${result.error.message}`);
   return (result.data ?? []) as T;
@@ -214,6 +218,19 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     readLinked(supabase, orgId, "messages", "*", personOnly),
   ]);
 
+  // SGN-02: the documents sent to the person for signature (their filled text) from their leads, contacts and deals, and the
+  // documents on other records (a company's, another deal's) that name them (`people`, review 1); the signatures on them
+  // (owners and admins read those, RLS) and the signed PDFs, whose bytes the ZIP streams (owners and admins, RLS). The
+  // server-only `people` list names other people too and is not selectable at all (column grants).
+  const personIds = [...leadIds, ...contactIds];
+  const naming = check(await supabase.rpc("signature_documents_naming", { p_org: orgId, p_ids: personIds }), "signature documents naming");
+  const namingIds = Array.isArray(naming) ? naming.filter((id): id is string => typeof id === "string") : [];
+  const signatureFilter = [linked, namingIds.length ? `id.in.(${namingIds.join(",")})` : null].filter(Boolean).join(",") || null;
+  const signatureDocuments = await readLinked(supabase, orgId, "signature_documents", SIGNATURE_DOCUMENT_COLUMNS, signatureFilter);
+  const signatureDocumentIds = uniqueIds(signatureDocuments.map((d) => d.id));
+  const signatureSignatures = await readByIds(supabase, orgId, "signature_signatures", "*", "document_id", signatureDocumentIds);
+  files.push(...(await readByIds(supabase, orgId, "files", FILE_COLUMNS, "signature_document_id", signatureDocumentIds)));
+
   // 4. names for the ids, so the file can be read without the system
   const companyIds = uniqueIds([...contacts.map((c) => c.company_id), ...contactCompanies.map((c) => c.company_id), ...deals.map((d) => d.company_id)]);
   const [companies, statuses, sources, stages, pipelines, fields, relationTypes, segments] = await Promise.all([
@@ -227,6 +244,7 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     readByIds(supabase, orgId, "segments", "id, name", "id", uniqueIds(segmentMembers.map((m) => m.segment_id))),
   ]);
   const userIds = [...leads, ...contacts, ...deals, ...activities, ...tasks, ...meetings, ...quotes, ...orders, ...paymentPromises].flatMap((r) => [r.owner_id, r.created_by, r.updated_by]);
+  userIds.push(...signatureDocuments.flatMap((d) => [d.sent_by, d.cancelled_by]));
   const userNames = await getUserNames(
     uniqueIds([
       ...userIds,
@@ -278,6 +296,8 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     deal_lines: dealLines,
     task_checklist_items: taskChecklistItems,
     messages,
+    signature_documents: signatureDocuments,
+    signature_signatures: signatureSignatures,
     segment_members: segmentMembers,
     consents,
     form_submissions: submissions,

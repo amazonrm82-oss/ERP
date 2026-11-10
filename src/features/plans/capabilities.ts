@@ -62,8 +62,8 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "meta_leads", label: "לידים מפייסבוק ואינסטגרם", built: true },
   // CAL-12 (owner, 9 November 2026, answer (178) ב): the plans that hold lead_distribution
   { feature: "meeting_reminders", label: "אישור ותזכורות פגישה ללקוח ב-SMS ובאימייל", built: true },
-  // SGN-01 (owner, 3 November 2026, answer (67) ג): basic and up; templates are built, sending and signing (SGN-02) are not
-  { feature: "signatures", label: "תבניות מסמך וחתימה דיגיטלית", built: false },
+  // SGN-01 (owner, 3 November 2026, answer (67) ג): basic and up; templates (SGN-01), sending and signing (SGN-02) are built
+  { feature: "signatures", label: "תבניות מסמך וחתימה דיגיטלית", built: true },
   // SMS (owner (210) ב): every SMS to a customer, with the plan's month quota
   { feature: "sms", label: "הודעות SMS ללקוחות, עם מכסה חודשית", built: true },
   { feature: "orders", label: "מודול הזמנות", built: true },

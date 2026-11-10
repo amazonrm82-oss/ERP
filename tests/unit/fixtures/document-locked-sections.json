@@ -1,0 +1,16 @@
+[
+  {"body": "טקסט רגיל בלי קטע נעול", "problem": null, "segments": [{"locked": false, "text": "טקסט רגיל בלי קטע נעול"}]},
+  {"body": "פתיחה\n::: נעול\nסעיף {שם העסק}\n:::\nסיום", "problem": null, "segments": [{"locked": false, "text": "פתיחה"}, {"locked": true, "text": "סעיף {שם העסק}"}, {"locked": false, "text": "סיום"}]},
+  {"body": "::: נעול\nרק נעול\n:::", "problem": null, "segments": [{"locked": true, "text": "רק נעול"}]},
+  {"body": "  :::   נעול  \nעם רווחים\n  :::  ", "problem": null, "segments": [{"locked": true, "text": "עם רווחים"}]},
+  {"body": "א\n::: נעול\nב\n:::\n::: נעול\nג\nד\n:::", "problem": null, "segments": [{"locked": false, "text": "א"}, {"locked": true, "text": "ב"}, {"locked": true, "text": "ג\nד"}]},
+  {"body": "שורה\r\nשנייה", "problem": null, "segments": [{"locked": false, "text": "שורה\nשנייה"}]},
+  {"body": "::: נעולים\nזה טקסט רגיל", "problem": null, "segments": [{"locked": false, "text": "::: נעולים\nזה טקסט רגיל"}]},
+  {"body": "טקסט ::: נעול באמצע שורה", "problem": null, "segments": [{"locked": false, "text": "טקסט ::: נעול באמצע שורה"}]},
+  {"body": "::: נעול\nבלי סוף", "problem": "unclosed"},
+  {"body": ":::\nסוף בלי התחלה", "problem": "stray"},
+  {"body": "::: נעול\n::: נעול\nא\n:::\n:::", "problem": "nested"},
+  {"body": "::: נעול\n   \n:::", "problem": "empty"},
+  {"body": "::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n", "problem": "too_many"},
+  {"body": "::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\n::: נעול\nקטע\n:::\nסוף", "problem": null, "segments": [{"locked": true, "text": "קטע"}, {"locked": true, "text": "קטע"}, {"locked": true, "text": "קטע"}, {"locked": true, "text": "קטע"}, {"locked": true, "text": "קטע"}, {"locked": true, "text": "קטע"}, {"locked": true, "text": "קטע"}, {"locked": true, "text": "קטע"}, {"locked": true, "text": "קטע"}, {"locked": true, "text": "קטע"}, {"locked": true, "text": "קטע"}, {"locked": true, "text": "קטע"}, {"locked": true, "text": "קטע"}, {"locked": true, "text": "קטע"}, {"locked": true, "text": "קטע"}, {"locked": true, "text": "קטע"}, {"locked": true, "text": "קטע"}, {"locked": true, "text": "קטע"}, {"locked": true, "text": "קטע"}, {"locked": true, "text": "קטע"}, {"locked": false, "text": "סוף"}]}
+]

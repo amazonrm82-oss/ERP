@@ -5,12 +5,12 @@ import { useState, useTransition } from "react";
 import { FormError } from "@/components/ui/feedback";
 import { SelectField } from "@/components/ui/field";
 import { SearchPicker, type SearchPickerChoice } from "@/components/ui/search-picker";
-import { NoteText } from "@/features/activities/components/note-text";
 
 import { documentPreviewAction, searchDocumentRecordsAction, type DocumentPreviewRecord } from "../actions";
 import { fillDocument, unfilledDocumentFields } from "../fields";
 import type { DocumentTemplate } from "../queries";
 import { DOCUMENT_KIND_LABELS } from "../templates";
+import { DocumentSegments } from "./document-segments";
 import { DRAFT_LINE, type RecordTypeLabels } from "./templates-editor";
 
 type Props = {
@@ -86,12 +86,12 @@ export function DocumentTemplatePreview({ orgId, templates, business, labels }: 
       {template?.draftWording ? <p className="text-sm text-ink-soft">{DRAFT_LINE}</p> : null}
       {template ? (
         <div className="rounded-md border border-line bg-canvas px-3 py-3" aria-live="polite" aria-busy={pending}>
-          <NoteText text={filled} className="text-md text-ink" />
+          <DocumentSegments text={filled} />
         </div>
       ) : null}
       {!record ? <p className="text-sm text-ink-soft">בחרו רשומה כדי לראות את המסמך עם הפרטים שלה. בלי רשומה מוצגים רק פרטי העסק.</p> : null}
       {unfilled.length > 0 ? <p className="text-sm text-ink-soft">{`שדות שאין להם ערך: ${unfilled.join(", ")}`}</p> : null}
-      <p className="text-sm text-ink-soft">התצוגה לא נשמרת ולא נשלחת לאף אחד. שליחה לחתימה עוד לא קיימת במערכת.</p>
+      <p className="text-sm text-ink-soft">התצוגה לא נשמרת ולא נשלחת לאף אחד. שליחה לחתימה נעשית מכרטיס הרשומה.</p>
     </div>
   );
 }

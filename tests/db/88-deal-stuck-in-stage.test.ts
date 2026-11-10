@@ -104,6 +104,10 @@ const RERUN = [
   // of _import_consent_undo.sql last (an unsubscribe link's entry stops marketing only; a page re-subscribe of the person's own
   // unsubscribe)
   migrationFile("_consent_preference_links.sql"),
+  // SGN-02 (224) ב redefines app.document_templates_check() of _document_templates.sql last (locked sections)
+  migrationFile("_signature_documents.sql"),
+  // the pasted erasure gives app.signature_pdf_drop() of _signature_documents.sql its body
+  migrationFile("_signature_pdf_erase.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

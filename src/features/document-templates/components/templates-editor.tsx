@@ -7,13 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { Checkbox, SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
-import { NoteText } from "@/features/activities/components/note-text";
 import type { FormState } from "@/lib/action-result";
 
 import { addDocumentTemplateAction, deleteDocumentTemplateAction, switchOffDocumentTemplateAction, updateDocumentTemplateAction } from "../actions";
 import { DOCUMENT_BUSINESS_FIELDS, DOCUMENT_RECORD_FIELDS, DOCUMENT_RECORD_TYPES, isDocumentRecordType, type DocumentRecordType } from "../fields";
 import type { DocumentTemplate } from "../queries";
 import { DOCUMENT_KIND_LABELS, DOCUMENT_KINDS, DOCUMENT_TEMPLATE_BODY_MAX, DOCUMENT_TEMPLATE_NAME_MAX, type DocumentKind } from "../templates";
+import { DocumentSegments } from "./document-segments";
 
 /** The record type in the business's own words (FLD-10). */
 export type RecordTypeLabels = Record<DocumentRecordType, string>;
@@ -112,7 +112,7 @@ function TemplateFields({
         defaultValue={values?.body ?? initial.body}
         placeholder={"**כותרת**\n\nנערך ביום {תאריך היום} בין {שם העסק} לבין {שם מלא}."}
         error={errors?.body}
-        hint="**מודגש**, שורה שמתחילה ב-״- ״ לרשימה, ״1. ״ לרשימה ממוספרת. שדות כותבים בסוגריים מסולסלים, בדיוק כמו ברשימה."
+        hint="**מודגש**, שורה שמתחילה ב-״- ״ לרשימה, ״1. ״ לרשימה ממוספרת. שדות כותבים בסוגריים מסולסלים, בדיוק כמו ברשימה. קטע שהשולח לא יוכל לערוך: שורה ״::: נעול״ לפניו ושורה ״:::״ אחריו."
       />
       <FieldList type={shownType} labels={labels} />
       <Checkbox
@@ -177,7 +177,7 @@ export function DocumentTemplateList({
                 <EditableBody orgId={orgId} template={template} labels={labels} />
               ) : (
                 <>
-                  <NoteText text={template.body} className="text-md text-ink" />
+                  <DocumentSegments text={template.body} />
                   {removable ? <RemoveOnly orgId={orgId} template={template} /> : null}
                 </>
               )}

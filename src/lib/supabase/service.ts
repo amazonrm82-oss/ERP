@@ -74,6 +74,12 @@ import { getSupabaseEnv } from "@/lib/env";
  *   - the customer's preferences page and unsubscribe link (CNS-09 / CNS-10, owner's answer (225) א)
  *     (src/features/preferences/public-server.ts): public.consent_preferences_public() and
  *     consent_preferences_submit() only;
+ *   - a document for signature (SGN-02, owner 9 November 2026, answer (191) א)
+ *     (src/features/signatures/public-server.ts): public.signature_public(),
+ *     signature_public_sign() and, after signing, signature_public_pdf() only (owner (223) ב,
+ *     bytes compared with the SHA-256 when served); its signed PDF (src/features/signatures/pdf-server.ts):
+ *     public.signature_pdf_public(), signature_pdf_public_store() and signature_pdf_store()
+ *     only, uploading only to the path they answer;
  *   - the QR scan (src/features/qr-codes/scan-server.ts): public.qr_scan() only;
  *   - the site widget (src/features/site-widgets/public-server.ts):
  *     public.site_widget_public() and site_widget_submit() only;

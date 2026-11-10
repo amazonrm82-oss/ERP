@@ -34,7 +34,7 @@ export async function GET(request: NextRequest, { params }: Context) {
   const readFile = () =>
     supabase
       .from("files")
-      .select("name, mime_type, storage_path, unconfirmed_since, quote_id, order_id, sha256")
+      .select("name, mime_type, storage_path, unconfirmed_since, quote_id, order_id, signature_document_id, sha256")
       .eq("organization_id", orgId)
       .eq("id", fileId)
       .maybeSingle();
@@ -56,7 +56,8 @@ export async function GET(request: NextRequest, { params }: Context) {
   // kept when it wrote the file; never through a signed link, so nothing else can be served in its place. A PDF kept before
   // the fingerprint existed has none and still opens as before. ORD-05 PDF (owner, 1 November 2026): an order's PDF is
   // written by the server the same way and is served the same way (it always has its SHA-256).
-  if ((file.quote_id || file.order_id) && file.sha256) {
+  // SGN-02: a signed document's PDF is written by the server the same way and served the same way
+  if ((file.quote_id || file.order_id || file.signature_document_id) && file.sha256) {
     const object = await supabase.storage.from(FILES_BUCKET).download(file.storage_path);
     if (object.error || !object.data) return new NextResponse("לא נמצא", { status: 404 });
     const bytes = new Uint8Array(await object.data.arrayBuffer());

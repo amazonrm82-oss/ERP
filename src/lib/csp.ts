@@ -23,12 +23,13 @@ type Options = {
 /**
  * A public page that may be framed by customers' sites: every /f/ page except the QR scan route, whose page before an
  * external link (BIZ-03) carries the business's name on our domain and must never sit inside another site, and the
- * customer's statement page (BAL-04), which shows a customer's debts and must never sit inside another site either.
- * next.config.ts leaves the same two prefixes out of `frame-ancestors *`; keep the two in step.
+ * customer's statement page (BAL-04), which shows a customer's debts and must never sit inside another site either, and
+ * the signing page (SGN-02), where a signature must never be clicked inside another site. next.config.ts leaves the same
+ * prefixes out of `frame-ancestors *`; keep the two in step.
  */
 // CNS-09 / CNS-10: the customer's preferences page and unsubscribe confirmation change what the person receives, so they
-// never sit inside another site either (a framed button could be clicked without the person seeing it).
-export const NOT_EMBEDDABLE_PUBLIC_PREFIXES = ["/f/q/", "/f/statement/", "/f/prefs/", "/f/unsub/"] as const;
+// never sit inside another site either (SGN-02's signing page too) (a framed button could be clicked without the person seeing it).
+export const NOT_EMBEDDABLE_PUBLIC_PREFIXES = ["/f/q/", "/f/statement/", "/f/prefs/", "/f/unsub/", "/f/sign/"] as const;
 
 export function isEmbeddablePublicPath(pathname: string): boolean {
   return pathname.startsWith("/f/") && !NOT_EMBEDDABLE_PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));

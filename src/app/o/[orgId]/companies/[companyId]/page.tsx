@@ -32,6 +32,7 @@ import { listRecordTypes } from "@/features/record-type-options/queries";
 import { RelatedDealsCard } from "@/features/deals/components/related-deals-card";
 import { RecordQuotesCard } from "@/features/quotes/components/record-quotes-card";
 import { RecordOrdersCard } from "@/features/orders/components/record-orders-card";
+import { RecordSignaturesCard } from "@/features/signatures/components/record-signatures-card";
 import { CompanyCreditCard } from "@/features/allocations/components/company-credit-card";
 import { CompanyOpeningCard } from "@/features/documents/components/company-opening-card";
 import { CustomerHoldCard } from "@/features/customer-holds/components/customer-hold-card";
@@ -213,6 +214,8 @@ export default async function CompanyPage({ params, searchParams }: Props) {
           {/* QUO-16: the quotes that name the company (made from its deals and people) */}
           <RecordQuotesCard orgId={orgId} subject={{ kind: "company", id: company.id }} canCreate={false} />
           {/* ORD-01: the company's orders while the orders module is on */}
+          {/* SGN-02: documents sent from this company for signature, and the signed PDFs */}
+          <RecordSignaturesCard orgId={orgId} kind="company" recordId={company.id} canEdit={canEditRecordHint(context, company.owner_id)} phoneE164={company.phone_e164} />
           <RecordOrdersCard orgId={orgId} subject={{ kind: "company", id: company.id }} canCreate={canEditRecordHint(context, company.owner_id)} />
           {/* COL-05: "לא למכור עד הסדרת חוב" */}
           <CustomerHoldCard orgId={orgId} subject={{ kind: "company", id: company.id }} />

@@ -1474,6 +1474,9 @@ export type FileRow = {
   quote_signed: boolean | null;
   // LIB-01 (migration content_library): the content library's file item this file is (one per item); null on every other file
   library_item_id: string | null;
+  // SGN-02 (migration signature_documents): the signed document whose PDF this is (one per document, written by the server,
+  // read by owners and admins only); null on every other file
+  signature_document_id: string | null;
 };
 
 // REC-03 (migration 0104): one row per user and followed record; user_id comes from the session
@@ -2596,6 +2599,59 @@ export type OrderDecisionRow = {
   ip: string | null;
   user_agent: string | null;
   decline_reason: string | null;
+  erased_at: string | null;
+  created_at: string;
+};
+
+// SGN-02: a document filled from a template and sent from one record for signature (migration signature_documents). No client
+// writes; read by the record's readers. status: sent | viewed | signed | cancelled.
+export type SignatureDocumentRow = {
+  id: string;
+  organization_id: string;
+  lead_id: string | null;
+  contact_id: string | null;
+  company_id: string | null;
+  deal_id: string | null;
+  template_id: string | null;
+  title: string;
+  body: string;
+  status: string;
+  sent_by: string | null;
+  sent_at: string;
+  viewed_at: string | null;
+  signed_at: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  expires_at: string | null;
+  content_sha256: string;
+  // server only (review 1): the leads and contacts it was about when sent and signed, for erasure
+  people: string[];
+  // owner (219) ב: the record it was on, once purged (server only)
+  former_lead_id: string | null;
+  former_contact_id: string | null;
+  former_company_id: string | null;
+  former_deal_id: string | null;
+  customer_deleted_at: string | null;
+  erased_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// SGN-02: the customer's signature of a document (as quote_decisions). Written only by public.signature_public_sign, read only
+// by owners and admins.
+export type SignatureSignatureRow = {
+  id: string;
+  organization_id: string;
+  document_id: string;
+  signed_at: string;
+  signer_name: string | null;
+  signer_id_number: string | null;
+  signature_kind: string;
+  signature_image: string | null;
+  wording_version: string;
+  content_sha256: string;
+  ip: string | null;
+  user_agent: string | null;
   erased_at: string | null;
   created_at: string;
 };
@@ -3824,6 +3880,9 @@ export type Database = {
       quote_decisions: ReadOnlyTable<QuoteDecisionRow>;
       // ORD-05: no client writes
       order_decisions: ReadOnlyTable<OrderDecisionRow>;
+      // SGN-02: no client writes
+      signature_documents: ReadOnlyTable<SignatureDocumentRow>;
+      signature_signatures: ReadOnlyTable<SignatureSignatureRow>;
       quote_views: ReadOnlyTable<QuoteViewRow>;
       // MSG-03: no client writes
       messages: ReadOnlyTable<MessageRow>;
@@ -4640,6 +4699,44 @@ export type Database = {
         Returns: Json;
       };
       quote_signed_pdf_public: { Args: { p_token: string }; Returns: Json };
+      // SGN-02: sending a document for signature from a record, a new link, cancelling (the person's session); the customer's
+      // page and signature (service_role only); the signed PDF: what to render and the write (customer's route, service_role
+      // only), staff's right (their session) and the write for staff (service_role only)
+      signature_document_send: {
+        Args: { p_org: string; p_template: string; p_record_type: string; p_record_id: string; p_title: string; p_body: string; p_valid_days?: number | null };
+        Returns: Json;
+      };
+      // (224) ב: the template filled by the database for the record, in segments (the sending rights)
+      signature_document_draft: { Args: { p_org: string; p_template: string; p_record_type: string; p_record_id: string }; Returns: Json };
+      signature_document_link: { Args: { p_org: string; p_doc: string }; Returns: string };
+      // review 3: the ids of the documents that name these leads and contacts (owners and admins; the person export)
+      signature_documents_naming: { Args: { p_org: string; p_ids: string[] }; Returns: string[] };
+      signature_document_cancel: { Args: { p_org: string; p_doc: string }; Returns: boolean };
+      signature_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
+      signature_public_sign: {
+        Args: {
+          p_token: string;
+          p_fingerprint: string;
+          p_signer_name: string;
+          p_id_number?: string | null;
+          p_signature_kind?: string | null;
+          p_signature_image?: string | null;
+          p_wording_version?: string | null;
+          p_agreed?: boolean;
+          p_ip?: string | null;
+          p_user_agent?: string | null;
+        };
+        Returns: Json;
+      };
+      signature_pdf_public: { Args: { p_token: string }; Returns: Json };
+      // (223) ב: the customer's download of the signed PDF (service_role only)
+      signature_public_pdf: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
+      signature_pdf_public_store: { Args: { p_token: string; p_size: number; p_sha256: string; p_path?: string | null; p_fingerprint?: string | null }; Returns: Json };
+      signature_pdf_allowed: { Args: { p_org: string; p_doc: string }; Returns: Json };
+      signature_pdf_store: {
+        Args: { p_org: string; p_doc: string; p_user: string; p_size: number; p_sha256: string; p_path?: string | null; p_fingerprint?: string | null };
+        Returns: Json;
+      };
       quote_signed_pdf_public_store: {
         Args: { p_token: string; p_size: number; p_sha256: string; p_name: string; p_path?: string | null; p_fingerprint?: string | null };
         Returns: Json;

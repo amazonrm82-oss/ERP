@@ -19,8 +19,9 @@ const nextConfig: NextConfig = {
       {
         // The app itself must never be framed by another site (clickjacking); nor the QR scan route, whose page
         // before an external link (BIZ-03) names the business on our domain, nor the customer's statement page (BAL-04),
-        // which shows a customer's debts, nor the preferences and unsubscribe pages (CNS-09/10). Same prefixes as NOT_EMBEDDABLE_PUBLIC_PREFIXES in src/lib/csp.ts.
-        source: "/((?!f/(?!q/|statement/|prefs/|unsub/)).*)",
+        // which shows a customer's debts, nor the preferences and unsubscribe pages (CNS-09/10), nor a document for signature
+        // (SGN-02: a signature must never be clicked inside another site). Same prefixes as NOT_EMBEDDABLE_PUBLIC_PREFIXES in src/lib/csp.ts.
+        source: "/((?!f/(?!q/|statement/|prefs/|unsub/|sign/)).*)",
         headers: [
           { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
           { key: "X-Frame-Options", value: "DENY" },
@@ -30,8 +31,8 @@ const nextConfig: NextConfig = {
       },
       {
         // Public lead forms are made to be embedded in customers' websites (every /f/ page but the QR scan route and
-        // the statement page).
-        source: "/f/((?!q/|statement/|prefs/|unsub/).*)",
+        // the statement page, the preferences and unsubscribe pages and the signing page).
+        source: "/f/((?!q/|statement/|prefs/|unsub/|sign/).*)",
         headers: [
           { key: "Content-Security-Policy", value: "frame-ancestors *" },
           { key: "Referrer-Policy", value: "no-referrer" },
@@ -48,8 +49,8 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // CNS-09 / CNS-10: the preferences page and the unsubscribe confirmation, the same as the statement page
-        source: "/f/:page(prefs|unsub)/:path*",
+        // CNS-09 / CNS-10 (preferences, unsubscribe) and SGN-02 (signing): like the statement page, never framed, no referrer
+        source: "/f/:page(prefs|unsub|sign)/:path*",
         headers: [
           { key: "Referrer-Policy", value: "no-referrer" },
           { key: "X-Content-Type-Options", value: "nosniff" },

@@ -99,6 +99,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   quote_lines: "שורה בהצעת מחיר",
   // GAP-09
   quote_payment_steps: "תשלום בלוח התשלומים של הצעה",
+  // SGN-02
+  signature_documents: "מסמך לחתימה",
   // ORD-01
   orders: "הזמנה",
   order_lines: "שורה בהזמנה",
@@ -192,6 +194,8 @@ export const ACTION_LABELS: Record<string, string> = {
   person_erase: "מחיקת אדם מכל מקום (בקשת פרטיות)",
   quote_link: "קישור ללקוח להצעה",
   order_link: "קישור ללקוח להזמנה",
+  // SGN-02: a document for signature sent, given a new link or cancelled (ids and codes only; never the token or the text)
+  signature_document: "מסמך לחתימה",
   // BAL-04: the customer's statement link on a contact or company (created / revoked; never the token)
   statement_link: "קישור לדף חשבון",
   consent_link: "קישור להעדפות דיוור",

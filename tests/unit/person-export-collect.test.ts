@@ -164,7 +164,8 @@ function query(table: string) {
   return builder;
 }
 
-vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ from: query }) }));
+// SGN-02 review 3: the person export asks signature_documents_naming for documents that name the person (none here)
+vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ from: query, rpc: async () => ({ data: [], error: null }) }) }));
 vi.mock("@/features/shell/queries", () => ({ getUserNames: async (ids: string[]) => new Map(ids.map((id) => [id, `שם ${id}`])) }));
 
 describe("a person's export carries the quote decision, views, schedule and segments (RVW-33)", () => {

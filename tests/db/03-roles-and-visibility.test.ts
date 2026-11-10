@@ -737,6 +737,46 @@ describe("roles and record visibility", () => {
     }
   });
 
+  it("a document for signature follows its record; its signature is read by owners and admins only; nobody writes either (SGN-02)", async () => {
+    await setVisibility("own");
+    try {
+      const contact = await asUser(m1.id, async (q) =>
+        (await q<{ id: string }>("insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'לקוח לחתימה', $2) returning id", [org, m1.id])).rows[0].id,
+      );
+      const doc = await asAdmin(async (q) =>
+        (
+          await q<{ id: string }>(
+            "insert into public.signature_documents (organization_id, contact_id, title, body, content_sha256) values ($1, $2, 'מסמך', 'טקסט', repeat('0', 64)) returning id",
+            [org, contact],
+          )
+        ).rows[0].id,
+      );
+      const signature = await asAdmin(async (q) =>
+        (
+          await q<{ id: string }>(
+            "insert into public.signature_signatures (organization_id, document_id, signer_name, signature_kind, wording_version, content_sha256, ip) values ($1, $2, 'חותם', 'typed', 'v1', repeat('0', 64), '203.0.113.9') returning id",
+            [org, doc],
+          )
+        ).rows[0].id,
+      );
+      const seesDoc = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.signature_documents where id = $1", [doc]));
+      const seesSignature = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.signature_signatures where id = $1", [signature]));
+      for (const u of [owner, admin, m1]) expect(await seesDoc(u), u.email).toBe(1);
+      // visibility "own": another member does not read the contact, so not its documents either
+      expect(await seesDoc(m2)).toBe(0);
+      for (const u of [owner, admin]) expect(await seesSignature(u), u.email).toBe(1);
+      for (const u of [manager, m1, m2, viewer]) expect(await seesSignature(u), u.email).toBe(0);
+      for (const u of [owner, m1]) {
+        expect((await pgError(asUser(u.id, (q) => q("update public.signature_documents set title = 'x' where id = $1", [doc])))).code, u.email).toBe("42501");
+        expect((await pgError(asUser(u.id, (q) => q("delete from public.signature_documents where id = $1", [doc])))).code, u.email).toBe("42501");
+        expect((await pgError(asUser(u.id, (q) => q("update public.signature_signatures set ip = null where id = $1", [signature])))).code, u.email).toBe("42501");
+        expect((await pgError(asUser(u.id, (q) => q("delete from public.signature_signatures where id = $1", [signature])))).code, u.email).toBe("42501");
+      }
+    } finally {
+      await setVisibility("org");
+    }
+  });
+
   it("a customer's answer on an order is read by owners and admins only, and written by nobody (ORD-05)", async () => {
     await setVisibility("org");
     await asAdmin((q) => q("update public.subscriptions set feature_overrides = coalesce(feature_overrides, '{}'::jsonb) || '{\"orders\": true}' where organization_id = $1", [org]));

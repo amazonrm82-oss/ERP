@@ -788,6 +788,11 @@ describe("setup checklist and sample data (USR-04)", () => {
       // 100,000 cap too), app.consent_service_blocked() of _message_types.sql and app.consent_state_of() / app.consent_prepare()
       // of _import_consent_undo.sql last
       "_consent_preference_links.sql",
+      // SGN-02 alters the files_select policy and the storage policy record_files_delete of _content_library.sql last (a
+      // signed document's PDF: owners and admins read it, no person removes its object)
+      "_signature_documents.sql",
+      // the pasted erasure gives app.signature_pdf_drop() of _signature_documents.sql its body (listed for staleRestores)
+      "_signature_pdf_erase.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

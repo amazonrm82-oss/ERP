@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 
 import { RecordConsents } from "@/features/consents/components/record-consents";
+import { RecordSignaturesCard } from "@/features/signatures/components/record-signatures-card";
 import { createdLineText } from "@/features/imports/history";
 import { ManualAutomationsButton } from "@/features/automations/components/manual-automations-button";
 import { SendEmailButton } from "@/features/record-email/components/send-email-button";
@@ -347,6 +348,9 @@ export default async function LeadPage({ params, searchParams }: Props) {
             selectedIds={lead.tag_ids}
             canEdit={canEditRecordHint(context, lead.owner_id)}
           />
+
+          {/* SGN-02: documents sent from this lead for signature, and the signed PDFs */}
+          <RecordSignaturesCard orgId={orgId} kind="lead" recordId={lead.id} canEdit={canEditRecordHint(context, lead.owner_id)} phoneE164={lead.phone_e164} />
 
           <div className="print:hidden">
             <RecordConsents

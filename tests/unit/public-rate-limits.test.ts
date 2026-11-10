@@ -255,6 +255,29 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
     refusal: JSON_429 + " (with status), or " + TEXT_429 + " for a one-click post",
     sender: "first",
   },
+  // SGN-02 (owner (191) א): the quote page's limits
+  "/f/sign/[token]": {
+    guard: "database",
+    functions: ["public_sender_check", "public_sender_miss", "signature_public"],
+    limit: SENDER + "120 views per link and 60 per sender (scope signature) in 10 min, after the lookup; a preview bot gets a generic page and no read",
+    refusal: PAGE_TEXT,
+    sender: "first",
+  },
+  "/api/forms/sign/[token]": {
+    guard: "database",
+    functions: ["public_sender_check", "public_sender_miss", "signature_public_sign", "signature_pdf_public", "signature_pdf_public_store"],
+    limit: SENDER + "the link's 120-view window plus 10 signing tries per link in 10 min, after the lookup; the signed PDF is written once after a signature",
+    refusal: JSON_429 + " (with status)",
+    sender: "first",
+  },
+  // (223) ב: the customer's signed PDF, after signing
+  "/api/forms/sign/[token]/pdf": {
+    guard: "database",
+    functions: ["public_sender_check", "public_sender_miss", "signature_public_pdf"],
+    limit: SENDER + "20 downloads per sender (scope signature) plus the link's 120-view window in 10 min, after the lookup; only the link it was signed with",
+    refusal: TEXT_429,
+    sender: "first",
+  },
   "/f/privacy/[token]": {
     guard: "database",
     functions: ["privacy_request_page"],

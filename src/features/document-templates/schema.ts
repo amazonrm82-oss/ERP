@@ -6,6 +6,7 @@ import { templateVariantProblem, VARIANT_PROBLEM_MESSAGES } from "@/features/wha
 import { requiredText } from "@/lib/validation";
 
 import { DOCUMENT_RECORD_TYPES, unknownDocumentFields, type DocumentRecordType } from "./fields";
+import { LOCKED_PROBLEM_MESSAGES, lockedSegments } from "./locked";
 import { DOCUMENT_KINDS, DOCUMENT_TEMPLATE_BODY_MAX, DOCUMENT_TEMPLATE_NAME_MAX } from "./templates";
 
 const CONTROL_CHARACTER = /\p{Cc}/u;
@@ -25,6 +26,9 @@ export function documentBodyProblem(body: string, type: DocumentRecordType): str
   const unknown = unknownDocumentFields(body, type);
   if (unknown.length > 0) return `השדה ${unknown.join(", ")} לא קיים לסוג הרשומה הזה. אפשר להשתמש רק בשדות שברשימה, כתובים בדיוק כך.`;
   if (mentionIds(body).length > 0) return "אי אפשר לתייג אנשי צוות במסמך.";
+  // (224) ב: "::: נעול" ... ":::" (app.document_locked_segments)
+  const locked = lockedSegments(body);
+  if (locked.problem) return LOCKED_PROBLEM_MESSAGES[locked.problem];
   return null;
 }
 
