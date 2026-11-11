@@ -115,6 +115,15 @@ and build this CRM here instead. The old code is preserved on the branch
    open; every signing logged in `app.platform_log` (ids only); tests prove such a token reads nothing beyond the user; an independent
    review; its own "In use" line. (161) א the job stops when the session ends; (162) ב an export over the upload limit fails with a notice
    pointing to the direct download; (163) ב background import only with "skip" or "update" for duplicates.
+   Owner, 11 November 2026, answers (267) א, (270) א, (271) ב, (272) א, (276) א (approved, not built yet; each needs its own "In use" line
+   once built, database tests and an independent review): OPS-04 job kinds `digest.send` (per-recipient summaries computed under the
+   recipient's own rights through IMP-04's short background token, (160)'s conditions), `documents.pull` and `documents.import` (DOC-11,
+   DOC-12), all under answer (55)'s conditions (ids only in the queue, bodies pinned by md5). Three new secret-link public pages under
+   this rule's approved pattern: the business page (BIZ-01), a non-medical prefilled form (BIZ-05) and a tracked library link (LIB-02);
+   not the internal survey (RET-02). The landing page's price list (LND-13/WEB-01) reads one anon-callable function returning only public
+   fields of available and coming-soon plans, cached an hour like the subprocessors page (a second anon function beside `health_check`;
+   test 01 names it). In-person signing (SGN-07): a rep's own session may trigger the signed-PDF writer, under SGN-02's conditions (191):
+   the session is checked first, only someone who may send the document, and the signing is recorded with the rep's identity and device.
    In use (IMP-04, owner 9 November 2026, answers (155) א, (160) א, (161) א, (162) ב, (163) ב; migration `_background_jobs.sql`; two
    independent reviews): the OPS-04 worker (same route and secret) also claims `import.run` and `export.run` (payload `{request_id,
    user_id}` only) in its own pass (lease 900 s, one job, 40 s budget, then saved and handed back uncounted with
