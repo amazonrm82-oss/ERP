@@ -124,7 +124,23 @@ and build this CRM here instead. The old code is preserved on the branch
    fields of available and coming-soon plans, cached an hour like the subprocessors page (a second anon function beside `health_check`;
    test 01 names it). In-person signing (SGN-07): a rep's own session may trigger the signed-PDF writer, under SGN-02's conditions (191):
    the session is checked first, only someone who may send the document, and the signing is recorded with the rep's identity and device.
-   In use (IMP-04, owner 9 November 2026, answers (155) א, (160) א, (161) א, (162) ב, (163) ב; migration `_background_jobs.sql`; two
+   Built, no service-key use yet (AUT-08, SPD-04; migrations 021224, 021225; owner (80) א, (120) ג, (259) א, (261) א, (280) ג;
+  four independent reviews): automation step `send_email` (`app.automation_send_email`, EML-02's rules; one per rule, record and
+  business day; no attachments; button presses count in the person's 30 emails an hour with card sends; a session's step takes the
+  person locks `record_email:<user>` then `record_sms:<user>` first, every path, so no cycle) and the instant reply to a web-form
+  inquiry (`app.instant_reply_queue` from `app.emit_form_submitted` in its own exception block; type `instant_reply`, a service
+  type; only when the typed address equals the record's own; one per address per business day by HMAC bucket of the folded address
+  (`app.instant_reply_email_key`, `consent_hash_key`; no key = nothing), 200 a business day per business with one notice; outcomes
+  in `app.instant_replies`). `app.message_window_exempt` (verification_code, instant_reply) is read only by the window line of
+  `public.job_message_may_send` and the hours move of `app.message_move_waiting`; `app.message_always_sends` stays
+  verification_code only, so an instant reply takes the rates (test 284's pin changed, reviewed 11 November 2026, window line
+  only). The four instant-reply templates are seeded only with the `instant_reply` key and are fixed for a person's write (only
+  is_active; trigger `message_templates_fixed_notice`, hint `message_template:fixed_notice`; interim until owner question 282).
+  `org_message_settings.instant_reply_default` gives a new web form its switch. THE FUTURE SENDER re-checks the `instant_reply`
+  key and the form's switch, re-reads the submission, sends nothing unless the record's address still equals the typed one, and
+  needs its own "In use" line. `app.job_payload_ok` was last redefined in 021225. Tests 64 and 88 end with `_instant_reply.sql`.
+  The advisor's findings on the four `app.instant_repl*` tables are expected.
+  In use (IMP-04, owner 9 November 2026, answers (155) א, (160) א, (161) א, (162) ב, (163) ב; migration `_background_jobs.sql`; two
    independent reviews): the OPS-04 worker (same route and secret) also claims `import.run` and `export.run` (payload `{request_id,
    user_id}` only) in its own pass (lease 900 s, one job, 40 s budget, then saved and handed back uncounted with
    `finish_job(started=false)`), and calls with the service key only `public.background_job_begin()`, `background_job_progress()`,
