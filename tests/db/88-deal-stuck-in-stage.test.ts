@@ -136,6 +136,9 @@ const RERUN = [
   migrationFile("_instant_reply.sql"),
   // COL-07 redefines app.job_payload_ok() of _instant_reply.sql and app.send_collection_reminders() last
   migrationFile("_collection_customer_reminders.sql"),
+  // SGN-07 redefines public.signature_pdf_store, public.quote_signed_pdf_store, app.signature_pdf_source and
+  // app.quote_signature_block last (the in-person rep)
+  migrationFile("_in_person_signing.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

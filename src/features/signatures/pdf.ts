@@ -7,7 +7,7 @@ import { z } from "zod";
 
 import { parseNote, type Inline } from "@/features/activities/markdown";
 import { ltr, type PdfBlock, type PdfDocument, type PdfLine, type PdfLogo } from "@/features/pdf/document";
-import { checkSignaturePng, signedAtText, type SignatureProblem } from "@/features/quotes/signed-pdf";
+import { checkSignaturePng, inPersonLine, signedAtText, type SignatureProblem } from "@/features/quotes/signed-pdf";
 import { SIGNATURE_IMAGE, SIGNATURE_IMAGE_MAX } from "@/features/quotes/decision";
 
 import { TEXT_ERASED_LINE } from "./states";
@@ -36,6 +36,8 @@ export type SignedDocumentSource = {
     // review 5: the stored text of that version (app.signature_wording_versions), null when it is not registered
     wording: string | null;
     fingerprint: string;
+    // SGN-07: signed face to face on the rep's device, and the rep's name (null when the profile has none)
+    inPerson: { repName: string | null } | null;
   };
 };
 
@@ -60,6 +62,8 @@ const sourceSchema = z.object({
     wording_version: z.string().min(1).max(40),
     wording: z.string().min(1).max(2000).nullable().optional(),
     fingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+    in_person: z.boolean().optional(),
+    in_person_by_name: z.string().min(1).max(200).nullable().optional(),
   }),
 });
 
@@ -94,6 +98,7 @@ export function readSignedDocumentSource(raw: unknown): { source: SignedDocument
         wordingVersion: r.signature.wording_version,
         wording: r.signature.wording ?? null,
         fingerprint: r.signature.fingerprint,
+        inPerson: r.signature.in_person === true ? { repName: r.signature.in_person_by_name ?? null } : null,
       },
     },
   };
@@ -146,6 +151,7 @@ export function signedDocumentPdf(source: SignedDocumentSource, logo: PdfLogo | 
   if (s.idNumber) facts.push({ text: `תעודת זהות: ${ltr(s.idNumber)}` });
   facts.push(
     { text: `נחתם ב-${signedAtText(s.signedAt, s.timeZone)}` },
+    ...(s.inPerson ? [{ text: inPersonLine(s.inPerson) }] : []),
     { text: wording, muted: true, size: 8.5 },
     { text: `טביעת האצבע של המסמך, SHA-256: ${ltr(s.fingerprint)}`, muted: true, size: 7.5 },
   );

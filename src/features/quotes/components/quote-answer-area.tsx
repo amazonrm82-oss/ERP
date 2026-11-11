@@ -7,13 +7,17 @@ import { formatMoney } from "@/lib/format";
 
 import { choiceKeys, choiceTotals, initialChoice, isOptionalItem } from "../optional-choice";
 import type { QuoteLine } from "../queries";
-import { QuoteDecisionPanel } from "./quote-decision-panel";
+import { QuoteDecisionPanel, type DecisionReply } from "./quote-decision-panel";
+import type { DecisionBody } from "../decision";
+import type { ReactNode } from "react";
 
 type Props = {
-  token: string;
+  token?: string;
   fingerprint: string;
   quote: { vatRateBp: number | null; pricesIncludeVat: boolean; discountBp: number | null; discountAgorot: number | null; };
   lines: QuoteLine[];
+  // SGN-07: in-person acceptance on the rep's device (see QuoteDecisionPanel)
+  inPerson?: { send: (body: DecisionBody) => Promise<DecisionReply>; evidence: string; done: (reply: DecisionReply) => ReactNode };
 };
 
 /**
@@ -21,13 +25,19 @@ type Props = {
  * ticks the ones they want first (all start unticked, owner's answer) and sees the total of that choice; the acceptance
  * carries the choice and that total, and the server refuses it if the two disagree.
  */
-export function QuoteAnswerArea({ token, fingerprint, quote, lines }: Props) {
+export function QuoteAnswerArea({ token, fingerprint, quote, lines, inPerson }: Props) {
   const ids = useId();
   const optional = useMemo(() => lines.filter(isOptionalItem), [lines]);
   const [ticked, setTicked] = useState<string[]>(() => initialChoice(lines));
   const totals = useMemo(() => choiceTotals(quote, lines, ticked), [quote, lines, ticked]);
 
-  if (optional.length === 0) return <QuoteDecisionPanel token={token} fingerprint={fingerprint} />;
+  const panel = (choice?: { optionalKeys: number[]; acceptedTotalAgorot: number } | null) =>
+    inPerson ? (
+      <QuoteDecisionPanel fingerprint={fingerprint} choice={choice} send={inPerson.send} acceptOnly evidence={inPerson.evidence} done={inPerson.done} />
+    ) : (
+      <QuoteDecisionPanel token={token} fingerprint={fingerprint} choice={choice} />
+    );
+  if (optional.length === 0) return panel();
 
   const choice = totals.ok ? { optionalKeys: choiceKeys(lines, ticked), acceptedTotalAgorot: totals.totals.totalAgorot } : null;
   return (
@@ -60,7 +70,7 @@ export function QuoteAnswerArea({ token, fingerprint, quote, lines }: Props) {
         </p>
         {totals.ok ? null : <p className="text-sm text-danger">ההנחה על ההצעה גדולה מהשורות שנבחרו. סמנו שורות נוספות או פנו לעסק.</p>}
       </section>
-      <QuoteDecisionPanel token={token} fingerprint={fingerprint} choice={choice} />
+      {panel(choice)}
     </div>
   );
 }

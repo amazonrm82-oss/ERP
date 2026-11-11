@@ -25,6 +25,8 @@ export type QuoteSignature = {
   wordingVersion: string;
   // quote_decisions.choice_sha256, else content_sha256: the store checks it again
   fingerprint: string;
+  // SGN-07: signed face to face on the rep's device, and the rep's name (null when the profile has none)
+  inPerson?: { repName: string | null } | null;
 };
 
 const blockSchema = z.object({
@@ -35,7 +37,14 @@ const blockSchema = z.object({
   time_zone: z.string().min(1).max(64),
   wording_version: z.string().min(1).max(40),
   fingerprint: z.string().regex(/^[0-9a-f]{64}$/),
+  in_person: z.boolean().optional(),
+  in_person_by_name: z.string().min(1).max(200).nullable().optional(),
 });
+
+/** SGN-07: the line a signed PDF prints when the customer signed in person, on the rep's device. */
+export function inPersonLine(inPerson: { repName: string | null }): string {
+  return inPerson.repName ? `נחתם פנים אל פנים, בנוכחות ${inPerson.repName}` : "נחתם פנים אל פנים, במכשיר של העסק";
+}
 
 const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
@@ -129,7 +138,16 @@ export function readSignature(raw: unknown): { signature: QuoteSignature } | { p
     image = checked.bytes;
   }
   return {
-    signature: { signerName: b.signer_name, kind: b.kind, image, decidedAt: b.decided_at, timeZone: b.time_zone, wordingVersion: b.wording_version, fingerprint: b.fingerprint },
+    signature: {
+      signerName: b.signer_name,
+      kind: b.kind,
+      image,
+      decidedAt: b.decided_at,
+      timeZone: b.time_zone,
+      wordingVersion: b.wording_version,
+      fingerprint: b.fingerprint,
+      inPerson: b.in_person === true ? { repName: b.in_person_by_name ?? null } : null,
+    },
   };
 }
 
@@ -196,6 +214,7 @@ export function quoteSignedPdfDocument(data: QuoteDocumentData, logo: PdfLogo | 
   const facts: PdfLine[] = [
     { text: `שם החותם: ${signature.signerName}`, bold: true },
     { text: `נחתם ב-${when}` },
+    ...(signature.inPerson ? [{ text: inPersonLine(signature.inPerson) }] : []),
     { text: wording, muted: true, size: 8.5 },
     { text: `טביעת האצבע של האישור, SHA-256: ${ltr(signature.fingerprint)}`, muted: true, size: 7.5 },
   ];

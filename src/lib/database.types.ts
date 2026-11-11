@@ -2602,6 +2602,9 @@ export type QuoteDecisionRow = {
   accepted_vat_agorot: number | null;
   accepted_total_agorot: number | null;
   currency: string;
+  // SGN-07 (migration in_person_signing): accepted face to face on the rep's device, and that rep (both or neither)
+  in_person: boolean | null;
+  in_person_by: string | null;
 };
 
 // ORD-05: the customer's answer on an order through its link (migration order_links); the shape of QuoteDecisionRow.
@@ -2684,6 +2687,9 @@ export type SignatureSignatureRow = {
   user_agent: string | null;
   erased_at: string | null;
   created_at: string;
+  // SGN-07 (migration in_person_signing): signed face to face on the rep's device, and that rep (both or neither)
+  in_person: boolean | null;
+  in_person_by: string | null;
 };
 
 // CNS-06: the business's do-not-market list (migration consent_blocklist). Owners and admins read it; written only by
@@ -4765,6 +4771,43 @@ export type Database = {
         Returns: Json;
       };
       signature_pdf_public: { Args: { p_token: string }; Returns: Json };
+      // SGN-07: in-person signing on the rep's device (the rep's session; the sending right), and the signed PDF's source for
+      // the rep who was present, within the hour
+      signature_in_person_sign: {
+        Args: {
+          p_org: string;
+          p_doc: string;
+          p_fingerprint: string;
+          p_signer_name: string;
+          p_id_number?: string | null;
+          p_signature_kind?: string | null;
+          p_signature_image?: string | null;
+          p_wording_version?: string | null;
+          p_agreed?: boolean;
+          p_user_agent?: string | null;
+        };
+        Returns: Json;
+      };
+      signature_in_person_pdf_allowed: { Args: { p_org: string; p_doc: string }; Returns: Json };
+      quote_in_person_open: { Args: { p_org: string; p_quote: string }; Returns: Json };
+      quote_in_person_accept: {
+        Args: {
+          p_org: string;
+          p_quote: string;
+          p_fingerprint: string;
+          p_signer_name?: string | null;
+          p_id_number?: string | null;
+          p_signature_kind?: string | null;
+          p_signature_image?: string | null;
+          p_wording_version?: string | null;
+          p_agreed?: boolean;
+          p_user_agent?: string | null;
+          p_optional_keys?: number[] | null;
+          p_accepted_total_agorot?: number | null;
+        };
+        Returns: Json;
+      };
+      quote_in_person_pdf_allowed: { Args: { p_org: string; p_quote: string }; Returns: Json };
       // (223) ב: the customer's download of the signed PDF (service_role only)
       signature_public_pdf: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       signature_pdf_public_store: { Args: { p_token: string; p_size: number; p_sha256: string; p_path?: string | null; p_fingerprint?: string | null }; Returns: Json };

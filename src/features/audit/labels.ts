@@ -197,6 +197,8 @@ export const ACTION_LABELS: Record<string, string> = {
   // SGN-02: a document for signature sent, given a new link or cancelled (ids and codes only; never the token or the text)
   signature_document: "מסמך לחתימה",
   signature_validity: "תוקף מסמך חתום",
+  // SGN-07: the customer signed a document or accepted a quote on the rep's device (ids and codes only)
+  in_person_signature: "חתימה במקום",
   // BAL-04: the customer's statement link on a contact or company (created / revoked; never the token)
   statement_link: "קישור לדף חשבון",
   consent_link: "קישור להעדפות דיוור",

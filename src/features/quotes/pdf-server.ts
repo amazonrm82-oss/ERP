@@ -228,11 +228,19 @@ const SIGNED_NOT_PERMITTED = "אין לכם הרשאה לשמור את ה-PDF ה
  * render error). The person's right and the signature block come from public.quote_signed_pdf_allowed with their own
  * session; the document is read with it too, rendered here, and written with the service key for that user (checked again).
  */
-export async function storeSignedQuotePdf(supabase: Client, orgId: string, quote: Quote, userId: string): Promise<QuotePdfResult> {
+export async function storeSignedQuotePdf(
+  supabase: Client,
+  orgId: string,
+  quote: Quote,
+  userId: string,
+  // SGN-07 (276) א: "in_person" = the rep who was present at an in-person acceptance, right after it (the rep's session asks
+  // public.quote_in_person_pdf_allowed; the same writer checks that rep again)
+  via: "staff" | "in_person" = "staff",
+): Promise<QuotePdfResult> {
   if (quote.status !== "accepted") return { ok: false, message: "PDF חתום נשמר רק להצעה שהלקוח אישר וחתם עליה." };
   const existing = await getSignedQuotePdfFile(supabase, orgId, quote.id).catch(() => null);
   if (existing) return { ok: true, fileId: existing.id };
-  const allowed = await supabase.rpc("quote_signed_pdf_allowed", { p_org: orgId, p_quote: quote.id });
+  const allowed = await supabase.rpc(via === "in_person" ? "quote_in_person_pdf_allowed" : "quote_signed_pdf_allowed", { p_org: orgId, p_quote: quote.id });
   // owners and admins only (review, until the owner answers question 37)
   if (allowed.error?.code === "42501") return { ok: false, message: SIGNED_NOT_PERMITTED };
   if (allowed.error) return { ok: false, message: dbErrorMessage(allowed.error) };

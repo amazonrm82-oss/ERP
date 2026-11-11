@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useId, useState, useTransition } from "react";
+import { useId, useState, useTransition, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { FormError, FormNotice } from "@/components/ui/feedback";
@@ -16,7 +16,19 @@ import { SignaturePad } from "./signature-pad";
 type Subject = "quote" | "order";
 // QUO-08: the customer's choice of optional lines and the total shown for it (quotes only); null = the choice cannot be accepted
 type Choice = { optionalKeys: number[]; acceptedTotalAgorot: number };
-type Props = { token: string; fingerprint: string; subject?: Subject; choice?: Choice | null };
+// SGN-07: the reply of whoever receives the answer (the customer's route, or the rep's in-person action)
+export type DecisionReply = { ok: boolean; status?: string; message: string };
+type Props = {
+  token?: string;
+  fingerprint: string;
+  subject?: Subject;
+  choice?: Choice | null;
+  // SGN-07: in-person signing: accept only, posted through the rep's own action, with its own evidence line and done view
+  send?: (body: DecisionBody) => Promise<DecisionReply>;
+  acceptOnly?: boolean;
+  evidence?: string;
+  done?: (reply: DecisionReply) => ReactNode;
+};
 
 const SUBJECT: Record<Subject, { route: string; wording: string; title: string; decline: string }> = {
   quote: { route: "quote", wording: ACCEPT_WORDING, title: "התשובה שלך להצעה", decline: "דחיית ההצעה" },
@@ -29,11 +41,11 @@ type Mode = "choose" | "accept" | "decline";
  * typed signature, the checkbox) or decline with an optional reason. The answer names the fingerprint of the version shown,
  * so it applies to exactly what the customer read.
  */
-export function QuoteDecisionPanel({ token, fingerprint, subject = "quote", choice }: Props) {
+export function QuoteDecisionPanel({ token, fingerprint, subject = "quote", choice, send, acceptOnly = false, evidence, done }: Props) {
   const texts = SUBJECT[subject];
   const router = useRouter();
   const ids = useId();
-  const [mode, setMode] = useState<Mode>("choose");
+  const [mode, setMode] = useState<Mode>(acceptOnly ? "accept" : "choose");
   const [name, setName] = useState("");
   const [idNumber, setIdNumber] = useState("");
   const [kind, setKind] = useState<"drawn" | "typed">("drawn");
@@ -41,7 +53,7 @@ export function QuoteDecisionPanel({ token, fingerprint, subject = "quote", choi
   const [agreed, setAgreed] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<DecisionReply | null>(null);
   const [pending, startTransition] = useTransition();
 
   const canAccept = name.trim().length >= 2 && agreed && (kind === "typed" || image !== null) && choice !== null;
@@ -50,14 +62,19 @@ export function QuoteDecisionPanel({ token, fingerprint, subject = "quote", choi
     setError(null);
     startTransition(async () => {
       try {
-        const response = await fetch(`/api/forms/${texts.route}/${encodeURIComponent(token)}/decide`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        const answer = (await response.json()) as { ok: boolean; status?: string; message: string };
+        let answer: DecisionReply;
+        if (send) {
+          answer = await send(body);
+        } else {
+          const response = await fetch(`/api/forms/${texts.route}/${encodeURIComponent(token ?? "")}/decide`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          answer = (await response.json()) as DecisionReply;
+        }
         if (answer.ok) {
-          setNotice(answer.message);
+          setNotice(answer);
           router.refresh();
           return;
         }
@@ -70,7 +87,7 @@ export function QuoteDecisionPanel({ token, fingerprint, subject = "quote", choi
     });
   }
 
-  if (notice) return <FormNotice message={notice} className="print:hidden" />;
+  if (notice) return done ? <>{done(notice)}</> : <FormNotice message={notice.message} className="print:hidden" />;
 
   return (
     <section aria-labelledby={`${ids}-title`} className="space-y-4 rounded-lg border border-line bg-surface p-4 print:hidden sm:p-6">
@@ -135,15 +152,17 @@ export function QuoteDecisionPanel({ token, fingerprint, subject = "quote", choi
           </fieldset>
           {/* DRAFT wording until the lawyer edits it (ACCEPT_WORDING, ORDER_ACCEPT_WORDING) */}
           <Checkbox label={texts.wording} checked={agreed} onChange={(event) => setAgreed(event.currentTarget.checked)} />
-          <p className="text-sm text-ink-soft">עם החתימה נשמרים השם, החתימה, השעה, כתובת ה-IP והדפדפן, כראיה לאישור.</p>
+          <p className="text-sm text-ink-soft">{evidence ?? "עם החתימה נשמרים השם, החתימה, השעה, כתובת ה-IP והדפדפן, כראיה לאישור."}</p>
           <FormError message={error} />
           <div className="flex flex-wrap gap-2">
             <Button type="submit" loading={pending} disabled={!canAccept}>
               אישור וחתימה
             </Button>
-            <Button type="button" variant="ghost" onClick={() => setMode("choose")} disabled={pending}>
-              חזרה
-            </Button>
+            {acceptOnly ? null : (
+              <Button type="button" variant="ghost" onClick={() => setMode("choose")} disabled={pending}>
+                חזרה
+              </Button>
+            )}
           </div>
         </form>
       ) : (

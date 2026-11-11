@@ -830,6 +830,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // COL-07 redefines app.job_payload_ok() of _instant_reply.sql and app.send_collection_reminders() of
       // _collection_reminder_paused_line.sql last (a stage also queues the customer's message)
       "_collection_customer_reminders.sql",
+      // SGN-07 redefines public.signature_pdf_store, public.quote_signed_pdf_store, app.signature_pdf_source and
+      // app.quote_signature_block last (the in-person rep)
+      "_in_person_signing.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

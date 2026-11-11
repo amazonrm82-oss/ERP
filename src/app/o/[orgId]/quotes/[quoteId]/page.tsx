@@ -26,6 +26,7 @@ import { QuoteEditor } from "@/features/quotes/components/quote-editor";
 import { getRecipientSetup } from "@/features/punch-cards/recipient-server";
 import { QuoteTemplateTools } from "@/features/quotes/components/quote-template-tools";
 import { detachedQuotesPath, quoteDocumentPath, quotePath } from "@/features/quotes/paths";
+import { quoteInPersonPath } from "@/features/in-person-signing/texts";
 import { listQuoteTemplates } from "@/features/quotes/template-server";
 import { appliedText } from "@/features/quotes/templates";
 import { fromDealText } from "@/features/quotes/from-deal";
@@ -277,6 +278,12 @@ export default async function QuotePage({ params, searchParams }: Props) {
                 canStore={canStorePdf}
                 label={remadeAsAccepted ? ACCEPTED_REMAKE_PDF_LABEL : signedFile ? AS_SENT_PDF_LABEL : pdfAsSent ? PDF_AS_SENT_STAFF : undefined}
               />
+            ) : null}
+            {/* SGN-07: the customer signs on this device (whoever may send the quote; the database decides again) */}
+            {linkStatus?.active && context.canWrite && (quote.status === "sent" || quote.status === "viewed") ? (
+              <ButtonLink href={quoteInPersonPath(orgId, quote.id)} variant="secondary" size="sm">
+                חתימה במקום
+              </ButtonLink>
             ) : null}
             {quote.status === "accepted" ? (
               <QuoteSignedPdfButton orgId={orgId} quoteId={quote.id} href={signedFile ? paths.file(orgId, signedFile.id) : null} canStore={canStoreSigned} />

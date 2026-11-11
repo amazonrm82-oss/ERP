@@ -18,6 +18,8 @@ export function QuoteDecisionCard({ decision }: Props) {
     { label: "סוג החתימה", value: decision.signatureKind === "drawn" ? "ציור" : decision.signatureKind === "typed" ? "שם מוקלד" : null },
     { label: "נוסח האישור", value: decision.wordingVersion, ltr: true },
     { label: "סיבת הדחייה", value: decision.declineReason },
+    // SGN-07: signed on a rep's device (the rep and the time are in the audit log); no IP is kept then
+    { label: "אופן החתימה", value: decision.inPerson ? "פנים אל פנים, במכשיר של הצוות" : null },
     { label: "כתובת IP", value: decision.ip, ltr: true },
     { label: "דפדפן", value: decision.userAgent, ltr: true },
     { label: "טביעת הגרסה שנחתמה", value: decision.contentSha256, ltr: true },

@@ -11,6 +11,7 @@ import type { DocumentRecordType } from "@/features/document-templates/fields";
 
 import { cancelSignatureDocumentAction, makeSignedDocumentPdfAction, newSignatureLinkAction } from "../actions";
 import { signatureWhatsappHref } from "../states";
+import { signatureInPersonPath } from "@/features/in-person-signing/texts";
 
 type Props = {
   orgId: string;
@@ -74,6 +75,10 @@ export function SignatureDocActions({ orgId, kind, recordId, docId, title, waiti
     <div className="mt-2 flex flex-wrap gap-2">
       {waiting ? (
         <>
+          {/* SGN-07: the customer signs on this device */}
+          <a href={signatureInPersonPath(orgId, docId)} className={buttonClasses("secondary", "sm")}>
+            חתימה במקום
+          </a>
           <ConfirmButton
             variant="secondary"
             size="sm"
