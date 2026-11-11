@@ -138,8 +138,26 @@ and build this CRM here instead. The old code is preserved on the branch
   is_active; trigger `message_templates_fixed_notice`, hint `message_template:fixed_notice`; interim until owner question 282).
   `org_message_settings.instant_reply_default` gives a new web form its switch. THE FUTURE SENDER re-checks the `instant_reply`
   key and the form's switch, re-reads the submission, sends nothing unless the record's address still equals the typed one, and
-  needs its own "In use" line. `app.job_payload_ok` was last redefined in 021225. Tests 64 and 88 end with `_instant_reply.sql`.
+  needs its own "In use" line. `app.job_payload_ok` was redefined in 021225 (then 021226).
   The advisor's findings on the four `app.instant_repl*` tables are expected.
+  Built, no service-key use yet (COL-07, migration 021226; owner (255) א, (256) ג, (257) ד, (258) ב, lead's choice for question 284;
+  five independent reviews): collection reminders to the customer. `org_document_settings.collection_customer_reminder` (off by
+  default) and `collection_customer_stages` (subset of {-3,0,7,14}, default {0,7,14}); the COL-04 job (`app.send_collection_reminders`,
+  its 021135 task lines moved unchanged into `app.collection_stage_task`) queues one `message.send` of service type `collection` per
+  chosen stage through `app.collection_customer_message`: the contact's preferred channel (SMS or email), else SMS, else email, the
+  first with an active `collection_reminder` template and an address that is not service-blocked (fail closed); SMS only while
+  `app.collection_sms_room` (the `sms` key and the month's quota, `job_message_may_send`'s reading); nothing queued while HEB-09
+  pauses, or when no worker asked for `message.send` in the last day (per kind, not per channel; accepted). Then outcome
+  paused|no_provider|blocked|quota|no_address and the rep's task as before; the task is made only when no message was queued, and
+  always at +14. A stage supersedes the document's earlier waiting messages; each job carries `event_at` (the next COL-04 offset's
+  day). The sweep (`app.cancel_settled_collection_messages`, stage rows skip locked, capped by `app.collection_reminder_limit()`)
+  cancels expired jobs first, then by `app.collection_customer_refusal(org, doc, contact, offset)` (reminder_off, stage_off,
+  business_off, debt_settled, customer_changed); a message that died, was refused by the queue or expired gets the stage's task once
+  (`app.collection_stage_task_backstop`, only while the debt stands and no later stage was handled; 3 failures then 'failed').
+  Switching off or deleting the settings row cancels waiting jobs. THE FUTURE SENDER asks `app.collection_customer_refusal` with the
+  stage's `offset_days` right before sending and needs its own "In use" line. `app.job_payload_ok` was last redefined in 021226
+  (`collection_document_id`). Tests 64 and 88 end with `_collection_customer_reminders.sql`. The advisor's finding on
+  `app.collection_template_seeds` is expected.
   In use (IMP-04, owner 9 November 2026, answers (155) א, (160) א, (161) א, (162) ב, (163) ב; migration `_background_jobs.sql`; two
    independent reviews): the OPS-04 worker (same route and secret) also claims `import.run` and `export.run` (payload `{request_id,
    user_id}` only) in its own pass (lease 900 s, one job, 40 s budget, then saved and handed back uncounted with
