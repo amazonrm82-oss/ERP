@@ -177,7 +177,7 @@ and build this CRM here instead. The old code is preserved on the branch
    `checkPage` call within 10 s, and never logged, stored or returned. In the eslint allow-list. The advisor's findings on the two
    functions and on `app.integration_tests` / `app.integration_notice_days` are expected.
    In use (CNS-09 / CNS-10, owner 10 November 2026, answers (225) א, (229) א, (230) ב, (231) ב, (232) א, (233) ב; migrations
-   021210 and 021211 pasted by hand; one independent review and three delta reviews): the customer's preferences page and unsubscribe
+   021210 and 021211 (only 021211 pasted by hand, md5 checked 10 November 2026); one independent review and three delta reviews): the customer's preferences page and unsubscribe
    link (`src/features/preferences/public-server.ts`; pages `/f/prefs/<token>` and `/f/unsub/<token>`, which only read; routes
    `POST /api/forms/prefs/<token>` and `POST /api/forms/unsub/<token>`, the latter also taking RFC 8058 one-click posts; a GET there only
    redirects 303 to the page), which call only `public.consent_preferences_public()` (business display name, logo, colour, built-with,
@@ -200,8 +200,8 @@ and build this CRM here instead. The old code is preserved on the branch
    token). `public.consent_preference_link_for_job(job, lease)` (service_role, lease-bound, refuses service types) has NO CALLER YET;
    the future sender needs its own "In use" line. In the eslint allow-list. The advisor's findings on
    `consent_preference_link_create` and the three `app.consent_preference_*` tables are expected.
-   In use (SGN-02, owner 9 and 10 November 2026, answers (191) א, (219) ב, (223) ב, (224) ב; migrations 021212 and 021213 pasted by
-   hand; two full independent reviews and two delta reviews): a document for signature (`src/features/signatures/public-server.ts`,
+   In use (SGN-02, owner 9 and 10 November 2026, answers (191) א, (219) ב, (223) ב, (224) ב; migrations 021212 and 021213 (only 021213 pasted by
+   hand, md5 checked 10 November 2026); two full independent reviews and two delta reviews): a document for signature (`src/features/signatures/public-server.ts`,
    page `/f/sign/<token>`, routes `POST /api/forms/sign/<token>` and `GET /api/forms/sign/<token>/pdf`), which calls only
    `public.signature_public()` (title, filled text, status and dates, the business display name, phone, logo, colour and time zone;
    120 views per link and 60 per sender, keyed IP hash scope `signature`, in 10 minutes; a view moves sent to viewed),
@@ -1138,7 +1138,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   **Senders (CNS-07 and every marketing send) judge only by `app.consent_suppressed(org, channel, address)`, never by a record's
   consent state or its card**: the blocklist and an opt-out or erasure of the same address on another record are not in the
   record's own state.
-- Unsubscribe link and preferences (CNS-09/CNS-10, migrations 021210 and 021211 pasted by hand; hard rule 5, In use (CNS-09 …)): the
+- Unsubscribe link and preferences (CNS-09/CNS-10, migrations 021210 and 021211 (only 021211 pasted by hand, md5 checked 10 November 2026); hard rule 5, In use (CNS-09 …)): the
   consent history walk is `app.consent_register_walk` (state and the "own unsubscribe" tally; `app.consent_register_state` and
   `app.consent_preference_relist_ok` read it, so the read rule and the write check cannot drift; every source but `preferences` keeps
   its 020985 answer). Blocklist removal reasons are now added_by_mistake | person_consented | other | resubscribed | superseded (the
@@ -1968,7 +1968,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   procedure in DECISIONS.md (answer (146) ג: re-encrypt every secret and verify the count), approved as a new use when needed.
   Meta Lead Ads (CAP-11) is the first provider: `public.meta_lead_forms` (a Meta form's owner or team routing, one CRM form of kind
   `meta` each, synced by `app.meta_lead_forms_sync_form`, locked by `app.forms_meta_lock`), settings page `/settings/meta-leads`.
-- Integrations screen and sync log (INT-01, INT-03, migrations 021208 and 021209 pasted by hand; owner (226) ב, (227) ב, (228) ב):
+- Integrations screen and sync log (INT-01, INT-03, migrations 021208 and 021209 (only 021209 pasted by hand, md5 checked 10 November 2026); owner (226) ב, (227) ב, (228) ב):
   `/settings/integrations` (owners/admins) lists the connections with "בדיקת החיבור" (hard rule 5, In use (INT-01 …)).
   `public.integration_events` (one line per connection, kind (closed list) and code, folded per business day with `hits`; ids
   and codes only; owners/admins read; no client writes) is written by definer triggers on `public.integrations` (state lines) and
@@ -2762,7 +2762,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   alone is never trusted); no health declaration is seeded until PRV-05. Merge fields are a closed list per record type,
   `app.document_merge_fields` = `src/features/document-templates/fields.ts` (hint `document_template:field`); HEB-01 blocks hold.
   Nothing is filled, sent or signed yet (SGN-02). Page `/settings/document-templates`.
-- Signing documents (SGN-02, migrations 021212 and 021213 pasted by hand; hard rule 5, In use (SGN-02 …)): `public.signature_documents`
+- Signing documents (SGN-02, migrations 021212 and 021213 (only 021213 pasted by hand, md5 checked 10 November 2026); hard rule 5, In use (SGN-02 …)): `public.signature_documents`
   (a filled SGN-01 template on a lead, contact, company or deal; status draft..signed|cancelled|expired; column select grants for every
   column but the server-only `people`, the leads/contacts the document names, read through `public.signature_documents_naming`,
   owners/admins, 2,000 ids) and `public.signature_signatures` (owners/admins read). The database fills the template
@@ -2910,6 +2910,11 @@ that back.
   exists renames it (`<name>_<migration>_retired`), moves it into schema `app` and revokes every grant (service_role included),
   then `create or replace` makes the new signature (one function with defaults, never two overloads: test 07 keys functions by
   name). `public.log_export` now takes `p_format` csv|xlsx.
+- A file to paste by hand is recorded as waiting until the lead has verified it on the hosted project (function exists, md5
+  against the local build without carriage returns, its cron job); only then do docs say "pasted, md5 checked <date>" (RVW-68,
+  RVW-78). A CI run on `main` that ends red with no red job is re-run before the next push, so `production` never stays behind
+  quietly (RVW-87). The courier's first use (SGN-02, 021212) dropped one blank line inside `app.audit_erase_core`; the md5 check
+  caught it and 021214 defined the function again unchanged (RVW-79).
 - A file the owner pastes in the SQL Editor may arrive with Windows line endings: compare its functions with
   `md5(replace(pg_get_functiondef(oid), chr(13), ''))` against the local build (seen 19 October 2026: FXD-06, QUO-13).
 - Courier for a large migration (owner, 4 November 2026, answer (א) with conditions): an exception to "only the lead uses the
