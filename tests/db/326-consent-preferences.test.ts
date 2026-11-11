@@ -90,17 +90,6 @@ const relistOk = (org: string, channel: string, address: string) =>
         )
       ).rows[0].ok,
   );
-// delta review M1: a staff link's re-subscribe rule (relist_ok and a consent before the run of own opt-outs)
-const staffRelistOk = (org: string, channel: string, address: string) =>
-  asAdmin(
-    async (q) =>
-      (
-        await q<{ ok: boolean }>(
-          "select app.consent_preference_staff_relist_ok($1, $2, app.consent_address_hash($1, app.consent_address_kind($2), $3, 1::smallint)) as ok",
-          [org, channel, channel === "email" ? address : `+972${address.slice(1)}`],
-        )
-      ).rows[0].ok,
-  );
 const channelState = (page: Page, channel: string) => page.channels.find((c) => c.channel === channel);
 
 /**
@@ -192,24 +181,22 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
     }
   });
 
-  it("turning the link's own channel on records a 'granted' from the page; another channel is never turned on; unsubscribing records the opt-out and the blocklist", async () => {
+  it("the link a message carries never gives a first consent; unsubscribing records the opt-out and the blocklist; it re-subscribes the person's own unsubscribe", async () => {
     const lead = await insertLead(owner.id, org, { email: "roni@example.test", phone: "0523330003" });
     const token = await sent(org, "lead", lead, "email");
-    expect(channelState(await read(token), "email")).toEqual({ channel: "email", state: "unknown", can_turn_on: true });
+    // owner (254) ב: a message link only unsubscribes and re-subscribes: a channel never consented is not turned on
+    expect(channelState(await read(token), "email")).toEqual({ channel: "email", state: "unknown", can_turn_on: false });
     // review 1: an email link never turns SMS or WhatsApp marketing on for the record's phone
     expect(await submit(token, "preferences", [{ channel: "whatsapp", on: true }, { channel: "sms", on: true }, { channel: "email", on: true }])).toEqual({
       status: "saved",
       results: [
         { channel: "whatsapp", result: "refused" },
         { channel: "sms", result: "refused" },
-        { channel: "email", result: "saved" },
+        { channel: "email", result: "refused" },
       ],
     });
-    expect(await entries(org, "lead_id", lead)).toEqual([
-      { channel: "email", state: "granted", source: "preferences", method: "דף העדפות", wording: PREFERENCES_CONSENT_WORDING, wording_version: PREFERENCES_CONSENT_VERSION },
-    ]);
+    expect(await entries(org, "lead_id", lead)).toEqual([]);
     expect(await suppressed(org, "email", "roni@example.test")).toBe(false);
-    expect(channelState(await read(token), "email")).toEqual({ channel: "email", state: "in", can_turn_on: false });
     // the one-click unsubscribe of the email link
     const before = (await blocks(org)).length;
     expect(await submit(token, "unsubscribe")).toEqual({ status: "done" });
@@ -220,12 +207,19 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
     expect(await serviceBlocked(org, "email", "roni@example.test")).toBe(false);
     // twice = nothing new
     expect(await submit(token, "unsubscribe")).toEqual({ status: "done" });
-    expect(await entries(org, "lead_id", lead)).toHaveLength(2);
+    expect(await entries(org, "lead_id", lead)).toHaveLength(1);
     expect((await blocks(org)).length).toBe(before + 1);
     // (231) ב: the person's own unsubscribe is lifted from the page: the link's entry is marked removed, a grant is written
     expect(channelState(await read(token), "email")).toEqual({ channel: "email", state: "out", can_turn_on: true });
     expect(await submit(token, "preferences", [{ channel: "email", on: true }])).toEqual({ status: "saved", results: [{ channel: "email", result: "saved" }] });
-    expect((await entries(org, "lead_id", lead)).at(-1)).toMatchObject({ channel: "email", state: "granted", source: "preferences" });
+    expect((await entries(org, "lead_id", lead)).at(-1)).toEqual({
+      channel: "email",
+      state: "granted",
+      source: "preferences",
+      method: "דף העדפות",
+      wording: PREFERENCES_CONSENT_WORDING,
+      wording_version: PREFERENCES_CONSENT_VERSION,
+    });
     expect((await blocks(org)).length).toBe(before);
     const removed = await asAdmin(
       async (q) =>
@@ -384,7 +378,8 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
 
   it("without the consent key nothing can be turned on (fail closed); a replaced token's 'remove from every channel' removes its own channel only", async () => {
     const lead = await insertLead(owner.id, org, { email: "nokey2@example.test", phone: "0523330011" });
-    const token = await sent(org, "lead", lead, "email");
+    // a staff link (the one that may give a first consent, (254) ב)
+    const token = await mint(owner.id, org, "lead", lead, "email");
     await setKey(null);
     try {
       expect(channelState(await read(token), "email")).toEqual({ channel: "email", state: "unknown", can_turn_on: false });
@@ -444,14 +439,17 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
     const page = { state: "granted", source: "preferences" };
     expect(await stateAfter([link, page])).toBe("in");
     expect(await stateAfter([{ state: "withdrawn", source: "preferences" }, page])).toBe("in");
-    // (250) ב: a staff link's opt-outs count as the page's; its grant ends a run of own opt-outs only when the run began from
-    // an 'in' (delta re-review): never a return to nothing
+    // (250) ב: a staff link's opt-outs count as the page's; (254) ב: its grant is read exactly as the page's (021221's
+    // "only when the run began from an 'in'" is gone): it ends a run of the person's own opt-outs, nothing else
     const staffPage = { state: "granted", source: "preferences_staff_link" };
-    expect(await stateAfter([link, staffPage])).toBe("out");
+    expect(await stateAfter([staffPage])).toBe("in");
+    expect(await stateAfter([link, staffPage])).toBe("in");
     expect(await stateAfter([{ state: "granted", source: "form" }, link, staffPage])).toBe("in");
     expect(await stateAfter([{ state: "granted", source: "import" }, link, staffPage])).toBe("in");
     expect(await stateAfter([{ state: "granted", source: "form" }, link, staffPage, link, staffPage])).toBe("in");
-    expect(await stateAfter([link, staffPage, link, staffPage])).toBe("out");
+    expect(await stateAfter([link, staffPage, link, staffPage])).toBe("in");
+    expect(await stateAfter([{ state: "withdrawn", source: "unsubscribe", method: 'תשובת "הסר" ב-SMS' }, staffPage])).toBe("out");
+    expect(await stateAfter([{ state: "denied", source: "import" }, link, staffPage])).toBe("out");
     expect(await stateAfter([{ state: "withdrawn", source: "preferences_staff_link", method: "קישור הסרה" }, page])).toBe("in");
     expect(await stateAfter([{ state: "withdrawn", source: "manual", method: "בשיחה" }, link, staffPage])).toBe("out");
     expect(await stateAfter([link, { state: "withdrawn", source: "erasure" }, staffPage])).toBe("blocked");
@@ -524,9 +522,9 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
   it("never reaches another business: the same address there is untouched", async () => {
     const lead = await insertLead(owner.id, org, { email: "shared@example.test", phone: "0523330006" });
     const other = await insertLead(ownerB.id, orgB, { email: "shared@example.test", phone: "0523330006" });
-    const token = await sent(org, "lead", lead, "email");
+    const token = await mint(owner.id, org, "lead", lead, "email");
     const blocksB = (await blocks(orgB)).length;
-    await submit(token, "preferences", [{ channel: "email", on: true }]);
+    expect(await submit(token, "preferences", [{ channel: "email", on: true }])).toEqual({ status: "saved", results: [{ channel: "email", result: "saved" }] });
     await submit(token, "unsubscribe_all");
     expect(await entries(orgB, "lead_id", other)).toEqual([]);
     expect((await blocks(orgB)).length).toBe(blocksB);
@@ -585,7 +583,7 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
     await asAdmin((q) => q("update app.jobs set status = 'done', lease_id = null, locked_until = null where id = $1", [serviceJob.id]));
   });
 
-  it("(250) ב: a link a person on the staff copied re-subscribes the person's own unsubscribe for 7 days, with source 'preferences_staff_link'; who copied it and when is audited", async () => {
+  it("(250) ב, (254) ב: a link a person on the staff copied gives a first consent and re-subscribes the person's own unsubscribe for 7 days, with source 'preferences_staff_link'; who copied it and when is audited", async () => {
     const lead = await insertLead(owner.id, org, { email: "staffcopy@example.test" });
     const staffToken = await mint(owner.id, org, "lead", lead, "email");
     // who and when: the link's audit entry names the person and its time
@@ -601,46 +599,64 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
     expect(audit).toEqual([{ actor_id: owner.id, fresh: true }]);
     const page = await read(staffToken);
     expect(page.unsubscribe_only).toBe(false);
-    // review M1 (lead's choice, owner question 254): a staff link only RE-subscribes: a channel never consented is not turned on
-    expect(channelState(page, "email")).toEqual({ channel: "email", state: "unknown", can_turn_on: false });
-    expect(await submit(staffToken, "preferences", [{ channel: "email", on: true }])).toEqual({ status: "saved", results: [{ channel: "email", result: "refused" }] });
-    expect(await entries(org, "lead_id", lead)).toEqual([]);
+    // owner (254) ב: a staff link may give a first consent on a channel never consented, on the record's own address
+    expect(channelState(page, "email")).toEqual({ channel: "email", state: "unknown", can_turn_on: true });
+    // only the token's own channel (the record has no phone here, and an email link never reaches SMS)
+    expect(await submit(staffToken, "preferences", [{ channel: "sms", on: true }, { channel: "email", on: true }])).toEqual({
+      status: "saved",
+      results: [
+        { channel: "sms", result: "refused" },
+        { channel: "email", result: "saved" },
+      ],
+    });
+    expect(await entries(org, "lead_id", lead)).toEqual([
+      { channel: "email", state: "granted", source: "preferences_staff_link", method: "דף העדפות", wording: PREFERENCES_CONSENT_WORDING, wording_version: PREFERENCES_CONSENT_VERSION },
+    ]);
+    expect(await suppressed(org, "email", "staffcopy@example.test")).toBe(false);
+    expect(channelState(await read(staffToken), "email")).toEqual({ channel: "email", state: "in", can_turn_on: false });
     // the one-click unsubscribe through it: the staff source, the blocklist entry as for every link
     expect(await submit(staffToken, "unsubscribe")).toEqual({ status: "done" });
-    expect(await entries(org, "lead_id", lead)).toEqual([
-      { channel: "email", state: "withdrawn", source: "preferences_staff_link", method: "קישור הסרה", wording: null, wording_version: null },
-    ]);
+    expect((await entries(org, "lead_id", lead)).at(-1)).toEqual({
+      channel: "email",
+      state: "withdrawn",
+      source: "preferences_staff_link",
+      method: "קישור הסרה",
+      wording: null,
+      wording_version: null,
+    });
     expect(await suppressed(org, "email", "staffcopy@example.test")).toBe(true);
-    // delta review M1: that opt-out is the person's own, but there was never a consent to return to: still refused
+    // the person's own unsubscribe is re-subscribed through it (plain relist_ok)
     expect(await relistOk(org, "email", "staffcopy@example.test")).toBe(true);
-    expect(await staffRelistOk(org, "email", "staffcopy@example.test")).toBe(false);
-    expect(channelState(await read(staffToken), "email")).toEqual({ channel: "email", state: "out", can_turn_on: false });
-    expect(await submit(staffToken, "preferences", [{ channel: "email", on: true }])).toEqual({ status: "saved", results: [{ channel: "email", result: "refused" }] });
-    expect((await entries(org, "lead_id", lead)).map((e) => e.state)).toEqual(["withdrawn"]);
-    // app.consent_prepare holds the same line for any server write of the staff source (with the link's blocklist entry
-    // marked removed, as the page's write does first, so the register's 'out' is what is judged)
-    await asAdmin((q) =>
-      q(
-        "update public.consent_blocklist set removed_at = now(), removed_reason = 'resubscribed' where organization_id = $1 and removed_at is null and reason = 'unsubscribe_link' and address_hash = app.consent_address_hash($1, 'email', 'staffcopy@example.test', 1::smallint)",
-        [org],
-      ),
+    expect(channelState(await read(staffToken), "email")).toEqual({ channel: "email", state: "out", can_turn_on: true });
+    expect(await submit(staffToken, "preferences", [{ channel: "email", on: true }])).toEqual({ status: "saved", results: [{ channel: "email", result: "saved" }] });
+    expect((await entries(org, "lead_id", lead)).map((e) => `${e.state}:${e.source}`)).toEqual([
+      "granted:preferences_staff_link",
+      "withdrawn:preferences_staff_link",
+      "granted:preferences_staff_link",
+    ]);
+    expect(await suppressed(org, "email", "staffcopy@example.test")).toBe(false);
+    // app.consent_prepare: a server write of the staff source never passes another opt-out (here a manual one)
+    const srvLead = await insertLead(owner.id, org, { email: "staffsrv@example.test" });
+    await asUser(owner.id, (q) =>
+      q("insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'email', 'withdrawn', 'manual', 'בשיחה')", [org, srvLead]),
     );
     expect(
       (
         await pgError(
           asAdmin((q) =>
-            q("insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'email', 'granted', 'preferences_staff_link', 'דף העדפות')", [org, lead]),
+            q("insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'email', 'granted', 'preferences_staff_link', 'דף העדפות')", [org, srvLead]),
           ),
         )
       ).hint,
     ).toBe("consent:optout_locked");
-    // the same after the link a message carries unsubscribed a never-consented address: a new staff copy cannot turn it on
+    // after the link a message carries unsubscribed a never-consented address, a staff copy re-subscribes it (the person's
+    // own unsubscribe, (254) ב)
     const msgLead = await insertLead(owner.id, org, { email: "staffmsg@example.test" });
     expect(await submit(await sent(org, "lead", msgLead, "email"), "unsubscribe")).toEqual({ status: "done" });
     const msgStaff = await mint(owner.id, org, "lead", msgLead, "email");
-    expect(channelState(await read(msgStaff), "email")).toEqual({ channel: "email", state: "out", can_turn_on: false });
-    expect(await submit(msgStaff, "preferences", [{ channel: "email", on: true }])).toEqual({ status: "saved", results: [{ channel: "email", result: "refused" }] });
-    expect(await suppressed(org, "email", "staffmsg@example.test")).toBe(true);
+    expect(channelState(await read(msgStaff), "email")).toEqual({ channel: "email", state: "out", can_turn_on: true });
+    expect(await submit(msgStaff, "preferences", [{ channel: "email", on: true }])).toEqual({ status: "saved", results: [{ channel: "email", result: "saved" }] });
+    expect(await suppressed(org, "email", "staffmsg@example.test")).toBe(false);
 
     // a real consent (a public form's 'granted'), then the person's own unsubscribe through the staff link: it returns to it
     const formLead = await insertLead(owner.id, org, { email: "staffform@example.test" });
@@ -648,7 +664,7 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
     const formStaff = await mint(owner.id, org, "lead", formLead, "email");
     expect(channelState(await read(formStaff), "email")).toEqual({ channel: "email", state: "in", can_turn_on: false });
     expect(await submit(formStaff, "unsubscribe")).toEqual({ status: "done" });
-    expect(await staffRelistOk(org, "email", "staffform@example.test")).toBe(true);
+    expect(await relistOk(org, "email", "staffform@example.test")).toBe(true);
     expect(channelState(await read(formStaff), "email")).toEqual({ channel: "email", state: "out", can_turn_on: true });
     expect(await submit(formStaff, "preferences", [{ channel: "email", on: true }])).toEqual({ status: "saved", results: [{ channel: "email", result: "saved" }] });
     expect((await entries(org, "lead_id", formLead)).at(-1)).toEqual({
@@ -716,9 +732,20 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
     expect(await suppressed(org, "email", "staffold@example.test")).toBe(false);
     // the replaced staff token says nothing of staff
     expect((await read(staffToken)).unsubscribe_only).toBe(false);
+    // (254) ב: a first consent through a staff link only within its 7 days
+    const fresh = await insertLead(owner.id, org, { email: "stafffresh@example.test" });
+    const freshToken = await mint(owner.id, org, "lead", fresh, "email");
+    await age(freshToken, "6 days 23 hours");
+    expect(channelState(await read(freshToken), "email")).toEqual({ channel: "email", state: "unknown", can_turn_on: true });
+    await age(freshToken, "7 days");
+    expect(channelState(await read(freshToken), "email")).toEqual({ channel: "email", state: "unknown", can_turn_on: false });
+    expect(await submit(freshToken, "preferences", [{ channel: "email", on: true }])).toEqual({ status: "saved", results: [{ channel: "email", result: "refused" }] });
+    expect(await entries(org, "lead_id", fresh)).toEqual([]);
+    expect(await submit(freshToken, "unsubscribe")).toEqual({ status: "done" });
+    expect(await suppressed(org, "email", "stafffresh@example.test")).toBe(true);
   });
 
-  it("delta re-review: a staff link's grant that returned to an import's consent stops counting once the import is undone", async () => {
+  it("(254) ב: a staff link's grant after an import's consent stands on its own once the import is undone", async () => {
     const email = "staffundo@example.test";
     const hashOf = (q: (sql: string, params?: unknown[]) => Promise<{ rows: { h: string }[] }>) =>
       q("select app.consent_address_hash($1, 'email', $2, 1::smallint) as h", [org, email]);
@@ -752,19 +779,21 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
     expect(await submit(staffToken, "preferences", [{ channel: "email", on: true }])).toEqual({ status: "saved", results: [{ channel: "email", result: "saved" }] });
     expect(await stateOf()).toBe("in");
     expect(await granted()).toBe(true);
-    // the import is undone: its 'granted' is cancelled, so the staff link's grant returned to nothing
+    // the import is undone: its 'granted' is cancelled. (254) ב: the staff link's grant no longer leans on it (021221's
+    // o_had_in rule is gone); it is read as a page grant: the register is now the person's own unsubscribe, then the
+    // person's own grant through the staff link, so the state stays 'in'. Acceptable: the owner allows a first consent
+    // through a staff link on the record's own address, which is exactly what that grant is once the import is gone
     expect(await asUser(owner.id, async (q) => (await q<{ r: Record<string, number> }>("select public.undo_import($1, $2) as r", [org, job])).rows[0].r)).toMatchObject({
       consents: 1,
     });
-    expect(await stateOf()).toBe("out");
-    expect(await granted()).toBe(false);
-    expect(await suppressed(org, "email", email)).toBe(true);
-    expect(await staffRelistOk(org, "email", email)).toBe(false);
-    // the record back from the bin: the staff link still cannot turn it on, and the leftover grant counts for no new cycle
+    expect(await stateOf()).toBe("in");
+    expect(await granted()).toBe(true);
+    expect(await suppressed(org, "email", email)).toBe(false);
+    // the record back from the bin: nothing more to turn on
     await asAdmin((q) => q("update public.leads set deleted_at = null where id = $1", [lead]));
-    expect(channelState(await read(staffToken), "email")).toEqual({ channel: "email", state: "out", can_turn_on: false });
-    expect(await submit(staffToken, "preferences", [{ channel: "email", on: true }])).toEqual({ status: "saved", results: [{ channel: "email", result: "refused" }] });
-    // "off" still records the person's unsubscribe on the blocklist (the staff turn-on had marked the link's entry removed)
+    expect(channelState(await read(staffToken), "email")).toEqual({ channel: "email", state: "in", can_turn_on: false });
+    expect(await submit(staffToken, "preferences", [{ channel: "email", on: true }])).toEqual({ status: "saved", results: [{ channel: "email", result: "unchanged" }] });
+    // "off" records the person's unsubscribe on the blocklist again (the staff turn-on had marked the link's entry removed)
     expect(await submit(staffToken, "preferences", [{ channel: "email", on: false }])).toEqual({ status: "saved", results: [{ channel: "email", result: "saved" }] });
     expect(await stateOf()).toBe("listed");
     expect(await granted()).toBe(false);
@@ -821,6 +850,24 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
     expect(await relistOk(org, "email", "staffdenied@example.test")).toBe(false);
     expect(await submit(deniedToken, "preferences", [{ channel: "email", on: true }])).toEqual({ status: "saved", results: [{ channel: "email", result: "refused" }] });
     expect(await suppressed(org, "email", "staffdenied@example.test")).toBe(true);
+    // (254) ב: a first consent ('unknown' on this record) is judged across the business: another record's manual opt-out or
+    // erasure of the same address blocks it
+    const otherOut = await insertLead(owner.id, org, { email: "staffacross@example.test" });
+    await asUser(owner.id, (q) =>
+      q("insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'email', 'withdrawn', 'manual', 'בשיחה')", [org, otherOut]),
+    );
+    const across = await insertLead(owner.id, org, { email: "staffacross@example.test" });
+    const acrossToken = await mint(owner.id, org, "lead", across, "email");
+    expect(channelState(await read(acrossToken), "email")).toEqual({ channel: "email", state: "out", can_turn_on: false });
+    expect(await submit(acrossToken, "preferences", [{ channel: "email", on: true }])).toEqual({ status: "saved", results: [{ channel: "email", result: "refused" }] });
+    expect(await entries(org, "lead_id", across)).toEqual([]);
+    const otherErased = await insertLead(owner.id, org, { email: "staffacross2@example.test" });
+    await asAdmin((q) => q("insert into public.consents (organization_id, lead_id, channel, state, source) values ($1, $2, 'email', 'withdrawn', 'erasure')", [org, otherErased]));
+    const across2 = await insertLead(owner.id, org, { email: "staffacross2@example.test" });
+    const across2Token = await mint(owner.id, org, "lead", across2, "email");
+    expect(channelState(await read(across2Token), "email")).toEqual({ channel: "email", state: "out", can_turn_on: false });
+    expect(await submit(across2Token, "preferences", [{ channel: "email", on: true }])).toEqual({ status: "saved", results: [{ channel: "email", result: "refused" }] });
+    expect(await suppressed(org, "email", "staffacross2@example.test")).toBe(true);
     // a person cannot write the staff link's source by hand (policy consents_insert: 'manual' only)
     const plain = await insertLead(owner.id, org, { email: "staffplain@example.test" });
     expect(
@@ -832,6 +879,24 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
         )
       ).code,
     ).toBe("42501");
+  });
+
+  it("(254) ב: no rule reads 021221's staff-only re-subscribe check any more (kept defined, unused)", async () => {
+    const callers = await asAdmin(
+      async (q) =>
+        (
+          await q<{ name: string }>(
+            `select n.nspname || '.' || p.proname as name from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where n.nspname in ('app', 'public') and p.proname <> 'consent_preference_staff_relist_ok'
+                and (p.prosrc like '%consent_preference_staff_relist_ok%' or p.prosrc like '%o_had_in then%')
+              order by 1`,
+          )
+        ).rows,
+    );
+    expect(callers).toEqual([]);
+    expect(
+      await asAdmin(async (q) => (await q<{ n: number }>("select count(*)::int as n from pg_proc where proname = 'consent_preference_staff_relist_ok'")).rows[0].n),
+    ).toBe(1);
   });
 
   it("(233) ב: tokens and their address hashes are deleted 24 months after they were made", async () => {

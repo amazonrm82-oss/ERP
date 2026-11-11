@@ -124,6 +124,9 @@ const RERUN = [
   // CNS-10 (250) ב redefines app.consent_register_walk() / app.consent_prepare() of _consent_preference_links.sql and
   // app.consent_preference_channels() / public.consent_preferences_public() of _review_1111_messaging.sql last
   migrationFile("_staff_preference_link.sql"),
+  // CNS-10 (254) ב redefines app.consent_register_walk_full() / app.consent_prepare() / app.consent_preference_channels() of
+  // _staff_preference_link.sql last
+  migrationFile("_staff_link_first_grant.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its
