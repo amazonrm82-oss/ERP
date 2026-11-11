@@ -115,6 +115,8 @@ const RERUN = [
   // SGN-03 redefines app.job_payload_ok() of _sms_d_sender_check.sql, app.message_merge_fields() / app.message_type_fields() of
   // _meeting_customer_reminders.sql and public.signature_document_send() of _signature_documents.sql last
   migrationFile("_signature_status_reminders.sql"),
+  // RVW-77 redefines app.document_record_values() of _signature_documents.sql last
+  migrationFile("_signature_fill_reader.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

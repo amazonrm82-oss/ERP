@@ -54,6 +54,18 @@ export function pdfHeaders(name: string, size: number, inline = false): Record<s
 export const DAMAGED_PDF_MESSAGE = "קובץ ה-PDF של ההצעה פגום ולכן לא נפתח. פנו לתמיכה";
 /** ORD-05 PDF: the same for an order's stored PDF. */
 export const DAMAGED_ORDER_PDF_MESSAGE = "קובץ ה-PDF של ההזמנה פגום ולכן לא נפתח. פנו לתמיכה";
+/** SGN-02 (RVW-86): the same for a signed document's stored PDF. */
+export const DAMAGED_SIGNATURE_PDF_MESSAGE = "קובץ ה-PDF של המסמך החתום פגום ולכן לא נפתח. פנו לתמיכה";
+
+/** RVW-86: which server-written PDF a damaged file is (the log line's kind) and the message staff see for it. */
+export function damagedPdf(file: { order_id: string | null; signature_document_id: string | null }): {
+  kind: "quote" | "order" | "signature";
+  message: string;
+} {
+  if (file.signature_document_id) return { kind: "signature", message: DAMAGED_SIGNATURE_PDF_MESSAGE };
+  if (file.order_id) return { kind: "order", message: DAMAGED_ORDER_PDF_MESSAGE };
+  return { kind: "quote", message: DAMAGED_PDF_MESSAGE };
+}
 
 export type StoreAnswer = { status: "upload"; path: string } | { status: "stored"; fileId: string } | { status: "busy" };
 

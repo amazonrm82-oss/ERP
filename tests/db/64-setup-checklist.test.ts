@@ -802,6 +802,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_signature_erase_named.sql",
       // SGN-03 grants select on signature_documents.expired_at, after _signature_documents.sql's revoke all
       "_signature_status_reminders.sql",
+      // RVW-77 redefines app.document_record_values() of _signature_documents.sql last (linked rows judged for the person)
+      "_signature_fill_reader.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

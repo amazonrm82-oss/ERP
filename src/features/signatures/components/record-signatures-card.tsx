@@ -5,11 +5,14 @@ import type { DocumentRecordType } from "@/features/document-templates/fields";
 import { isAdminRole } from "@/features/settings/permissions";
 import { orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
+import { getOrgTerms } from "@/features/terminology/queries";
 import { formatDate } from "@/lib/format";
 import { paths } from "@/lib/paths";
+import { recordTypeNames } from "@/lib/record-types";
 
 import { signatureDayText } from "../public";
 import { listRecordSignatureDocuments, listSendableTemplates } from "../queries";
+import { convertedLeadsNote, fromLeadLine } from "../record-filter";
 import { awaitsSignature, SIGNATURE_STATE_LABELS, shownSignatureState, signatureDatesLine, TEXT_ERASED_LINE, type ShownSignatureState } from "../states";
 import { SignatureDocActions } from "./signature-doc-actions";
 import { SignatureSendPanel } from "./signature-send-panel";
@@ -38,11 +41,14 @@ const TONES: Record<ShownSignatureState, BadgeTone> = {
  * by the server) is read by owners and admins only, as a signed quote's (owner (37) ב's safe side).
  */
 export async function RecordSignaturesCard({ orgId, kind, recordId, canEdit, phoneE164 = null }: Props) {
-  const [inPlan, docs, context] = await Promise.all([
+  const [inPlan, listed, context, terms] = await Promise.all([
     orgHasFeature(orgId, "signatures"),
     listRecordSignatureDocuments(orgId, kind, recordId),
     getOrgContext(orgId),
+    kind === "contact" ? getOrgTerms(orgId) : null,
   ]);
+  const { docs, moreConvertedLeads } = listed;
+  const leadSingular = terms ? recordTypeNames("lead", terms).singular : "";
   const canSend = inPlan && canEdit && context.canWrite;
   const templates = canSend ? await listSendableTemplates(orgId, kind) : [];
   if (docs.length === 0 && !canSend) return null;
@@ -67,6 +73,7 @@ export async function RecordSignaturesCard({ orgId, kind, recordId, canEdit, pho
                   <p className="text-sm text-ink-soft">
                     {signatureDatesLine(doc, state, formatDate, (iso) => signatureDayText(iso, context.org.timeZone))}
                   </p>
+                  {doc.fromLead ? <p className="text-sm text-ink-soft">{fromLeadLine(leadSingular)}</p> : null}
                   {doc.textErased ? <p className="text-sm text-ink-soft">{TEXT_ERASED_LINE}</p> : null}
                   {doc.fileId ? (
                     <a href={paths.file(orgId, doc.fileId)} className={`${buttonClasses("secondary", "sm")} mt-2`}>
@@ -78,7 +85,8 @@ export async function RecordSignaturesCard({ orgId, kind, recordId, canEdit, pho
                       ה-PDF החתום עוד לא נשמר. אם האחסון של העסק מלא, הוא לא יישמר עד שמפנים מקום או משדרגים את החבילה.
                     </p>
                   ) : null}
-                  {canSend ? (
+                  {/* RVW-83 review: a document shown from a converted lead is read-only here */}
+                  {canSend && !doc.fromLead ? (
                     <SignatureDocActions
                       orgId={orgId}
                       kind={kind}
@@ -98,6 +106,7 @@ export async function RecordSignaturesCard({ orgId, kind, recordId, canEdit, pho
         ) : (
           <p className="text-sm text-ink-soft">מסמך מתבנית, עם הפרטים של הרשומה, נשלח ללקוח בקישור. הלקוח קורא וחותם מהטלפון, וה-PDF החתום נשמר כאן.</p>
         )}
+        {moreConvertedLeads && terms ? <p className="text-sm text-ink-soft">{convertedLeadsNote(terms.lead, terms.contact)}</p> : null}
         {docs.some((doc) => doc.status === "signed") && !isAdmin ? (
           <p className="text-sm text-ink-soft">את ה-PDF החתום רואים בעלים ומנהלי מערכת.</p>
         ) : null}

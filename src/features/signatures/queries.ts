@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import type { DocumentRecordType } from "@/features/document-templates/fields";
 
+import { CONVERTED_LEADS_MAX, recordDocumentsFilter } from "./record-filter";
 import { signatureCustomerReminderOf, signatureReminderDaysOf, type SignatureReminderSettings } from "./reminder";
 import { isSignatureStatus, type SignatureStatus } from "./states";
 
@@ -39,6 +40,8 @@ export type RecordSignatureDocument = {
   emptied: boolean;
   // (234) ב: signed, and a person's erasure changed its text since (the text stays)
   textErased: boolean;
+  // RVW-83: on a contact's card, a document sent while the contact was still a lead
+  fromLead?: boolean;
 };
 
 type Client = Awaited<ReturnType<typeof createClient>>;
@@ -55,23 +58,42 @@ async function erasedSignatures(supabase: Client, orgId: string, ids: string[]):
   return new Set(rows.map((row) => row.document_id));
 }
 
-const COLUMN: Record<DocumentRecordType, "lead_id" | "contact_id" | "company_id" | "deal_id"> = {
-  lead: "lead_id",
-  contact: "contact_id",
-  company: "company_id",
-  deal: "deal_id",
-};
-
-/** The record's documents for signature, newest first (at most 50). */
-export async function listRecordSignatureDocuments(orgId: string, kind: DocumentRecordType, recordId: string): Promise<RecordSignatureDocument[]> {
-  const supabase = await createClient();
+// RVW-83: the newest leads converted into a contact (at most CONVERTED_LEADS_MAX), read with the user's session (RLS
+// decides), and whether there are more
+async function convertedLeads(supabase: Client, orgId: string, contactId: string): Promise<{ ids: string[]; more: boolean }> {
   const rows =
     must(
       await supabase
-        .from("signature_documents")
-        .select("id, title, status, sent_at, viewed_at, signed_at, cancelled_at, expires_at, erased_at, text_erased_at")
+        .from("leads")
+        .select("id")
         .eq("organization_id", orgId)
-        .eq(COLUMN[kind], recordId)
+        .eq("converted_contact_id", contactId)
+        .order("converted_at", { ascending: false, nullsFirst: false })
+        .order("id", { ascending: false })
+        .limit(CONVERTED_LEADS_MAX + 1),
+      "converted leads",
+    ) ?? [];
+  return { ids: rows.slice(0, CONVERTED_LEADS_MAX).map((row) => row.id), more: rows.length > CONVERTED_LEADS_MAX };
+}
+
+export type RecordSignatureDocuments = {
+  docs: RecordSignatureDocument[];
+  // RVW-83: a contact with more converted leads than are looked at (their newest CONVERTED_LEADS_MAX were)
+  moreConvertedLeads: boolean;
+};
+
+/** The record's documents for signature, newest first (at most 50); a contact's also those of the leads converted into it. */
+export async function listRecordSignatureDocuments(orgId: string, kind: DocumentRecordType, recordId: string): Promise<RecordSignatureDocuments> {
+  const supabase = await createClient();
+  const converted = kind === "contact" ? await convertedLeads(supabase, orgId, recordId) : { ids: [], more: false };
+  const filter = recordDocumentsFilter(kind, recordId, converted.ids);
+  const base = supabase
+    .from("signature_documents")
+    .select("id, title, status, sent_at, viewed_at, signed_at, cancelled_at, expires_at, erased_at, text_erased_at, lead_id")
+    .eq("organization_id", orgId);
+  const rows =
+    must(
+      await (filter.kind === "eq" ? base.eq(filter.column, filter.value) : base.or(filter.filter))
         .order("sent_at", { ascending: false })
         .order("id", { ascending: false })
         .limit(50),
@@ -87,7 +109,7 @@ export async function listRecordSignatureDocuments(orgId: string, kind: Document
         ) ?? []);
   const fileOf = new Map(files.map((file) => [file.signature_document_id, file.id]));
   const signerErased = await erasedSignatures(supabase, orgId, ids);
-  return rows.flatMap((row) =>
+  const docs = rows.flatMap((row) =>
     isSignatureStatus(row.status)
       ? [
           {
@@ -103,10 +125,12 @@ export async function listRecordSignatureDocuments(orgId: string, kind: Document
             erased: row.erased_at !== null || signerErased.has(row.id),
             emptied: row.erased_at !== null,
             textErased: row.status === "signed" && row.erased_at === null && row.text_erased_at !== null,
+            fromLead: kind === "contact" && row.lead_id !== null,
           },
         ]
       : [],
   );
+  return { docs, moreConvertedLeads: converted.more };
 }
 
 export type DetachedSignatureDocument = RecordSignatureDocument & { body: string; customerDeletedAt: string };

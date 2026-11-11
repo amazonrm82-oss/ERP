@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { FILES_BUCKET, opensInBrowser } from "@/features/files/types";
-import { DAMAGED_ORDER_PDF_MESSAGE, DAMAGED_PDF_MESSAGE, matchesFingerprint, pdfHeaders } from "@/features/quotes/pdf-fingerprint";
+import { damagedPdf, matchesFingerprint, pdfHeaders } from "@/features/quotes/pdf-fingerprint";
 import { remakeLegacyQuotePdf } from "@/features/quotes/pdf-server";
 import { readQuote } from "@/features/quotes/queries";
 import { sessionCheck } from "@/lib/auth";
@@ -62,9 +62,10 @@ export async function GET(request: NextRequest, { params }: Context) {
     if (object.error || !object.data) return new NextResponse("לא נמצא", { status: 404 });
     const bytes = new Uint8Array(await object.data.arrayBuffer());
     if (!matchesFingerprint(bytes, file.sha256)) {
-      // review M1: reported and logged, never replaced automatically
-      await serverLog("error", "files.pdf_fingerprint_mismatch", { kind: file.order_id ? "order" : "quote", org_id: orgId, file_id: fileId });
-      return new NextResponse(`${file.order_id ? DAMAGED_ORDER_PDF_MESSAGE : DAMAGED_PDF_MESSAGE} (${SUPPORT_LINE}).`, {
+      // review M1: reported and logged, never replaced automatically; RVW-86: a signed document's file has its own kind and text
+      const damaged = damagedPdf(file);
+      await serverLog("error", "files.pdf_fingerprint_mismatch", { kind: damaged.kind, org_id: orgId, file_id: fileId });
+      return new NextResponse(`${damaged.message} (${SUPPORT_LINE}).`, {
         status: 409,
         headers: { "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8" },
       });
