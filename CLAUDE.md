@@ -197,7 +197,7 @@ and build this CRM here instead. The old code is preserved on the branch
    after the lookup: 120 per link, then 60 per sender (keyed IP hash, scope `preferences`, scoped per link) in 10 minutes, shared by views
    and writes; OPS-02 shared guard first. Never framed, no-referrer, always light, generic previews. Lock order: record FOR KEY SHARE,
    link counter, blocklist lock. Staff: `public.consent_preference_link_create` (owners/admins, audited `consent_link` without the
-   token). `public.consent_preference_link_for_job(job, lease)` (service_role, lease-bound, refuses service types) has NO CALLER YET;
+   token). Since 021220 (RVW-82, owner question 250 pending) a link whose active token a staff member minted (`consent_preference_links.created_by`) only unsubscribes: `app.consent_preference_channels` answers `can_turn_on` false and `consent_preferences_public` answers `staff_link` (full page only). `public.consent_preference_link_for_job(job, lease)` (service_role, lease-bound, refuses service types) has NO CALLER YET;
    the future sender needs its own "In use" line. In the eslint allow-list. The advisor's findings on
    `consent_preference_link_create` and the three `app.consent_preference_*` tables are expected.
    In use (SGN-02, owner 9 and 10 November 2026, answers (191) א, (219) ב, (223) ב, (224) ב; migrations 021212 and 021213 (only 021213 pasted by
@@ -2746,7 +2746,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   (service_role, NO CALLER YET; the inbound webhook needs its own "In use" line) adds the number to the business blocklist
   (server-only reason `sms_reply`, hash only, outside the 100,000 cap; `consent_blocklist_add_noted` last redefined in 021203) and a
   withdrawn consent on records holding it as primary phone; whole-message match against `src/features/messaging/sms-optout-words.json`
-  (mirrored by `app.sms_optout_words`, unit test); 600 opt-outs a minute per business. `public.sms_sender_code_issue` (service_role,
+  (mirrored by `app.sms_optout_words`, unit test); 600 opt-outs a minute per business. Since 021220 `sms_sender_verify_start` needs the `sms` key (RVW-81) and `app.jobs_record_message` (pin rechecked) skips sender-verification jobs (RVW-80). `public.sms_sender_code_issue` (service_role,
   lease-bound) has NO CALLER YET either: the future SMS sender needs its own "In use" line in hard rule 5 for both. The advisor's
   findings on `record_sms_queue`, `sms_sender_verify(_start)`, the two `platform_*sms_sender*` functions and the four new app tables
   (`sms_optout_counts`, `sms_quota_months`, `sms_quota_notices`, `sms_sender_checks`) are expected.
@@ -2812,7 +2812,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   (`app.message_notice_template_problem` = 021162's rule + `app.message_notice_fields`; `app.message_template_problem` is its wrapper;
   `app.message_template_sendable` last redefined in 021218; TS `NOTICE_KIND_FIELDS`). THE FUTURE SENDER re-reads the document by
   `signature_document_id`, sends nothing unless still sent/viewed and not expired, re-reads the setting and the `signatures` key,
-  mints the link itself, and needs its own "In use" line. Tests 64 and 88 end with `_signature_status_reminders.sql`. The advisor's findings on `app.signature_reminders`, `app.signature_customer_reminders` and `app.signature_template_seeds` are expected.
+  mints the link itself, and needs its own "In use" line. Tests 64 and 88 end with `_signature_status_reminders.sql`. Since 021219 (RVW-77) the server fill `app.document_record_values` judges a linked contact or company by `app.document_caller_reads` (definer; the `contacts_select` / `companies_select` rule for `auth.uid()`: `app.can_read_record` or `app.deputy_readable`), never by an invoker helper inside a definer body; the contact card also lists, read-only, the documents of leads converted into it (20 newest). Tests 64 and 88 end with `_review_1111_messaging.sql`. The advisor's findings on `app.signature_reminders`, `app.signature_customer_reminders` and `app.signature_template_seeds` are expected.
 - In-app guide (UX-05, migration 021199; owner's answers 203 ב, 204 א, 205 א, 206 ב, 10 November 2026): `profiles.guide_tour_seen_at` (own column
   grant; null = the first-visit tour opens; never marked in a support session; replaying from the account menu "סיור במערכת" changes
   nothing). Texts are Markdown in `docs/help/` (articles, screens, tour; frontmatter checked by `tests/unit/in-app-guide.test.ts`),
