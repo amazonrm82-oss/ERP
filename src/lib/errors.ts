@@ -2,6 +2,9 @@ import { MENTION_MAX } from "@/features/mentions/token";
 import { VARIANT_PROBLEM_MESSAGES } from "@/features/whatsapp/variants";
 import { SUPPORT_LINE } from "@/lib/support-phone";
 
+/** SPD-04 review 3: the system's instant reply templates (notice_kind instant_reply_open|closed) are fixed. */
+export const FIXED_NOTICE_TEMPLATE = "את התבנית הזו המערכת שולחת כמענה מיידי לפנייה, והנוסח שלה קבוע. אפשר לכבות אותה או להפעיל אותה מחדש, בלי לשנות את הנוסח.";
+
 // Maps Postgres / PostgREST / Supabase Auth errors to short Hebrew messages.
 // Raw database messages are never shown to the user.
 
@@ -351,6 +354,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "sms_sender:not_own_phone": "מספר שולח יכול להיות רק מספר הטלפון של העסק, כפי שהוא רשום בפרטי העסק. בחרו את המספר הזה, או שם באותיות באנגלית.",
   // SMS-02 review (2): a send_sms step of a collection template is saved only by a payment recorder
   "automation:sms_collection": "שלב SMS עם תבנית גבייה יכול לשמור רק מי שרושם תשלומים בעסק. בחרו תבנית אחרת או בקשו מבעלי העסק לשמור את הכלל.",
+  // AUT-08: a send_email step of a collection template is saved only by a payment recorder
+  "automation:email_collection": "שלב אימייל עם תבנית גבייה יכול לשמור רק מי שרושם תשלומים בעסק. בחרו תבנית אחרת או בקשו מבעלי העסק לשמור את הכלל.",
   // SMS (owner (210) ב): not in the personal plan
   "feature:sms": "שליחת SMS אינה כלולה בחבילה הנוכחית. בעלי העסק רואים את השימוש ב\"הגדרות > חבילה ושימוש\", ושם גם איך מגדילים את החבילה.",
   "feature:campaign_costs": "עלויות קמפיינים ודוח ההחזר על ההשקעה אינם כלולים בחבילה הנוכחית. בעלי העסק רואים את השימוש ב\"הגדרות > חבילה ושימוש\", ושם גם איך מגדילים את החבילה.",
@@ -504,6 +509,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "message_template:field": "בנוסח יש שדה שהמערכת לא מכירה. אפשר להשתמש רק בשדות שברשימה, כתובים בדיוק כך, למשל {שם פרטי}.",
   "message_template:variant": VARIANT_PROBLEM_MESSAGES.variant,
   "message_template:neutral": VARIANT_PROBLEM_MESSAGES.neutral,
+  // SPD-04 review 3: the system's instant reply templates are fixed
+  "message_template:fixed_notice": FIXED_NOTICE_TEMPLATE,
   // EML-02 (migration record_email)
   "record_email:not_found": "הרשומה לא נמצאה, או שאין לכם גישה אליה. רעננו את הדף ונסו שוב.",
   "record_email:kind": "אפשר לשלוח אימייל רק מכרטיס של ליד, איש קשר או עסקה.",

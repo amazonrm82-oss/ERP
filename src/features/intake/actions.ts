@@ -30,6 +30,7 @@ import {
   sameProductSelection,
   type ProductSelection,
 } from "./product";
+import { INSTANT_REPLY_MARKER } from "./instant-reply";
 import { marketingConsentSetting } from "./marketing-consent";
 import { callbackSlotsOff, createIntakeSchema, fieldsFromForm, updateIntakeSchema } from "./schema";
 import { defaultWhatsappButton, whatsappNumber } from "./whatsapp";
@@ -112,6 +113,7 @@ async function updateIntake(orgId: string, formId: string, _prev: FormState, for
       "callback_choice",
       "channel_choice",
       "locale_choice",
+      "instant_reply",
     ]),
   );
   if (!parsed.success) {
@@ -186,7 +188,7 @@ async function updateIntake(orgId: string, formId: string, _prev: FormState, for
 
   // CAP-05: webhooks keep their WhatsApp columns as they are; with the button off
   // only the switch is saved, and the stored number and text stay untouched
-  const { whatsapp_button, whatsapp_phone, whatsapp_text, callback_choice, channel_choice, locale_choice, ...settings } = parsed.data;
+  const { whatsapp_button, whatsapp_phone, whatsapp_text, callback_choice, channel_choice, locale_choice, instant_reply, ...settings } = parsed.data;
   const thanks =
     current.kind !== "form" ? {} : whatsapp_button ? { whatsapp_button, whatsapp_phone, whatsapp_text } : { whatsapp_button };
   // SPD-05: a webhook has no form to ask on; its switch stays as it is. The slot
@@ -200,6 +202,8 @@ async function updateIntake(orgId: string, formId: string, _prev: FormState, for
           locale_choice,
           // CAP-07 / CNS-04: the marketing-consent boxes
           marketing_consent_channels: marketingConsentSetting(formData),
+          // SPD-04: only when the editor showed the switch (the business has the instant_reply key); else it stays as stored
+          ...(formData.get(INSTANT_REPLY_MARKER) === "1" ? { instant_reply } : {}),
           ...(callback_choice ? { callback_choice, callback_slots_off: callbackSlotsOff(formData) } : { callback_choice }) };
   const save = (patch: ProductPatch | Record<string, never>) =>
     context.supabase

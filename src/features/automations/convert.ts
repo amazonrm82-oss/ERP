@@ -10,6 +10,7 @@ import { createDealAction, createDealDraft, createQuoteAction, createQuoteDraft 
 import { dateTriggerConfig, dateTriggerDraft } from "./date-trigger";
 import { fieldTriggerConfig } from "./field-trigger";
 import { scheduleTriggerConfig, scheduleTriggerDraft } from "./schedule-trigger";
+import { sendEmailAction, sendEmailDraft } from "./send-email";
 import { sendSmsAction, sendSmsDraft } from "./send-sms";
 import { customDefinition, setFieldDraft, setFieldRelativeDraft, setFieldValue } from "./set-field";
 
@@ -165,6 +166,10 @@ export function toDbRule(rule: Rule, lookups: Lookups): DbRule | string {
       const built = sendSmsAction(entity, action, lookups);
       if (typeof built === "string") return built;
       actions.push(built);
+    } else if (action.type === "send_email") {
+      const built = sendEmailAction(entity, action, lookups);
+      if (typeof built === "string") return built;
+      actions.push(built);
     }
   }
 
@@ -264,6 +269,8 @@ export function fromDbRule(
         return [createQuoteDraft(a)];
       case "send_sms":
         return [sendSmsDraft(a)];
+      case "send_email":
+        return [sendEmailDraft(a)];
       default:
         return [];
     }

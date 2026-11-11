@@ -57,7 +57,7 @@ const consent = (user: string, org: string, lead: string, channel: string, state
 describe("message types: marketing and service (CNS-07)", () => {
   let owner: { id: string }, org: string;
   // PKG-03 (owner (127) ב, 4 November 2026) adds punch_card_notice
-  const SERVICE = ["meeting_reminder", "requested_document", "collection", "verification_code", "punch_card_notice"];
+  const SERVICE = ["meeting_reminder", "requested_document", "collection", "verification_code", "punch_card_notice", "instant_reply"];
 
   beforeAll(async () => {
     await setKey(KEY);

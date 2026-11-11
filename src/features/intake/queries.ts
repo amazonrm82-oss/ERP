@@ -78,6 +78,8 @@ export type IntakeDetails = {
   channelChoice: boolean;
   // CAP-08: the hosted form asks the person's preferred language
   localeChoice: boolean;
+  // SPD-04: the form sends an instant automatic reply to the address typed in each submission
+  instantReply: boolean;
   // LEAD-04 / CAP-08: the hosted form asks for a requested product; the picked ones (null = every offerable product)
   productChoice: boolean;
   productIds: string[] | null;
@@ -90,7 +92,7 @@ export async function getIntake(orgId: string, formId: string): Promise<IntakeDe
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("forms")
-    .select("id, kind, name, token, title, intro, submit_label, success_message, redirect_url, fields, source_id, owner_id, team_id, assign_mode, is_active, whatsapp_button, whatsapp_phone, whatsapp_text, callback_choice, callback_slots_off, channel_choice, locale_choice, product_choice, product_ids, product_category_ids, marketing_consent_channels")
+    .select("id, kind, name, token, title, intro, submit_label, success_message, redirect_url, fields, source_id, owner_id, team_id, assign_mode, is_active, whatsapp_button, whatsapp_phone, whatsapp_text, callback_choice, callback_slots_off, channel_choice, locale_choice, instant_reply, product_choice, product_ids, product_category_ids, marketing_consent_channels")
     .eq("organization_id", orgId)
     .eq("id", formId)
     // BIZ-02 / SPD-07: a business card's or site widget's form is managed with its card or widget, not here
@@ -125,6 +127,7 @@ export async function getIntake(orgId: string, formId: string): Promise<IntakeDe
     callbackSlotsOff: (data.callback_slots_off ?? []).filter(isCallbackSlotStart),
     channelChoice: data.channel_choice,
     localeChoice: data.locale_choice,
+    instantReply: data.instant_reply,
     productChoice: data.product_choice,
     productIds: data.product_ids,
     productCategoryIds: data.product_category_ids,
@@ -144,6 +147,16 @@ function toSubmissionItem(row: SubmissionRow): SubmissionItem {
     .filter((value): value is string => typeof value === "string" && value !== "")
     .join(", ");
   return { id: row.id, status: row.status, leadId: row.lead_id, createdAt: row.created_at, summary: summary || "ללא פרטים" };
+}
+
+/** SPD-04 (259) א: the business default of the instant reply (no settings row = off). */
+export async function getInstantReplyDefault(orgId: string): Promise<boolean> {
+  const supabase = await createClient();
+  const data = must(
+    await supabase.from("org_message_settings").select("instant_reply_default").eq("organization_id", orgId).maybeSingle(),
+    "instant reply default",
+  );
+  return data?.instant_reply_default === true;
 }
 
 /** The latest submissions of a form (30). */

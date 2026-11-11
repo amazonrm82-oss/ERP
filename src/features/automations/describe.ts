@@ -5,6 +5,7 @@ import { describeCreateDeal, describeCreateQuote } from "./create-records";
 import { describeDateTrigger } from "./date-trigger";
 import { describeFieldTrigger } from "./field-trigger";
 import { describeScheduleTrigger } from "./schedule-trigger";
+import { describeSendEmail } from "./send-email";
 import { describeSendSms } from "./send-sms";
 import { describeSetField } from "./set-field";
 
@@ -95,6 +96,8 @@ export function describeRule(
         return `${label}: ${describeCreateQuote(a, lookups)}`;
       case "send_sms":
         return `${label}: ${describeSendSms(a, lookups)}`;
+      case "send_email":
+        return `${label}: ${describeSendEmail(a, lookups)}`;
       default:
         return label;
     }
@@ -150,6 +153,15 @@ export const STEP_ERRORS: Record<string, string> = {
   "collection messages need the payments right of the person who pressed": "הודעת גבייה נשלחת מכפתור רק כשמי שלחץ רושם תשלומים",
   "the SMS template is off": "תבנית ה-SMS כבויה",
   "the SMS template cannot be sent": "התבנית לא תישלח: יש בה שדה שלא מתאים לסוג ההודעה, קישור חיצוני, או שהיא ארוכה מדי",
+  // SGN-03 review M1: a template the system sends itself (SMS and email steps)
+  "the system sends this template itself, not an automation": "את התבנית הזו המערכת שולחת לבד, ולא אוטומציה",
+  // AUT-08: a send_email step (app.automation_send_email)
+  "an email goes to a lead, a contact or a deal's contact": "הודעת אימייל נשלחת רק לליד, לאיש קשר או לאיש הקשר של עסקה",
+  "the record has no email": "לרשומה אין כתובת אימייל",
+  "the email template no longer exists": "תבנית האימייל נמחקה",
+  "the template is not an email template": "התבנית שנבחרה אינה תבנית אימייל",
+  "the email template is off": "תבנית האימייל כבויה",
+  "the email template cannot be sent": "התבנית לא תישלח: יש בה שדה שלא מתאים לסוג ההודעה, קישור חיצוני, או שהיא ארוכה מדי",
 };
 
 /**
@@ -183,11 +195,15 @@ export const STEP_WARNINGS: Record<string, string> = {
   // SEG-02 / DQL-04 (owner, 26 October 2026): an automation fills only an empty first source of a lead or contact
   "the first source is already set": "מקור ראשון כבר קיים",
   // SMS-02 (HEB-09): the SMS was queued while customer sending is paused; it goes out after the resume (or is cancelled after 24 hours)
-  "customer sending is paused": "ה-SMS ממתין: השליחה ללקוחות עצורה כרגע",
+  // (AUT-08: the email step too)
+  "customer sending is paused": "ההודעה ממתינה: השליחה ללקוחות עצורה כרגע",
   // review F4 (lead's interim choice): at most one SMS per rule and record a business day
   "an SMS was already sent today by this rule": "לא נשלח: הכלל הזה כבר שלח היום SMS לרשומה הזו",
   // review (7): a button press counts in the presser's 30 SMS an hour
   "too many SMS this hour by the person who pressed": "לא נשלח: מי שלחץ על הכפתור כבר שלח 30 הודעות SMS בשעה האחרונה",
+  // AUT-08: at most one email per rule and record a business day; a button press counts in the presser's 30 emails an hour
+  "an email was already sent today by this rule": "לא נשלח: הכלל הזה כבר שלח היום אימייל לרשומה הזו",
+  "too many emails this hour by the person who pressed": "לא נשלח: מי שלחץ על הכפתור כבר שלח 30 הודעות אימייל בשעה האחרונה",
 };
 
 /** "שורה אחת" / "3 שורות" / "חלק מהשורות" (no count). */

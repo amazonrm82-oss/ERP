@@ -205,7 +205,9 @@ export type ActionType =
   | "create_note"
   | "create_quote"
   // SMS-02: one SMS of the business's SMS template to the record (a deal: its contact)
-  | "send_sms";
+  | "send_sms"
+  // AUT-08: one email of the business's email template to the record (a deal: its contact)
+  | "send_email";
 
 export const ACTION_LABELS: Record<ActionType, string> = {
   create_task: "יצירת משימה",
@@ -219,6 +221,7 @@ export const ACTION_LABELS: Record<ActionType, string> = {
   create_note: "הוספת הערה",
   create_quote: "יצירת הצעת מחיר מתבנית",
   send_sms: "שליחת SMS",
+  send_email: "שליחת אימייל",
 };
 
 export function actionsFor(entity: Entity): ActionType[] {
@@ -228,6 +231,7 @@ export function actionsFor(entity: Entity): ActionType[] {
     "create_note",
     "create_quote",
     "send_sms",
+    "send_email",
     "notify",
     "assign_owner",
     "add_tag",
@@ -243,6 +247,8 @@ export function actionsFor(entity: Entity): ActionType[] {
       (type !== "create_quote" || entity === "deal" || entity === "contact") &&
       // SMS-02: an SMS goes to a lead, a contact or a deal's contact
       (type !== "send_sms" || entity === "lead" || entity === "contact" || entity === "deal") &&
+      // AUT-08: an email goes to a lead, a contact or a deal's contact
+      (type !== "send_email" || entity === "lead" || entity === "contact" || entity === "deal") &&
       (type !== "add_tag" || entity !== "task") &&
       (type !== "set_lead_status" || entity === "lead") &&
       (type !== "move_deal_stage" || entity === "deal"),

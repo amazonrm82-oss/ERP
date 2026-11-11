@@ -171,13 +171,15 @@ describe("CNS-07: a closed list of message types; service is a closed list too",
       ["verification_code", "service"],
       // PKG-03 (owner (127) ב)
       ["punch_card_notice", "service"],
+      // SPD-04 (owner (80) א)
+      ["instant_reply", "service"],
       ["marketing", "marketing"],
       [null, "marketing"],
     ]);
     for (const bad of ["service", "promo", 1]) {
       expect(await handler(job({ channel: "sms", lead_id: lead, message_type: bad }))).toEqual({ status: "failed", error: "payload", final: true });
     }
-    expect(maySend).toHaveBeenCalledTimes(7);
+    expect(maySend).toHaveBeenCalledTimes(8);
   });
 
   it("the types and the service list mirror the migration", () => {

@@ -30,14 +30,16 @@ const isId = (value: unknown): value is string => typeof value === "string" && v
  * carries none of them, so every other message is handed over exactly as before.
  */
 export function recordEmailParts(payload: Record<string, unknown>): RecordEmailParts | undefined {
-  const { template_id: template, deal_id: deal, file_ids: files, library_file_ids: library, reply_to_user_id: replyTo } = payload;
-  if (deal === undefined && files === undefined && library === undefined && replyTo === undefined) return undefined;
+  const { template_id: template, deal_id: deal, file_ids: files, library_file_ids: library, reply_to_user_id: replyTo, automation_id: automation } = payload;
+  if (deal === undefined && files === undefined && library === undefined && replyTo === undefined && automation === undefined) return undefined;
   return {
     templateId: isId(template) ? template : null,
     dealId: isId(deal) ? deal : null,
     fileIds: Array.isArray(files) ? files.filter(isId) : [],
     libraryFileIds: Array.isArray(library) ? library.filter(isId) : [],
     replyToUserId: isId(replyTo) ? replyTo : null,
+    // AUT-08: an automation's email (app.automation_send_email)
+    ...(isId(automation) ? { automationId: automation } : {}),
   };
 }
 

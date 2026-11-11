@@ -27,6 +27,8 @@ export const SERVICE_TYPE_FIELDS: Record<ServiceMessageType, readonly MergeField
   verification_code: ["businessName", "verificationCode"],
   // PKG-03 (owner (127) ב): no price, link or offer; the business's name signs it (the owner's wording)
   punch_card_notice: ["firstName", "businessName", "businessPhone", "cardName", "entriesLeft", "date"],
+  // SPD-04 (owner (80) א, (261) א): the business signs it; the return time
+  instant_reply: ["firstName", "businessName", "businessPhone", "time"],
 };
 
 /**

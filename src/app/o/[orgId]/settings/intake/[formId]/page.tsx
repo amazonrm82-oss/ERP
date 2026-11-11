@@ -24,7 +24,7 @@ import {
 import { requestedProductEnabled } from "@/features/requested-product/queries";
 import { getLeadLookups } from "@/features/leads/queries";
 import { isAdminRole } from "@/features/settings/permissions";
-import { getOrganizationSettings, getTeam, listMembers, listTeams } from "@/features/settings/queries";
+import { getOrganizationSettings, getTeam, listMembers, listTeams, orgHasFeature } from "@/features/settings/queries";
 import { UNOWNED_NOTE, unownedLeadsGoTo } from "@/features/intake/unowned";
 import { whatsappNumber } from "@/features/intake/whatsapp";
 import { getOrgContext } from "@/features/shell/queries";
@@ -41,7 +41,7 @@ export default async function IntakeItemPage({ params }: Props) {
   if (!isUuid(formId) || !isAdminRole(role)) {
     notFound();
   }
-  const [intake, submissions, lookups, members, teams, origin, definitions, organization, productsOn] = await Promise.all([
+  const [intake, submissions, lookups, members, teams, origin, definitions, organization, productsOn, instantReplyOn] = await Promise.all([
     getIntake(orgId, formId),
     listSubmissions(orgId, formId),
     getLeadLookups(orgId),
@@ -52,6 +52,8 @@ export default async function IntakeItemPage({ params }: Props) {
     getOrganizationSettings(orgId),
     // LEAD-04 / CAP-08: the product question needs the products flag
     requestedProductEnabled(orgId),
+    // SPD-04: the instant reply needs the instant_reply plan key
+    orgHasFeature(orgId, "instant_reply"),
   ]);
   if (!intake) {
     notFound();
@@ -180,6 +182,7 @@ export default async function IntakeItemPage({ params }: Props) {
               businessPhone={businessPhone}
               businessName={organization?.name ?? ""}
               productChoices={productChoices}
+              instantReplyAvailable={instantReplyOn && intake.kind === "form"}
             />
           ) : (
             <p className="text-md text-ink-soft">העסק במצב קריאה בלבד.</p>

@@ -24,6 +24,7 @@ export const MESSAGE_TYPE_LABELS: Record<MessageType, string> = {
   collection: "גבייה",
   verification_code: "קוד אימות",
   punch_card_notice: "כרטיסייה",
+  instant_reply: "מענה מיידי לפנייה",
   marketing: "שיווק",
 };
 
@@ -237,3 +238,42 @@ export const DEFAULT_SIGNATURE_REMINDER_TEMPLATES: ReadonlyArray<{
     noticeKind: "signature_reminder",
   },
 ];
+
+// SPD-04 (owner (80) א, 3 November 2026): the instant reply to a web form inquiry, SMS and email, in working hours and
+// outside them (server-only mark notice_kind), seeded by app.seed_instant_reply_templates with the wording version below
+// when a form's switch is first turned on; tests/unit/instant-reply.test.ts keeps the two equal. DRAFT wording until the
+// lawyer edits it. {שעה} is the return time in the business's zone; outside working hours "ביום העבודה הבא עד {שעה}" (owner
+// (261) א). The two marked templates are fixed: a person only switches them off or on (hint message_template:fixed_notice).
+export const INSTANT_REPLY_WORDING_VERSION = "instant-reply-draft-1";
+
+export type InstantReplyNoticeKind = "instant_reply_open" | "instant_reply_closed";
+
+const INSTANT_OPEN_BODY = "שלום {שם פרטי}, קיבלנו את הפנייה שלך ל-{שם העסק}. נחזור אליך עד השעה {שעה}. {שם העסק}, {טלפון העסק}";
+const INSTANT_CLOSED_BODY = "שלום {שם פרטי}, קיבלנו את הפנייה שלך ל-{שם העסק}. נחזור אליך ביום העבודה הבא עד {שעה}. {שם העסק}, {טלפון העסק}";
+const INSTANT_SUBJECT = "קיבלנו את הפנייה שלך ל-{שם העסק}";
+
+export const DEFAULT_INSTANT_REPLY_TEMPLATES: ReadonlyArray<{
+  name: string;
+  channel: MessageChannel;
+  messageType: MessageType;
+  subject: string | null;
+  body: string;
+  noticeKind: InstantReplyNoticeKind;
+}> = [
+  { name: "מענה מיידי: בשעות הפעילות (SMS)", channel: "sms", messageType: "instant_reply", subject: null, body: INSTANT_OPEN_BODY, noticeKind: "instant_reply_open" },
+  { name: "מענה מיידי: מחוץ לשעות הפעילות (SMS)", channel: "sms", messageType: "instant_reply", subject: null, body: INSTANT_CLOSED_BODY, noticeKind: "instant_reply_closed" },
+  { name: "מענה מיידי: בשעות הפעילות (אימייל)", channel: "email", messageType: "instant_reply", subject: INSTANT_SUBJECT, body: INSTANT_OPEN_BODY, noticeKind: "instant_reply_open" },
+  {
+    name: "מענה מיידי: מחוץ לשעות הפעילות (אימייל)",
+    channel: "email",
+    messageType: "instant_reply",
+    subject: INSTANT_SUBJECT,
+    body: INSTANT_CLOSED_BODY,
+    noticeKind: "instant_reply_closed",
+  },
+];
+
+/** SPD-04 review 3: a template the system sends as an instant reply; its wording is fixed (= trigger message_templates_fixed_notice). */
+export function isFixedNoticeTemplate(noticeKind: string | null | undefined): boolean {
+  return noticeKind === "instant_reply_open" || noticeKind === "instant_reply_closed";
+}

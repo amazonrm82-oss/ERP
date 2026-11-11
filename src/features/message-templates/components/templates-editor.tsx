@@ -9,11 +9,13 @@ import { Checkbox, SelectField, TextareaField, TextField } from "@/components/ui
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { MessageChannel, MessageType } from "@/features/messaging/providers/types";
 import type { FormState } from "@/lib/action-result";
+import { FIXED_NOTICE_TEMPLATE } from "@/lib/errors";
 
 import { addMessageTemplateAction, deleteMessageTemplateAction, updateMessageTemplateAction } from "../actions";
 import type { MessageTemplate } from "../queries";
 import { editedTemplateProblemText, templateProblemText, type OwnAddresses } from "../service-rule";
 import {
+  isFixedNoticeTemplate,
   isServiceType,
   MESSAGE_TEMPLATE_BODY_MAX,
   MESSAGE_TEMPLATE_NAME_MAX,
@@ -245,9 +247,12 @@ function ReadRow({ template, own }: { template: MessageTemplate; own: OwnAddress
 function EditableRow({ orgId, template, own }: { orgId: string; template: MessageTemplate; own: OwnAddresses }) {
   const [state, formAction] = useActionState<FormState, FormData>(updateMessageTemplateAction.bind(null, orgId, template.id), null);
   const failure = state && !state.ok ? state : null;
+  // SPD-04 review 3: the system's instant reply templates are fixed (only switched off or on; never deleted)
+  const fixed = isFixedNoticeTemplate(template.noticeKind);
   return (
     <li className="space-y-3 px-4 py-4 sm:px-5">
       <RowHeading template={template} />
+      {fixed ? <p className="text-sm text-ink-soft">{FIXED_NOTICE_TEMPLATE}</p> : null}
       <SendProblem message={storedProblem(template, own)} />
       <form action={formAction} className="space-y-3" noValidate>
         <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
@@ -275,6 +280,7 @@ function EditableRow({ orgId, template, own }: { orgId: string; template: Messag
           ) : null}
         </div>
       </form>
+      {fixed ? null : (
       <ActionButton
         action={deleteMessageTemplateAction.bind(null, orgId, template.id)}
         pendingText="מוחקים…"
@@ -284,6 +290,7 @@ function EditableRow({ orgId, template, own }: { orgId: string; template: Messag
       >
         מחיקה
       </ActionButton>
+      )}
     </li>
   );
 }

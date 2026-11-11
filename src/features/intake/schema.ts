@@ -60,6 +60,8 @@ export const updateIntakeSchema = z.object({
   channel_choice: checkbox,
   // CAP-08: ask the person's preferred language
   locale_choice: checkbox,
+  // SPD-04: an instant automatic reply to the address typed in each submission
+  instant_reply: checkbox,
 });
 
 const slotsOffSchema = z.array(z.enum(CALLBACK_SLOT_STARTS as [CallbackSlotStart, ...CallbackSlotStart[]])).max(CALLBACK_SLOT_STARTS.length);

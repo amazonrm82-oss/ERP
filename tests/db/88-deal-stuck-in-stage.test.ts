@@ -129,6 +129,11 @@ const RERUN = [
   migrationFile("_staff_link_first_grant.sql"),
   // SGN-04 redefines app.document_templates_guard() of _document_templates.sql last
   migrationFile("_contract_renewals.sql"),
+  // AUT-08 redefines app.job_payload_ok() and app.automation_send_sms() of _signature_status_reminders.sql and
+  // app.run_automation_actions() of _sms_b_send.sql last
+  migrationFile("_automation_send_email.sql"),
+  // SPD-04 redefines app.job_payload_ok() of _automation_send_email.sql and the message type lists last
+  migrationFile("_instant_reply.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

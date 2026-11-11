@@ -938,6 +938,8 @@ export type OrgMessageSettingsRow = {
   meeting_confirm: boolean;
   meeting_remind_day: boolean;
   meeting_remind_hour: boolean;
+  // SPD-04 (259) א: a new web form starts with the instant reply on
+  instant_reply_default: boolean;
   // SMS-01: the sender the customer's phone shows (app.sms_sender_name_ok); null = the platform account's default
   sms_sender_name: string | null;
   // SMS-01b (server only): the business phone verified by a code, and the platform's approval of a letter name
@@ -1317,6 +1319,8 @@ export type FormRow = {
   channel_choice: boolean;
   // CAP-08: the hosted form asks the person's preferred language
   locale_choice: boolean;
+  // SPD-04: an instant automatic reply to the address typed in each submission (web forms; owners/admins)
+  instant_reply: boolean;
   // LEAD-04 / CAP-08: the hosted form asks for a requested product; which ones (null = every offerable product)
   product_choice: boolean;
   product_ids: string[] | null;
@@ -3412,6 +3416,7 @@ export type Database = {
           callback_slots_off?: string[];
           channel_choice?: boolean;
           locale_choice?: boolean;
+          instant_reply?: boolean;
           product_choice?: boolean;
           product_ids?: string[] | null;
           product_category_ids?: string[] | null;
@@ -3437,6 +3442,7 @@ export type Database = {
           callback_slots_off?: string[];
           channel_choice?: boolean;
           locale_choice?: boolean;
+          instant_reply?: boolean;
           product_choice?: boolean;
           product_ids?: string[] | null;
           product_category_ids?: string[] | null;
@@ -3672,6 +3678,7 @@ export type Database = {
           meeting_confirm?: boolean;
           meeting_remind_day?: boolean;
           meeting_remind_hour?: boolean;
+          instant_reply_default?: boolean;
           sms_sender_name?: string | null;
         },
         {
@@ -3684,6 +3691,7 @@ export type Database = {
           meeting_confirm?: boolean;
           meeting_remind_day?: boolean;
           meeting_remind_hour?: boolean;
+          instant_reply_default?: boolean;
           sms_sender_name?: string | null;
         }
       >;

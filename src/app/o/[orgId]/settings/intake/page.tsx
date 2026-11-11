@@ -7,8 +7,10 @@ import { EmptyState } from "@/components/ui/feedback";
 import { ForwardIcon, FormIcon } from "@/components/ui/icons";
 import { CreateIntakeForm } from "@/features/intake/components/intake-editor";
 import { SubmissionList } from "@/features/intake/components/submission-list";
-import { listIntakes, listKeptSubmissions } from "@/features/intake/queries";
+import { InstantReplyDefaultForm } from "@/features/intake/components/instant-reply-default";
+import { getInstantReplyDefault, listIntakes, listKeptSubmissions } from "@/features/intake/queries";
 import { isAdminRole } from "@/features/settings/permissions";
+import { orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { paths } from "@/lib/paths";
 
@@ -26,7 +28,13 @@ export default async function IntakeSettingsPage({ params }: Props) {
       </div>
     );
   }
-  const [intakes, kept] = await Promise.all([listIntakes(orgId), listKeptSubmissions(orgId)]);
+  const [intakes, kept, instantReplyOn, instantReplyDefault] = await Promise.all([
+    listIntakes(orgId),
+    listKeptSubmissions(orgId),
+    // SPD-04 (259) א: the business default, shown only with the plan key
+    orgHasFeature(orgId, "instant_reply"),
+    getInstantReplyDefault(orgId),
+  ]);
 
   return (
     <div className="space-y-5">
@@ -39,6 +47,14 @@ export default async function IntakeSettingsPage({ params }: Props) {
           <CardHeader id="new-intake-title" title="טופס או webhook חדש" />
           <CardBody>
             <CreateIntakeForm orgId={orgId} />
+          </CardBody>
+        </Card>
+      ) : null}
+      {canWrite && instantReplyOn ? (
+        <Card aria-labelledby="instant-reply-default-title">
+          <CardHeader id="instant-reply-default-title" title="מענה מיידי ללקוח" />
+          <CardBody>
+            <InstantReplyDefaultForm orgId={orgId} value={instantReplyDefault} />
           </CardBody>
         </Card>
       ) : null}

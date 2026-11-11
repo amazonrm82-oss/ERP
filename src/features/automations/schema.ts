@@ -77,6 +77,8 @@ const actionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("create_quote"), template_id: z.guid({ error: "יש לבחור תבנית הצעת מחיר." }), owner_id: id.optional() }),
   // SMS-02: one SMS of an SMS template (checked against the business's templates in toDbRule)
   z.object({ type: z.literal("send_sms"), template_id: z.guid({ error: "יש לבחור תבנית SMS." }) }),
+  // AUT-08: one email of an email template (checked against the business's templates in toDbRule)
+  z.object({ type: z.literal("send_email"), template_id: z.guid({ error: "יש לבחור תבנית אימייל." }) }),
 ]);
 
 export type RuleAction = z.infer<typeof actionSchema>;

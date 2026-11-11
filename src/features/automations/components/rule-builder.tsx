@@ -20,6 +20,7 @@ import { DEAL_NAME_MAX, defaultDealName, NOTE_BODY_MAX, openStagesOf } from "../
 import { DATE_TRIGGER_HOUR, DATE_TRIGGER_MAX_DAYS, dateTriggerChoices } from "../date-trigger";
 import { watchChoices, watchValues } from "../field-trigger";
 import { SCHEDULE_MINUTES, WEEKDAYS } from "../schedule-trigger";
+import { offeredEmailTemplates } from "../send-email";
 import { offeredSmsTemplates } from "../send-sms";
 import { conditionsPayload, fitConditions, type ConditionItem } from "../conditions";
 import { ACTION_LABELS, actionOffered, actionsFor, TASK_TYPES, TRIGGERS, triggerOffered, type ActionType, type Entity } from "../definitions";
@@ -61,6 +62,8 @@ function blankAction(type: ActionType): Draft {
     case "create_quote":
       return { type, template_id: "", owner_id: "" };
     case "send_sms":
+      return { type, template_id: "" };
+    case "send_email":
       return { type, template_id: "" };
   }
 }
@@ -613,6 +616,31 @@ function ActionFields({ orgId, entity, action, index, lookups, onChange }: Field
             {entity === "deal" ? "ההודעה נשלחת לאיש הקשר של העסקה, " : "ההודעה נשלחת "}
             למספר הטלפון שברשומה, בשם השולח של העסק. הודעת שיווק יוצאת רק ללקוח שהסכים לקבל SMS, עם המילה ״פרסומת״ ושורת ההסרה. כשהשליחה ללקוחות
             עצורה, ההודעה מחכה. עד שספק ה-SMS יחובר, ההודעות ממתינות בתור.
+          </p>
+        </div>
+      );
+    }
+    case "send_email": {
+      // AUT-08: one email of an email template to the record (a deal: its contact); the queue judges consent and the pause
+      const templates = offeredEmailTemplates(lookups.emailTemplates ?? [], action.template_id);
+      return (
+        <div className="space-y-2">
+          {templates.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2">{pick(`תבנית אימייל (פעולה ${n})`, "template_id", templates)}</div>
+          ) : (
+            <p className="text-sm text-ink-soft">
+              אין עדיין תבניות אימייל פעילות בעסק.{" "}
+              <TextLink href={messageTemplatesPath(orgId)} target="_blank" className="font-medium">
+                לתבניות ההודעה
+                <span className="sr-only"> (נפתח בחלון חדש)</span>
+              </TextLink>{" "}
+              אחרי שמוסיפים, מרעננים את הדף ובוחרים תבנית.
+            </p>
+          )}
+          <p className="text-sm text-ink-soft">
+            {entity === "deal" ? "ההודעה נשלחת לאיש הקשר של העסקה, " : "ההודעה נשלחת "}
+            לכתובת האימייל שברשומה, בלי קבצים מצורפים. הודעת שיווק יוצאת רק ללקוח שהסכים לקבל אימייל, עם המילה ״פרסומת״ ושורת ההסרה. כשהשליחה
+            ללקוחות עצורה, ההודעה מחכה. עד שספק האימייל יחובר, ההודעות ממתינות בתור.
           </p>
         </div>
       );

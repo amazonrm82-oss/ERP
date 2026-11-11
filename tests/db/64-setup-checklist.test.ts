@@ -818,6 +818,15 @@ describe("setup checklist and sample data (USR-04)", () => {
       // SGN-04 redefines app.document_templates_guard() of _document_templates.sql last and grants select on
       // signature_documents.valid_until / renewal_on after _signature_documents.sql's revoke all
       "_contract_renewals.sql",
+      // AUT-08 redefines app.job_payload_ok() and app.automation_send_sms() of _signature_status_reminders.sql and
+      // app.run_automation_actions() / app.record_sms_sent_last_hour() / app.automations_sms_collection_check() of _sms_b_send.sql last
+      "_automation_send_email.sql",
+      // (AUT-08 also redefines app.record_email_enqueue() of _signature_status_reminders.sql)
+      // SPD-04 redefines public.job_message_may_send() of _sms_d_sender_check.sql, app.message_move_waiting() of
+      // _message_send_review_fixes.sql, app.job_payload_ok() of _automation_send_email.sql, app.message_types() / app.service_message_types() of
+      // _punch_card_notice_messages.sql, app.message_type_fields() of _meeting_customer_reminders.sql and app.emit_form_submitted() of
+      // _automation_more_triggers.sql last (it adds app.message_window_exempt; app.message_always_sends is not redefined)
+      "_instant_reply.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

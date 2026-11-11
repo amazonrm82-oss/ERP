@@ -15,7 +15,7 @@ export const MESSAGE_MERGE_FIELDS = {
   userName: { token: "{שם הנציג}", label: "השם של הנציג ששולח" },
   businessName: { token: "{שם העסק}", label: "שם העסק" },
   date: { token: "{תאריך}", label: "תאריך הפגישה; בכרטיסייה או במסמך לחתימה, היום האחרון" },
-  time: { token: "{שעה}", label: "שעת הפגישה" },
+  time: { token: "{שעה}", label: "שעת הפגישה; במענה מיידי לפנייה, השעה שנחזור עד אליה" },
   document: { token: "{מסמך}", label: "המסמך (סוג ומספר), בגבייה" },
   amount: { token: "{סכום}", label: "הסכום לתשלום, בגבייה" },
   dueDate: { token: "{מועד תשלום}", label: "מועד התשלום, בגבייה" },

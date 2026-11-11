@@ -12,6 +12,7 @@ import type { Json } from "@/lib/database.types";
 
 import { createIntakeAction, updateIntakeAction } from "../actions";
 import { CALLBACK_SLOTS, slotInputName, slotLabel } from "../callback";
+import { INSTANT_REPLY_HINT, INSTANT_REPLY_LABEL, INSTANT_REPLY_MARKER } from "../instant-reply";
 import { parseFieldsConfig, storedFields, type FormFieldConfig, type FormFieldOption } from "../fields";
 import {
   addressField,
@@ -81,6 +82,8 @@ type EditProps = {
   businessName?: string;
   // LEAD-04 / CAP-08: what the product question offers to pick; null when the business has no products flag
   productChoices?: ProductChoices | null;
+  // SPD-04: whether the business has the instant_reply plan key (the switch shows only then)
+  instantReplyAvailable?: boolean;
 };
 
 /** LEAD-04 / CAP-08: the product question's lists and counts, read by the settings page. */
@@ -115,6 +118,7 @@ export function IntakeSettingsForm({
   businessPhone,
   businessName = "",
   productChoices = null,
+  instantReplyAvailable = false,
 }: EditProps) {
   const [state, formAction] = useActionState<FormState, FormData>(updateIntakeAction.bind(null, orgId, intake.id), null);
   const failure = state && !state.ok ? state : null;
@@ -140,6 +144,7 @@ export function IntakeSettingsForm({
           <CallbackSettings intake={intake} values={values} />
           <ChannelSettings intake={intake} values={values} />
           <LocaleSettings intake={intake} values={values} />
+          {instantReplyAvailable ? <InstantReplySettings intake={intake} values={values} /> : null}
           <MarketingConsentSettings intake={intake} values={values} businessName={businessName} fieldKeys={builderInitial.map((field) => field.key)} />
           {productChoices ? <ProductSettings intake={intake} values={values} choices={productChoices} error={errors.product_ids} /> : null}
           <TextField label="טקסט הכפתור" name="submit_label" maxLength={40} autoComplete="off" placeholder="שליחת הפרטים" defaultValue={values?.submit_label ?? intake.submitLabel ?? ""} error={errors.submit_label} />
@@ -282,6 +287,25 @@ function CallbackSettings({ intake, values }: { intake: IntakeDetails; values?: 
         </fieldset>
       ) : null}
     </div>
+  );
+}
+
+/** SPD-04: an instant automatic reply to the address typed in each submission (a service message, off by default). */
+function InstantReplySettings({ intake, values }: { intake: IntakeDetails; values?: Record<string, string> }) {
+  return (
+    <label className="flex items-start gap-2.5 text-md">
+      <input type="hidden" name={INSTANT_REPLY_MARKER} value="1" />
+      <input
+        type="checkbox"
+        name="instant_reply"
+        defaultChecked={values ? values.instant_reply === "on" : intake.instantReply}
+        className="mt-1 size-4.5 accent-accent"
+      />
+      <span>
+        {INSTANT_REPLY_LABEL}
+        <span className="block text-sm text-ink-soft">{INSTANT_REPLY_HINT}</span>
+      </span>
+    </label>
   );
 }
 

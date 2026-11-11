@@ -210,7 +210,7 @@ export const EXPORT_COLUMNS: Partial<Record<ExportTableName, string>> = {
     "id, organization_id, lead_id, contact_id, company_id, deal_id, template_id, title, body, status, sent_by, sent_at, viewed_at, signed_at, cancelled_at, cancelled_by, expires_at, content_sha256, former_lead_id, former_contact_id, former_company_id, former_deal_id, customer_deleted_at, erased_at, text_erased_at, expired_at, valid_until, renewal_on, created_at, updated_at",
   // SMS-01b review (8): who on the platform approved the SMS sender name is not selected by clients (column grants)
   org_message_settings:
-    "id, organization_id, window_from, window_until, skip_rest_days, updated_by, created_at, updated_at, monthly_cap_email, monthly_cap_sms, monthly_cap_whatsapp, meeting_confirm, meeting_remind_day, meeting_remind_hour, sms_sender_name, sms_sender_verified_phone, sms_sender_verified_at, sms_sender_approved_at, sms_sender_rejected_at",
+    "id, organization_id, window_from, window_until, skip_rest_days, updated_by, created_at, updated_at, monthly_cap_email, monthly_cap_sms, monthly_cap_whatsapp, meeting_confirm, meeting_remind_day, meeting_remind_hour, sms_sender_name, sms_sender_verified_phone, sms_sender_verified_at, sms_sender_approved_at, sms_sender_rejected_at, instant_reply_default",
   // CNS-01: the address hash is not shown to anyone (column grants)
   consents:
     "id, organization_id, seq, lead_id, contact_id, subject_type, subject_id, channel, state, source, wording, wording_version, method, copied_from, import_job_id, cancels, lift_method, lift_note, recorded_by, created_at",

@@ -45,7 +45,10 @@ const REVIEWED_MD5 = {
   // everything else as above; final review: sms_off waits as a cap waiter, a sender check is not held by HEB-09's pause
   // 021202/021204 rechecked 10 November 2026 by an independent review: the sms flag/quota block and the sender-check branch
   // only delay, never pass; verification_code exempt
-  job_message_may_send: "726e29b81669a1f1eb6d75f0006f9652",
+  // SPD-04 review 2 (migration _instant_reply.sql): only the window line changed, it reads app.message_window_exempt
+  // (verification_code, instant_reply) instead of app.message_always_sends; the rates keep app.message_always_sends
+  // (verification_code only). Reviewed 11 November 2026 (window line only)
+  job_message_may_send: "af0350a2d0e4688855205bcd8cc9779b",
 };
 
 // MSG-03: the trigger function that writes public.messages from the worker's path (see its test below)

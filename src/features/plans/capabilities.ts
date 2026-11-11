@@ -45,7 +45,7 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   // SPD-07
   { feature: "site_widget", label: "כפתור צף לאתר: WhatsApp, חיוג וטופס קצר", built: true },
   { feature: "money_waiting", label: "כסף שמחכה", built: true },
-  { feature: "instant_reply", label: "מענה מיידי ללקוח", built: false },
+  { feature: "instant_reply", label: "מענה מיידי ללקוח", built: true },
   { feature: "email_sync", label: "סנכרון אימייל ויומן", built: false },
   { feature: "whatsapp_inbox", label: "תיבת WhatsApp (ההודעות מהארנק)", built: false },
   { feature: "goals", label: "יעד לעסק", built: true },

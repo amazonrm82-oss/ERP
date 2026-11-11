@@ -10,6 +10,7 @@ import { getMyPermissions } from "@/features/permissions/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { RECORD_TYPES } from "@/lib/record-types";
 
+import { EMAIL_AUTOMATION_TYPES } from "./send-email";
 import { SMS_AUTOMATION_TYPES } from "./send-sms";
 import { createClient } from "@/lib/supabase/server";
 import { must } from "@/lib/db-read";
@@ -44,6 +45,8 @@ export type Lookups = {
   // SMS-02: the business's SMS templates of a type an automation may send (marketing, requested_document, collection), for a
   // "send SMS" step; inactive ones too, so a saved rule still names its template (the builder offers active ones)
   smsTemplates?: Array<{ id: string; name: string; messageType: string; isActive: boolean }>;
+  // AUT-08: the business's email templates of a type an automation may send, for a "send email" step (inactive ones too)
+  emailTemplates?: Array<{ id: string; name: string; messageType: string; isActive: boolean }>;
 };
 
 type ReadFailure = { message: string; code?: string | null };
@@ -80,7 +83,7 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
   } catch (error) {
     return { data: null, error: { message: error instanceof Error ? error.message : "field definitions query failed" } };
   }
-  const [statuses, sources, pipelines, stages, tags, members, teams, reasons, terms, templates, forms, smsTemplates] = await Promise.all([
+  const [statuses, sources, pipelines, stages, tags, members, teams, reasons, terms, templates, forms, smsTemplates, emailTemplates] = await Promise.all([
     supabase.from("lead_statuses").select("id, name, kind").eq("organization_id", orgId).order("position"),
     supabase.from("lead_sources").select("id, name").eq("organization_id", orgId).eq("is_active", true).order("name"),
     supabase.from("pipelines").select("id, name").eq("organization_id", orgId).is("deleted_at", null).order("position"),
@@ -111,6 +114,16 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
       .is("notice_kind", null)
       .order("name")
       .order("id"),
+    // AUT-08: the email templates a "send email" step may name
+    supabase
+      .from("message_templates")
+      .select("id, name, message_type, is_active")
+      .eq("organization_id", orgId)
+      .eq("channel", "email")
+      .in("message_type", [...EMAIL_AUTOMATION_TYPES])
+      .is("notice_kind", null)
+      .order("name")
+      .order("id"),
   ]);
   if (reasons.error) {
     return { data: null, error: reasons.error };
@@ -123,6 +136,9 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
   }
   if (smsTemplates.error) {
     return { data: null, error: smsTemplates.error };
+  }
+  if (emailTemplates.error) {
+    return { data: null, error: emailTemplates.error };
   }
   return {
     data: {
@@ -147,6 +163,7 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
       quoteTemplates: templates.data ?? [],
       forms: forms.data ?? [],
       smsTemplates: (smsTemplates.data ?? []).map((t) => ({ id: t.id, name: t.name, messageType: t.message_type, isActive: t.is_active })),
+      emailTemplates: (emailTemplates.data ?? []).map((t) => ({ id: t.id, name: t.name, messageType: t.message_type, isActive: t.is_active })),
     },
     error: null,
   };
