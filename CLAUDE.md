@@ -2812,7 +2812,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   (`app.message_notice_template_problem` = 021162's rule + `app.message_notice_fields`; `app.message_template_problem` is its wrapper;
   `app.message_template_sendable` last redefined in 021218; TS `NOTICE_KIND_FIELDS`). THE FUTURE SENDER re-reads the document by
   `signature_document_id`, sends nothing unless still sent/viewed and not expired, re-reads the setting and the `signatures` key,
-  mints the link itself, and needs its own "In use" line. Tests 64 and 88 end with `_signature_status_reminders.sql`.
+  mints the link itself, and needs its own "In use" line. Tests 64 and 88 end with `_signature_status_reminders.sql`. The advisor's findings on `app.signature_reminders`, `app.signature_customer_reminders` and `app.signature_template_seeds` are expected.
 - In-app guide (UX-05, migration 021199; owner's answers 203 ב, 204 א, 205 א, 206 ב, 10 November 2026): `profiles.guide_tour_seen_at` (own column
   grant; null = the first-visit tour opens; never marked in a support session; replaying from the account menu "סיור במערכת" changes
   nothing). Texts are Markdown in `docs/help/` (articles, screens, tour; frontmatter checked by `tests/unit/in-app-guide.test.ts`),
