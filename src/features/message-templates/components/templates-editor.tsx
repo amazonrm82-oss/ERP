@@ -224,6 +224,8 @@ function RowHeading({ template }: { template: MessageTemplate }) {
       <Badge>{TEMPLATE_CHANNEL_LABELS[template.channel]}</Badge>
       <TypeBadge type={template.messageType} />
       <span className="text-sm font-normal text-ink-soft">{localeName(template.locale)}</span>
+      {/* a template the system sends itself (notice_kind): never offered on a card or in a rule */}
+      {template.noticeKind ? <Badge tone="neutral">נשלחת אוטומטית</Badge> : null}
       {template.isActive ? null : <Badge tone="neutral">לא פעילה</Badge>}
     </p>
   );

@@ -827,6 +827,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // _punch_card_notice_messages.sql, app.message_type_fields() of _meeting_customer_reminders.sql and app.emit_form_submitted() of
       // _automation_more_triggers.sql last (it adds app.message_window_exempt; app.message_always_sends is not redefined)
       "_instant_reply.sql",
+      // COL-07 redefines app.job_payload_ok() of _instant_reply.sql and app.send_collection_reminders() of
+      // _collection_reminder_paused_line.sql last (a stage also queues the customer's message)
+      "_collection_customer_reminders.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
-import { Card, CardBody } from "@/components/ui/card";
+import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/feedback";
 import { Checkbox, Select } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
@@ -16,20 +16,24 @@ import {
   type CollectionFilters,
   type CollectionRow,
 } from "@/features/collection/collection";
+import { CollectionCustomerReminderForm } from "@/features/collection/components/customer-reminder-form";
 import { PromiseButton } from "@/features/collection/components/promise-button";
 import { PromiseLine } from "@/features/collection/components/promise-line";
 import {
   getCollection,
   getCollectionAccess,
+  getCollectionCustomerReminder,
   getCustomerPromise,
 } from "@/features/collection/queries";
+import { collectionCustomerReminderLine } from "@/features/collection/customer-reminder";
 import {
   DOCUMENT_TYPE_LABELS,
   documentTitle,
 } from "@/features/documents/schema";
 import { collectionPath, paymentsPath } from "@/features/payments/paths";
-import { listMembers } from "@/features/settings/queries";
-import { getUserNames } from "@/features/shell/queries";
+import { isAdminRole } from "@/features/settings/permissions";
+import { listMembers, orgHasFeature } from "@/features/settings/queries";
+import { getOrgContext, getUserNames } from "@/features/shell/queries";
 import { getOrgTerms } from "@/features/terminology/queries";
 import { formatDate, formatMoney } from "@/lib/format";
 import { paths } from "@/lib/paths";
@@ -91,10 +95,15 @@ export default async function CollectionPage({ params, searchParams }: Props) {
     );
 
   const filters = collectionFilters(await searchParams);
-  const [data, members] = await Promise.all([
+  const [data, members, context, customerReminder, sms] = await Promise.all([
     getCollection(orgId, filters),
     listMembers(orgId),
+    getOrgContext(orgId),
+    getCollectionCustomerReminder(orgId),
+    orgHasFeature(orgId, "sms"),
   ]);
+  // COL-07: owners and admins of a writable business switch the customer's reminders
+  const reminderEditable = isAdminRole(context.role) && context.canWrite;
   if (!data.allowed)
     return notice(
       "מסך הגבייה פתוח לבעלים, למנהלי מערכת, למנהלי צוות ולמי שקיבל הרשאת רישום תשלומים.",
@@ -444,6 +453,19 @@ export default async function CollectionPage({ params, searchParams }: Props) {
             : "מוצגים 500 המסמכים הוותיקים ביותר באיחור; הסכומים כוללים את כולם. צמצמו בסינון כדי לראות את השאר."}
         </p>
       ) : null}
+      {/* COL-07 */}
+      <Card className="mt-4" aria-labelledby="collection-customer-reminder-title">
+        <CardHeader id="collection-customer-reminder-title" title="תזכורות גבייה ללקוח" />
+        <CardBody className="space-y-2">
+          {reminderEditable ? (
+            <CollectionCustomerReminderForm orgId={orgId} settings={customerReminder} sms={sms} />
+          ) : (
+            <p className="text-sm text-ink-soft">
+              {collectionCustomerReminderLine(customerReminder)} בעלים ומנהלי מערכת משנים את ההגדרה.
+            </p>
+          )}
+        </CardBody>
+      </Card>
     </>
   );
 }

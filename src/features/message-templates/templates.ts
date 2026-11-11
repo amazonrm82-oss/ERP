@@ -277,3 +277,32 @@ export const DEFAULT_INSTANT_REPLY_TEMPLATES: ReadonlyArray<{
 export function isFixedNoticeTemplate(noticeKind: string | null | undefined): boolean {
   return noticeKind === "instant_reply_open" || noticeKind === "instant_reply_closed";
 }
+
+// COL-07 (owner's answers (255)-(258)): the collection reminder to the customer, SMS and email (server-only mark notice_kind
+// 'collection_reminder'), seeded by app.seed_collection_reminder_templates with the wording version below the first time a
+// business with the switch on reaches a stage; tests/unit/collection-customer-reminders.test.ts keeps the two equal. DRAFT
+// wording until the lawyer edits it. Only the collection type's own fields (no link); {סכום} is the balance the sender reads
+// when it sends.
+export const COLLECTION_CUSTOMER_WORDING_VERSION = "collection-draft-1";
+
+const COLLECTION_CUSTOMER_BODY =
+  "שלום {שם פרטי}, תזכורת מ-{שם העסק}: {מסמך} על סך {סכום}, מועד התשלום {מועד תשלום}. אם כבר שילמתם, תודה. לפרטים: {טלפון העסק}";
+
+export const DEFAULT_COLLECTION_CUSTOMER_TEMPLATES: ReadonlyArray<{
+  name: string;
+  channel: MessageChannel;
+  messageType: MessageType;
+  subject: string | null;
+  body: string;
+  noticeKind: "collection_reminder";
+}> = [
+  { name: "גבייה: תזכורת ללקוח (SMS)", channel: "sms", messageType: "collection", subject: null, body: COLLECTION_CUSTOMER_BODY, noticeKind: "collection_reminder" },
+  {
+    name: "גבייה: תזכורת ללקוח (אימייל)",
+    channel: "email",
+    messageType: "collection",
+    subject: "תזכורת לתשלום מ-{שם העסק}",
+    body: COLLECTION_CUSTOMER_BODY,
+    noticeKind: "collection_reminder",
+  },
+];

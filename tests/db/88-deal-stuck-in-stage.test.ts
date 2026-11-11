@@ -134,6 +134,8 @@ const RERUN = [
   migrationFile("_automation_send_email.sql"),
   // SPD-04 redefines app.job_payload_ok() of _automation_send_email.sql and the message type lists last
   migrationFile("_instant_reply.sql"),
+  // COL-07 redefines app.job_payload_ok() of _instant_reply.sql and app.send_collection_reminders() last
+  migrationFile("_collection_customer_reminders.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

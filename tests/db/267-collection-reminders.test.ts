@@ -532,14 +532,20 @@ describe("collection reminders (COL-04)", () => {
           `select p.proname as name, p.prosrc like '%app.collection_task_attached(%' as uses,
                   p.prosrc like '%when d.deal_id is not null then t.deal_id%' as inline
              from pg_proc p join pg_namespace s on s.oid = p.pronamespace
-            where s.nspname = 'app' and p.proname in ('close_paid_collection_tasks', 'send_collection_reminders') order by 1`,
+            where s.nspname = 'app' and p.proname in ('close_paid_collection_tasks', 'collection_stage_task') order by 1`,
         )
       ).rows,
     );
     expect(bodies).toEqual([
       { name: "close_paid_collection_tasks", uses: true, inline: false },
-      { name: "send_collection_reminders", uses: true, inline: false },
+      // COL-07 (third review): the reminder job's task lines live in app.collection_stage_task, which the job calls
+      { name: "collection_stage_task", uses: true, inline: false },
     ]);
+    expect(
+      await asAdmin(async (q) =>
+        (await one<{ ok: boolean }>(q, "select prosrc like '%app.collection_stage_task(%' as ok from pg_proc where oid = 'app.send_collection_reminders(uuid[])'::regprocedure")).ok,
+      ),
+    ).toBe(true);
     // no client may call it
     expect(
       await asAdmin(async (q) =>

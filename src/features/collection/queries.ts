@@ -9,6 +9,11 @@ import { getOrgContext } from "@/features/shell/queries";
 import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
+import {
+  collectionCustomerReminderOf,
+  collectionCustomerStagesOf,
+  type CollectionCustomerReminderSettings,
+} from "./customer-reminder";
 import { coverageOf } from "./promise";
 import {
   parseCollection,
@@ -189,4 +194,17 @@ export async function getPromiseCoverage(
   });
   if (error) return null;
   return coverageOf(data, promiseId);
+}
+
+/** COL-07: whether the collection reminders also go to the customer, and at which stages (no settings row = off, default stages). */
+export async function getCollectionCustomerReminder(orgId: string): Promise<CollectionCustomerReminderSettings> {
+  const supabase = await createClient();
+  const row = must(
+    await supabase.from("org_document_settings").select("collection_customer_reminder, collection_customer_stages").eq("organization_id", orgId).maybeSingle(),
+    "collection customer reminder",
+  );
+  return {
+    on: collectionCustomerReminderOf(row?.collection_customer_reminder),
+    stages: collectionCustomerStagesOf(row?.collection_customer_stages),
+  };
 }
