@@ -7,7 +7,7 @@ import { PublicBrandHeader, PublicPageFooter } from "@/features/branding/compone
 import { logoPublicUrl } from "@/features/branding/logo";
 import { isPreviewBotRequest } from "@/features/link-preview/bot-request";
 import { SignPanel } from "@/features/signatures/components/sign-panel";
-import { publicSignaturePdfPath, signatureDateText } from "@/features/signatures/public";
+import { publicSignaturePdfPath, signatureDateText, signatureDayText } from "@/features/signatures/public";
 import { getPublicSignature } from "@/features/signatures/public-server";
 import { TEXT_ERASED_LINE } from "@/features/signatures/states";
 import { clientIp } from "@/lib/keyed-ip-hash";
@@ -104,7 +104,7 @@ export default async function PublicSignaturePage({ params }: Props) {
             </a>
           </p>
         ) : page.expiresAt ? (
-          <p className="text-sm text-ink-soft">{`אפשר לחתום עד ${signatureDateText(page.expiresAt, page.timeZone)}.`}</p>
+          <p className="text-sm text-ink-soft">{`בתוקף עד ${signatureDayText(page.expiresAt, page.timeZone)}.`}</p>
         ) : null}
         {page.status === "signed" && page.textErased ? <p className="text-sm text-ink-soft">{TEXT_ERASED_LINE}</p> : null}
         <article className="rounded-lg border border-line bg-surface p-4 sm:p-6">

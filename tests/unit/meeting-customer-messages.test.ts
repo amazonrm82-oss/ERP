@@ -52,7 +52,9 @@ describe("meeting messages to the customer (CAL-12)", () => {
   });
 
   it("the meeting's location and link are merge fields a meeting message may hold", () => {
-    expect(MERGE_FIELD_NAMES.slice(-2)).toEqual(["מיקום", "קישור"]);
+    // SGN-03 adds {שם המסמך} after them
+    const at = MERGE_FIELD_NAMES.indexOf("מיקום");
+    expect(MERGE_FIELD_NAMES.slice(at, at + 2)).toEqual(["מיקום", "קישור"]);
     expect(SERVICE_TYPE_FIELDS.meeting_reminder).toEqual(expect.arrayContaining(["meetingLocation", "manageLink"]));
     expect(SERVICE_TYPE_FIELDS.punch_card_notice).not.toContain("manageLink");
   });

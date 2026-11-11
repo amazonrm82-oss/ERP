@@ -13,6 +13,8 @@ export type MessageTemplate = {
   body: string;
   locale: string;
   isActive: boolean;
+  // SGN-03 review M1: the system's own mark (server only); such a template is sent by its own job, never from a card
+  noticeKind: string | null;
 };
 
 /** Every message template of the business (MSG-02), by channel then name, with the user's session (members read). */
@@ -22,7 +24,7 @@ export async function listMessageTemplates(orgId: string): Promise<MessageTempla
     must(
       await supabase
         .from("message_templates")
-        .select("id, name, channel, message_type, subject, body, locale, is_active")
+        .select("id, name, channel, message_type, subject, body, locale, is_active, notice_kind")
         .eq("organization_id", orgId)
         .order("channel", { ascending: true })
         .order("name", { ascending: true })
@@ -42,6 +44,7 @@ export async function listMessageTemplates(orgId: string): Promise<MessageTempla
         body: row.body,
         locale: row.locale,
         isActive: row.is_active,
+        noticeKind: row.notice_kind,
       },
     ];
   });

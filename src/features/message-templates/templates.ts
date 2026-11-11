@@ -211,3 +211,29 @@ export const DEFAULT_MEETING_CUSTOMER_TEMPLATES: ReadonlyArray<{
     noticeKind: "meeting_moved",
   },
 ];
+
+// SGN-03 (owner 11 November 2026, answer (249) א): the customer's one reminder before a document's last day, SMS and email
+// (server-only mark notice_kind 'signature_reminder'), seeded by app.seed_signature_reminder_templates with the wording
+// version below; tests/unit/signature-status-reminders.test.ts keeps the two equal. DRAFT wording until the lawyer edits it.
+export const SIGNATURE_REMINDER_WORDING_VERSION = "signature-draft-1";
+
+const SIGNATURE_REMINDER_BODY = 'שלום {שם פרטי}, המסמך "{שם המסמך}" מ-{שם העסק} ממתין לחתימתך עד {תאריך}: {קישור}. {שם העסק}, {טלפון העסק}';
+
+export const DEFAULT_SIGNATURE_REMINDER_TEMPLATES: ReadonlyArray<{
+  name: string;
+  channel: MessageChannel;
+  messageType: MessageType;
+  subject: string | null;
+  body: string;
+  noticeKind: "signature_reminder";
+}> = [
+  { name: "מסמך לחתימה: תזכורת (SMS)", channel: "sms", messageType: "requested_document", subject: null, body: SIGNATURE_REMINDER_BODY, noticeKind: "signature_reminder" },
+  {
+    name: "מסמך לחתימה: תזכורת (אימייל)",
+    channel: "email",
+    messageType: "requested_document",
+    subject: "מסמך מ-{שם העסק} ממתין לחתימתך",
+    body: SIGNATURE_REMINDER_BODY,
+    noticeKind: "signature_reminder",
+  },
+];

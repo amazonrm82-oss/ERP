@@ -31,7 +31,7 @@ class ReadError extends Error {}
 
 // SGN-02: every column a client may select (column grants: never the server-only `people`)
 const SIGNATURE_DOCUMENT_COLUMNS =
-  "id, organization_id, lead_id, contact_id, company_id, deal_id, template_id, title, body, status, sent_by, sent_at, viewed_at, signed_at, cancelled_at, cancelled_by, expires_at, content_sha256, former_lead_id, former_contact_id, former_company_id, former_deal_id, customer_deleted_at, erased_at, text_erased_at, created_at, updated_at";
+  "id, organization_id, lead_id, contact_id, company_id, deal_id, template_id, title, body, status, sent_by, sent_at, viewed_at, signed_at, cancelled_at, cancelled_by, expires_at, content_sha256, former_lead_id, former_contact_id, former_company_id, former_deal_id, customer_deleted_at, erased_at, text_erased_at, expired_at, created_at, updated_at";
 
 function check<T>(result: { data: T | null; error: { message: string } | null }, what: string): T {
   if (result.error) throw new ReadError(`${what}: ${result.error.message}`);

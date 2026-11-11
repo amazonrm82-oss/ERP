@@ -200,7 +200,8 @@ describe("meeting messages to the customer (CAL-12)", () => {
       one<{ fields: string[]; merge: string[] }>(q, "select app.message_type_fields('meeting_reminder') as fields, app.message_merge_fields() as merge"),
     );
     expect(lists.fields).toEqual(expect.arrayContaining(["מיקום", "קישור"]));
-    expect(lists.merge.slice(-2)).toEqual(["מיקום", "קישור"]);
+    // SGN-03 adds {שם המסמך} after them
+    expect(lists.merge.slice(lists.merge.indexOf("מיקום"), lists.merge.indexOf("מיקום") + 2)).toEqual(["מיקום", "קישור"]);
     // the payload takes meeting_id (a uuid) and nothing else new
     const ok = (payload: Record<string, unknown>) =>
       asAdmin(async (q) => (await one<{ ok: boolean }>(q, "select app.job_payload_ok('message.send', $1) as ok", [JSON.stringify(payload)])).ok);

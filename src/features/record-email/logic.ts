@@ -31,6 +31,8 @@ export type CardTemplate = {
   subject: string | null;
   body: string;
   isActive: boolean;
+  // SGN-03 review M1: a template the system sends itself (notice_kind) is never offered on a card
+  noticeKind?: string | null;
 };
 
 /** The templates the dialog offers: active email templates of marketing or a card's service type (collection only for a payment recorder). */
@@ -39,6 +41,7 @@ export function cardEmailTemplates<T extends CardTemplate>(templates: readonly T
     (t) =>
       t.channel === "email" &&
       t.isActive &&
+      !t.noticeKind &&
       (t.messageType === "marketing" ||
         ((CARD_SERVICE_TYPES as readonly string[]).includes(t.messageType) && (t.messageType !== "collection" || canRecordPayments))),
   );

@@ -107,6 +107,8 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
       .eq("organization_id", orgId)
       .eq("channel", "sms")
       .in("message_type", [...SMS_AUTOMATION_TYPES])
+      // SGN-03 review M1: a template the system sends itself is never a rule's
+      .is("notice_kind", null)
       .order("name")
       .order("id"),
   ]);

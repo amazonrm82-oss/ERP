@@ -153,3 +153,23 @@ export function signatureDateText(iso: string, timeZone: string): string {
     return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(date);
   }
 }
+
+function zoned(date: Date, timeZone: string, options: Intl.DateTimeFormatOptions): string {
+  try {
+    return new Intl.DateTimeFormat("he-IL", { ...options, timeZone }).format(date);
+  } catch {
+    return new Intl.DateTimeFormat("he-IL", { ...options, timeZone: "Asia/Jerusalem" }).format(date);
+  }
+}
+
+/**
+ * SGN-03 (owner (247) ב): a document's last day, "15 בנובמבר", in the business zone. A document sent before 021218 may end
+ * at another moment than the end of its day: then the time is shown too, "15 בנובמבר, 14:30" (review L7).
+ */
+export function signatureDayText(iso: string, timeZone: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const day = zoned(date, timeZone, { day: "numeric", month: "long" });
+  const time = zoned(date, timeZone, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  return time === "23:59" ? day : `${day}, ${time}`;
+}

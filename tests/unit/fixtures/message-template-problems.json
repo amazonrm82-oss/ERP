@@ -2569,5 +2569,56 @@
     "subject": null,
     "body": "Thé.It was great",
     "problem": "external_link"
+  },
+  {
+    "note": "SGN-03 review M1: the signature reminder with its mark",
+    "channel": "sms",
+    "messageType": "requested_document",
+    "subject": null,
+    "body": "שלום {שם פרטי}, המסמך \"{שם המסמך}\" מ-{שם העסק} ממתין לחתימתך עד {תאריך}: {קישור}. {שם העסק}, {טלפון העסק}",
+    "noticeKind": "signature_reminder",
+    "problem": null
+  },
+  {
+    "note": "SGN-03 review M1: the same text without the mark (a person's template) may not hold the document's link",
+    "channel": "sms",
+    "messageType": "requested_document",
+    "subject": null,
+    "body": "שלום {שם פרטי}, המסמך \"{שם המסמך}\" מ-{שם העסק} ממתין לחתימתך עד {תאריך}: {קישור}. {שם העסק}, {טלפון העסק}",
+    "problem": "field_not_allowed"
+  },
+  {
+    "note": "SGN-03 review M1: {קישור} alone on a person's requested_document",
+    "channel": "email",
+    "messageType": "requested_document",
+    "subject": "מסמך",
+    "body": "שלום {שם פרטי}, הקישור: {קישור}",
+    "problem": "field_not_allowed"
+  },
+  {
+    "note": "SGN-03 review M1: {שם המסמך} alone on a person's requested_document",
+    "channel": "sms",
+    "messageType": "requested_document",
+    "subject": null,
+    "body": "שלום {שם פרטי}, המסמך {שם המסמך} ממתין",
+    "problem": "field_not_allowed"
+  },
+  {
+    "note": "SGN-03 review M1: another mark gives nothing extra",
+    "channel": "sms",
+    "messageType": "requested_document",
+    "subject": null,
+    "body": "המסמך {שם המסמך}: {קישור}",
+    "noticeKind": "meeting_confirm",
+    "problem": "field_not_allowed"
+  },
+  {
+    "note": "SGN-03 review M1: the mark gives nothing on another type",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "המסמך {שם המסמך}",
+    "noticeKind": "signature_reminder",
+    "problem": "field_not_allowed"
   }
 ]

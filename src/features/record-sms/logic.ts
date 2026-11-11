@@ -26,6 +26,7 @@ export function cardSmsTemplates<T extends CardTemplate>(templates: readonly T[]
     (t) =>
       t.channel === "sms" &&
       t.isActive &&
+      !t.noticeKind &&
       (t.messageType === "marketing" ||
         ((SMS_SERVICE_TYPES as readonly string[]).includes(t.messageType) && (t.messageType !== "collection" || canRecordPayments))),
   );

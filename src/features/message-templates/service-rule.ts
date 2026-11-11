@@ -29,6 +29,20 @@ export const SERVICE_TYPE_FIELDS: Record<ServiceMessageType, readonly MergeField
   punch_card_notice: ["firstName", "businessName", "businessPhone", "cardName", "entriesLeft", "date"],
 };
 
+/**
+ * SGN-03 review M1: the fields a template may hold only with the system's own mark (message_templates.notice_kind), on
+ * top of its type's (= app.message_notice_fields). A requested_document marked 'signature_reminder' carries the document's
+ * title, last day and link; no template a person writes may.
+ */
+export const NOTICE_KIND_FIELDS: Partial<Record<ServiceMessageType, Record<string, readonly MergeFieldKey[]>>> = {
+  requested_document: { signature_reminder: ["date", "manageLink", "documentName"] },
+};
+
+function allowedFields(template: { messageType: ServiceMessageType; noticeKind?: string | null }): readonly MergeFieldKey[] {
+  const extra = template.noticeKind ? (NOTICE_KIND_FIELDS[template.messageType]?.[template.noticeKind] ?? []) : [];
+  return [...SERVICE_TYPE_FIELDS[template.messageType], ...extra];
+}
+
 /** A service message's body cap by channel, in characters, counted on the template as written (= app.message_service_body_max). */
 export const SERVICE_BODY_MAX: Record<MessageChannel, number> = { sms: 300, whatsapp: 1000, email: 2000 };
 
@@ -464,6 +478,8 @@ export type TemplateText = {
   ownDomain?: string | null;
   /** owner (111) ב: the business's own email (org_document_settings.email); it may appear in a service message */
   businessEmail?: string | null;
+  /** SGN-03 review M1: the system's own mark (message_templates.notice_kind), null for a template a person writes */
+  noticeKind?: string | null;
 };
 
 /** The business's own addresses a service message may hold (owners (105), (111)): its website's domain and its email. */
@@ -472,7 +488,7 @@ export type OwnAddresses = { ownDomain: string | null; businessEmail: string | n
 /** Every {field} of the template that its service type may not hold, in order, each once; [] for marketing. */
 export function fieldsNotAllowed(template: TemplateText): string[] {
   if (!isService(template.messageType)) return [];
-  const allowed = new Set(SERVICE_TYPE_FIELDS[template.messageType].map(fieldName));
+  const allowed = new Set(allowedFields({ messageType: template.messageType, noticeKind: template.noticeKind }).map(fieldName));
   const found = new Set<string>();
   for (const match of `${template.subject ?? ""}\n${template.body}`.matchAll(MERGE_FIELD_PATTERN)) {
     if (!allowed.has(match[1])) found.add(match[0]);
@@ -494,12 +510,26 @@ export function messageTemplateProblem(template: TemplateText): TemplateProblem 
   return null;
 }
 
+/**
+ * SGN-03 delta review D1: the editor's and the save's answer for a template as written, judged with its stored mark
+ * (message_templates.notice_kind, server only), so a seeded system template is judged by its own fields.
+ */
+export function editedTemplateProblemText(
+  values: { channel: MessageChannel; messageType: MessageType; subject: string | null; body: string },
+  noticeKind: string | null | undefined,
+  own: Partial<OwnAddresses>,
+): string | null {
+  return templateProblemText({ ...values, ...own, noticeKind: noticeKind ?? null });
+}
+
 /** Why the template will not be sent, in Hebrew, for the settings page and the editor; null when it may be sent. */
 export function templateProblemText(template: TemplateText): string | null {
   const problem = messageTemplateProblem(template);
   if (!problem || !isService(template.messageType)) return null;
   if (problem === "field_not_allowed") {
-    const allowed = SERVICE_TYPE_FIELDS[template.messageType].map((key) => MESSAGE_MERGE_FIELDS[key].token).join(" ");
+    const allowed = allowedFields({ messageType: template.messageType, noticeKind: template.noticeKind })
+      .map((key) => MESSAGE_MERGE_FIELDS[key].token)
+      .join(" ");
     return `התבנית לא תישלח: בהודעת שירות מהסוג הזה אפשר להשתמש רק בשדות ${allowed}. צריך להוריד את ${fieldsNotAllowed(template).join(", ")}.`;
   }
   if (problem === "glued_address") {

@@ -14,7 +14,7 @@ export const MESSAGE_MERGE_FIELDS = {
   fullName: { token: "{שם מלא}", label: "השם המלא של הלקוח" },
   userName: { token: "{שם הנציג}", label: "השם של הנציג ששולח" },
   businessName: { token: "{שם העסק}", label: "שם העסק" },
-  date: { token: "{תאריך}", label: "תאריך הפגישה, או בכרטיסייה היום האחרון שלה" },
+  date: { token: "{תאריך}", label: "תאריך הפגישה; בכרטיסייה או במסמך לחתימה, היום האחרון" },
   time: { token: "{שעה}", label: "שעת הפגישה" },
   document: { token: "{מסמך}", label: "המסמך (סוג ומספר), בגבייה" },
   amount: { token: "{סכום}", label: "הסכום לתשלום, בגבייה" },
@@ -34,7 +34,9 @@ export const MESSAGE_MERGE_FIELDS = {
   // CAL-12 (owner (177), (182); migration meeting_customer_reminders): the meeting's location, and the customer's personal
   // link (confirm, cancel or change), in a meeting message
   meetingLocation: { token: "{מיקום}", label: "המיקום של הפגישה, בהודעה על פגישה" },
-  manageLink: { token: "{קישור}", label: "הקישור האישי של הלקוח לאישור, ביטול או שינוי של הפגישה" },
+  manageLink: { token: "{קישור}", label: "הקישור האישי של הלקוח: לאישור, ביטול או שינוי של הפגישה, או לחתימה על המסמך" },
+  // SGN-03 (owner (249) א; migration signature_status_reminders): the title of a document sent for signature
+  documentName: { token: "{שם המסמך}", label: "שם המסמך שנשלח לחתימה" },
 } as const;
 
 export type MergeFieldKey = keyof typeof MESSAGE_MERGE_FIELDS;

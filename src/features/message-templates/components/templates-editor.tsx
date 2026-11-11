@@ -12,7 +12,7 @@ import type { FormState } from "@/lib/action-result";
 
 import { addMessageTemplateAction, deleteMessageTemplateAction, updateMessageTemplateAction } from "../actions";
 import type { MessageTemplate } from "../queries";
-import { templateProblemText, type OwnAddresses } from "../service-rule";
+import { editedTemplateProblemText, templateProblemText, type OwnAddresses } from "../service-rule";
 import {
   isServiceType,
   MESSAGE_TEMPLATE_BODY_MAX,
@@ -57,6 +57,8 @@ type Values = {
   body: string;
   locale: string;
   isActive: boolean;
+  // SGN-03 delta review D1: the stored mark of a system template (never written by the form)
+  noticeKind?: string | null;
 };
 
 const EMPTY: Values = {
@@ -92,13 +94,16 @@ function TemplateFields({
   // shown while typing; saving is never refused (owner (90) ג: checked before every send)
   const problem =
     picked && pickedChannel
-      ? templateProblemText({
-          channel: pickedChannel,
-          messageType: picked,
-          subject: pickedChannel === "email" ? subject.trim() : null,
-          body: body.replace(/\r\n?/g, "\n").trim(),
-          ...own,
-        })
+      ? editedTemplateProblemText(
+          {
+            channel: pickedChannel,
+            messageType: picked,
+            subject: pickedChannel === "email" ? subject.trim() : null,
+            body: body.replace(/\r\n?/g, "\n").trim(),
+          },
+          initial.noticeKind,
+          own,
+        )
       : null;
   return (
     <div className="space-y-3">
@@ -257,6 +262,7 @@ function EditableRow({ orgId, template, own }: { orgId: string; template: Messag
             body: template.body,
             locale: template.locale,
             isActive: template.isActive,
+            noticeKind: template.noticeKind,
           }}
         />
         <div className="flex flex-wrap items-center gap-2">

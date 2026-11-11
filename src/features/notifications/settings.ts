@@ -25,6 +25,8 @@ export const NOTIFICATION_KINDS = [
   { key: "payment", label: "תשלום התקבל", group: "money", shown: true },
   // PKG-03 (owner, 4 November 2026, answer (132) ב): a punch card has few entries left or its last day is near
   { key: "punch_card", label: "כרטיסייה: נשארו מעט כניסות או שהתוקף מתקרב", group: "money", shown: true },
+  // SGN-03 (owner, 11 November 2026, answer (248) ב): a task to remind a customer who has not signed a document yet
+  { key: "signature_reminder", label: "תזכורת: מסמך לחתימה שעוד לא נחתם", group: "calendar", shown: true },
   { key: "automation", label: "התראות מאוטומציות", group: "automations", shown: true },
   { key: "automation_failed", label: "אוטומציה נכשלה (למנהלים)", group: "automations", shown: true },
 ] as const;

@@ -172,6 +172,10 @@ export type OrgDocumentSettingsRow = {
   quick_sale_pipeline_id: string | null;
   // CAL-13 (migration meeting_order_draft): text with a check: button | auto (a held meeting's draft order)
   meeting_order_draft: string;
+  // SGN-03 (migration signature_status_reminders): business days after sending until the reminder task, 0 = off (0..30)
+  signature_reminder_days: number;
+  // SGN-03 (owner (249) א): the customer's one reminder 2 days before a document's last day (default on)
+  signature_customer_reminder: boolean;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
@@ -314,6 +318,8 @@ type OrgDocumentSettingsWrite = {
   quote_accept_deal?: "auto" | "ask" | "none";
   quick_sale_pipeline_id?: string | null;
   meeting_order_draft?: "button" | "auto";
+  signature_reminder_days?: number;
+  signature_customer_reminder?: boolean;
   legal_name?: string | null;
   tax_id?: string | null;
   address_line?: string | null;
@@ -2635,6 +2641,8 @@ export type SignatureDocumentRow = {
   erased_at: string | null;
   // (234) ב: when a person's erasure first changed its text (server only)
   text_erased_at: string | null;
+  // SGN-03 (migration signature_status_reminders): when the expiry job stamped an unsigned document past expires_at (server only)
+  expired_at: string | null;
   created_at: string;
   updated_at: string;
 };

@@ -19,7 +19,7 @@ import { pick } from "@/lib/validation";
 
 import { messageTemplatesPath } from "./paths";
 import { messageTemplateSchema, type MessageTemplateInput } from "./schema";
-import { templateProblemText } from "./service-rule";
+import { editedTemplateProblemText } from "./service-rule";
 
 // MSG-02: owners and admins of a writable business manage the list; RLS refuses everyone else (0 rows / 42501).
 
@@ -27,7 +27,7 @@ const DUPLICATE_NAME = "כבר יש תבנית בשם הזה.";
 const FIELDS = ["name", "channel", "message_type", "subject", "body", "locale", "is_active"] as const;
 
 /** Owner (90) ג: a service template that will not be sent is still saved; the answer says why (null when it may be sent). */
-async function sendProblem(orgId: string, input: MessageTemplateInput): Promise<string | null> {
+async function sendProblem(orgId: string, input: MessageTemplateInput, noticeKind: string | null = null): Promise<string | null> {
   // owners (97), (104): the business's own domain is allowed; a failed read judges without it (the stricter answer)
   // owner (111) ב: and its email from the business details; a failed read judges without it
   const supabase = await createClient();
@@ -37,14 +37,12 @@ async function sendProblem(orgId: string, input: MessageTemplateInput): Promise<
   ]);
   const website = org.error ? null : (org.data?.website ?? null);
   const businessEmail = details.error ? null : (details.data?.email ?? null);
-  return templateProblemText({
-    channel: input.channel,
-    messageType: input.message_type,
-    subject: input.subject,
-    body: input.body,
-    ownDomain: websiteDomain(website),
-    businessEmail,
-  });
+  // SGN-03 delta review D1: a system template is judged with its own mark (read back by the update)
+  return editedTemplateProblemText(
+    { channel: input.channel, messageType: input.message_type, subject: input.subject, body: input.body },
+    noticeKind,
+    { ownDomain: websiteDomain(website), businessEmail },
+  );
 }
 
 function parse(formData: FormData) {
@@ -77,13 +75,13 @@ export async function updateMessageTemplateAction(orgId: string, templateId: str
     .update(parsed.data)
     .eq("organization_id", orgId)
     .eq("id", templateId)
-    .select("id");
+    .select("id, notice_kind");
   if (error) {
     return fail(error.code === "23505" ? DUPLICATE_NAME : dbErrorMessage(error, "לא הצלחנו לשמור. נסו שוב."), { values: formValues(formData) });
   }
   if (data.length === 0) return fail(NOT_FOUND_OR_FORBIDDEN);
   revalidatePath(messageTemplatesPath(orgId));
-  const problem = await sendProblem(orgId, parsed.data);
+  const problem = await sendProblem(orgId, parsed.data, data[0]?.notice_kind ?? null);
   return { ok: true, message: problem ? `התבנית נשמרה. ${problem}` : "התבנית נשמרה." };
 }
 

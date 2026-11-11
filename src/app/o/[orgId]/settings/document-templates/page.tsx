@@ -10,6 +10,9 @@ import { DOCUMENT_TEMPLATES_PER_ORG } from "@/features/document-templates/templa
 import { businessDocumentValues } from "@/features/document-templates/values";
 import { isAdminRole } from "@/features/settings/permissions";
 import { orgHasFeature } from "@/features/settings/queries";
+import { SignatureReminderForm } from "@/features/signatures/components/reminder-form";
+import { getSignatureReminderSettings } from "@/features/signatures/queries";
+import { signatureReminderLabel } from "@/features/signatures/reminder";
 import { getOrgContext } from "@/features/shell/queries";
 import { getDocumentDetails } from "@/features/tax/queries";
 import { getOrgTerms } from "@/features/terminology/queries";
@@ -29,13 +32,14 @@ type Props = { params: Promise<{ orgId: string }> };
 export default async function DocumentTemplatesPage({ params }: Props) {
   const { orgId } = await params;
   const supabase = await createClient();
-  const [context, templates, details, terms, inPlan, org] = await Promise.all([
+  const [context, templates, details, terms, inPlan, org, reminders] = await Promise.all([
     getOrgContext(orgId),
     listDocumentTemplates(orgId),
     getDocumentDetails(orgId),
     getOrgTerms(orgId),
     orgHasFeature(orgId, "signatures"),
     supabase.from("organizations").select("phone").eq("id", orgId).maybeSingle(),
+    getSignatureReminderSettings(orgId),
   ]);
   const orgPhone = must(org, "organization phone")?.phone ?? null;
   const manageable = isAdminRole(context.role) && context.canWrite;
@@ -99,6 +103,22 @@ export default async function DocumentTemplatesPage({ params }: Props) {
           </CardBody>
         ) : null}
       </Card>
+      {inPlan ? (
+        <Card aria-labelledby="signature-reminder-title">
+          <CardHeader id="signature-reminder-title" title="מסמך שלא נחתם" />
+          <CardBody className="space-y-2">
+            <p className="text-md text-ink-soft">
+              הסטטוס של כל מסמך מופיע בכרטיס הרשומה: נשלח, נצפה, נחתם או פג תוקף. מסמך שהתוקף שלו עבר ולא נחתם מסומן &quot;פג תוקף&quot;, ומי ששלח
+              אותו מקבל התראה.
+            </p>
+            {editable ? (
+              <SignatureReminderForm orgId={orgId} settings={reminders} />
+            ) : (
+              <p className="text-sm text-ink-soft">{`תזכורת לנציג: ${signatureReminderLabel(reminders.days)}. תזכורת ללקוח לפני שהתוקף נגמר: ${reminders.customer ? "פועלת" : "כבויה"}. בעלים ומנהלי מערכת משנים את ההגדרות.`}</p>
+            )}
+          </CardBody>
+        </Card>
+      ) : null}
       {templates.length > 0 ? (
         <Card aria-label="תצוגה מקדימה">
           <CardBody>

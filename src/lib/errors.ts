@@ -539,6 +539,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "record_sms:template": "התבנית לא נמצאה. רעננו את הדף ובחרו תבנית אחרת.",
   "record_sms:channel": "אפשר לשלוח מכאן רק תבנית SMS. בחרו תבנית SMS.",
   "record_sms:type": "את סוג ההודעה הזה המערכת שולחת לבד בזמן המתאים, ולא מכרטיס הרשומה. בחרו תבנית אחרת.",
+  // SGN-03 review M1: a template the system sends itself (a reminder before a document's last day, a meeting message)
+  "record_message:notice_template": "את התבנית הזאת המערכת שולחת לבד בזמן המתאים, ולא מכרטיס הרשומה. בחרו תבנית אחרת.",
   "record_sms:not_sendable": "התבנית הזו לא תישלח כרגע. בדקו אותה במסך תבניות ההודעה.",
   "record_sms:collection": "תבנית גבייה נשלחת רק על ידי מי שרושם תשלומים בעסק. בחרו תבנית אחרת.",
   "record_sms:rate": "שלחתם הרבה הודעות SMS בשעה האחרונה. אפשר לשלוח עד 30 בשעה. נסו שוב מאוחר יותר.",

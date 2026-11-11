@@ -8,8 +8,9 @@ import { getOrgContext } from "@/features/shell/queries";
 import { formatDate } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
+import { signatureDayText } from "../public";
 import { listRecordSignatureDocuments, listSendableTemplates } from "../queries";
-import { awaitsSignature, SIGNATURE_STATE_LABELS, shownSignatureState, TEXT_ERASED_LINE, type ShownSignatureState } from "../states";
+import { awaitsSignature, SIGNATURE_STATE_LABELS, shownSignatureState, signatureDatesLine, TEXT_ERASED_LINE, type ShownSignatureState } from "../states";
 import { SignatureDocActions } from "./signature-doc-actions";
 import { SignatureSendPanel } from "./signature-send-panel";
 
@@ -64,10 +65,7 @@ export async function RecordSignaturesCard({ orgId, kind, recordId, canEdit, pho
                     <Badge tone={TONES[state]}>{SIGNATURE_STATE_LABELS[state]}</Badge>
                   </div>
                   <p className="text-sm text-ink-soft">
-                    {`נשלח ב-${formatDate(doc.sentAt)}`}
-                    {doc.signedAt ? ` · נחתם ב-${formatDate(doc.signedAt)}` : ""}
-                    {doc.cancelledAt ? ` · בוטל ב-${formatDate(doc.cancelledAt)}` : ""}
-                    {state !== "signed" && state !== "cancelled" && doc.expiresAt ? ` · בתוקף עד ${formatDate(doc.expiresAt)}` : ""}
+                    {signatureDatesLine(doc, state, formatDate, (iso) => signatureDayText(iso, context.org.timeZone))}
                   </p>
                   {doc.textErased ? <p className="text-sm text-ink-soft">{TEXT_ERASED_LINE}</p> : null}
                   {doc.fileId ? (

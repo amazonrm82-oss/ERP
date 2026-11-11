@@ -27,17 +27,23 @@ describe("service template rule (MSG-02)", () => {
       const got = await asAdmin(
         async (q) =>
           (
-            await q<{ p: string | null }>("select app.message_template_problem($1, $2, $3, $4, $5, $6) as p", [
-              c.channel,
-              c.messageType,
-              c.subject,
-              c.body,
-              ("ownDomain" in c ? c.ownDomain : null) ?? null,
-              ("businessEmail" in c ? c.businessEmail : null) ?? null,
-            ])
-          ).rows[0].p,
+            await q<{ p: string | null; w: string | null }>(
+              // SGN-03 review M1: the mark-aware rule; the 6-argument form is it without a mark
+              "select app.message_notice_template_problem($1, $2, $7, $3, $4, $5, $6) as p, app.message_template_problem($1, $2, $3, $4, $5, $6) as w",
+              [
+                c.channel,
+                c.messageType,
+                c.subject,
+                c.body,
+                ("ownDomain" in c ? c.ownDomain : null) ?? null,
+                ("businessEmail" in c ? c.businessEmail : null) ?? null,
+                ("noticeKind" in c ? c.noticeKind : null) ?? null,
+              ],
+            )
+          ).rows[0],
       );
-      expect(got, c.note).toBe(c.problem);
+      expect(got.p, c.note).toBe(c.problem);
+      if (!("noticeKind" in c)) expect(got.w, c.note).toBe(c.problem);
     }
   });
 
@@ -49,6 +55,7 @@ describe("service template rule (MSG-02)", () => {
             `select r.role, f.f, has_function_privilege(r.role, f.f, 'execute') as ok
                from unnest(array['anon', 'authenticated', 'service_role']) as r(role),
                     unnest(array['app.message_template_problem(text, text, text, text, text, text)', 'app.message_template_sendable(uuid, uuid)',
+                                 'app.message_notice_template_problem(text, text, text, text, text, text, text)', 'app.message_notice_fields(text, text)',
                                  'app.message_template_problem(text, text, text, text, text)',
                                  'app.message_external_link(text, text)', 'app.message_link_tld(text)',
                                  'app.message_ascii_lower(text)', 'app.message_plain_email(text)', 'app.message_local_host(text)', 'app.message_token_link(text, text, text)',

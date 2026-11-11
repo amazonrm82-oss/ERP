@@ -6,7 +6,18 @@ import { createClient } from "@/lib/supabase/server";
 
 import type { DocumentRecordType } from "@/features/document-templates/fields";
 
+import { signatureCustomerReminderOf, signatureReminderDaysOf, type SignatureReminderSettings } from "./reminder";
 import { isSignatureStatus, type SignatureStatus } from "./states";
+
+/** SGN-03: the reminder interval in business days (0 = off) and the customer's reminder (no settings row = 3 and on). */
+export async function getSignatureReminderSettings(orgId: string): Promise<SignatureReminderSettings> {
+  const supabase = await createClient();
+  const row = must(
+    await supabase.from("org_document_settings").select("signature_reminder_days, signature_customer_reminder").eq("organization_id", orgId).maybeSingle(),
+    "signature reminder settings",
+  );
+  return { days: signatureReminderDaysOf(row?.signature_reminder_days), customer: signatureCustomerReminderOf(row?.signature_customer_reminder) };
+}
 
 // SGN-02: a record's documents for signature and the templates it may send, read with the user's session (RLS decides: the
 // record's readers see its documents; only owners and admins see a signed PDF's file row).
