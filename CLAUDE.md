@@ -2790,6 +2790,29 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `app.document_templates_check` was last redefined in 021212 (locked sections). The files_select policy and the storage policy
   `record_files_delete` were last altered in 021212; `files_one_subject` counts ten columns. Tests 64 and 88 end with
   `_signature_erase_named.sql`. Questions 241-243 built as (א); a document sent before 021212 has no `people` (none on hosted).
+  Statuses and reminders (SGN-03, migration 021218; owner (247) ב, (248) ב, (249) א; one independent review and two delta reviews):
+  `public.signature_document_send` (last redefined there, only `expires_at`) sets validity to the end of the business day of
+  sending day + N (`app.signature_valid_until`); the page shows the day ("בתוקף עד 15 בנובמבר"; an older time-of-day expiry shows
+  the time too). pg_cron `crm-signature-expiry` (`app.expire_signature_documents`, 200 per business / 2,000 per run) stamps
+  server-only `expired_at` (status stays sent/viewed; the public and sign paths already treat it as expired) with one `system`
+  notice holding nothing personal. Staff reminder (`app.send_signature_reminders`, pg_cron `crm-signature-reminders`):
+  `org_document_settings.signature_reminder_days` (0 off, 1..30, default 3) business days after sending, then every N, at most 3
+  (`app.signature_reminders`), a task for the sender if usable else the owner else the oldest admin (an open task re-dated,
+  taken `for update skip locked`; an unusable owner's task closed "נסגרה: הועברה לאחראי אחר"), with a notice of the new mutable kind
+  `signature_reminder`; tasks close themselves when the document is signed, cancelled or expires
+  (`signature_documents_reminder_close`). Customer reminder (`app.send_signature_customer_reminders`, pg_cron
+  `crm-signature-customer-reminders`): ONE `requested_document` service message 2 calendar days before the last day, SMS else email,
+  through `app.enqueue_job` (payload ids only, optional `signature_document_id` in `app.job_payload_ok`, last redefined there;
+  `event_at` = `expires_at`), from DRAFT templates with `notice_kind` 'signature_reminder' seeded once per business and channel
+  (`app.signature_template_seeds`; a business at the 50 cap never gets one); switch `org_document_settings.signature_customer_reminder`
+  (default on; switching off, or a first row saved off, cancels waiting jobs `refused:reminder_off`). Templates with a `notice_kind`
+  are refused on every person's and rule's send path (hint `record_message:notice_template`: `app.record_email_enqueue`,
+  `app.record_sms_template_refusal`, `app.record_sms_enqueue`, `app.automation_send_sms`, all last redefined in 021218) and hidden
+  from pickers; `{תאריך}`, `{קישור}`, `{שם המסמך}` are allowed only on a `requested_document` marked `signature_reminder`
+  (`app.message_notice_template_problem` = 021162's rule + `app.message_notice_fields`; `app.message_template_problem` is its wrapper;
+  `app.message_template_sendable` last redefined in 021218; TS `NOTICE_KIND_FIELDS`). THE FUTURE SENDER re-reads the document by
+  `signature_document_id`, sends nothing unless still sent/viewed and not expired, re-reads the setting and the `signatures` key,
+  mints the link itself, and needs its own "In use" line. Tests 64 and 88 end with `_signature_status_reminders.sql`.
 - In-app guide (UX-05, migration 021199; owner's answers 203 ב, 204 א, 205 א, 206 ב, 10 November 2026): `profiles.guide_tour_seen_at` (own column
   grant; null = the first-visit tour opens; never marked in a support session; replaying from the account menu "סיור במערכת" changes
   nothing). Texts are Markdown in `docs/help/` (articles, screens, tour; frontmatter checked by `tests/unit/in-app-guide.test.ts`),
