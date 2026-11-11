@@ -70,6 +70,16 @@ export function notificationHref(orgId: string, entityType: string | null, entit
     // IMP-04: a background import or export ended (its id); the import page lists it, with the export's download
     case "background_request":
       return paths.imports(orgId);
+    // MNY-04: anomaly alerts (the id is the business); each opens the page where the business sees which source, person,
+    // form or campaign the count is about
+    case "anomaly_lead_drop":
+      return paths.report(orgId, "sources");
+    case "anomaly_idle_rep":
+      return paths.report(orgId, "activity");
+    case "anomaly_quiet_form":
+      return paths.settingsIntake(orgId);
+    case "anomaly_campaign_jump":
+      return paths.report(orgId, "campaign_roi");
     default:
       return null;
   }

@@ -20,6 +20,8 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "content_library", label: "ספריית תוכן: קבצים וקישורים לשליחה ללקוחות", built: true, core: true },
   // DQL-03 (owner, 2 November 2026, answer (60) א): core, open in every plan
   { feature: "cleanup_suggestions", label: "הצעות ניקוי שבועיות: כפילויות, רשומות בלי אחראי ובלי דרך קשר", built: true, core: true },
+  // MNY-04 (owner, 11 November 2026, answer (273)): core, open in every plan
+  { feature: "anomaly_alerts", label: "התראות על חריגה: ירידה בפניות ממקור, חבר צוות שלא עדכן, טופס שהפסיק וקמפיין שהתייקר", built: true, core: true },
   // CAL-08: a managed list of the calendar, no plan key (owner, 15 October 2026)
   { feature: "meeting_types", label: "סוגי פגישה עם משך, מרווח וצבע", built: true, core: true },
   // DLI-01..02, PL-03: product lines in a deal sit under the products flag (owner, 14 October 2026)
