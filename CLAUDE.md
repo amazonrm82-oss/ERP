@@ -169,6 +169,16 @@ and build this CRM here instead. The old code is preserved on the branch
   named rep again (`app.signature_in_person_rep` / `app.quote_in_person_rep`, the hour, active non-viewer, `app.signature_pdf_user_may` =
   `app.quote_pdf_user_may`'s rule). The notice keeps the public title 'מסמך נחתם בקישור' so erasure reaches it. No new service-key file.
   The advisor's findings on the five new public definers are expected.
+  Built (MNY-04, migration 021228; owner (273): every plan; an independent review and two delta reviews): anomaly alerts. pg_cron
+  `crm-anomaly-alerts` (hourly :47) runs `app.send_anomaly_alerts` once per business and local day from 08:00, writable businesses,
+  in turns, 100 a run, 60 s budget, 3 failures then skipped for the day (`app.anomaly_alert_days`). Four definer detectors (no grants):
+  lead drop from a regular source, idle rep (the person's own working days, `app.member_in_hours`; skipped while the business was not
+  writable; activity = audited writes incl. payments/documents/files, logged activities, and `message.send` jobs naming the person,
+  read through the partial sender indexes), quiet form (kinds form|webhook), campaign cost-per-lead jump (only with `campaign_costs`;
+  imported and sample leads left out). Lead drop and quiet form are skipped in a week with fewer working days. One `system` notice per
+  kind to active owners/admins, counts only, `entity_id` = the business, at most once per target a week (campaign: once per month and
+  key), `app.anomaly_alerts_sent`; "נוסף" when earlier targets were told that week. Index `activities_org_created_idx`. Interim
+  thresholds in the migration header (owner questions 285-286). The advisor's findings on the two app tables are expected.
   In use (IMP-04, owner 9 November 2026, answers (155) א, (160) א, (161) א, (162) ב, (163) ב; migration `_background_jobs.sql`; two
    independent reviews): the OPS-04 worker (same route and secret) also claims `import.run` and `export.run` (payload `{request_id,
    user_id}` only) in its own pass (lease 900 s, one job, 40 s budget, then saved and handed back uncounted with
