@@ -462,16 +462,30 @@ describe("the customer's page: optional lines and a question (QUO-08)", () => {
       const token = await linkOf(ids.quote);
       for (let i = 0; i < 5; i++) expect(await ask(token, `שאלה ${i}`, "sender-a")).toEqual({ status: "sent" });
       expect(await ask(token, "עוד אחת", "sender-a")).toEqual({ status: "rate_limited" });
-      // another sender still may
-      expect(await ask(token, "שאלה אחרת", "sender-b")).toEqual({ status: "sent" });
+      // another sender still may (one whose bucket differs from sender-a's: 1,024 reused buckets, so a fixed second name
+      // shares sender-a's bucket in about one run of 1,024)
+      const bucketOf = (hash: string) =>
+        asAdmin(async (q) =>
+          (
+            await one<{ b: number }>(
+              q,
+              "select (((hashtextextended(app.quote_link_sender($1, $2), 0) % 1024) + 1024) % 1024)::int as b",
+              [ids.quote, hash],
+            )
+          ).b,
+        );
+      const bucketA = await bucketOf("sender-a");
+      let senderB = "sender-b";
+      for (let i = 0; (await bucketOf(senderB)) === bucketA; i++) senderB = `sender-b${i}`;
+      expect(await ask(token, "שאלה אחרת", senderB)).toEqual({ status: "sent" });
       expect(await entries(ids.quote)).toHaveLength(6);
       // the hash itself is never kept
       expect(await asAdmin((q) => count(q, "select 1 from app.quote_question_counts where quote_id = $1 and window_start is not null", [ids.quote]))).toBeGreaterThan(0);
       // the link's own cap: question 21 within a day is refused, whoever sends it
       await asAdmin((q) => q("update app.quote_links set question_window_started_at = now(), question_count = 20 where quote_id = $1", [ids.quote]));
-      expect(await ask(token, "שאלה", "sender-c")).toEqual({ status: "rate_limited" });
+      expect(await ask(token, "שאלה", senderB)).toEqual({ status: "rate_limited" });
       await asAdmin((q) => q("update app.quote_links set question_window_started_at = now() - interval '25 hours' where quote_id = $1", [ids.quote]));
-      expect(await ask(token, "שאלה", "sender-c")).toEqual({ status: "sent" });
+      expect(await ask(token, "שאלה", senderB)).toEqual({ status: "sent" });
     });
 
     it("a privacy erasure of the customer empties the question in the entry and the notice", async () => {
