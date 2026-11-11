@@ -21,11 +21,34 @@ type Page = {
   built_with: boolean;
   channel: string;
   full: boolean;
+  staff_link: boolean;
   channels: { channel: string; state: string; can_turn_on: boolean }[];
 };
 
 const mint = (user: string, org: string, kind: "lead" | "contact", id: string, channel: string) =>
   asUser(user, async (q) => (await q<{ t: string }>("select public.consent_preference_link_create($1, $2, $3, $4) as t", [org, kind, id, channel])).rows[0].t);
+// RVW-82: the link a message carries (the future sender's mint, a marketing job's live lease); a staff-copied link only removes
+const sent = async (org: string, kind: "lead" | "contact", id: string, channel: string) => {
+  const job = await asAdmin(
+    async (q) =>
+      (
+        await q<{ id: string; lease_id: string }>(
+          `insert into app.jobs (organization_id, kind, payload, status, lease_id, locked_until)
+           values ($1, 'message.send', $2, 'running', gen_random_uuid(), now() + interval '1 minute') returning id, lease_id`,
+          [org, JSON.stringify({ channel, [`${kind}_id`]: id, message_type: "marketing" })],
+        )
+      ).rows[0],
+  );
+  try {
+    const answer = await asService(
+      async (q) => (await q<{ r: { token?: string; refused?: string } }>("select public.consent_preference_link_for_job($1, $2) as r", [job.id, job.lease_id])).rows[0].r,
+    );
+    if (!answer.token) throw new Error(`no link: ${answer.refused}`);
+    return answer.token;
+  } finally {
+    await asAdmin((q) => q("update app.jobs set status = 'done', lease_id = null, locked_until = null where id = $1", [job.id]));
+  }
+};
 const read = (token: string, ip: string | null = null) =>
   asService(async (q) => (await q<{ r: Page & { rate_limited?: boolean } }>("select public.consent_preferences_public($1, $2) as r", [token, ip])).rows[0].r);
 const submit = (token: string, mode: string, choices: unknown = null, ip: string | null = null) =>
@@ -141,7 +164,7 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
     const lead = await insertLead(owner.id, org, { full_name: "שרה כהן", email: "sara@example.test", phone: "052-3330002" });
     const token = await mint(owner.id, org, "lead", lead, "email");
     const page = await read(token);
-    expect(Object.keys(page).sort()).toEqual(["brand", "built_with", "business", "channel", "channels", "full"]);
+    expect(Object.keys(page).sort()).toEqual(["brand", "built_with", "business", "channel", "channels", "full", "staff_link"]);
     expect(page.business).toBe("עסק העדפות");
     expect(page.channel).toBe("email");
     expect(page.full).toBe(true);
@@ -160,7 +183,7 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
 
   it("turning the link's own channel on records a 'granted' from the page; another channel is never turned on; unsubscribing records the opt-out and the blocklist", async () => {
     const lead = await insertLead(owner.id, org, { email: "roni@example.test", phone: "0523330003" });
-    const token = await mint(owner.id, org, "lead", lead, "email");
+    const token = await sent(org, "lead", lead, "email");
     expect(channelState(await read(token), "email")).toEqual({ channel: "email", state: "unknown", can_turn_on: true });
     // review 1: an email link never turns SMS or WhatsApp marketing on for the record's phone
     expect(await submit(token, "preferences", [{ channel: "whatsapp", on: true }, { channel: "sms", on: true }, { channel: "email", on: true }])).toEqual({
@@ -212,7 +235,7 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
     await asUser(owner.id, (q) =>
       q("insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'email', 'withdrawn', 'manual', 'בשיחה')", [org, lead]),
     );
-    const token = await mint(owner.id, org, "lead", lead, "email");
+    const token = await sent(org, "lead", lead, "email");
     await submit(token, "unsubscribe");
     expect(channelState(await read(token), "email")).toEqual({ channel: "email", state: "out", can_turn_on: false });
     expect(await submit(token, "preferences", [{ channel: "email", on: true }])).toEqual({ status: "saved", results: [{ channel: "email", result: "refused" }] });
@@ -222,7 +245,7 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
 
     // an owner's blocklist entry beside the link's own: refused, and service messages stay stopped by the owner's entry
     const listed = await insertLead(owner.id, org, { email: "listed@example.test" });
-    const listedToken = await mint(owner.id, org, "lead", listed, "email");
+    const listedToken = await sent(org, "lead", listed, "email");
     await submit(listedToken, "unsubscribe");
     await asUser(owner.id, (q) => q("select public.consent_blocklist_add($1, 'all', array['listed@example.test'], 'person_request')", [org]));
     expect(await submit(listedToken, "preferences", [{ channel: "email", on: true }])).toEqual({ status: "saved", results: [{ channel: "email", result: "refused" }] });
@@ -232,7 +255,7 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
   it("delta review 1: after a link unsubscribe, an owner's entry and an SMS reply are each stored, stop service messages and block the re-subscribe", async () => {
     // the owner adds the same address with a stronger reason
     const lead = await insertLead(owner.id, org, { email: "strong@example.test", phone: "0523330010" });
-    const token = await mint(owner.id, org, "lead", lead, "email");
+    const token = await sent(org, "lead", lead, "email");
     await submit(token, "unsubscribe");
     expect(await serviceBlocked(org, "email", "strong@example.test")).toBe(false);
     const added = await asUser(owner.id, async (q) =>
@@ -253,7 +276,7 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
     expect(await serviceBlocked(org, "email", "strong@example.test")).toBe(false);
     expect(await relistOk(org, "email", "strong@example.test")).toBe(true);
     // an SMS "הסר" reply after a link unsubscribe stores its own entry (rule 209 ב)
-    const smsToken = await mint(owner.id, org, "lead", lead, "sms");
+    const smsToken = await sent(org, "lead", lead, "sms");
     await submit(smsToken, "unsubscribe");
     expect(await serviceBlocked(org, "sms", "0523330010")).toBe(false);
     const reply = await asService(
@@ -281,7 +304,7 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
     for (const channel of ["all", "email"]) {
       const address = `listed-first-${channel}@example.test`;
       const lead = await insertLead(owner.id, org, { email: address });
-      const token = await mint(owner.id, org, "lead", lead, "email");
+      const token = await sent(org, "lead", lead, "email");
       // the record moves on to another address; the owner lists the old one
       await asUser(owner.id, (q) => q("update public.leads set email = $2 where id = $1", [lead, `moved-${channel}@example.test`]));
       await asUser(owner.id, (q) => q("select public.consent_blocklist_add($1, $2, array[$3], 'complaint')", [org, channel, address]));
@@ -297,8 +320,8 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
 
   it("delta review 2-2: a waiting owner's entry or SMS reply is kept when the key returns, beside a link's unsubscribe", async () => {
     const lead = await insertLead(owner.id, org, { email: "waiting-owner@example.test", phone: "0523330020" });
-    const emailToken = await mint(owner.id, org, "lead", lead, "email");
-    const smsToken = await mint(owner.id, org, "lead", lead, "sms");
+    const emailToken = await sent(org, "lead", lead, "email");
+    const smsToken = await sent(org, "lead", lead, "sms");
     await submit(emailToken, "unsubscribe");
     await submit(smsToken, "unsubscribe");
     expect(await serviceBlocked(org, "email", "waiting-owner@example.test")).toBe(false);
@@ -338,7 +361,7 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
 
   it("an erasure of the address is never lifted from the page", async () => {
     const lead = await insertLead(owner.id, org, { email: "erased@example.test" });
-    const token = await mint(owner.id, org, "lead", lead, "email");
+    const token = await sent(org, "lead", lead, "email");
     await submit(token, "unsubscribe");
     // a privacy erasure's do-not-contact on the same address (the server path of app.audit_erase_request)
     await asAdmin((q) => q("insert into public.consents (organization_id, lead_id, channel, state, source) values ($1, $2, 'email', 'withdrawn', 'erasure')", [org, lead]));
@@ -350,7 +373,7 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
 
   it("without the consent key nothing can be turned on (fail closed); a replaced token's 'remove from every channel' removes its own channel only", async () => {
     const lead = await insertLead(owner.id, org, { email: "nokey2@example.test", phone: "0523330011" });
-    const token = await mint(owner.id, org, "lead", lead, "email");
+    const token = await sent(org, "lead", lead, "email");
     await setKey(null);
     try {
       expect(channelState(await read(token), "email")).toEqual({ channel: "email", state: "unknown", can_turn_on: false });
@@ -360,7 +383,7 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
     }
     expect(await entries(org, "lead_id", lead)).toEqual([]);
     // an older token: unsubscribe_all reaches only its own channel and address
-    await mint(owner.id, org, "lead", lead, "email");
+    await sent(org, "lead", lead, "email");
     expect(await submit(token, "unsubscribe_all")).toEqual({ status: "done" });
     expect(await suppressed(org, "email", "nokey2@example.test")).toBe(true);
     expect(await suppressed(org, "sms", "0523330011")).toBe(false);
@@ -371,7 +394,7 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
     const ownerC = await createUser("prefs-owner-c");
     const orgC = await createOrg(ownerC.id, "עסק המתנה");
     const lead = await insertLead(ownerC.id, orgC, { email: "wait@example.test" });
-    const token = await mint(ownerC.id, orgC, "lead", lead, "email");
+    const token = await sent(orgC, "lead", lead, "email");
     await submit(token, "unsubscribe");
     expect(await relistOk(orgC, "email", "wait@example.test")).toBe(true);
     const other = await insertLead(ownerC.id, orgC, { email: "pending@example.test" });
@@ -430,7 +453,7 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
   it("an address the business blocklisted can never be turned on from the page", async () => {
     const lead = await insertLead(owner.id, org, { email: "blocked@example.test", phone: "0523330004" });
     await asUser(owner.id, (q) => q("select public.consent_blocklist_add($1, 'sms', array['0523330004'], 'person_request')", [org]));
-    const token = await mint(owner.id, org, "lead", lead, "sms");
+    const token = await sent(org, "lead", lead, "sms");
     expect(channelState(await read(token), "sms")).toEqual({ channel: "sms", state: "out", can_turn_on: false });
     expect(await submit(token, "preferences", [{ channel: "sms", on: true }])).toEqual({ status: "saved", results: [{ channel: "sms", result: "refused" }] });
     expect(await entries(org, "lead_id", lead)).toEqual([]);
@@ -443,8 +466,8 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
 
   it("a replaced token still unsubscribes its own address, and does nothing else", async () => {
     const lead = await insertLead(owner.id, org, { email: "old@example.test", phone: "0523330005" });
-    const first = await mint(owner.id, org, "lead", lead, "email");
-    const second = await mint(owner.id, org, "lead", lead, "email");
+    const first = await sent(org, "lead", lead, "email");
+    const second = await sent(org, "lead", lead, "email");
     expect(first).not.toBe(second);
     const old = await read(first);
     expect(old.full).toBe(false);
@@ -460,7 +483,7 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
 
   it("the address the token was made for is unsubscribed even after the record changed its address or was purged", async () => {
     const lead = await insertLead(owner.id, org, { email: "moved@example.test" });
-    const token = await mint(owner.id, org, "lead", lead, "email");
+    const token = await sent(org, "lead", lead, "email");
     await asUser(owner.id, (q) => q("update public.leads set email = 'new@example.test' where id = $1", [lead]));
     expect(await submit(token, "unsubscribe")).toEqual({ status: "done" });
     // the old address is blocked; the record's new address is not (its consent entry would be about the new one)
@@ -469,7 +492,7 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
     expect(await entries(org, "lead_id", lead)).toEqual([]);
 
     const gone = await insertLead(owner.id, org, { email: "gone@example.test" });
-    const goneToken = await mint(owner.id, org, "lead", gone, "email");
+    const goneToken = await sent(org, "lead", gone, "email");
     await asAdmin((q) => q("delete from public.leads where id = $1", [gone]));
     expect((await read(goneToken)).channels).toEqual([{ channel: "email", state: "unknown", can_turn_on: false }]);
     expect(await submit(goneToken, "unsubscribe")).toEqual({ status: "done" });
@@ -479,7 +502,7 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
   it("never reaches another business: the same address there is untouched", async () => {
     const lead = await insertLead(owner.id, org, { email: "shared@example.test", phone: "0523330006" });
     const other = await insertLead(ownerB.id, orgB, { email: "shared@example.test", phone: "0523330006" });
-    const token = await mint(owner.id, org, "lead", lead, "email");
+    const token = await sent(org, "lead", lead, "email");
     const blocksB = (await blocks(orgB)).length;
     await submit(token, "preferences", [{ channel: "email", on: true }]);
     await submit(token, "unsubscribe_all");
@@ -491,7 +514,7 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
 
   it("limits: 60 calls per sender, then 120 per link, in 10 minutes", async () => {
     const lead = await insertLead(owner.id, org, { email: "rate@example.test" });
-    const token = await mint(owner.id, org, "lead", lead, "email");
+    const token = await sent(org, "lead", lead, "email");
     const ip = "a".repeat(64);
     for (let i = 0; i < 60; i += 1) expect((await read(token, ip)).rate_limited).toBeUndefined();
     expect(await read(token, ip)).toEqual({ rate_limited: true });
@@ -538,6 +561,41 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
       await asService(async (q) => (await q<{ r: unknown }>("select public.consent_preference_link_for_job($1, $2) as r", [serviceJob.id, serviceJob.lease_id])).rows[0].r),
     ).toEqual({ refused: "service_type" });
     await asAdmin((q) => q("update app.jobs set status = 'done', lease_id = null, locked_until = null where id = $1", [serviceJob.id]));
+  });
+
+  it("RVW-82: a link a person on the staff copied only removes: nothing is turned on from it; the link a message carries still can", async () => {
+    const lead = await insertLead(owner.id, org, { email: "staffcopy@example.test" });
+    const staffToken = await mint(owner.id, org, "lead", lead, "email");
+    const page = await read(staffToken);
+    expect(page.staff_link).toBe(true);
+    expect(channelState(page, "email")).toEqual({ channel: "email", state: "unknown", can_turn_on: false });
+    expect(await submit(staffToken, "preferences", [{ channel: "email", on: true }])).toEqual({ status: "saved", results: [{ channel: "email", result: "refused" }] });
+    expect(await entries(org, "lead_id", lead)).toEqual([]);
+    // unsubscribing works as before, and the person's own unsubscribe is still not lifted through the staff link
+    expect(await submit(staffToken, "unsubscribe")).toEqual({ status: "done" });
+    expect(await suppressed(org, "email", "staffcopy@example.test")).toBe(true);
+    expect(channelState(await read(staffToken), "email")).toEqual({ channel: "email", state: "out", can_turn_on: false });
+    expect(await submit(staffToken, "preferences", [{ channel: "email", on: true }])).toEqual({ status: "saved", results: [{ channel: "email", result: "refused" }] });
+    expect(await suppressed(org, "email", "staffcopy@example.test")).toBe(true);
+    // the sender's mint (the link a message carries) replaces it: the person may turn their own unsubscribe back
+    const sentToken = await sent(org, "lead", lead, "email");
+    const sentPage = await read(sentToken);
+    expect(sentPage.staff_link).toBe(false);
+    expect(channelState(sentPage, "email")).toEqual({ channel: "email", state: "out", can_turn_on: true });
+    expect(await submit(sentToken, "preferences", [{ channel: "email", on: true }])).toEqual({ status: "saved", results: [{ channel: "email", result: "saved" }] });
+    expect(await suppressed(org, "email", "staffcopy@example.test")).toBe(false);
+    // the replaced staff token is not the full page any more: it says nothing about staff and turns nothing on
+    const old = await read(staffToken);
+    expect({ full: old.full, staff_link: old.staff_link }).toEqual({ full: false, staff_link: false });
+    // a fresh staff copy again only removes
+    const again = await mint(owner.id, org, "lead", lead, "email");
+    expect((await read(again)).staff_link).toBe(true);
+    expect(channelState(await read(again), "email")).toMatchObject({ state: "in", can_turn_on: false });
+    // staff_link holds only on the full page: a staff copy replaced by another staff copy is neither full nor staff
+    const newer = await mint(owner.id, org, "lead", lead, "email");
+    const replaced = await read(again);
+    expect({ full: replaced.full, staff_link: replaced.staff_link }).toEqual({ full: false, staff_link: false });
+    expect((await read(newer)).staff_link).toBe(true);
   });
 
   it("(233) ב: tokens and their address hashes are deleted 24 months after they were made", async () => {

@@ -28,13 +28,14 @@ export default async function MessageSendingSettingsPage({ params }: Props) {
   const { role, canWrite } = await getOrgContext(orgId);
   const admin = isAdminRole(role);
   const editable = admin && canWrite;
-  const [hours, caps, meetingMessages, meetingRemindersInPlan, usage, smsSender] = await Promise.all([
+  const [hours, caps, meetingMessages, meetingRemindersInPlan, usage, smsSender, smsInPlan] = await Promise.all([
     getSendingHours(orgId),
     getMessageCaps(orgId),
     getMeetingMessages(orgId),
     orgHasFeature(orgId, MEETING_REMINDERS_FEATURE),
     admin ? getMessageUsage(orgId) : Promise.resolve({ allowed: false } as const),
     getSmsSender(orgId),
+    orgHasFeature(orgId, "sms"),
   ]);
 
   const rules = (
@@ -74,7 +75,7 @@ export default async function MessageSendingSettingsPage({ params }: Props) {
         {usageCard}
         <MessageCapsForm orgId={orgId} caps={caps} />
         <MeetingMessagesForm orgId={orgId} settings={meetingMessages} available={meetingRemindersInPlan} />
-        <SmsSenderForm orgId={orgId} sender={smsSender} />
+        <SmsSenderForm orgId={orgId} sender={smsSender} smsInPlan={smsInPlan} />
         {rules}
       </div>
     );

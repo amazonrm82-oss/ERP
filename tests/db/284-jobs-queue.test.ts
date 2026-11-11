@@ -52,7 +52,10 @@ const REVIEWED_MD5 = {
 // MSG-02 (103) (021160): plus one call of app.message_send_refused(org, payload template_id, 'too_long') when the outcome is
 // 'failed' with code 'too_long' and no provider, in its own exception block (the finish never fails)
 // (rechecked: two independent reviews, 3 November 2026)
-const REVIEWED_RECORD_MESSAGE_MD5 = "c9b18ee53d49a9ea1dfff777f633c306";
+// RVW-80 (021220, weekly review of 11 November 2026): plus one early return for a job whose payload names a sender check
+// (`sender_check_id`, SMS-01b): no public.messages row and no warning for the business's own verification code; every other
+// line unchanged (rechecked: reviewed independently on 11 November 2026)
+const REVIEWED_RECORD_MESSAGE_MD5 = "661b354f4b31a1a5cb4bc36be859de96";
 
 type Claimed = { id: string; lease: string; kind: string; organization_id: string; payload: Record<string, unknown>; attempt: number };
 type Job = { status: string; attempts: number; last_error: string | null; next_run_at: Date; lease_id: string | null; locked_until: Date | null };

@@ -35,6 +35,8 @@ export type PreferencesPage = {
   builtWith: boolean;
   channel: PreferenceChannel;
   full: boolean;
+  /** RVW-82: the link was copied by a person on the staff, so it only removes (nothing is turned on from it). */
+  staffLink: boolean;
   channels: PreferenceChannelRow[];
 };
 
@@ -62,6 +64,7 @@ export function preferencesPageFrom(data: unknown): PreferencesPage | null {
     builtWith: d.built_with === true,
     channel: d.channel,
     full: d.full,
+    staffLink: d.staff_link === true,
     channels,
   };
 }
@@ -110,6 +113,7 @@ export const PREFERENCES_TEXTS = {
   oldLink: "הקישור הזה הוחלף בקישור חדש. אפשר עדיין להפסיק דרכו את ההודעות בערוץ שלו.",
   saved: "השינויים נשמרו.",
   refused: "לא ניתן לחדש כאן את ההרשמה לערוץ הזה. אפשר לפנות לעסק.",
+  staffLink: "בקישור הזה אפשר רק להפסיק את ההודעות. כדי לחדש את ההרשמה, אפשר להשתמש בקישור שבהודעה שקיבלתם מאיתנו או לפנות לעסק.",
   unsubscribeIntro: (channel: PreferenceChannel) => `להפסיק לקבל מאיתנו הודעות שיווקיות ב${channelPhrase(channel)}?`,
   unsubscribeNote: "הודעות שירות, כמו תזכורת לפגישה, ממשיכות להגיע.",
   unsubscribeButton: "כן, להסיר אותי",

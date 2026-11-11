@@ -1,6 +1,7 @@
+import { Client } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { addMember, asAdmin, asMfaUser, asService, asUser, closePool, createOrg, createUser, insertLead, pgError } from "./helpers";
+import { addMember, asAdmin, asMfaUser, asService, asUser, closePool, createOrg, createUser, insertLead, pgError, TEST_DB_URL } from "./helpers";
 
 type Claimed = { id: string; lease: string };
 type Answer = Record<string, unknown>;
@@ -257,5 +258,60 @@ describe("SMS sender verification and approval (SMS-01b)", () => {
       { role: "authenticated", issue: false, start: true },
       { role: "service_role", issue: true, start: true },
     ]);
+  });
+
+  it("RVW-80: finishing a verification code writes no message row and no warning; a customer's SMS is still recorded", async () => {
+    const o = await createUser("sms-check-finish");
+    const fo = await createOrg(o.id, "עסק סיום אימות");
+    await asAdmin(async (q) => {
+      await q("update public.organizations set phone = '052-7770030' where id = $1", [fo]);
+      await q("insert into public.org_message_settings (organization_id, window_from, window_until, skip_rest_days) values ($1, '00:00', '24:00', false)", [fo]);
+    });
+    expect(await start(o.id, fo)).toEqual({ ok: true });
+    const claimed = await claim((await checkJob(fo)).id);
+    expect(await maySend(claimed)).toEqual({ may_send: true });
+    const notices: string[] = [];
+    const client = new Client({ connectionString: TEST_DB_URL });
+    client.on("notice", (n) => notices.push(n.message ?? ""));
+    await client.connect();
+    try {
+      const done = await client.query<{ r: string }>("select public.finish_job($1, $2, true, null, false, true, 'fake', 'check-1', null) as r", [claimed.id, claimed.lease]);
+      expect(done.rows[0].r).toBe("done");
+    } finally {
+      await client.end();
+    }
+    expect(await asAdmin(async (q) => (await q<{ o: string | null }>("select message_outcome as o from app.jobs where id = $1", [claimed.id])).rows[0].o)).toBe("sent");
+    expect(notices.filter((n) => n.includes("jobs_record_message"))).toEqual([]);
+    expect(await asAdmin(async (q) => (await q<{ n: number }>("select count(*)::int as n from public.messages where job_id = $1", [claimed.id])).rows[0].n)).toBe(0);
+    // an SMS to a lead is still recorded on its timeline
+    const leadId = await insertLead(o.id, fo, { phone: "0527770031" });
+    const sms = await asAdmin(
+      async (q) =>
+        (await q<{ id: string }>("select app.enqueue_job($1, 'message.send', $2::jsonb, null) as id", [fo, JSON.stringify({ channel: "sms", message_type: "requested_document", lead_id: leadId })]))
+          .rows[0].id,
+    );
+    const job = await claim(sms);
+    expect(await maySend(job)).toEqual({ may_send: true });
+    await asService((q) => q("select public.finish_job($1, $2, true, null, false, true, 'fake', 'sms-1', null)", [job.id, job.lease]));
+    expect(await asAdmin(async (q) => (await q<{ lead_id: string; status: string }>("select lead_id, status from public.messages where job_id = $1", [job.id])).rows)).toEqual([
+      { lead_id: leadId, status: "sent" },
+    ]);
+  });
+
+  it("RVW-81: a business whose plan has no SMS cannot ask for a verification code", async () => {
+    const o = await createUser("sms-check-noflag");
+    const nf = await createOrg(o.id, "עסק בלי SMS");
+    await asAdmin(async (q) => {
+      await q("update public.organizations set phone = '052-7770020' where id = $1", [nf]);
+      await q("update public.subscriptions set feature_overrides = coalesce(feature_overrides, '{}'::jsonb) || '{\"sms\": false}'::jsonb where organization_id = $1", [nf]);
+    });
+    const refused = await pgError(start(o.id, nf));
+    expect({ code: refused.code, hint: refused.hint }).toEqual({ code: "P0001", hint: "feature:sms" });
+    // nothing was opened or queued
+    expect(await asAdmin(async (q) => (await q<{ n: number }>("select count(*)::int as n from app.sms_sender_checks where organization_id = $1", [nf])).rows[0].n)).toBe(0);
+    expect(await checkJob(nf)).toBeUndefined();
+    // with the flag back the code goes as before
+    await asAdmin((q) => q("update public.subscriptions set feature_overrides = feature_overrides - 'sms' where organization_id = $1", [nf]));
+    expect(await start(o.id, nf)).toEqual({ ok: true });
   });
 });

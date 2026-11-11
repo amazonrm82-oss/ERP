@@ -14,6 +14,7 @@ type Props = { orgId: string; subject: { kind: "lead" | "contact"; id: string };
 /**
  * CNS-10: owners and admins make a fresh link to the customer's preferences page for one channel, to copy and send by hand.
  * The link is shown once (only its hash is kept); a new one replaces the earlier one, which keeps only unsubscribing.
+ * RVW-82: a link copied here only unsubscribes; it never re-subscribes the customer.
  */
 export function PreferenceLinkButton({ orgId, subject, channels }: Props) {
   const selectId = useId();
@@ -47,6 +48,7 @@ export function PreferenceLinkButton({ orgId, subject, channels }: Props) {
   return (
     <div className="space-y-3 border-t border-line pt-3">
       <p className="text-md font-medium">קישור להעדפות הדיוור</p>
+      <p className="text-sm text-ink-soft">הקישור שמעתיקים כאן מאפשר רק הסרה מדיוור, לא הרשמה מחדש.</p>
       <FormError message={error} />
       {url ? (
         <div className="space-y-2">

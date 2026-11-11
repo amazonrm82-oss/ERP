@@ -117,6 +117,10 @@ const RERUN = [
   migrationFile("_signature_status_reminders.sql"),
   // RVW-77 redefines app.document_record_values() of _signature_documents.sql last
   migrationFile("_signature_fill_reader.sql"),
+  // the weekly review of 11 November 2026 redefines app.jobs_record_message() of _service_message_send_rules.sql,
+  // public.sms_sender_verify_start() of _sms_d_sender_check.sql and app.consent_preference_channels() /
+  // public.consent_preferences_public() of _consent_preference_links.sql last (RVW-80, RVW-81, RVW-82)
+  migrationFile("_review_1111_messaging.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

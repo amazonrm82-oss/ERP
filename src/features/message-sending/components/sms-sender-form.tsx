@@ -11,7 +11,8 @@ import type { FormState } from "@/lib/action-result";
 
 import { saveSmsSenderAction, startSenderCheckAction, verifySenderCodeAction } from "../actions";
 
-type Props = { orgId: string; sender: SmsSender };
+/** smsInPlan: the plan has SMS (RVW-81: without it no verification code is sent; the database refuses it too). */
+type Props = { orgId: string; sender: SmsSender; smsInPlan: boolean };
 
 /** What the customer's phone shows now (SMS-01b: an approved name, else the verified number, else the platform default). */
 export function smsSenderNowText(sender: SmsSender): string {
@@ -24,7 +25,7 @@ export function smsSenderNowText(sender: SmsSender): string {
  * approval; a number is only the business's own phone, verified once by a code sent to it. Owners and admins of a writable
  * business.
  */
-export function SmsSenderForm({ orgId, sender }: Props) {
+export function SmsSenderForm({ orgId, sender, smsInPlan }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(saveSmsSenderAction.bind(null, orgId), null);
   const [startState, startAction] = useActionState<FormState, FormData>(() => startSenderCheckAction(orgId), null);
   const [verifyState, verifyAction] = useActionState<FormState, FormData>(verifySenderCodeAction.bind(null, orgId), null);
@@ -73,26 +74,33 @@ export function SmsSenderForm({ orgId, sender }: Props) {
               ומקלידים אותו כאן. הקוד בתוקף עשר דקות, ואחרי חמישה ניסיונות שגויים מחכים חצי שעה.
             </p>
           )}
-          <form action={startAction}>
-            <SubmitButton variant="secondary">{sender.verifiedPhone ? "אימות מחדש" : "שליחת קוד"}</SubmitButton>
-          </form>
-          <FormError message={startState && !startState.ok ? startState.message : null} />
-          <FormNotice message={startState?.ok ? startState.message : null} />
-          <form action={verifyAction} noValidate className="flex flex-wrap items-end gap-3">
-            <TextField
-              label="הקוד שהתקבל"
-              name="code"
-              dir="ltr"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              className="sm:max-w-xs"
-              error={verifyFailure?.fieldErrors?.code}
-            />
-            <SubmitButton>אימות</SubmitButton>
-          </form>
-          <FormError message={verifyFailure && !verifyFailure.fieldErrors?.code ? verifyFailure.message : null} />
-          <FormNotice message={verifyState?.ok ? verifyState.message : null} />
+          {smsInPlan ? (
+            <>
+              <form action={startAction}>
+                <SubmitButton variant="secondary">{sender.verifiedPhone ? "אימות מחדש" : "שליחת קוד"}</SubmitButton>
+              </form>
+              <FormError message={startState && !startState.ok ? startState.message : null} />
+              <FormNotice message={startState?.ok ? startState.message : null} />
+              <form action={verifyAction} noValidate className="flex flex-wrap items-end gap-3">
+                <TextField
+                  label="הקוד שהתקבל"
+                  name="code"
+                  dir="ltr"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  className="sm:max-w-xs"
+                  error={verifyFailure?.fieldErrors?.code}
+                />
+                <SubmitButton>אימות</SubmitButton>
+              </form>
+              <FormError message={verifyFailure && !verifyFailure.fieldErrors?.code ? verifyFailure.message : null} />
+              <FormNotice message={verifyState?.ok ? verifyState.message : null} />
+            </>
+          ) : (
+            // RVW-81: a plan without SMS sends no verification code
+            <p className="text-sm text-ink-soft">שליחת SMS אינה כלולה בחבילה הנוכחית, ולכן אי אפשר לאמת כרגע את המספר.</p>
+          )}
         </div>
       </CardBody>
     </Card>

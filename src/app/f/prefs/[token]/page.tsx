@@ -66,7 +66,8 @@ export default async function PublicPreferencesPage({ params }: Props) {
           {page.full ? (
             <div className="space-y-4">
               <p className="text-md">{PREFERENCES_TEXTS.intro}</p>
-              <PreferencesForm token={token} channels={page.channels} />
+              {page.staffLink ? <p className="text-sm text-ink-soft">{PREFERENCES_TEXTS.staffLink}</p> : null}
+              <PreferencesForm token={token} channels={page.channels} staffLink={page.staffLink} />
             </div>
           ) : (
             <div className="space-y-4">

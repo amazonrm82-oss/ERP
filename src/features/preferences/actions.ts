@@ -20,8 +20,9 @@ const CANNOT = "רק בעלים ומנהלי מערכת יוצרים קישור 
 
 /**
  * CNS-10: an owner or admin copies a fresh preferences link for one channel of a lead or contact (for example to send it
- * by hand). It replaces the record's earlier link for that channel, which keeps only unsubscribing. The address is shown
- * once: only its hash is kept, and the audit log says that a link was made, never the link.
+ * by hand). It replaces the record's earlier link for that channel, which keeps only unsubscribing. RVW-82: a link copied
+ * here only unsubscribes too; it never turns a channel back on (only the link a message carries does). The address is
+ * shown once: only its hash is kept, and the audit log says that a link was made, never the link.
  */
 export async function createPreferenceLinkAction(
   orgId: string,
