@@ -40,6 +40,9 @@ export const MASK_PATTERNS = [
   // ages and countdowns: "לפני 3 שעות", "בעוד יומיים", "5 דק'", "3 ימים"
   "(לפני|בעוד) [^,.;·|()]{1,24}",
   "\\d+ ?(שניות|שנייה|דקות|דקה|דק'|שעות|שעה|ימים|יום|שבועות|שבוע|חודשים|חודש|שנים|שנה)",
+  // the snooze button's first choice reads "למחר", or "ליום העבודה הבא" when tomorrow is a rest day in the business zone
+  // (a CI run after midnight Israel time on a Thursday): the same button either way
+  "ליום העבודה הבא|למחר",
 ];
 
 /** The same replacement the browser does, for the unit test. */

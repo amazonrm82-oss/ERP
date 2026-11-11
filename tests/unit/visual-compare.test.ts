@@ -182,6 +182,8 @@ describe("masking changing text", () => {
     ["יום ראשון, 8 בנוב׳ 2026", MASK],
     ["נוצר ב-8 בנוב' 2026", `נוצר ב-${MASK}`],
     ["7 בינו׳", MASK],
+    ["למחר", MASK],
+    ["ליום העבודה הבא", MASK],
   ])("%s", (input, output) => {
     expect(maskText(input)).toBe(output);
   });
