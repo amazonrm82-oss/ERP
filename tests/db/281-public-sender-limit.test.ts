@@ -133,6 +133,12 @@ describe("OPS-02 (41): the quote page's per-sender view limit (public.quote_publ
       return (await one<{ p: Record<string, unknown> }>(q, "select public.quote_public($1) as p", [token])).p;
     });
   const limited = (answer: Record<string, unknown>) => answer.rate_limited === true;
+  /** the bucket public.quote_public counts a sender's header value in (1,024 per quote) */
+  const bucketOf = (quote: string, hash: string) =>
+    asAdmin(
+      async (q) =>
+        (await one<{ b: number }>(q, "select (((hashtextextended(app.quote_link_sender($1, $2), 0) % 1024) + 1024) % 1024)::int as b", [quote, hash])).b,
+    );
   const counted = (quote: string) =>
     asAdmin(async (q) => Number((await one<{ n: string }>(q, "select coalesce(sum(views), 0) as n from app.quote_link_view_counts where quote_id = $1", [quote])).n));
 
@@ -197,7 +203,11 @@ describe("OPS-02 (41): the quote page's per-sender view limit (public.quote_publ
     const a = sender("ops02b-quote-a");
     for (let i = 0; i < 60; i += 1) expect(limited(await view(first.token, a)), `view ${i + 1}`).toBe(false);
     expect(await view(first.token, a)).toEqual({ rate_limited: true });
-    expect(limited(await view(first.token, sender("ops02b-quote-b")))).toBe(false);
+    // another sender, in another of the quote's 1,024 buckets
+    const bucketA = await bucketOf(first.quote, a);
+    let b = sender("ops02b-quote-b");
+    for (let i = 0; (await bucketOf(first.quote, b)) === bucketA; i++) b = sender(`ops02b-quote-b${i}`);
+    expect(limited(await view(first.token, b))).toBe(false);
     expect(limited(await view(second.token, a))).toBe(false);
     // a read without the header (the signed PDF's own read, a page older than the migration) is not counted per sender
     const before = await counted(first.quote);
@@ -210,7 +220,17 @@ describe("OPS-02 (41): the quote page's per-sender view limit (public.quote_publ
 
   it("the link's own 120 views in 10 minutes still hold, whoever the senders are", async () => {
     const link = await newLink();
-    for (let i = 0; i < 120; i += 1) expect(limited(await view(link.token, sender(`ops02b-many-${i % 3}`))), `view ${i + 1}`).toBe(false);
+    // three senders in three different buckets, so none reaches its own 60
+    const many: string[] = [];
+    const used = new Set<number>();
+    for (let i = 0; many.length < 3; i++) {
+      const hash = sender(`ops02b-many-${i}`);
+      const bucket = await bucketOf(link.quote, hash);
+      if (used.has(bucket)) continue;
+      used.add(bucket);
+      many.push(hash);
+    }
+    for (let i = 0; i < 120; i += 1) expect(limited(await view(link.token, many[i % 3])), `view ${i + 1}`).toBe(false);
     expect(await view(link.token, sender("ops02b-fresh"))).toEqual({ rate_limited: true });
     expect(await view(link.token, null)).toEqual({ rate_limited: true });
   });

@@ -539,8 +539,22 @@ describe("consent preferences link (CNS-09, CNS-10)", () => {
     for (let i = 0; i < 60; i += 1) expect((await read(token, ip)).rate_limited).toBeUndefined();
     expect(await read(token, ip)).toEqual({ rate_limited: true });
     expect(await submit(token, "unsubscribe", null, ip)).toEqual({ rate_limited: true });
-    // another sender still gets through until the link's window is full
-    for (let i = 0; i < 58; i += 1) expect((await read(token, "b".repeat(64))).rate_limited).toBeUndefined();
+    // another sender, in another of the link's 1,024 buckets, still gets through until the link's window is full
+    const bucketOf = (hash: string) =>
+      asAdmin(
+        async (q) =>
+          (
+            await q<{ b: number }>(
+              `select (((hashtextextended(app.consent_preference_sender(t.link_id, $2), 0) % 1024) + 1024) % 1024)::int as b
+                 from app.consent_preference_tokens t where t.token_hash = encode(sha256(convert_to($1, 'UTF8')), 'hex')`,
+              [token, hash],
+            )
+          ).rows[0].b,
+      );
+    const bucketA = await bucketOf(ip);
+    let ipB = "b".repeat(64);
+    for (let i = 0; (await bucketOf(ipB)) === bucketA; i++) ipB = (i.toString(16) + "b".repeat(64)).slice(0, 64);
+    for (let i = 0; i < 58; i += 1) expect((await read(token, ipB)).rate_limited).toBeUndefined();
     expect(await read(token, "c".repeat(64))).toEqual({ rate_limited: true });
   });
 

@@ -154,8 +154,17 @@ describe("privacy requests (PRK-02)", () => {
     await resetCounts();
     for (let i = 0; i < 3; i += 1) expect((await submit(token, PAYLOAD, HASH_A, i % 2 === 0)).status).toBe("received");
     expect(await submit(token, PAYLOAD, HASH_A)).toEqual({ rate_limited: true });
-    // another sender is not refused
-    expect(await submit(token, PAYLOAD, HASH_B)).toEqual({ status: "received" });
+    // another sender, in another of the business's 1,024 buckets (keyed by the random org id), is not refused
+    const bucketOf = (hash: string) =>
+      asAdmin(
+        async (q) =>
+          (await q<{ b: number }>("select (((hashtextextended(app.privacy_request_sender($1, $2), 0) % 1024) + 1024) % 1024)::int as b", [org, hash]))
+            .rows[0].b,
+      );
+    const bucketA = await bucketOf(HASH_A);
+    let hashB = HASH_B;
+    for (let i = 0; (await bucketOf(hashB)) === bucketA; i++) hashB = (i.toString(16) + HASH_B).slice(0, 64);
+    expect(await submit(token, PAYLOAD, hashB)).toEqual({ status: "received" });
     // the day's cap: after 10 tries in a day the sender waits, even when each 10-minute window was kept
     await resetCounts();
     for (let round = 0; round < 4; round += 1) {
@@ -170,10 +179,10 @@ describe("privacy requests (PRK-02)", () => {
     await resetCounts();
     for (let i = 0; i < 60; i += 1) expect((await page(token, HASH_A)).business).toBeDefined();
     expect(await page(token, HASH_A)).toEqual({ rate_limited: true });
-    expect((await page(token, HASH_B)).business).toBeDefined();
+    expect((await page(token, hashB)).business).toBeDefined();
     const kept = await asAdmin(async (q) => (await q<{ t: string }>("select row_to_json(c)::text as t from app.privacy_request_counts c")).rows.map((r) => r.t).join(" "));
     expect(kept).not.toContain(HASH_A);
-    expect(kept).not.toContain(HASH_B);
+    expect(kept).not.toContain(hashB);
   });
 
   it("after 5 requests in a business's day, one notice counts the rest", async () => {

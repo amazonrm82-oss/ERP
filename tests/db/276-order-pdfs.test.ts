@@ -347,7 +347,16 @@ describe("order confirmation PDFs (ORD-05 PDF)", () => {
     await resetWindows(order);
     for (let i = 0; i < 20; i += 1) expect((await download(token, "ip-a")).rate_limited, `try ${i}`).toBeUndefined();
     expect(await download(token, "ip-a")).toEqual({ rate_limited: true });
-    expect((await download(token, "ip-b")).sha256).toBe(sha("4"));
+    // another sender, in another of the 1,024 buckets (the bucket hash is keyed by the random order id)
+    const bucketOf = (hash: string) =>
+      asAdmin(
+        async (q) =>
+          (await one<{ b: number }>(q, "select (((hashtextextended(app.order_link_sender($1, $2), 0) % 1024) + 1024) % 1024)::int as b", [order, hash])).b,
+      );
+    const bucketA = await bucketOf("ip-a");
+    let senderB = "ip-b";
+    for (let i = 0; (await bucketOf(senderB)) === bucketA; i++) senderB = `ip-b${i}`;
+    expect((await download(token, senderB)).sha256).toBe(sha("4"));
     // the link's window is shared with the page: 120 in 10 minutes
     await resetWindows(order);
     await asAdmin((q) => q("update app.order_links set window_count = 120, window_started_at = now() where order_id = $1", [order]));
