@@ -194,6 +194,10 @@ and build this CRM here instead. The old code is preserved on the branch
   audited `library_link` without the token) and `public.library_link_revoke` (maker or owner/admin). A link whose maker left keeps
   serving with no notice (interim, owner question 296). In the eslint allow-list. The advisor's findings on the two staff definers and
   the two app tables are expected.
+  Owner, 12 November 2026, answer (281) א (approved, not built yet; FXS-12): one server file only, in the eslint allow-list, may use the
+  project secret key `sb_secret_…` (set by the owner in Vercel) solely to forward the user's IP address to Supabase Auth's rate limit
+  (header `sb-forwarded-for`) on sign-in, sign-up and password reset; a test proves the key never reaches the browser; its own "In use"
+  line once built.
   In use (IMP-04, owner 9 November 2026, answers (155) א, (160) א, (161) א, (162) ב, (163) ב; migration `_background_jobs.sql`; two
    independent reviews): the OPS-04 worker (same route and secret) also claims `import.run` and `export.run` (payload `{request_id,
    user_id}` only) in its own pass (lease 900 s, one job, 40 s budget, then saved and handed back uncounted with
