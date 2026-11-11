@@ -158,6 +158,17 @@ and build this CRM here instead. The old code is preserved on the branch
   stage's `offset_days` right before sending and needs its own "In use" line. `app.job_payload_ok` was last redefined in 021226
   (`collection_document_id`). Tests 64 and 88 end with `_collection_customer_reminders.sql`. The advisor's finding on
   `app.collection_template_seeds` is expected.
+  In use (SGN-07, owner 11 November 2026, answer (276) א; migration 021227; an independent review and a delta review): in-person
+  signing on the rep's device (`src/features/in-person-signing/`, pages `/o/[org]/signatures/[doc]/sign` and `/o/[org]/quotes/[quote]/sign`).
+  The rep's session signs first through `public.signature_in_person_sign` / `public.quote_in_person_accept` (definer, authenticated:
+  the right that sends the document, `app.signature_managed_document` / `app.quote_editable` with can_write, writable, the key; only
+  with a live link row, whose try window it shares with the customer's link; `in_person` + `in_person_by` + the rep's user agent, no
+  IP; the quote path is `quote_public_answer`'s accepted branch with the JWT claims set aside around the writes). Then, only after
+  `signature_in_person_pdf_allowed` / `quote_in_person_pdf_allowed` with the same session (the rep who was present, within an hour),
+  the existing writers `public.signature_pdf_store` / `public.quote_signed_pdf_store` (service_role) write the signed PDF; they judge the
+  named rep again (`app.signature_in_person_rep` / `app.quote_in_person_rep`, the hour, active non-viewer, `app.signature_pdf_user_may` =
+  `app.quote_pdf_user_may`'s rule). The notice keeps the public title 'מסמך נחתם בקישור' so erasure reaches it. No new service-key file.
+  The advisor's findings on the five new public definers are expected.
   In use (IMP-04, owner 9 November 2026, answers (155) א, (160) א, (161) א, (162) ב, (163) ב; migration `_background_jobs.sql`; two
    independent reviews): the OPS-04 worker (same route and secret) also claims `import.run` and `export.run` (payload `{request_id,
    user_id}` only) in its own pass (lease 900 s, one job, 40 s budget, then saved and handed back uncounted with
