@@ -6,16 +6,18 @@ import { isAdminRole } from "@/features/settings/permissions";
 import { orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { getOrgTerms } from "@/features/terminology/queries";
-import { formatDate } from "@/lib/format";
+import { formatDate, zoneDate } from "@/lib/format";
 import { paths } from "@/lib/paths";
 import { recordTypeNames } from "@/lib/record-types";
 
 import { signatureDayText } from "../public";
-import { listRecordSignatureDocuments, listSendableTemplates } from "../queries";
+import { getContractRenewalDays, listRecordSignatureDocuments, listSendableTemplates } from "../queries";
 import { convertedLeadsNote, fromLeadLine } from "../record-filter";
 import { awaitsSignature, SIGNATURE_STATE_LABELS, shownSignatureState, signatureDatesLine, TEXT_ERASED_LINE, type ShownSignatureState } from "../states";
+import { contractExpired, endsSoon, validityLine } from "../validity";
 import { SignatureDocActions } from "./signature-doc-actions";
 import { SignatureSendPanel } from "./signature-send-panel";
+import { SignatureValidityForm } from "./validity-form";
 
 type Props = {
   orgId: string;
@@ -53,6 +55,9 @@ export async function RecordSignaturesCard({ orgId, kind, recordId, canEdit, pho
   const templates = canSend ? await listSendableTemplates(orgId, kind) : [];
   if (docs.length === 0 && !canSend) return null;
   const isAdmin = isAdminRole(context.role);
+  // SGN-04: the alert's lead time, for the "ending soon" mark (read only when a signed document has a last day)
+  const renewalDays = docs.some((doc) => doc.validUntil) ? await getContractRenewalDays(orgId) : 0;
+  const today = zoneDate(new Date(), context.org.timeZone);
   const titleId = `signatures-${recordId}`;
   return (
     <Card aria-labelledby={titleId} className="print:hidden">
@@ -75,6 +80,16 @@ export async function RecordSignaturesCard({ orgId, kind, recordId, canEdit, pho
                   </p>
                   {doc.fromLead ? <p className="text-sm text-ink-soft">{fromLeadLine(leadSingular)}</p> : null}
                   {doc.textErased ? <p className="text-sm text-ink-soft">{TEXT_ERASED_LINE}</p> : null}
+                  {state === "signed" && validityLine(doc.validUntil, doc.renewalOn) ? (
+                    <p className="flex flex-wrap items-center gap-2 text-sm text-ink">
+                      <span>{validityLine(doc.validUntil, doc.renewalOn)}</span>
+                      {contractExpired(doc.validUntil, today) ? (
+                        <Badge tone="danger">פג תוקף החוזה</Badge>
+                      ) : endsSoon(doc.validUntil, doc.renewalOn, today, renewalDays) ? (
+                        <Badge tone="warning">מסתיים בקרוב</Badge>
+                      ) : null}
+                    </p>
+                  ) : null}
                   {doc.fileId ? (
                     <a href={paths.file(orgId, doc.fileId)} className={`${buttonClasses("secondary", "sm")} mt-2`}>
                       הורדת PDF חתום
@@ -86,6 +101,19 @@ export async function RecordSignaturesCard({ orgId, kind, recordId, canEdit, pho
                     </p>
                   ) : null}
                   {/* RVW-83 review: a document shown from a converted lead is read-only here */}
+                  {canSend && !doc.fromLead && state === "signed" && !doc.emptied ? (
+                    <SignatureValidityForm
+                      orgId={orgId}
+                      kind={kind}
+                      recordId={recordId}
+                      docId={doc.id}
+                      title={doc.title}
+                      validUntil={doc.validUntil}
+                      renewalOn={doc.renewalOn}
+                      signedDay={doc.signedAt ? zoneDate(new Date(doc.signedAt), context.org.timeZone) : null}
+                      timeZone={context.org.timeZone}
+                    />
+                  ) : null}
                   {canSend && !doc.fromLead ? (
                     <SignatureDocActions
                       orgId={orgId}

@@ -176,6 +176,9 @@ export type OrgDocumentSettingsRow = {
   signature_reminder_days: number;
   // SGN-03 (owner (249) א): the customer's one reminder 2 days before a document's last day (default on)
   signature_customer_reminder: boolean;
+  // SGN-04 (migration contract_renewals): days before a signed contract's renewal day (else its last day) the alert task is
+  // made, 0 = off (0..365)
+  contract_renewal_days: number;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
@@ -320,6 +323,7 @@ type OrgDocumentSettingsWrite = {
   meeting_order_draft?: "button" | "auto";
   signature_reminder_days?: number;
   signature_customer_reminder?: boolean;
+  contract_renewal_days?: number;
   legal_name?: string | null;
   tax_id?: string | null;
   address_line?: string | null;
@@ -1205,6 +1209,8 @@ export type DocumentTemplateRow = {
   draft_wording: boolean;
   // server only: the seed's marker of a default (its kind code), null on a person's template
   key: string | null;
+  // SGN-04 (migration contract_renewals): months a signed document is valid when signed (1..120, null = none)
+  default_validity_months: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -2643,6 +2649,10 @@ export type SignatureDocumentRow = {
   text_erased_at: string | null;
   // SGN-03 (migration signature_status_reminders): when the expiry job stamped an unsigned document past expires_at (server only)
   expired_at: string | null;
+  // SGN-04 (migration contract_renewals): a signed document's last day and renewal day (dates; set by the server and
+  // public.signature_document_set_validity only)
+  valid_until: string | null;
+  renewal_on: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -3311,8 +3321,8 @@ export type Database = {
       // SGN-01: the organization and draft_wording are fixed (column-level grants)
       document_templates: Table<
         DocumentTemplateRow,
-        { organization_id: string; name: string; kind?: string; record_type: string; body: string; is_active?: boolean },
-        { name?: string; kind?: string; record_type?: string; body?: string; is_active?: boolean }
+        { organization_id: string; name: string; kind?: string; record_type: string; body: string; is_active?: boolean; default_validity_months?: number | null },
+        { name?: string; kind?: string; record_type?: string; body?: string; is_active?: boolean; default_validity_months?: number | null }
       >;
       // MSG-02: the organization is fixed (column-level update grant)
       message_templates: Table<
@@ -4722,6 +4732,8 @@ export type Database = {
       // review 3: the ids of the documents that name these leads and contacts (owners and admins; the person export)
       signature_documents_naming: { Args: { p_org: string; p_ids: string[] }; Returns: string[] };
       signature_document_cancel: { Args: { p_org: string; p_doc: string }; Returns: boolean };
+      // SGN-04: a signed document's last day and renewal day (whoever may edit its record)
+      signature_document_set_validity: { Args: { p_org: string; p_doc: string; p_valid_until: string | null; p_renewal_on: string | null }; Returns: Json };
       signature_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       signature_public_sign: {
         Args: {

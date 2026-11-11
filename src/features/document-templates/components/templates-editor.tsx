@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { Checkbox, SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { DEFAULT_VALIDITY_CHOICES, defaultValidityLabel } from "@/features/signatures/validity";
 import type { FormState } from "@/lib/action-result";
 
 import { addDocumentTemplateAction, deleteDocumentTemplateAction, switchOffDocumentTemplateAction, updateDocumentTemplateAction } from "../actions";
@@ -49,9 +50,9 @@ export function FieldList({ type, labels }: { type: DocumentRecordType; labels: 
   );
 }
 
-type Values = { name: string; kind: DocumentKind; recordType: DocumentRecordType; body: string; isActive: boolean };
+type Values = { name: string; kind: DocumentKind; recordType: DocumentRecordType; body: string; isActive: boolean; defaultValidityMonths: number | null };
 
-const EMPTY: Values = { name: "", kind: "contract", recordType: "contact", body: "", isActive: true };
+const EMPTY: Values = { name: "", kind: "contract", recordType: "contact", body: "", isActive: true, defaultValidityMonths: null };
 
 function TemplateFields({
   initial,
@@ -115,6 +116,19 @@ function TemplateFields({
         hint="**מודגש**, שורה שמתחילה ב-״- ״ לרשימה, ״1. ״ לרשימה ממוספרת. שדות כותבים בסוגריים מסולסלים, בדיוק כמו ברשימה. קטע שהשולח לא יוכל לערוך: שורה ״::: נעול״ לפניו ושורה ״:::״ אחריו."
       />
       <FieldList type={shownType} labels={labels} />
+      <SelectField
+        label="תוקף אחרי החתימה"
+        name="default_validity_months"
+        defaultValue={values?.default_validity_months ?? (initial.defaultValidityMonths === null ? "" : String(initial.defaultValidityMonths))}
+        error={errors?.default_validity_months}
+        hint="כשהלקוח חותם, נקבע תאריך סוף תוקף לפי הבחירה. אפשר לשנות אותו אחר כך בכרטיס הרשומה."
+      >
+        {validityChoices(initial.defaultValidityMonths).map((months) => (
+          <option key={months ?? "none"} value={months === null ? "" : String(months)}>
+            {defaultValidityLabel(months)}
+          </option>
+        ))}
+      </SelectField>
       <Checkbox
         label="פעילה"
         name="is_active"
@@ -123,6 +137,12 @@ function TemplateFields({
       />
     </div>
   );
+}
+
+// SGN-04: the offered months, plus a stored value outside them
+function validityChoices(current: number | null): (number | null)[] {
+  const months = current === null || DEFAULT_VALIDITY_CHOICES.includes(current) ? [...DEFAULT_VALIDITY_CHOICES] : [...DEFAULT_VALIDITY_CHOICES, current].sort((a, b) => a - b);
+  return [null, ...months];
 }
 
 function RowHeading({ template, labels }: { template: DocumentTemplate; labels: RecordTypeLabels }) {
@@ -166,7 +186,7 @@ export function DocumentTemplateList({
   return (
     <ol className="divide-y divide-line">
       {templates.map((template) => (
-        <li key={`${template.id}-${template.name}-${template.body}-${template.kind}-${template.recordType}-${template.isActive}`} className="px-4 py-3 sm:px-5">
+        <li key={`${template.id}-${template.name}-${template.body}-${template.kind}-${template.recordType}-${template.isActive}-${template.defaultValidityMonths ?? ""}`} className="px-4 py-3 sm:px-5">
           <details className="group">
             <summary className="cursor-pointer list-none">
               <RowHeading template={template} labels={labels} />
@@ -199,7 +219,14 @@ function EditableBody({ orgId, template, labels }: { orgId: string; template: Do
         <TemplateFields
           failure={failure}
           labels={labels}
-          initial={{ name: template.name, kind: template.kind, recordType: template.recordType, body: template.body, isActive: template.isActive }}
+          initial={{
+            name: template.name,
+            kind: template.kind,
+            recordType: template.recordType,
+            body: template.body,
+            isActive: template.isActive,
+            defaultValidityMonths: template.defaultValidityMonths,
+          }}
         />
         <div className="flex flex-wrap items-center gap-2">
           <SubmitButton size="sm" variant="secondary" pendingText="שומרים…">

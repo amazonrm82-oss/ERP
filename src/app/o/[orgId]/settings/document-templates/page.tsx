@@ -10,6 +10,7 @@ import { DOCUMENT_TEMPLATES_PER_ORG } from "@/features/document-templates/templa
 import { businessDocumentValues } from "@/features/document-templates/values";
 import { isAdminRole } from "@/features/settings/permissions";
 import { orgHasFeature } from "@/features/settings/queries";
+import { EndingSoonCard } from "@/features/signatures/components/ending-soon-card";
 import { SignatureReminderForm } from "@/features/signatures/components/reminder-form";
 import { getSignatureReminderSettings } from "@/features/signatures/queries";
 import { signatureReminderLabel } from "@/features/signatures/reminder";
@@ -119,6 +120,7 @@ export default async function DocumentTemplatesPage({ params }: Props) {
           </CardBody>
         </Card>
       ) : null}
+      {inPlan ? <EndingSoonCard orgId={orgId} timeZone={context.org.timeZone} editable={editable} /> : null}
       {templates.length > 0 ? (
         <Card aria-label="תצוגה מקדימה">
           <CardBody>

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { sanitizeNote } from "@/features/activities/markdown";
 import { mentionIds } from "@/features/mentions/token";
 import { templateVariantProblem, VARIANT_PROBLEM_MESSAGES } from "@/features/whatsapp/variants";
+import { defaultValidityField } from "@/features/signatures/validity";
 import { requiredText } from "@/lib/validation";
 
 import { DOCUMENT_RECORD_TYPES, unknownDocumentFields, type DocumentRecordType } from "./fields";
@@ -49,6 +50,8 @@ export const documentTemplateSchema = z
       ),
     ),
     is_active: z.preprocess((value) => value === "on" || value === "true", z.boolean()),
+    // SGN-04: months a signed document is valid (fills its last day when signed); "" = none
+    default_validity_months: defaultValidityField,
   })
   .superRefine((value, ctx) => {
     const message = documentBodyProblem(value.body, value.record_type);

@@ -815,6 +815,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // CNS-10 (254) ב redefines app.consent_register_walk_full() / app.consent_prepare() / app.consent_preference_channels() /
       // public.consent_preferences_submit() of _staff_preference_link.sql last (a staff link may give a first consent)
       "_staff_link_first_grant.sql",
+      // SGN-04 redefines app.document_templates_guard() of _document_templates.sql last and grants select on
+      // signature_documents.valid_until / renewal_on after _signature_documents.sql's revoke all
+      "_contract_renewals.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

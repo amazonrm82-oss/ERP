@@ -23,7 +23,7 @@ import { readRecordDocumentValues, type DocumentPreviewRecord } from "./record-v
 // and delete it (switchOffDocumentTemplateAction, deleteDocumentTemplateAction).
 
 const DUPLICATE_NAME = "כבר יש תבנית מסמך בשם הזה.";
-const FIELDS = ["name", "kind", "record_type", "body", "is_active"] as const;
+const FIELDS = ["name", "kind", "record_type", "body", "is_active", "default_validity_months"] as const;
 
 function parse(formData: FormData) {
   return documentTemplateSchema.safeParse(pick(formData, [...FIELDS]));

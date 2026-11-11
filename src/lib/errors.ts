@@ -554,6 +554,11 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "signature_document:title": "הכותרת ארוכה מדי. קצרו אותה עד 120 תווים.",
   "signature_document:body": "המסמך ריק או ארוך מדי. כתבו בו טקסט, עד 30,000 תווים.",
   "signature_document:valid_days": "תוקף הקישור לא תקין. בחרו תוקף בין יום אחד ל-365 ימים.",
+  // SGN-04: a signed document's validity and renewal day
+  "signature_document:validity_status": "תוקף ומועד חידוש נקבעים רק למסמך שנחתם. חכו שהלקוח יחתום, ואז קבעו את התאריכים.",
+  "signature_document:validity_erased": "פרטי המסמך נמחקו, אי אפשר לשנות את התאריכים שלו.",
+  "signature_document:validity_date": "תאריך סוף התוקף לא יכול להיות לפני יום החתימה. בחרו תאריך מאוחר יותר.",
+  "signature_document:validity_renewal": "מועד החידוש צריך להיות בין יום החתימה לסוף התוקף, ורק כשיש תאריך סוף תוקף. בחרו מועד חידוש בתוך התוקף.",
   "signature_document:closed": "המסמך כבר נחתם, בוטל או שתוקפו פג. אפשר לשלוח מסמך חדש מכרטיס הרשומה.",
   "signature_pdf:not_signed": "PDF חתום נשמר רק למסמך שהלקוח חתם עליו. שלחו את המסמך לחתימה, והקובץ יישמר אחרי החתימה.",
   "signature_pdf:invalid": "קובץ ה-PDF החתום לא נשמר. נסו שוב בעוד רגע.",
