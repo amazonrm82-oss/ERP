@@ -243,8 +243,23 @@ describe("documents for signature (SGN-02)", () => {
     const fresh = await send(member, org, contact);
     for (let i = 0; i < 60; i++) expect((await page(fresh.token, "a".repeat(64))).rate_limited).toBeUndefined();
     expect((await page(fresh.token, "a".repeat(64))).rate_limited).toBe(true);
-    // another sender still reads it, until the link's 120
-    for (let i = 0; i < 59; i++) expect((await page(fresh.token, "b".repeat(64))).rate_limited).toBeUndefined();
+    // another sender still reads it, until the link's 120 (a sender whose bucket differs from the first one's: 1,024 reused
+    // buckets, so a fixed second hash shares the first one's bucket in about one run of 1,024)
+    const bucketOf = (hash: string) =>
+      asAdmin(async (q) =>
+        Number(
+          (
+            await q<{ b: number }>(
+              "select (((hashtextextended(app.signature_link_sender($1, $2), 0) % 1024) + 1024) % 1024)::int as b",
+              [fresh.id, hash],
+            )
+          ).rows[0].b,
+        ),
+      );
+    const bucketA = await bucketOf("a".repeat(64));
+    let other = "b".repeat(64);
+    for (let i = 0; (await bucketOf(other)) === bucketA; i++) other = `${i.toString(16).padStart(2, "0")}${"b".repeat(62)}`;
+    for (let i = 0; i < 59; i++) expect((await page(fresh.token, other)).rate_limited).toBeUndefined();
     expect((await page(fresh.token, null)).rate_limited).toBe(true);
     // no IP hash is stored, only bucket numbers
     const buckets = await asAdmin(async (q) => (await q<Record<string, unknown>>("select * from app.signature_link_view_counts where document_id = $1", [fresh.id])).rows);
