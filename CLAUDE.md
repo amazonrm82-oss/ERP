@@ -2822,6 +2822,16 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `app.message_template_sendable` last redefined in 021218; TS `NOTICE_KIND_FIELDS`). THE FUTURE SENDER re-reads the document by
   `signature_document_id`, sends nothing unless still sent/viewed and not expired, re-reads the setting and the `signatures` key,
   mints the link itself, and needs its own "In use" line. Tests 64 and 88 end with `_signature_status_reminders.sql`. Since 021219 (RVW-77) the server fill `app.document_record_values` judges a linked contact or company by `app.document_caller_reads` (definer; the `contacts_select` / `companies_select` rule for `auth.uid()`: `app.can_read_record` or `app.deputy_readable`), never by an invoker helper inside a definer body; the contact card also lists, read-only, the documents of leads converted into it (20 newest). Tests 64 and 88 end with `_review_1111_messaging.sql`. The advisor's findings on `app.signature_reminders`, `app.signature_customer_reminders` and `app.signature_template_seeds` are expected.
+  Contract validity (SGN-04, migration 021223; owner (263)-(266), (277), (278) ב; two independent reviews and two delta reviews):
+  `signature_documents.valid_until` / `renewal_on` (select grants only; set on a signed document by `public.signature_document_set_validity`,
+  definer, who may send it; filled at signing from `document_templates.default_validity_months` by `app.contract_validity_end`, month-end
+  clamped, = `contractValidityEnd()`, shared fixture; audited `signature_validity`, dates only). `org_document_settings.contract_renewal_days`
+  (default 30). pg_cron `crm-contract-renewals` (`app.send_contract_renewals`) counts back from `renewal_on`, else `valid_until`: one notice and
+  one task for the sender, else the record's owner, else an admin (`app.contract_renewal_recipient`); task text is dates only, never the
+  document's title (`app.contract_renewal_task_text`); tasks close when the document is cancelled, erased or its dates change
+  (`app.signature_documents_renewal_close`); alerts and tasks kept in `app.contract_renewal_alerts|tasks` (RLS on, no grants). An expired
+  signed contract shows "פג תוקף החוזה" and is listed 90 days (app only). Tests 64 and 88 end with `_contract_renewals.sql`. The advisor's
+  findings on `signature_document_set_validity` and the two app tables are expected.
 - In-app guide (UX-05, migration 021199; owner's answers 203 ב, 204 א, 205 א, 206 ב, 10 November 2026): `profiles.guide_tour_seen_at` (own column
   grant; null = the first-visit tour opens; never marked in a support session; replaying from the account menu "סיור במערכת" changes
   nothing). Texts are Markdown in `docs/help/` (articles, screens, tour; frontmatter checked by `tests/unit/in-app-guide.test.ts`),
