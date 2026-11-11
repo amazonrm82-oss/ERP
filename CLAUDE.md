@@ -179,6 +179,21 @@ and build this CRM here instead. The old code is preserved on the branch
   kind to active owners/admins, counts only, `entity_id` = the business, at most once per target a week (campaign: once per month and
   key), `app.anomaly_alerts_sent`; "נוסף" when earlier targets were told that week. Index `activities_org_created_idx`. Interim
   thresholds in the migration header (owner questions 285-286). The advisor's findings on the two app tables are expected.
+  In use (LIB-02, owner 11 November 2026, hard rule 5's pattern; migration 021229; an independent review): a library item sent by a
+  tracked link (`src/features/library-links/public-server.ts`, page `/f/lib/<token>`, route `GET /api/forms/lib/<token>/file`), which
+  calls only `public.library_link_public()` (business display name, logo, colour, built-with, and the item's kind, title, description
+  and https link or its file's name, type and size; never an id or anything of the record; counts the view on `public.library_links`
+  and, once per link and business day, sends kind `library_viewed` to the maker while an active member who reads the record: item
+  title only) and `public.library_link_public_file()` (the current confirmed file's path, name and type only; the route answers a
+  60-second signed link, PDF and raster images inline, anything else a download). One not-found rule `app.library_link_usable`
+  (unknown or revoked token, closed public pages, item off, outside its window or without a confirmed file, record in the bin or
+  gone). Limits after the lookup: 120 per link and 60 per sender (keyed IP hash, scope `library`, re-scoped per link, 1,024 buckets,
+  no hash kept) in 10 minutes, page and file together; OPS-02 shared guard first. Never framed, no-referrer, generic previews,
+  preview bots read nothing, no cookies or visitor id. Staff: `public.library_link_create` (definer: `app.can_write`, writable, a
+  live record the caller reads, an item sendable now, 100 per person an hour; only the token's SHA-256 in `app.library_link_secrets`;
+  audited `library_link` without the token) and `public.library_link_revoke` (maker or owner/admin). A link whose maker left keeps
+  serving with no notice (interim, owner question 296). In the eslint allow-list. The advisor's findings on the two staff definers and
+  the two app tables are expected.
   In use (IMP-04, owner 9 November 2026, answers (155) א, (160) א, (161) א, (162) ב, (163) ב; migration `_background_jobs.sql`; two
    independent reviews): the OPS-04 worker (same route and secret) also claims `import.run` and `export.run` (payload `{request_id,
    user_id}` only) in its own pass (lease 900 s, one job, 40 s budget, then saved and handed back uncounted with
