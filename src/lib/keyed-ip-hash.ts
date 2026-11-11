@@ -10,7 +10,7 @@ import { logEvent } from "@/lib/log";
 
 /** Each public page hashes in its own scope, so one visitor is a different value on each kind of page. */
 /** `public` (OPS-02, owner (40) ב) is the one value per visitor across every public page, for the shared limit before a token is looked up. */
-export type IpHashScope = "intake" | "booking" | "card" | "widget" | "waitlist" | "order" | "quote" | "preview" | "statement" | "public" | "privacy" | "preferences" | "signature";
+export type IpHashScope = "intake" | "booking" | "card" | "widget" | "waitlist" | "order" | "quote" | "preview" | "statement" | "public" | "privacy" | "preferences" | "signature" | "library";
 
 const missingLogged = new Set<string>();
 

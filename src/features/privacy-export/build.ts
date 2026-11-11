@@ -93,6 +93,7 @@ export const PERSON_EXPORT_README = `ייצוא כל המידע על אדם אח
 - deal_lines: השורות (מוצרים ושירותים) של העסקאות
 - task_checklist_items: השלבים של המשימות
 - messages: יומן ההודעות שנשלחו לליד או לאיש הקשר או התקבלו מהם (ערוץ, סטטוס וזמנים, בלי תוכן)
+- library_links: פריטים מספריית התוכן שנשלחו אליו בקישור אישי, ומתי נפתחו
 - signature_documents: מסמכים שנשלחו לחתימה, עם הנוסח המלא כפי שנשלח והמצב שלהם
 - signature_signatures: החתימות על המסמכים האלה: שם החותם, מספר זהות, החתימה, כתובת IP והדפדפן
 - segment_members: הסגמנטים (רשימות ידניות) שהאדם הוכנס אליהם
@@ -142,6 +143,7 @@ export const PERSON_EXPORT_TABLES = [
   "accounting_document_lines",
   "privacy_requests",
   "messages",
+  "library_links",
   "signature_documents",
   "signature_signatures",
   "segment_members",

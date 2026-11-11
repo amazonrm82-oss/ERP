@@ -65,6 +65,7 @@ import { DealLinesCard } from "@/features/deal-lines/components/deal-lines-card"
 import { RecordQuotesCard } from "@/features/quotes/components/record-quotes-card";
 import { RecordOrdersCard } from "@/features/orders/components/record-orders-card";
 import { RecordSignaturesCard } from "@/features/signatures/components/record-signatures-card";
+import { LibraryLinksCard } from "@/features/library-links/components/library-links-card";
 import { RecordDocumentsCard } from "@/features/documents/components/record-documents-card";
 import { RecordPaymentsCard } from "@/features/payments/components/record-payments-card";
 import { getOrdersAccess } from "@/features/orders/access";
@@ -283,6 +284,8 @@ export default async function DealPage({ params, searchParams }: Props) {
           {/* ORD-01: the deal's orders while the orders module is on */}
           {/* SGN-02: documents sent from this deal for signature, and the signed PDFs */}
           <RecordSignaturesCard orgId={orgId} kind="deal" recordId={deal.id} canEdit={canEdit} />
+          {/* LIB-02: library items sent by a tracked link, and when the customer opened them */}
+          <LibraryLinksCard orgId={orgId} record={{ kind: "deal", id: deal.id }} recipient={{ name: null, phoneE164: null, email: null }} />
           <RecordOrdersCard orgId={orgId} subject={{ kind: "deal", id: deal.id }} canCreate={canEdit} dealWon={deal.status === "won"} />
           {/* DOC-01: documents issued outside the system and recorded here */}
           <RecordDocumentsCard orgId={orgId} subject={{ kind: "deal", id: deal.id }} />

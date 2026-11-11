@@ -274,6 +274,10 @@ describe("tenant isolation", () => {
     );
     // QUO-10: the customer opened A's quote (written by the server only)
     await asAdmin((q) => q("insert into public.quote_views (organization_id, quote_id) values ($1, $2)", [orgA, ids.quoteA]));
+    // LIB-02: a library link sent to A's lead (written only by public.library_link_create; no client write grant)
+    await asAdmin((q) =>
+      q("insert into public.library_links (organization_id, library_item_id, lead_id) values ($1, $2, $3)", [orgA, ids.libraryFileA, ids.leadA]),
+    );
     // PRK-02: a privacy request to A (written only by public.privacy_request_submit; no client insert grant)
     await asAdmin((q) =>
       q("insert into public.privacy_requests (organization_id, request_type, requester_name, contact_kind, contact_value, target_date) values ($1, 'access', 'פונה', 'email', 'p@example.com', current_date + 30)", [orgA]),
@@ -577,6 +581,8 @@ describe("tenant isolation", () => {
     "quote_decisions",
     // QUO-10
     "quote_views",
+    // LIB-02
+    "library_links",
     // PRK-02
     "privacy_requests",
     // MSG-03
@@ -821,6 +827,8 @@ describe("tenant isolation", () => {
       quote_decisions: "ip = ip",
       // no client write grant at all: a permission error is the expected outcome
       quote_views: "view_count = view_count",
+      // LIB-02: no client write grant at all
+      library_links: "view_count = view_count",
       // no delete grant at all: a permission error is the expected outcome for the delete
       privacy_requests: "status = status",
       // no client write grant at all (the job queue writes): a permission error is the expected outcome
@@ -996,6 +1004,7 @@ describe("tenant isolation", () => {
       ["insert into public.opening_credit_allocations (organization_id, credit_document_id, document_id, amount_agorot) values ($1, $2, $3, 1)", [orgA, ids.openingCreditA, ids.contactInvoiceA]],
       ["insert into public.quote_decisions (organization_id, quote_id, decision, content_sha256) values ($1, $2, 'rejected', repeat('1', 64))", [orgA, ids.quoteA]],
       ["insert into public.quote_views (organization_id, quote_id) values ($1, $2)", [orgA, ids.quoteA]],
+      ["insert into public.library_links (organization_id, library_item_id, lead_id) values ($1, $2, $3)", [orgA, ids.libraryFileA, ids.leadA]],
       ["insert into public.privacy_requests (organization_id, request_type, requester_name, contact_kind, contact_value, target_date) values ($1, 'access', 'x', 'email', 'x@example.com', current_date)", [orgA]],
       ["insert into public.messages (organization_id, contact_id, channel, direction, status) values ($1, $2, 'sms', 'outbound', 'sent')", [orgA, ids.contactA]],
       ["insert into public.punch_cards (organization_id, contact_id, product_id, name, entries_total) values ($1, $2, (select id from public.products where organization_id = $1 and kind = 'punch_card' limit 1), 'x', 5)", [orgA, ids.contactA]],
@@ -1150,6 +1159,7 @@ describe("tenant isolation", () => {
       ["customer_debt_totals", "open_agorot = 777", "open_agorot = 777"],
       ["quote_decisions", "ip = 'HACKED'", "ip = 'HACKED'"],
       ["quote_views", "view_count = 777", "view_count = 777"],
+      ["library_links", "view_count = 777", "view_count = 777"],
       ["privacy_requests", "status = 'refused'", "status = 'refused'"],
       ["messages", "status = 'failed'", "status = 'failed'"],
       ["punch_cards", "entries_total = 777", "entries_total = 777"],

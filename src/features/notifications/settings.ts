@@ -27,6 +27,8 @@ export const NOTIFICATION_KINDS = [
   { key: "punch_card", label: "כרטיסייה: נשארו מעט כניסות או שהתוקף מתקרב", group: "money", shown: true },
   // SGN-03 (owner, 11 November 2026, answer (248) ב): a task to remind a customer who has not signed a document yet
   { key: "signature_reminder", label: "תזכורת: מסמך לחתימה שעוד לא נחתם", group: "calendar", shown: true },
+  // LIB-02: the customer opened a library item the person sent by a tracked link (once a day per link)
+  { key: "library_viewed", label: "לקוח פתח קישור ששלחתי מספריית התוכן", group: "records", shown: true },
   { key: "automation", label: "התראות מאוטומציות", group: "automations", shown: true },
   { key: "automation_failed", label: "אוטומציה נכשלה (למנהלים)", group: "automations", shown: true },
 ] as const;

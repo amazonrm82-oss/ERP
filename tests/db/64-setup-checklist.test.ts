@@ -833,6 +833,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // SGN-07 redefines public.signature_pdf_store, public.quote_signed_pdf_store, app.signature_pdf_source and
       // app.quote_signature_block last (the in-person rep)
       "_in_person_signing.sql",
+      // LIB-02 redefines app.sample_untouched() of _punch_card_recipients.sql last (a library link is real work) and sets the
+      // notification kind constraints of _signature_status_reminders.sql last (the library_viewed kind)
+      "_library_links.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

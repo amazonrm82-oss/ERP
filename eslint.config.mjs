@@ -75,6 +75,8 @@ const serviceKeyAllowList = {
     "src/features/orders/public-server.ts",
     // BAL-04: the customer's statement page, approved public secret-link pattern (owner, 8 October 2026)
     "src/features/statements/public-server.ts",
+    // LIB-02: a library item sent by a tracked link, approved public secret-link pattern (owner, 11 November 2026)
+    "src/features/library-links/public-server.ts",
     // CNS-09 / CNS-10: the customer's preferences page and unsubscribe link, approved public secret-link pattern (owner's
     // answer (225) א, 10 November 2026)
     "src/features/preferences/public-server.ts",

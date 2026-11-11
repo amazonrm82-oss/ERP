@@ -2,6 +2,7 @@ import { Suspense } from "react";
 
 import { RecordConsents } from "@/features/consents/components/record-consents";
 import { RecordSignaturesCard } from "@/features/signatures/components/record-signatures-card";
+import { LibraryLinksCard } from "@/features/library-links/components/library-links-card";
 import { createdLineText } from "@/features/imports/history";
 import { ManualAutomationsButton } from "@/features/automations/components/manual-automations-button";
 import { SendEmailButton } from "@/features/record-email/components/send-email-button";
@@ -351,6 +352,8 @@ export default async function LeadPage({ params, searchParams }: Props) {
 
           {/* SGN-02: documents sent from this lead for signature, and the signed PDFs */}
           <RecordSignaturesCard orgId={orgId} kind="lead" recordId={lead.id} canEdit={canEditRecordHint(context, lead.owner_id)} phoneE164={lead.phone_e164} />
+          {/* LIB-02: library items sent by a tracked link, and when the customer opened them */}
+          <LibraryLinksCard orgId={orgId} record={{ kind: "lead", id: lead.id }} recipient={{ name, phoneE164: lead.phone_e164, email: lead.email }} />
 
           <div className="print:hidden">
             <RecordConsents

@@ -278,6 +278,21 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
     refusal: TEXT_429,
     sender: "first",
   },
+  // LIB-02 (owner, 11 November 2026): a library item sent by a tracked link
+  "/f/lib/[token]": {
+    guard: "database",
+    functions: ["public_sender_check", "public_sender_miss", "library_link_public"],
+    limit: SENDER + "120 calls per link and 60 per sender (keyed IP hash, scope library, re-scoped per link) in 10 min, after the lookup, shared with the file route; a preview bot gets a generic page and no read",
+    refusal: PAGE_TEXT,
+    sender: "first",
+  },
+  "/api/forms/lib/[token]/file": {
+    guard: "database",
+    functions: ["public_sender_check", "public_sender_miss", "library_link_public_file"],
+    limit: SENDER + "a call of the link (same counters; not a view); the file through a 60-second signed link",
+    refusal: TEXT_429,
+    sender: "first",
+  },
   "/f/privacy/[token]": {
     guard: "database",
     functions: ["privacy_request_page"],

@@ -3030,6 +3030,41 @@ describe("content library by role", () => {
   });
 });
 
+// LIB-02: a library item sent by a tracked link. Whoever writes (owner, admin, manager, member) makes a link for a record
+// they read; a viewer makes none; everyone who reads the record reads its links; no role writes the table (the rest is in
+// 339-library-links)
+describe("library links by role (LIB-02)", () => {
+  let org: string;
+  let item: string;
+  const people: Record<string, { id: string; email: string }> = {};
+
+  beforeAll(async () => {
+    const owner = await createUser("llrole-owner");
+    org = await createOrg(owner.id);
+    people.owner = owner;
+    for (const role of ["admin", "manager", "member", "viewer"] as const) {
+      people[role] = await addMember(org, owner.id, role, `llrole-${role}`);
+    }
+    item = await asUser(owner.id, async (q) =>
+      (await q<{ id: string }>("insert into public.library_items (organization_id, kind, title, url) values ($1, 'link', 'קטלוג', 'https://example.com/') returning id", [org])).rows[0].id,
+    );
+  });
+
+  it("writers make links, a viewer does not; everyone reads them; nobody writes the table", async () => {
+    const lead = await insertLead(people.owner.id, org);
+    for (const [role, user] of Object.entries(people)) {
+      const made = asUser(user.id, (q) => q("select public.library_link_create($1, $2, 'lead', $3)", [org, item, lead]));
+      if (role === "viewer") expect((await pgError(made)).code, role).toBe("42501");
+      else await made;
+    }
+    for (const [role, user] of Object.entries(people)) {
+      expect(await asUser(user.id, (q) => count(q, "select 1 from public.library_links where lead_id = $1", [lead])), role).toBe(4);
+      expect((await pgError(asUser(user.id, (q) => q("update public.library_links set view_count = 9 where lead_id = $1", [lead])))).code, role).toBe("42501");
+      expect((await pgError(asUser(user.id, (q) => q("delete from public.library_links where lead_id = $1", [lead])))).code, role).toBe("42501");
+    }
+  });
+});
+
 describe("background jobs by role (IMP-04)", () => {
   let org: string;
   const people: Record<string, { id: string; email: string }> = {};

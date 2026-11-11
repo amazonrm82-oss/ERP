@@ -208,7 +208,7 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
   const promiseFilter = [contactIds.length ? `contact_id.in.(${contactIds.join(",")})` : null, ownDocumentIds.length ? `document_id.in.(${ownDocumentIds.join(",")})` : null]
     .filter(Boolean)
     .join(",");
-  const [accountingDocumentLines, paymentPromises, privacyRequests, dealLines, taskChecklistItems, messages] = await Promise.all([
+  const [accountingDocumentLines, paymentPromises, privacyRequests, dealLines, taskChecklistItems, messages, libraryLinks] = await Promise.all([
     readByIds(supabase, orgId, "accounting_document_lines", "*", "document_id", ownDocumentIds),
     readLinked(supabase, orgId, "payment_promises", "*", promiseFilter || null),
     readLinked(supabase, orgId, "privacy_requests", PRIVACY_REQUEST_COLUMNS, personOnly),
@@ -216,6 +216,8 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     readByIds(supabase, orgId, "task_checklist_items", "*", "task_id", uniqueIds(tasks.map((t) => t.id))),
     // MSG-03: the log of messages sent to or received from the person (codes, ids and times; no content is kept)
     readLinked(supabase, orgId, "messages", "*", personOnly),
+    // LIB-02: the library items sent to the person by a tracked link, and when they opened them (never the token)
+    readLinked(supabase, orgId, "library_links", "*", linked),
   ]);
 
   // SGN-02: the documents sent to the person for signature (their filled text) from their leads, contacts and deals, and the
@@ -296,6 +298,7 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     deal_lines: dealLines,
     task_checklist_items: taskChecklistItems,
     messages,
+    library_links: libraryLinks,
     signature_documents: signatureDocuments,
     signature_signatures: signatureSignatures,
     segment_members: segmentMembers,

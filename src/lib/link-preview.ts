@@ -93,4 +93,6 @@ export const PREVIEW_TEXTS = {
   statement: { what: "דף חשבון", joiner: "מאת", description: "פירוט החובות הפתוחים, בקישור אישי." },
   // CNS-09 / CNS-10: always generic as well: the page is never read for a preview (a read counts a call)
   preferences: { what: "העדפות דיוור", joiner: "של", description: "בחירה באילו ערוצים לקבל הודעות, בקישור אישי." },
+  // LIB-02: always generic as well: the page is never read for a preview (a read counts a view and tells the rep)
+  library: { what: "חומר מהעסק", joiner: "מאת", description: "קטלוג, מחירון או מסמך שנשלח אליכם בקישור אישי." },
 } as const;

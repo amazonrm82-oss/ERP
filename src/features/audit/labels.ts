@@ -201,6 +201,8 @@ export const ACTION_LABELS: Record<string, string> = {
   in_person_signature: "חתימה במקום",
   // BAL-04: the customer's statement link on a contact or company (created / revoked; never the token)
   statement_link: "קישור לדף חשבון",
+  // LIB-02: a library item sent to the record by a tracked link (created / revoked; never the token)
+  library_link: "קישור לפריט מהספרייה",
   consent_link: "קישור להעדפות דיוור",
   // PRK-02: the business's public privacy-request link (created / revoked; never the token)
   privacy_request_link: "קישור לבקשות פרטיות",

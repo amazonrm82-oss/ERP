@@ -528,6 +528,25 @@ export type LibraryItemRow = {
   updated_at: string;
 };
 
+// LIB-02: a library item sent to one record by a personal tracked link (migration library_links). Written only by
+// public.library_link_create / _revoke and the public page (views); read by whoever reads the record.
+export type LibraryLinkRow = {
+  id: string;
+  organization_id: string;
+  library_item_id: string;
+  lead_id: string | null;
+  contact_id: string | null;
+  company_id: string | null;
+  deal_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  revoked_at: string | null;
+  revoked_by: string | null;
+  first_viewed_at: string | null;
+  last_viewed_at: string | null;
+  view_count: number;
+};
+
 export type LibraryItemWrite = {
   category_id?: string | null;
   title?: string;
@@ -3924,6 +3943,7 @@ export type Database = {
       signature_documents: ReadOnlyTable<SignatureDocumentRow>;
       signature_signatures: ReadOnlyTable<SignatureSignatureRow>;
       quote_views: ReadOnlyTable<QuoteViewRow>;
+      library_links: ReadOnlyTable<LibraryLinkRow>;
       // MSG-03: no client writes
       messages: ReadOnlyTable<MessageRow>;
       // PKG-01, PKG-02: written only by the punch_card_* functions and the meetings trigger
@@ -4684,6 +4704,11 @@ export type Database = {
       statement_link_revoke: { Args: { p_org: string; p_contact?: string | null; p_company?: string | null }; Returns: boolean };
       statement_link_status: { Args: { p_org: string; p_contact?: string | null; p_company?: string | null }; Returns: Json };
       statement_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
+      // LIB-02: a library item's tracked link (writers who read the record) and the customer's page (service_role only)
+      library_link_create: { Args: { p_org: string; p_item: string; p_record_type: string; p_record_id: string }; Returns: string };
+      library_link_revoke: { Args: { p_org: string; p_link: string }; Returns: boolean };
+      library_link_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
+      library_link_public_file: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       // PRK-02: the business's privacy-request link (owners/admins) and the public page (service_role only)
       privacy_request_link_create: { Args: { p_org: string }; Returns: string };
       privacy_request_link_revoke: { Args: { p_org: string }; Returns: boolean };
