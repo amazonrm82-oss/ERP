@@ -75,14 +75,23 @@ describe.each([
   });
 });
 
-// Owner's answer 240 (ב): in dark the logo sits on a light plate; its navy (the brand colour) must stand out from it
-// (3:1, non-text), and the plate from the dark card and page. In light the plate is transparent.
-describe("logo plate", () => {
-  it("is transparent in light", () => {
-    expect(light["--color-logo-plate"]).toBe("transparent");
+// Owner's answers 240 and 251: the logo is two SVGs (src/assets/mexuz-logo.svg, -dark.svg), the dark one shown under
+// data-theme="dark". Every fill stands out 3:1 (non-text) from the card and the page of its theme, and the dark file's
+// light part is the dark ink.
+const svgFills = (file: string) =>
+  [...readFileSync(new URL(`../../src/assets/${file}`, import.meta.url), "utf8").matchAll(/fill="(#[0-9a-f]{6})"/gi)].map((m) => m[1]);
+describe("logo", () => {
+  it.each([
+    ["mexuz-logo.svg", light],
+    ["mexuz-logo-dark.svg", dark],
+  ] as const)("%s: every fill 3:1 against surface and canvas", (file, vars) => {
+    const fills = svgFills(file);
+    expect(fills.length).toBeGreaterThanOrEqual(1);
+    for (const fill of fills)
+      for (const ground of ["surface", "canvas"]) expect(contrast(fill, resolve(vars, `--color-${ground}`))).toBeGreaterThanOrEqual(3);
   });
-  it.each(["brand", "surface", "canvas"])("dark plate against %s: 3:1 or more", (other) => {
-    expect(contrast(resolve(dark, "--color-logo-plate"), resolve(dark, `--color-${other}`))).toBeGreaterThanOrEqual(3);
+  it("the dark logo's light part is the dark ink", () => {
+    expect(svgFills("mexuz-logo-dark.svg")).toContain(resolve(dark, "--color-ink"));
   });
 });
 

@@ -76,10 +76,6 @@
   /* always white, in both themes: behind a QR code or a drawn signature */
   --color-paper: var(--mx-white);
 
-  /* behind the product logo (Wordmark): nothing in light; a light plate in dark, where the logo's navy part would vanish
-     (owner's answer 240 (ב), until a light SVG version exists) */
-  --color-logo-plate: transparent;
-
   /* the logo's navy: the sign-in side panel; the same in both themes */
   --color-brand: var(--mx-blue-900);
   --color-on-brand: var(--mx-white);
@@ -128,7 +124,6 @@
   --color-chart-bar: var(--mx-blue-300);
   --color-chart-done: var(--mx-green-300);
   --color-chart-alert: var(--mx-red-300);
-  --color-logo-plate: var(--mx-white);
 }
 
 :root {
