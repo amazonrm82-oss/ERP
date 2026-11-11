@@ -24,7 +24,7 @@ type Reply = { ok: true; results?: { channel: PreferenceChannel; result: Prefere
  * where the database allows it (never over an erasure, a manual or SMS-reply blocklist entry, or another opt-out), so its
  * box is disabled otherwise.
  */
-export function PreferencesForm({ token, channels, staffLink = false }: { token: string; channels: PreferenceChannelRow[]; staffLink?: boolean }) {
+export function PreferencesForm({ token, channels, unsubscribeOnly = false }: { token: string; channels: PreferenceChannelRow[]; unsubscribeOnly?: boolean }) {
   const [rows, setRows] = useState(channels);
   const [picked, setPicked] = useState<Record<string, boolean>>(() => Object.fromEntries(channels.map((c) => [c.channel, c.state === "in"])));
   const [pending, setPending] = useState(false);
@@ -61,7 +61,7 @@ export function PreferencesForm({ token, channels, staffLink = false }: { token:
       }
       const results = new Map((reply.results ?? []).map((r) => [r.channel, r.result]));
       setRows((current) =>
-        current.map((row) => (results.get(row.channel) === "saved" ? { ...row, state: picked[row.channel] ? "in" : "out", canTurnOn: !picked[row.channel] && !staffLink } : row)),
+        current.map((row) => (results.get(row.channel) === "saved" ? { ...row, state: picked[row.channel] ? "in" : "out", canTurnOn: !picked[row.channel] && !unsubscribeOnly } : row)),
       );
       setPicked((current) => {
         const next = { ...current };
@@ -88,8 +88,8 @@ export function PreferencesForm({ token, channels, staffLink = false }: { token:
         return;
       }
       // delta review 4: the person's own removal can be undone from the page (owner (231) ב); the server judges it again
-      // RVW-82: a link copied by staff never turns a channel on
-      setRows((current) => current.map((row) => ({ ...row, state: "out", canTurnOn: !staffLink })));
+      // owner (250) ב: a staff link past its 7 days never turns a channel on
+      setRows((current) => current.map((row) => ({ ...row, state: "out", canTurnOn: !unsubscribeOnly })));
       setPicked((current) => Object.fromEntries(Object.keys(current).map((channel) => [channel, false])));
       setNotice(PREFERENCES_TEXTS.removedAll);
     } catch {

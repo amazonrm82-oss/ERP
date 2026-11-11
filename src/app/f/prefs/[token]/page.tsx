@@ -66,12 +66,12 @@ export default async function PublicPreferencesPage({ params }: Props) {
           {page.full ? (
             <div className="space-y-4">
               <p className="text-md">{PREFERENCES_TEXTS.intro}</p>
-              {page.staffLink ? <p className="text-sm text-ink-soft">{PREFERENCES_TEXTS.staffLink}</p> : null}
-              <PreferencesForm token={token} channels={page.channels} staffLink={page.staffLink} />
+              {page.unsubscribeOnly ? <p className="text-sm text-ink-soft">{PREFERENCES_TEXTS.unsubscribeOnly}</p> : null}
+              <PreferencesForm token={token} channels={page.channels} unsubscribeOnly={page.unsubscribeOnly} />
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-md text-ink-soft">{PREFERENCES_TEXTS.oldLink}</p>
+              <p className="text-md text-ink-soft">{PREFERENCES_TEXTS.unsubscribeOnly}</p>
               <UnsubscribeConfirm token={token} channel={page.channel} full={false} />
             </div>
           )}

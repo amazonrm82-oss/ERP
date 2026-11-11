@@ -50,7 +50,7 @@ describe("preferences (CNS-09, CNS-10)", () => {
       builtWith: true,
       channel: "email",
       full: true,
-      staffLink: false,
+      unsubscribeOnly: false,
       channels: [
         { channel: "email", state: "in", canTurnOn: false },
         { channel: "sms", state: "unknown", canTurnOn: true },
@@ -59,8 +59,9 @@ describe("preferences (CNS-09, CNS-10)", () => {
     expect(preferencesPageFrom({ ...answer, channel: "phone" })).toBeNull();
     expect(preferencesPageFrom({ ...answer, channels: [{ channel: "sms", state: "maybe", can_turn_on: true }] })).toBeNull();
     expect(preferencesPageFrom(null)).toBeNull();
-    // RVW-82: a link copied by staff only removes
-    expect(preferencesPageFrom({ ...answer, staff_link: true })?.staffLink).toBe(true);
+    // owner (250) ב: a staff link past its 7 days only removes
+    expect(preferencesPageFrom({ ...answer, unsubscribe_only: true })?.unsubscribeOnly).toBe(true);
+    expect(preferencesPageFrom({ ...answer, staff_link: true })?.unsubscribeOnly).toBe(false);
   });
 
   it("a form sends one choice per channel, at most three", () => {

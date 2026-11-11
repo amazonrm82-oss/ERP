@@ -48,7 +48,7 @@ export function PreferenceLinkButton({ orgId, subject, channels }: Props) {
   return (
     <div className="space-y-3 border-t border-line pt-3">
       <p className="text-md font-medium">קישור להעדפות הדיוור</p>
-      <p className="text-sm text-ink-soft">הקישור שמעתיקים כאן מאפשר רק הסרה מדיוור, לא הרשמה מחדש.</p>
+      <p className="text-sm text-ink-soft">קישור להעדפות דיוור ללקוח. במשך 7 ימים אפשר בו להסיר ולהירשם מחדש; אחר כך רק להסיר.</p>
       <FormError message={error} />
       {url ? (
         <div className="space-y-2">

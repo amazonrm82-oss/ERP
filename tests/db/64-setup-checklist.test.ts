@@ -808,6 +808,10 @@ describe("setup checklist and sample data (USR-04)", () => {
       // public.sms_sender_verify_start() of _sms_d_sender_check.sql and app.consent_preference_channels() /
       // public.consent_preferences_public() of _consent_preference_links.sql last (RVW-80, RVW-81, RVW-82)
       "_review_1111_messaging.sql",
+      // CNS-10 (250) ב redefines app.consent_register_walk() / app.consent_prepare() / app.consent_preference_withdraw() /
+      // public.consent_preferences_submit() of _consent_preference_links.sql and app.consent_preference_channels() /
+      // public.consent_preferences_public() of _review_1111_messaging.sql last (a staff link turns on for 7 days)
+      "_staff_preference_link.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

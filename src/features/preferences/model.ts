@@ -35,8 +35,8 @@ export type PreferencesPage = {
   builtWith: boolean;
   channel: PreferenceChannel;
   full: boolean;
-  /** RVW-82: the link was copied by a person on the staff, so it only removes (nothing is turned on from it). */
-  staffLink: boolean;
+  /** Owner (250) ב: a link a person on the staff copied, more than 7 days ago: it only removes (nothing is turned on from it). */
+  unsubscribeOnly: boolean;
   channels: PreferenceChannelRow[];
 };
 
@@ -64,7 +64,7 @@ export function preferencesPageFrom(data: unknown): PreferencesPage | null {
     builtWith: d.built_with === true,
     channel: d.channel,
     full: d.full,
-    staffLink: d.staff_link === true,
+    unsubscribeOnly: d.unsubscribe_only === true,
     channels,
   };
 }
@@ -110,10 +110,10 @@ export const PREFERENCES_TEXTS = {
   removeAll: "הסרה מכל הערוצים",
   removeAllLine: "מפסיקים את ההודעות השיווקיות מאיתנו בכל הערוצים.",
   removedAll: "הוסרתם מכל הערוצים.",
-  oldLink: "הקישור הזה הוחלף בקישור חדש. אפשר עדיין להפסיק דרכו את ההודעות בערוץ שלו.",
   saved: "השינויים נשמרו.",
   refused: "לא ניתן לחדש כאן את ההרשמה לערוץ הזה. אפשר לפנות לעסק.",
-  staffLink: "בקישור הזה אפשר רק להפסיק את ההודעות. כדי לחדש את ההרשמה, אפשר להשתמש בקישור שבהודעה שקיבלתם מאיתנו או לפנות לעסק.",
+  // owner (232) א: an older link, and a staff link past its 7 days (250) ב
+  unsubscribeOnly: "בקישור הזה אפשר רק להפסיק את קבלת ההודעות. כדי להירשם מחדש, השתמשו בקישור שבהודעה האחרונה שקיבלתם מאיתנו, או פנו לעסק.",
   unsubscribeIntro: (channel: PreferenceChannel) => `להפסיק לקבל מאיתנו הודעות שיווקיות ב${channelPhrase(channel)}?`,
   unsubscribeNote: "הודעות שירות, כמו תזכורת לפגישה, ממשיכות להגיע.",
   unsubscribeButton: "כן, להסיר אותי",

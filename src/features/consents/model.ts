@@ -12,7 +12,7 @@ export const CONSENT_STATES = ["granted", "denied", "withdrawn", "unknown", "awa
 export type ConsentState = (typeof CONSENT_STATES)[number];
 
 // CNS-10 (migration _consent_preference_links.sql) adds the customer's own choice on the preferences page
-export const CONSENT_SOURCES = ["form", "manual", "import", "api", "unsubscribe", "erasure", "preferences"] as const;
+export const CONSENT_SOURCES = ["form", "manual", "import", "api", "unsubscribe", "erasure", "preferences", "preferences_staff_link"] as const;
 export type ConsentSource = (typeof CONSENT_SOURCES)[number];
 
 /** What a person may record by hand (CNS-03); "unknown" is what no entry means. */
@@ -57,6 +57,8 @@ export const SOURCE_LABELS: Record<ConsentSource, string> = {
   erasure: "בקשת מחיקה",
   // CNS-10: the customer's own choice on the preferences page of the business
   preferences: "דף העדפות",
+  // owner (250) ב: the same page, through a link a person on the staff copied
+  preferences_staff_link: "דף העדפות (קישור מהעסק)",
 };
 
 // the record's address a channel needs: a phone for SMS, WhatsApp and calls, an email for email
