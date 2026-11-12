@@ -161,6 +161,8 @@ const RERUN = [
   migrationFile("_review_url_any_https.sql"),
   // RET-02 (309) ב redefines app.job_payload_ok() and the review request job last
   migrationFile("_review_requests_leads.sql"),
+  // LIB-02 (299) ב redefines app.library_link_mark_viewed() last
+  migrationFile("_library_link_notice_owner.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

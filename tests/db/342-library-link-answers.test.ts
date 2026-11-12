@@ -148,7 +148,8 @@ describe("tracked library links: the owner's answers (292)-(296)", () => {
     expect(contact).toEqual({ last: null });
   });
 
-  it("(296) ג: a maker who no longer reads the record: the owners and admins are told on the first opening, and the link serves", async () => {
+  // (299) ב (021238) refines this: the record's current owner is told first; test 349 covers the owners and admins branch
+  it("(296) ג / (299) ב: a maker who no longer reads the record: the record's current owner is told on the first opening, and the link serves", async () => {
     const item = await linkItem("פריט של נציג");
     const leadId = await lead(member.id);
     const token = await create(member, item, "lead", leadId);
@@ -160,11 +161,11 @@ describe("tracked library links: the owner's answers (292)-(296)", () => {
       expect((await page(token)).item).toMatchObject({ title: "פריט של נציג" });
       await page(token);
       expect(await notices(member)).toBe(m);
-      expect(await notices(owner)).toBe(o + 1);
-      expect(await notices(admin)).toBe(a + 1);
-      expect(await notices(other)).toBe(x);
+      expect(await notices(owner)).toBe(o);
+      expect(await notices(admin)).toBe(a);
+      expect(await notices(other)).toBe(x + 1);
       const notice = await asAdmin(async (q) =>
-        one<{ title: string; body: string; entity_id: string }>(q, "select title, body, entity_id from public.notifications where user_id = $1 and type = 'library_viewed' order by created_at desc limit 1", [admin.id]),
+        one<{ title: string; body: string; entity_id: string }>(q, "select title, body, entity_id from public.notifications where user_id = $1 and type = 'library_viewed' order by created_at desc limit 1", [other.id]),
       );
       expect(notice).toEqual({ title: "הלקוח פתח קישור שנשלח מהספרייה", body: "פריט של נציג", entity_id: leadId });
     } finally {

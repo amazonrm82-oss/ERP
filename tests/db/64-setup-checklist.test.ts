@@ -863,6 +863,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       // RET-02 (309) ב redefines app.job_payload_ok(), app.merge_review_requests(), app.review_request_one() and
       // app.send_review_requests() of _review_requests.sql last
       "_review_requests_leads.sql",
+      // LIB-02 (299) ב redefines app.library_link_mark_viewed() of _library_link_answers.sql last (the record's owner is told)
+      "_library_link_notice_owner.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
