@@ -1,8 +1,10 @@
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { CheckIcon } from "@/components/ui/icons";
+import { landingUpcomingCapabilities } from "@/features/landing/upcoming";
 import { annualPriceLabel, monthlyPriceLabel, VAT_NOTE } from "@/features/plans/price";
 import { landingCoreCapabilities, landingPlanCapabilities, planQuotaLines, type PublicPlan } from "@/features/plans/public-plans";
+import { PUBLIC_ROADMAP_NOTE } from "@/features/roadmap/public-items";
 import { paths } from "@/lib/paths";
 
 const priced = (plan: PublicPlan) => ({
@@ -10,6 +12,27 @@ const priced = (plan: PublicPlan) => ({
   price_annual_agorot: plan.priceAnnualAgorot,
   price_unit: plan.priceUnit,
 });
+
+/** LND-13 (304) ב: what is on its way, from the public roadmap's list, each marked "בקרוב". Static, so it shows even when
+ * the plans cannot be read. */
+function Upcoming() {
+  const items = landingUpcomingCapabilities();
+  if (items.length === 0) return null;
+  return (
+    <div className="mt-6 rounded-lg border border-dashed border-line-strong bg-surface p-5">
+      <h3 className="font-semibold">בדרך למערכת</h3>
+      <ul className="mt-3 grid gap-2 text-md sm:grid-cols-2">
+        {items.map((item) => (
+          <li key={item.key} className="flex flex-wrap items-center gap-2">
+            <span className="min-w-0">{item.title}</span>
+            <Badge tone="accent">{item.mark}</Badge>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-sm text-ink-soft">{PUBLIC_ROADMAP_NOTE}.</p>
+    </div>
+  );
+}
 
 function Included({ label }: { label: string }) {
   return (
@@ -98,6 +121,7 @@ export function PriceList({ plans }: { plans: PublicPlan[] | null }) {
             </ul>
           </>
         )}
+        <Upcoming />
       </div>
     </section>
   );
