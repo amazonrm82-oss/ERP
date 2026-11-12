@@ -30,7 +30,7 @@ import { priceSourceText } from "@/features/deal-lines/schema";
 import { BundleLineControl } from "@/features/products/components/bundle-line-control";
 import { RecipientLineControl } from "@/features/punch-cards/components/recipient-line-control";
 import { getRecipientSetup } from "@/features/punch-cards/recipient-server";
-import { orgHasFeature } from "@/features/settings/queries";
+import { orgHasFeature, orgPdfQuotaZero } from "@/features/settings/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
 import { must } from "@/lib/db-read";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
@@ -100,6 +100,8 @@ export default async function OrderPage({ params }: Props) {
   // owner's answer (34) ב: the newest is the one the customer gets; the earlier versions stay for staff
   const pdfFiles = order.status !== "draft" ? await listOrderPdfFiles(supabase, orgId, order.id) : [];
   const pdfFile = pdfFiles[0] ?? null;
+  // owner (337) א: a plan whose PDF quota is zero offers no PDF of its own ("זמין מחבילת אישית")
+  const pdfZero = order.status !== "draft" ? await orgPdfQuotaZero(orgId) : false;
   const hasOrders = await orgHasFeature(orgId, "orders");
 
   return (
@@ -120,6 +122,7 @@ export default async function OrderPage({ params }: Props) {
                 href={pdfFile ? paths.file(orgId, pdfFile.id) : null}
                 canStore={hasOrders && orderPdfStorable(order) && mayEdit}
                 outdated={orderPdfOutdated(order, pdfFile)}
+                pdfZero={pdfZero}
               />
             ) : null}
             {mayEdit && order.status === "draft" ? (

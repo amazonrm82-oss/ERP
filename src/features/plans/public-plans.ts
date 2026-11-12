@@ -105,6 +105,9 @@ export function planQuotaLines(limits: unknown): string[] {
   if (users !== undefined) lines.push(users === null ? "משתמשים בלי תקרה" : `עד ${formatNumber(users)} משתמשים`);
   if (records !== undefined) lines.push(records === null ? "רשומות בלי תקרה" : `עד ${formatNumber(records)} רשומות`);
   if (storage !== undefined && storage !== null) lines.push(`אחסון ${formatNumber(storage)} GB`);
+  // owner (331) א: a plan that caps the quotes sent a month says so (the landing page's read carries no such limit)
+  const quotes = of("max_quotes_per_month");
+  if (typeof quotes === "number") lines.push(`עד ${formatNumber(quotes)} הצעות מחיר בחודש`);
   return lines;
 }
 

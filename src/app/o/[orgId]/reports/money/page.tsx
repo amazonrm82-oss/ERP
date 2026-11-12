@@ -8,6 +8,7 @@ import { RowActions } from "@/features/money-waiting/components/row-actions";
 import { getMoneyWaiting, getRowActionSetup, type MoneyWaiting } from "@/features/money-waiting/queries";
 import { rowActions } from "@/features/money-waiting/row-actions";
 import { withReportShape } from "@/features/reports/schemas";
+import { orgHasFeature } from "@/features/settings/queries";
 import { canEditRecordHint, getOrgContext } from "@/features/shell/queries";
 import { recordTemplateValues } from "@/features/whatsapp/templates";
 import { paths } from "@/lib/paths";
@@ -28,7 +29,9 @@ type Props = {
 export default async function MoneyWaitingPage({ params, searchParams }: Props) {
   const { orgId } = await params;
   const query = await searchParams;
-  const context = await getOrgContext(orgId);
+  const [context, withActions] = await Promise.all([getOrgContext(orgId), orgHasFeature(orgId, "money_waiting_actions")]);
+  // owner (330) א: a plan without the screen's actions (the free plan) reads the numbers only; a row offers nothing
+  const canAct = context.canWrite && withActions;
   const requested = firstParam(query.owner);
   const mine = requested === "me" || (requested !== "all" && context.role === "member");
   const money = await withReportShape(() => getMoneyWaiting(orgId, mine ? context.user.id : null));
@@ -40,14 +43,18 @@ export default async function MoneyWaitingPage({ params, searchParams }: Props) 
     ...(value.debts ?? []).slice(0, ROWS_SHOWN).map(debtContact),
     ...value.renewals.slice(0, ROWS_SHOWN).map((renewal) => renewal.contactId),
   ];
-  const setup = money.ok && money.value ? await getRowActionSetup(orgId, context.canWrite, shownContacts(money.value)) : null;
+  const setup = money.ok && money.value ? await getRowActionSetup(orgId, canAct, shownContacts(money.value)) : null;
   const canReassign = (ownerId: string | null) => context.role !== "member" && canEditRecordHint(context, ownerId);
 
   return (
     <>
       <PageHeader
         title="כסף שמחכה"
-        description="כמה כסף אפשר להכניס אם מטפלים במה שכבר נמצא במערכת. לכל שורה יש פעולה: משימה, הקצאה לנציג או WhatsApp."
+        description={
+          withActions
+            ? "כמה כסף אפשר להכניס אם מטפלים במה שכבר נמצא במערכת. לכל שורה יש פעולה: משימה, הקצאה לנציג או WhatsApp."
+            : "כמה כסף אפשר להכניס אם מטפלים במה שכבר נמצא במערכת. בחבילה הנוכחית המסך לקריאה בלבד: את הפעולות עושים מדף הרשומה."
+        }
         back={{ href: paths.reports(orgId), label: "דוחות" }}
       />
       <Tabs
@@ -78,7 +85,7 @@ export default async function MoneyWaitingPage({ params, searchParams }: Props) 
               values: recordTemplateValues({ firstName: person?.firstName, fullName: person?.fullName ?? null }, context),
               personName: person?.fullName || deal.name,
             };
-            const actions = rowActions({ kind: "deal", ownerId: deal.ownerId, phoneE164: target.phoneE164, canWrite: context.canWrite, canReassign: canReassign(deal.ownerId) });
+            const actions = rowActions({ kind: "deal", ownerId: deal.ownerId, phoneE164: target.phoneE164, canWrite: canAct, canReassign: canReassign(deal.ownerId) });
             return <RowActions orgId={orgId} target={target} actions={actions} owners={setup?.owners ?? []} />;
           }}
           recordAction={(row) => {
@@ -96,7 +103,7 @@ export default async function MoneyWaitingPage({ params, searchParams }: Props) 
               kind: row.kind,
               ownerId: row.ownerId,
               phoneE164: target.phoneE164,
-              canWrite: context.canWrite,
+              canWrite: canAct,
               // a quote's owner is not its deal's owner: the deal is handed over from its own page
               canReassign: row.group !== "quotes" && canReassign(row.ownerId),
               reminder: row.group === "debts",
@@ -113,7 +120,7 @@ export default async function MoneyWaitingPage({ params, searchParams }: Props) 
               values: recordTemplateValues({ fullName: lead.fullName }, context),
               personName: lead.name,
             };
-            const actions = rowActions({ kind: "lead", ownerId: lead.ownerId, phoneE164: lead.phoneE164, canWrite: context.canWrite, canReassign: canReassign(lead.ownerId) });
+            const actions = rowActions({ kind: "lead", ownerId: lead.ownerId, phoneE164: lead.phoneE164, canWrite: canAct, canReassign: canReassign(lead.ownerId) });
             return <RowActions orgId={orgId} target={target} actions={actions} owners={setup?.owners ?? []} />;
           }}
         />

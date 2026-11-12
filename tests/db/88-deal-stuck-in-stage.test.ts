@@ -167,6 +167,8 @@ const RERUN = [
   migrationFile("_business_page_routing.sql"),
   // BIZ-01 (316) ב sets the business_pages_audit trigger last
   migrationFile("_business_page_new_link.sql"),
+  // owner (330) א, (331) א redefine app.plan_key_defaults() last
+  migrationFile("_free_plan_quotes.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

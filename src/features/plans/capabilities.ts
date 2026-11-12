@@ -91,8 +91,14 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
 /** The capabilities a plan includes, in list order, from its plans.features. */
 export function planCapabilities(features: unknown): PlanCapability[] {
   const flags = features && typeof features === "object" && !Array.isArray(features) ? (features as Record<string, unknown>) : {};
-  return PLAN_CAPABILITIES.filter((item) => item.core === true || flags[item.feature] === true);
+  return PLAN_CAPABILITIES.filter((item) => item.core === true || flags[item.feature] === true).map((item) =>
+    // owner (330) א: without its row actions the screen is read only (the free plan), and the card says so
+    item.feature === "money_waiting" && flags.money_waiting_actions !== true ? { ...item, label: MONEY_WAITING_READ_ONLY_LABEL } : item,
+  );
 }
+
+/** The card's line for "כסף שמחכה" in a plan without `money_waiting_actions`. */
+export const MONEY_WAITING_READ_ONLY_LABEL = "כסף שמחכה (לקריאה בלבד)";
 
 // The "עסקי" plan opens when these are built (owner, 13 October 2026). The lead
 // flips `built` at merge; then the admin panel says the plan can be opened.

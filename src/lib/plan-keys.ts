@@ -1,8 +1,7 @@
 // Plan keys, prices and states (owner's pricing of 13 October 2026; it replaces the
 // temporary "everything open, high values" defaults). Mirrors migrations plan_pricing
 // (the seed), plan_trial_built_with (the changes of the owner's later decisions) and
-// plan_review_fixes, lead_distribution_plan, campaign_costs_plan, punch_cards_plan, meta_leads_plan, meeting_customer_reminders and document_templates (the latest app.plan_key_defaults()): PLAN_VALUES = the seed with
-// plan_review_fixes, lead_distribution_plan, campaign_costs_plan, punch_cards_plan, meta_leads_plan, meeting_customer_reminders, document_templates, sms_b_send, review_requests and business_page (the latest app.plan_key_defaults()): PLAN_VALUES = the seed with
+// plan_review_fixes, lead_distribution_plan, campaign_costs_plan, punch_cards_plan, meta_leads_plan, meeting_customer_reminders, document_templates, sms_b_send, review_requests, business_page and free_plan_quotes (the latest app.plan_key_defaults()): PLAN_VALUES = the seed with
 // those changes, PLAN_KEY_FALLBACK = the latest app.plan_key_defaults().
 // tests/unit/plan-keys.test.ts reads the migrations and compares; keep them in step.
 //
@@ -79,6 +78,8 @@ const LIMITS: Record<string, Record<SoldPlan, number | null>> = {
   // SMS (owner (210) ב, 10 November 2026, scope (א2)): every SMS to a customer a month (never a verification code);
   // personal 0 (later only from the SMS-04 wallet)
   max_sms_per_month: byPlan(0, 100, 300, 1000),
+  // owner (331) א, 12 November 2026: quotes SENT a month; no cap in the sold plans (the hidden free plan: 3)
+  max_quotes_per_month: byPlan(null, null, null, null),
 };
 
 const ALL = byPlan(true, true, true, true);
@@ -93,6 +94,8 @@ const FEATURES: Record<string, Record<SoldPlan, boolean>> = {
   balances: ALL,
   booking_page: ALL,
   money_waiting: ALL,
+  // owner (330) א, 12 November 2026: the row actions of "כסף שמחכה" (the hidden free plan: off = read only)
+  money_waiting_actions: ALL,
   instant_reply: ALL, // SPD-04
   email_sync: ALL, // email and calendar sync
   whatsapp_inbox: ALL, // messages paid from the wallet
@@ -188,6 +191,8 @@ const WAVE2_FEATURE_LIST = [
   "review_requests",
   // BIZ-01 (migration business_page)
   "public_page",
+  // owner (330) א (migration free_plan_quotes)
+  "money_waiting_actions",
 ] as const;
 const WAVE2_LIMIT_LIST = [
   "max_products", "max_price_lists", "max_quote_templates", "max_booking_pages", "max_booking_pages_per_user",
@@ -201,6 +206,8 @@ const WAVE2_LIMIT_LIST = [
   "max_signatures_per_month",
   // SMS-02 (migration sms_b_send)
   "max_sms_per_month",
+  // owner (331) א (migration free_plan_quotes)
+  "max_quotes_per_month",
 ] as const;
 
 export type Wave2FeatureKey = (typeof WAVE2_FEATURE_LIST)[number];

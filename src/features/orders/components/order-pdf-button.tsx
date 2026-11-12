@@ -5,6 +5,8 @@ import { useState, useTransition } from "react";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { FormError } from "@/components/ui/feedback";
 
+import { PDF_FROM_PERSONAL } from "@/features/plans/pdf-quota";
+
 import { storeOrderPdfAction } from "../actions";
 
 type Props = {
@@ -17,6 +19,8 @@ type Props = {
   // owner's answer (34) ב: the delivery date, shipping address or notes changed after the current PDF was made (its new
   // version failed when the order was saved); the user may make it now
   outdated?: boolean;
+  // owner (337) א: the plan's monthly PDF quota is zero (the free plan): no PDF is made, the button says so
+  pdfZero?: boolean;
 };
 
 /**
@@ -24,7 +28,7 @@ type Props = {
  * number. An order numbered before the PDF existed, or whose PDF could not be kept then (a full monthly quota), offers to
  * keep it now.
  */
-export function OrderPdfButton({ orgId, orderId, href, canStore, outdated = false }: Props) {
+export function OrderPdfButton({ orgId, orderId, href, canStore, outdated = false, pdfZero = false }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const keep = (label: string) => (
@@ -51,17 +55,30 @@ export function OrderPdfButton({ orgId, orderId, href, canStore, outdated = fals
           <a href={href} className={buttonClasses("secondary", "sm")}>
             הורדת PDF
           </a>
-          {outdated && canStore ? keep("עדכון ה-PDF") : null}
+          {outdated && canStore ? (pdfZero ? <PdfFromPersonal label="עדכון ה-PDF" /> : keep("עדכון ה-PDF")) : null}
         </span>
         <FormError message={error} />
       </span>
     );
   }
   if (!canStore) return null;
+  if (pdfZero) return <PdfFromPersonal label="שמירת PDF" />;
   return (
     <span className="inline-flex flex-col gap-1">
       {keep("שמירת PDF")}
       <FormError message={error} />
+    </span>
+  );
+}
+
+/** Owner (337) א: a disabled PDF button with the line "זמין מחבילת אישית" (the server refuses anyway). */
+function PdfFromPersonal({ label }: { label: string }) {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2 text-sm text-ink-soft">
+      <Button variant="secondary" size="sm" disabled>
+        {label}
+      </Button>
+      {PDF_FROM_PERSONAL}
     </span>
   );
 }

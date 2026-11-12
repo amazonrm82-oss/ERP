@@ -16,8 +16,8 @@ const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA
  * QUO-09 signed PDF (owner, 1 November 2026, answers (3) א and (33) ב): when the customer accepts a quote, the server keeps a
  * signed PDF as a newer version of the quote's PDF as sent (files.previous_id; or the first file when none was kept). Written by
  * the server only: from the customer's route by the link's token (public.quote_signed_pdf_public / _public_store), or by staff
- * (public.quote_signed_pdf_allowed with their own session, then public.quote_signed_pdf_store for that user). Counted in
- * max_pdf_per_month; the customer downloads the newest confirmed version; staff read both; erasure removes every version.
+ * (public.quote_signed_pdf_allowed with their own session, then public.quote_signed_pdf_store for that user). Never counted
+ * in max_pdf_per_month (owner (337) א); the customer downloads the newest confirmed version; staff read both; erasure removes every version.
  */
 describe("the signed PDF of an accepted quote (QUO-09)", () => {
   let owner: U, admin: U, manager: U, member: U, other: U, viewer: U, outsider: U;
@@ -169,7 +169,7 @@ describe("the signed PDF of an accepted quote (QUO-09)", () => {
     expect((await pgError(asAnon((q) => q("select public.quote_signed_pdf_public_store('x', 1, $1, 'x.pdf')", [sha("a")])))).code).toBe("42501");
   });
 
-  it("after acceptance: the customer's route renders the page and stores the signed PDF after the PDF as sent; counted once; no view counted", async () => {
+  it("after acceptance: the customer's route renders the page and stores the signed PDF after the PDF as sent; not counted (owner (337) א); no view counted", async () => {
     const quoteId = await newQuote(member, true);
     const sent = await storeSent(member, quoteId);
     const token = await link(member, quoteId);
@@ -201,7 +201,7 @@ describe("the signed PDF of an accepted quote (QUO-09)", () => {
 
     const before = await produced();
     const signed = await signFully(token, sha("c"), src.signature.fingerprint);
-    expect(await produced()).toBe(before + 1);
+    expect(await produced()).toBe(before);
     expect(await files(quoteId)).toEqual([
       { id: sent.id, previous_id: null, quote_signed: null, sha256: sha("a") },
       { id: signed.id, previous_id: sent.id, quote_signed: true, sha256: sha("c") },
@@ -210,7 +210,7 @@ describe("the signed PDF of an accepted quote (QUO-09)", () => {
     expect(await publicStore(token, sha("d"), null, src.signature.fingerprint)).toEqual({ status: "stored", file_id: signed.id });
     expect(await source(token)).toEqual({ done: true });
     expect(await staffAllowed(owner, quoteId)).toBeNull();
-    expect(await produced()).toBe(before + 1);
+    expect(await produced()).toBe(before);
 
     // the customer gets the signed one, and the interim label is gone
     expect(await download(token)).toMatchObject({ path: signed.path, sha256: sha("c"), name: "הצעה חתומה.pdf" });
@@ -403,7 +403,7 @@ describe("the signed PDF of an accepted quote (QUO-09)", () => {
     ).toBe("42501");
   });
 
-  it("staff: owners and admins only (review, high): the block and the write; checked again for that user; a full month refuses, the acceptance stays", async () => {
+  it("staff: owners and admins only (review, high): the block and the write; checked again for that user; the acceptance stays", async () => {
     const quoteId = await newQuote(member);
     const sent = await storeSent(member, quoteId);
     const token = await link(member, quoteId);
@@ -428,16 +428,7 @@ describe("the signed PDF of an accepted quote (QUO-09)", () => {
     }
     expect((await pgError(staffStore(admin, quoteId, sha("5"), null, block!.fingerprint, outsiderOrg))).code).toBe("42501");
 
-    // a full month refuses the signed PDF; the quote stays accepted
-    const counted = await produced();
-    await asAdmin((q) =>
-      q("update public.subscriptions set limit_overrides = limit_overrides || jsonb_build_object('max_pdf_per_month', $2::numeric) where organization_id = $1", [org, counted]),
-    );
-    try {
-      expect((await pgError(staffStore(admin, quoteId, sha("5"), null, block!.fingerprint))).hint).toBe("limit:max_pdf_per_month");
-    } finally {
-      await asAdmin((q) => q("update public.subscriptions set limit_overrides = limit_overrides || '{\"max_pdf_per_month\": 1000}'::jsonb where organization_id = $1", [org]));
-    }
+    // owner (337) א: a quote's PDF is never refused by max_pdf_per_month (the full-month refusal is gone); the quote stays accepted
     expect(await asAdmin((q) => one<{ status: string }>(q, "select status from public.quotes where id = $1", [quoteId]))).toEqual({ status: "accepted" });
     expect(await download(token)).toMatchObject({ sha256: sha("a") });
 

@@ -56,7 +56,9 @@ const KEPT = new Set([
   "app.dormant_backfills", "app.integration_notice_days", "app.integration_secrets", "app.integration_tests", "app.job_cancel_counts", "app.lead_retention_settings",
   "app.lead_rotation_clock", "app.lead_rotation_passes", "app.lead_score_queue", "app.message_cap_holds",
   "app.message_cap_notices", "app.message_refusal_notices", "app.message_send_rate", "app.message_usage_days",
-  "app.meta_lead_notice_days", "app.org_activation", "app.org_suspensions", "app.pdf_months", "app.platform_assignments",
+  "app.meta_lead_notice_days", "app.org_activation", "app.org_suspensions", "app.pdf_months",
+  // owner (331) א (after the script): the month's sent-quote counter is a quota like pdf_months, kept
+  "app.quote_months", "app.platform_assignments",
   "app.platform_log", "app.privacy_request_counts", "app.privacy_request_links", "app.privacy_request_notice_days",
   "app.punch_card_alert_orgs", "app.punch_card_alert_turns", "app.punch_card_template_seeds", "app.qr_external_blocks",
   "app.schedule_business_turns", "app.subprocessor_notices", "app.support_request_notes", "app.support_request_reads",

@@ -172,42 +172,27 @@ describe("quote PDFs and the monthly PDF quota (QUO-06)", () => {
     }
   });
 
-  it("counts every new PDF against max_pdf_per_month; a full quota refuses only new PDFs; one notice at 80%", async () => {
+  // owner (337) א, 12 November 2026: a quote's PDF is never counted in max_pdf_per_month and never refused by it (no rate either)
+  it("a quote's PDF is never counted in max_pdf_per_month nor refused by a full quota or the minute rate (owner (337) א)", async () => {
     await resetCount();
-    await setLimit(3);
-    const notices = () =>
-      asAdmin((q) => count(q, "select 1 from public.notifications where organization_id = $1 and type = 'system' and title like 'קובצי ה-PDF הגיעו ל-80%%'", [org]));
-    const before = await notices();
-    const quotes = [await quote(owner), await quote(owner), await quote(owner), await quote(owner)];
-    await store(owner, quotes[0]);
-    await store(owner, quotes[1]);
-    expect(await produced()).toBe(2);
-    expect(await notices()).toBe(before);
-    await store(owner, quotes[2]);
-    expect(await produced()).toBe(3);
-    // ceil(3 x 0.8) = 3: the active owner and admin, once
-    expect(await notices()).toBe(before + 2);
-    const full = await pgError(store(owner, quotes[3]));
-    expect(full.hint).toBe("limit:max_pdf_per_month");
-    // a refused PDF is not counted, and the quote itself still works (its link)
-    expect(await produced()).toBe(3);
-    const token = await asUser(owner.id, async (q) => (await one<{ t: string }>(q, "select public.quote_link_create($1, $2) as t", [org, quotes[3]])).t);
-    expect(token).toMatch(/.+/);
-    await setLimit(4);
-    await store(owner, quotes[3]);
-    expect(await notices()).toBe(before + 2);
-    await setLimit(1000);
-  });
-
-  it("at most 30 new PDFs a minute per business", async () => {
-    await resetCount();
-    const id = await quote(owner);
-    await asAdmin((q) => q("update app.pdf_months set minute_start = now(), minute_count = 30 where organization_id = $1 and month = app.automation_run_month($1)", [org]));
-    expect((await pgError(store(owner, id))).hint).toBe("rate:pdf");
-    await asAdmin((q) => q("update app.pdf_months set minute_start = now() - interval '2 minutes' where organization_id = $1", [org]));
-    await store(owner, id);
-    const row = await asAdmin((q) => one<{ minute_count: number }>(q, "select minute_count from app.pdf_months where organization_id = $1 and month = app.automation_run_month($1)", [org]));
-    expect(row.minute_count).toBe(1);
+    await setLimit(0);
+    try {
+      const quotes = [await quote(owner), await quote(owner)];
+      await store(owner, quotes[0]);
+      expect(await produced()).toBe(0);
+      await asAdmin((q) =>
+        q(
+          `insert into app.pdf_months (organization_id, month, minute_start, minute_count) values ($1, app.automation_run_month($1), now(), 30)
+           on conflict (organization_id, month) do update set minute_start = now(), minute_count = 30`,
+          [org],
+        ),
+      );
+      await store(owner, quotes[1]);
+      expect(await produced()).toBe(0);
+    } finally {
+      await setLimit(1000);
+      await resetCount();
+    }
   });
 
   it("the counter has no client access", async () => {
@@ -254,23 +239,18 @@ describe("quote PDFs and the monthly PDF quota (QUO-06)", () => {
     for (const u of [owner, admin, member]) expect(await remove(u, again.id), u.email).toBe(0);
   });
 
-  it("removing a waiting PDF gives its count back, so retries never drain the month (review M2)", async () => {
+  it("removing a waiting PDF gives nothing back: it was never counted (owner (337) א; was review M2)", async () => {
     await resetCount();
-    await setLimit(2);
-    try {
-      const id = await quote(owner);
-      for (let i = 0; i < 5; i++) {
-        const waiting = await store(owner, id);
-        expect(await produced()).toBe(1);
-        expect(await remove(owner, waiting.id)).toBe(1);
-        expect(await produced()).toBe(0);
-      }
-      const kept = await store(owner, id);
-      await upload(owner, kept, id);
-      expect(await produced()).toBe(1);
-    } finally {
-      await setLimit(1000);
+    const id = await quote(owner);
+    for (let i = 0; i < 3; i++) {
+      const waiting = await store(owner, id);
+      expect(await produced()).toBe(0);
+      expect(await remove(owner, waiting.id)).toBe(1);
+      expect(await produced()).toBe(0);
     }
+    const kept = await store(owner, id);
+    await upload(owner, kept, id);
+    expect(await produced()).toBe(0);
   });
 
   it("a privacy erasure of the quote's contact removes its PDF; the object goes to the orphan cleanup (review H1)", async () => {

@@ -45,7 +45,7 @@ describe("plan prices, limits and flags (owner's pricing, 13 October 2026)", () 
   it("the TS mirror equals the seed with the later changes, and the latest app.plan_key_defaults()", () => {
     const seed = quoted(migration("_plan_pricing.sql"), "seed") as Values;
     // every later change of the plans, in name order (plan_trial_built_with, then a key per capability, e.g. CAP-08)
-    for (const suffix of ["_plan_trial_built_with.sql", "_lead_distribution_plan.sql", "_campaign_costs_plan.sql", "_punch_cards_plan.sql", "_meta_leads_plan.sql", "_meeting_customer_reminders.sql", "_document_templates.sql", "_sms_b_send.sql", "_review_requests.sql", "_business_page.sql"]) {
+    for (const suffix of ["_plan_trial_built_with.sql", "_lead_distribution_plan.sql", "_campaign_costs_plan.sql", "_punch_cards_plan.sql", "_meta_leads_plan.sql", "_meeting_customer_reminders.sql", "_document_templates.sql", "_sms_b_send.sql", "_review_requests.sql", "_business_page.sql", "_free_plan_quotes.sql"]) {
       const delta = quoted(migration(suffix), "delta") as Values;
       for (const [plan, change] of Object.entries(delta)) {
         seed[plan].limits = { ...seed[plan].limits, ...change.limits };
@@ -54,7 +54,7 @@ describe("plan prices, limits and flags (owner's pricing, 13 October 2026)", () 
     }
     expect(seed).toEqual(PLAN_VALUES);
     // the latest app.plan_key_defaults()
-    expect(quoted(migration("_business_page.sql"), "json")).toEqual(PLAN_KEY_FALLBACK);
+    expect(quoted(migration("_free_plan_quotes.sql"), "json")).toEqual(PLAN_KEY_FALLBACK);
   });
 
   it("a wave 2 key a plan does not hold falls back to the most restrictive value", () => {
@@ -100,6 +100,9 @@ describe("plan prices, limits and flags (owner's pricing, 13 October 2026)", () 
     expect(limit("max_business_cards_per_user")).toEqual([1, 1, 1, 1]);
     expect(limit("max_booking_team_pages")).toEqual([0, 0, 10, 50]);
     expect(flag("booking_team_pages")).toEqual([false, false, true, true]);
+    // owner (330) א, (331) א: only the hidden free plan caps quotes and reads money waiting only
+    expect(limit("max_quotes_per_month")).toEqual([null, null, null, null]);
+    expect(flag("money_waiting_actions")).toEqual([true, true, true, true]);
   });
 
   it("a per-user quota is multiplied by the paid seats and added to the business-wide one", () => {

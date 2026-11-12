@@ -57,9 +57,12 @@ describe("plan keys: limits and flags", () => {
     }
   });
 
-  it("the free plan keeps its own values (quotes off) and its older keys", async () => {
+  it("the free plan keeps its own values and its older keys; quotes on with 3 a month (owner (331) א)", async () => {
     const free = (await plans()).find((p) => p.key === "free");
-    expect(free?.features.quotes).toBe(false);
+    // owner (331) א, 12 November 2026: 3 quotes a month (was: quotes off)
+    expect(free?.features.quotes).toBe(true);
+    expect(free?.limits.max_quotes_per_month).toBe(3);
+    expect(free?.features.money_waiting_actions).toBe(false);
     expect(free?.limits.max_users).toBe(2);
     expect(free?.limits.storage_gb).toBe(1);
   });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { PLAN_CAPABILITIES, planCapabilities } from "@/features/plans/capabilities";
+import { MONEY_WAITING_READ_ONLY_LABEL, PLAN_CAPABILITIES, planCapabilities } from "@/features/plans/capabilities";
+import { planQuotaLines } from "@/features/plans/public-plans";
 
 describe("plan capabilities", () => {
   it("lists core CRM data on every plan, with or without flags", () => {
@@ -32,5 +33,16 @@ describe("plan capabilities", () => {
   it("names each capability once", () => {
     const keys = PLAN_CAPABILITIES.map((item) => item.feature);
     expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("says when money waiting is read only, and the monthly quote cap (owner (330) א, (331) א)", () => {
+    const money = (features: Record<string, boolean>) => planCapabilities(features).find((item) => item.feature === "money_waiting")?.label;
+    expect(money({ money_waiting: true, money_waiting_actions: true })).toBe("כסף שמחכה");
+    expect(money({ money_waiting: true, money_waiting_actions: false })).toBe(MONEY_WAITING_READ_ONLY_LABEL);
+    expect(money({ money_waiting: true })).toBe(MONEY_WAITING_READ_ONLY_LABEL);
+    expect(money({ money_waiting_actions: true })).toBeUndefined();
+    expect(planQuotaLines({ max_quotes_per_month: 3 })).toContain("עד 3 הצעות מחיר בחודש");
+    expect(planQuotaLines({ max_quotes_per_month: null }).join(" ")).not.toContain("הצעות מחיר");
+    expect(planQuotaLines({}).join(" ")).not.toContain("הצעות מחיר");
   });
 });

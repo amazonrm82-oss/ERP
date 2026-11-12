@@ -6,7 +6,8 @@ import { getUserNames } from "@/features/shell/queries";
 import type { MembershipRole, MembershipStatus, RecordVisibility, SeatType } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { must } from "@/lib/db-read";
-import { effectiveFeature } from "@/lib/plan-keys";
+import { effectiveFeature, effectiveLimits } from "@/lib/plan-keys";
+import { pdfQuotaZero } from "@/features/plans/pdf-quota";
 
 import { primaryTeamState, type PrimaryTeamState } from "./primary-team";
 
@@ -62,6 +63,29 @@ const readPlanFeatures = cache(async (orgId: string): Promise<{ features: unknow
   }
   return { features: plan.features, overrides: subscription.feature_overrides };
 });
+
+// the plan's limits and the organization's overrides, read once per request
+const readPlanLimits = cache(async (orgId: string): Promise<Record<string, unknown> | null> => {
+  const supabase = await createClient();
+  const subscription = must(await supabase
+    .from("subscriptions")
+    .select("plan_key, limit_overrides")
+    .eq("organization_id", orgId)
+    .maybeSingle(), "subscriptions");
+  if (!subscription) return null;
+  const plan = must(await supabase.from("plans").select("limits").eq("key", subscription.plan_key).maybeSingle(), "plans");
+  if (!plan) return null;
+  return effectiveLimits(plan.limits, subscription.limit_overrides);
+});
+
+/**
+ * Owner (337) א: whether the business's monthly PDF quota is exactly zero (the free plan), as app.org_limit() decides it.
+ * The report and order PDF buttons then say "זמין מחבילת אישית"; a failed read answers false (the server still decides).
+ */
+export async function orgPdfQuotaZero(orgId: string): Promise<boolean> {
+  const limits = await readPlanLimits(orgId).catch(() => null);
+  return limits ? pdfQuotaZero(limits.max_pdf_per_month) : false;
+}
 
 /** Effective feature flag (plan + per-organization override), as app.org_has_feature() computes it. */
 export async function orgHasFeature(orgId: string, key: string): Promise<boolean> {

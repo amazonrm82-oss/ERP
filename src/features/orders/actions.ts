@@ -15,6 +15,8 @@ import { paths } from "@/lib/paths";
 import { pick } from "@/lib/validation";
 
 import { orderPath, ordersPath } from "./paths";
+import { PDF_FROM_PERSONAL } from "@/features/plans/pdf-quota";
+import { orgPdfQuotaZero } from "@/features/settings/queries";
 import { storeOrderPdf } from "./pdf-server";
 import { readOrder, readOrderPricing, type Order } from "./queries";
 import { MOVABLE_STATUSES, ORDER_DETAILS_FIELD_NAMES, ORDER_LINE_DESCRIPTION_MAX, ORDER_LINE_FIELD_NAMES, orderDetailsSchema, orderLineSchema } from "./schema";
@@ -78,8 +80,9 @@ export async function updateOrderDetailsAction(orgId: string, orderId: string, _
   // ORD-05 PDF (owner's answer (34) ב): a changed delivery date, shipping address or notes of a numbered order makes a new PDF
   // version (the database knows whether they changed); a failed render never refuses the edit
   const order = await readOrder(context.supabase, orgId, orderId).catch(() => null);
+  // owner (337) א: a plan with a PDF quota of zero makes no new version (and says nothing about it)
   const pdf =
-    order && order.status !== "draft"
+    order && order.status !== "draft" && !(await orgPdfQuotaZero(orgId))
       ? await storeOrderPdf(context.supabase, orgId, order, context.user.id, { onlyNewVersion: true }).catch(() => ({ ok: false as const, message: PDF_NOT_MADE }))
       : null;
   revalidateOrder(orgId, { id: orderId, dealId: data[0].deal_id, contactId: data[0].contact_id, companyId: data[0].company_id });
@@ -115,7 +118,7 @@ export async function confirmOrderAction(orgId: string, orderId: string): Promis
   if (error) return fail(writeError(error));
   const order = await readOrder(context.supabase, orgId, orderId);
   if (order) {
-    await keepOrderPdf(context.supabase, orgId, order, context.user.id);
+    if (!(await orgPdfQuotaZero(orgId))) await keepOrderPdf(context.supabase, orgId, order, context.user.id);
     revalidateOrder(orgId, order);
   }
   return ok();
@@ -135,6 +138,7 @@ export async function storeOrderPdfAction(orgId: string, orderId: string): Promi
   if (!context.ok) return context;
   const order = await readOrder(context.supabase, orgId, orderId);
   if (!order) return fail(NOT_FOUND_OR_FORBIDDEN);
+  if (await orgPdfQuotaZero(orgId)) return fail(PDF_FROM_PERSONAL);
   const pdf = await storeOrderPdf(context.supabase, orgId, order, context.user.id).catch(() => ({ ok: false as const, message: PDF_NOT_MADE }));
   if (!pdf.ok) return fail(pdf.message);
   revalidatePath(orderPath(orgId, orderId));
@@ -262,7 +266,7 @@ export async function orderFromQuoteAction(orgId: string, quoteId: string): Prom
   if (typeof data !== "string") return fail(FAILED);
   const order = await readOrder(context.supabase, orgId, data);
   if (!order) return fail(NOT_FOUND_OR_FORBIDDEN);
-  await keepOrderPdf(context.supabase, orgId, order, context.user.id);
+  if (!(await orgPdfQuotaZero(orgId))) await keepOrderPdf(context.supabase, orgId, order, context.user.id);
   revalidateOrder(orgId, order);
   revalidatePath(`/o/${orgId}/quotes/${quoteId}`);
   redirect(orderPath(orgId, data));
@@ -277,7 +281,7 @@ export async function orderFromDealAction(orgId: string, dealId: string): Promis
   if (typeof data !== "string") return fail(FAILED);
   const order = await readOrder(context.supabase, orgId, data);
   if (!order) return fail(NOT_FOUND_OR_FORBIDDEN);
-  await keepOrderPdf(context.supabase, orgId, order, context.user.id);
+  if (!(await orgPdfQuotaZero(orgId))) await keepOrderPdf(context.supabase, orgId, order, context.user.id);
   revalidateOrder(orgId, order);
   redirect(orderPath(orgId, data));
 }

@@ -35,7 +35,8 @@ describe("hidden free plan", () => {
     const free = await asAdmin(
       async (q) => (await q<{ is_public: boolean; quotes: boolean }>("select is_public, (features ->> 'quotes')::boolean as quotes from public.plans where key = 'free'")).rows[0],
     );
-    expect(free).toEqual({ is_public: false, quotes: false });
+    // owner (331) א, 12 November 2026: the free plan sends quotes (3 a month; was: quotes off)
+    expect(free).toEqual({ is_public: false, quotes: true });
     const shown = await asAdmin(async (q) => (await q<{ key: string }>("select key from public.plans where is_public order by position")).rows.map((r) => r.key));
     expect(shown).toEqual(["personal", "basic", "pro"]);
   });

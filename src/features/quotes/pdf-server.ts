@@ -156,8 +156,8 @@ export async function remakeLegacyQuotePdf(supabase: Client, orgId: string, quot
 }
 
 /**
- * QUO-06: makes the PDF of a sent quote and keeps it, once (owner, 13 October 2026: produced on our server, counted
- * against max_pdf_per_month only when a new version's file is made; a stored file is never made again).
+ * QUO-06: makes the PDF of a sent quote and keeps it, once (owner, 13 October 2026: produced on our server; a stored file is
+ * never made again). Since owner (337) א quote PDFs are not counted against max_pdf_per_month in any plan.
  * Since the follow-up of 26 October 2026 (answer 3) only the server writes it: the person's right is asked here with their
  * own session (public.quote_pdf_allowed), the PDF is rendered here, and the row and the object are written with the service
  * key through public.quote_pdf_store alone (pdf-store-server.ts), which checks the user again and keeps the file's SHA-256.

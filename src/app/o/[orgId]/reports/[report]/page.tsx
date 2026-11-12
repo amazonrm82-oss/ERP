@@ -20,7 +20,8 @@ import { getCollectionAccess } from "@/features/collection/queries";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport, filtersQuery, reportFilters } from "@/features/reports/request";
 import { withReportShape } from "@/features/reports/schemas";
-import { listMembers, orgHasFeature } from "@/features/settings/queries";
+import { PDF_FROM_PERSONAL } from "@/features/plans/pdf-quota";
+import { listMembers, orgHasFeature, orgPdfQuotaZero } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatDate, zonedIso } from "@/lib/format";
 import { paths } from "@/lib/paths";
@@ -92,7 +93,7 @@ export default async function ReportPage({ params, searchParams }: Props) {
     .map((m) => ({ value: m.userId, label: m.userId === context.user.id ? `${m.name} (אני)` : m.name }));
   const { period } = filters;
   // FLD-10: the title and description in the business's words
-  const texts = reportTexts(definition, await getOrgTerms(orgId));
+  const [texts, pdfZero] = await Promise.all([getOrgTerms(orgId).then((terms) => reportTexts(definition, terms)), orgPdfQuotaZero(orgId)]);
   const periodText = definition.filters.includes("period")
     ? `${formatDate(zonedIso(period.fromDate, "12:00:00"))} עד ${formatDate(zonedIso(period.toDate, "12:00:00"))}`
     : "מצב נוכחי";
@@ -114,9 +115,19 @@ export default async function ReportPage({ params, searchParams }: Props) {
               </a>
               {/* RPT-02: made on our server for this export, counted in the monthly PDF quota; no download attribute, so a refusal
                   (the month's quota, too many this minute) shows as a readable page and the file still downloads (attachment) */}
-              <a href={`${paths.report(orgId, definition.key)}/export?${filtersQuery(filters)}&format=pdf`} className={buttonClasses("secondary", "sm")}>
-                ייצוא ל-PDF
-              </a>
+              {pdfZero ? (
+                // owner (337) א: no PDF in a plan whose PDF quota is zero; the export route still refuses
+                <span className="inline-flex items-center gap-2 text-sm text-ink-soft">
+                  <span className={buttonClasses("secondary", "sm")} aria-disabled="true">
+                    ייצוא ל-PDF
+                  </span>
+                  {PDF_FROM_PERSONAL}
+                </span>
+              ) : (
+                <a href={`${paths.report(orgId, definition.key)}/export?${filtersQuery(filters)}&format=pdf`} className={buttonClasses("secondary", "sm")}>
+                  ייצוא ל-PDF
+                </a>
+              )}
             </div>
           ) : null
         }

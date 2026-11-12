@@ -239,7 +239,7 @@ describe("a service recipient's erasure and the payer's PDFs (PKG-06, owner (167
     expect((await pgError(storeQuote(plain, sha("9")))).hint).toBe("quote_pdf:closed");
   });
 
-  it("the PDFs made again show no name and are not counted in the quota; a later PDF is counted", async () => {
+  it("the PDFs made again show no name and are not counted in the quota; no quote PDF is (owner (337) א)", async () => {
     const payer = await contact("מיכל");
     const kid = await contact("עמית", "המחוק");
     await relate(payer, kid);
@@ -267,11 +267,11 @@ describe("a service recipient's erasure and the payer's PDFs (PKG-06, owner (167
     expect(await produced()).toBe(before);
     expect((await credits()).map((c) => c.used)).toEqual([true, true]);
     expect(await nameOf("quote", q1)).toBeNull();
-    // a new PDF of another quote is counted as before
+    // owner (337) א: a new PDF of another quote is not counted either (no quote PDF is)
     const q3 = await quote(payer, payer);
     const before3 = await produced();
     await storedQuote(q3);
-    expect(await produced()).toBe(before3 + 1);
+    expect(await produced()).toBe(before3);
   });
 
   it("a waiting PDF that took a credit and is removed gives the credit back, never a count", async () => {

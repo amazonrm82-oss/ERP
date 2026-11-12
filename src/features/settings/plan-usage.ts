@@ -22,6 +22,8 @@ const LABELS: Record<string, { label: string; unit?: string }> = {
   view_seats: { label: "מושבי צפייה (לפי מספר המושבים בתשלום)" },
   // AUT-07: runs that executed a step this month (manual test runs do not count)
   max_automation_runs_per_month: { label: "הרצות אוטומציה החודש" },
+  // owner (331) א: quotes sent this month (listed only while the plan caps them)
+  max_quotes_per_month: { label: "הצעות מחיר שנשלחו החודש" },
 };
 
 /** The business's plan, trial and usage against each limit (FXU-04, migration 0046). */

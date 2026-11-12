@@ -872,6 +872,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_business_page_new_link.sql",
       // LEGAL-2 (4) redefines public.intake_form() of _public_form_view_limit.sql last (the privacy notice's business details)
       "_privacy_notice_public_pages.sql",
+      // owner (330) א, (331) א redefine app.plan_key_defaults() of _business_page.sql and public.org_plan_usage() of
+      // _automation_run_quota.sql last
+      "_free_plan_quotes.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
