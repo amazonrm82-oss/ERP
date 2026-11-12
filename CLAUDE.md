@@ -240,6 +240,25 @@ and build this CRM here instead. The old code is preserved on the branch
   backs off a minute, logs one redacted line, and the section shows without prices. `/` renders per request. Test 344 pins the body by
   md5, the settings, the grants and the answer; flipping `built` in `capabilities.ts` needs a migration that redefines the function and a
   fresh review. The advisor's anon/authenticated definer findings on it are expected.
+  Built, no service-key use yet (RET-02, migration 021235; owner (271) ב, (273): plan key `review_requests` from basic up; an independent
+  review and two delta reviews): review requests. `public.review_request_settings` (one row per business: switch, the Google review link,
+  triggers deal won / meeting held, delay 0..30 days, server-only `enabled_at`; owners/admins of a writable business through column grants,
+  audited; definer check trigger, outsider guard first). The link rule `app.review_url_ok` = `reviewUrlOk()` (shared fixture
+  `review-urls.json`) allows only closed Google review shapes (g.page/r, search.google.com/local/writereview?placeid, google.com|co.il
+  /maps/, maps.app.goo.gl, g.co/kgs), with closed path characters, no `%`, dot or empty segment, fragment, /amp or redirect parameter, and
+  only each shape's query keys. No gating by satisfaction anywhere (Google's policy). Type `review_request` is MARKETING (not in
+  `app.service_message_types`): a recorded grant, caps and sending hours apply; a person can never create or convert a template of that
+  type (`message_templates_review_request_mark`); `{קישור לביקורת}` is filled only for it. pg_cron `crm-review-requests`
+  (`app.send_review_requests`: writable businesses with the key and the switch, not paused, in turns, 100 a run, 50 events per business,
+  500 a run, a per-business try-lock, an exception block per event; only events since `enabled_at`, at most 7 days late, never an imported
+  deal; one per event in `app.review_requests`; once per contact per 90 days, moved with a merge by `app.merge_review_requests`; the
+  channel is the preferred one, else SMS with room, else email, only with a recorded grant and no suppression) queues one `message.send`
+  with ids only (`review_request_id`, `app.job_payload_ok` last redefined in 021235). THE FUTURE SENDER re-reads the request and the
+  settings, sends nothing unless the key, the switch and `app.review_url_ok` still hold, fills the link only with the stored one, applies
+  `marketingEnvelope()`, asks `app.message_template_sendable` and `app.message_filled_problem`, never adds a rating step, and needs its own
+  "In use" line. `app.message_notice_template_problem`, `app.message_types`, `app.message_type_fields`, `app.message_merge_fields`,
+  `app.plan_key_defaults` and `public.plans_public` (adds `review_requests` to its closed list; test 344's pin rechecked) were last
+  redefined in 021235. The advisor's findings on the three new app tables are expected.
   In use (IMP-04, owner 9 November 2026, answers (155) א, (160) א, (161) א, (162) ב, (163) ב; migration `_background_jobs.sql`; two
    independent reviews): the OPS-04 worker (same route and secret) also claims `import.run` and `export.run` (payload `{request_id,
    user_id}` only) in its own pass (lease 900 s, one job, 40 s budget, then saved and handed back uncounted with
