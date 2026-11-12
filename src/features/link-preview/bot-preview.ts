@@ -6,7 +6,7 @@ import { businessPreview, genericPreview, PREVIEW_TEXTS } from "@/lib/link-previ
 // WAB-05 follow-up: what a listed preview bot gets for a customer page (src/lib/preview-bots.ts). Pure: the shape of
 // public.link_preview_public's answer, the metadata built from it, and the one line of the page's minimal body.
 
-export type PreviewKind = "form" | "quote" | "order" | "booking" | "booking_manage" | "card";
+export type PreviewKind = "form" | "quote" | "order" | "booking" | "booking_manage" | "card" | "page";
 
 export type BotPreview = {
   /** the business's DISPLAY name (organizations.name; owner, 27 October 2026, answer (2) ב), never the registered name */
@@ -37,6 +37,7 @@ const TEXTS: Record<PreviewKind, { what: string; joiner: string; description: st
   booking: PREVIEW_TEXTS.booking,
   booking_manage: PREVIEW_TEXTS.manage,
   card: PREVIEW_TEXTS.card,
+  page: PREVIEW_TEXTS.page,
 };
 
 /** QUO-14: the quote and order pages never send their secret address in a Referer header. */

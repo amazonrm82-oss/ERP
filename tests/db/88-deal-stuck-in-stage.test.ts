@@ -153,6 +153,8 @@ const RERUN = [
   // RET-02 redefines app.job_payload_ok(), the message type lists, app.message_merge_fields(),
   // app.message_notice_template_problem() and app.plan_key_defaults() last
   migrationFile("_review_requests.sql"),
+  // BIZ-01 redefines app.plan_key_defaults() and app.guard_form() last
+  migrationFile("_business_page.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

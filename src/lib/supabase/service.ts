@@ -68,6 +68,9 @@ import { getSupabaseEnv } from "@/lib/env";
  *     order_public_decide() only;
  *   - the customer's statement page (BAL-04)
  *     (src/features/statements/public-server.ts): public.statement_public() only;
+ *   - the public business page (BIZ-01, owner 11 November 2026, answer (271) ב)
+ *     (src/features/business-page/public-server.ts): public.business_page_public() and
+ *     business_page_submit() only;
  *   - a library item sent by a tracked link (LIB-02, owner 11 November 2026)
  *     (src/features/library-links/public-server.ts): public.library_link_public() and
  *     library_link_public_file() only, and a 60-second signed link to the path the latter answers;

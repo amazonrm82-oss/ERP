@@ -602,6 +602,35 @@ export type BusinessCardWrite = {
   public_fields?: string[];
 };
 
+// BIZ-01: the business's public page (one per business, owners/admins only); token = its public link (/f/biz/<token>),
+// made by the database; booking_page_ids = the booking pages it links to (the business's own, at most 20)
+export type BusinessPageRow = {
+  id: string;
+  organization_id: string;
+  token: string;
+  is_active: boolean;
+  about: string | null;
+  show_phone: boolean;
+  show_whatsapp: boolean;
+  show_website: boolean;
+  show_hours: boolean;
+  show_form: boolean;
+  booking_page_ids: string[];
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+export type BusinessPageWrite = {
+  is_active?: boolean;
+  about?: string | null;
+  show_phone?: boolean;
+  show_whatsapp?: boolean;
+  show_website?: boolean;
+  show_hours?: boolean;
+  show_form?: boolean;
+  booking_page_ids?: string[];
+};
+
 // INT-02: a business's connection to a provider (owners/admins only). It holds no secret: secret_set_at /
 // secret_key_version say only that an encrypted one is stored (app.integration_secrets). status pending | connected |
 // disconnected | error; provider 'meta_lead_ads' (CAP-11, external_id = the Meta page id)
@@ -1404,6 +1433,8 @@ export type FormRow = {
   site_widget_id: string | null;
   // CAP-11: the Meta form row this form belongs to (kind 'meta' only; made and changed by that row's triggers)
   meta_lead_form_id: string | null;
+  // BIZ-01: the business page this form belongs to (kind 'page' only; made by the page's trigger)
+  business_page_id: string | null;
 };
 
 export type FormSubmissionRow = {
@@ -4079,6 +4110,8 @@ export type Database = {
       campaign_costs: Table<CampaignCostRow, CampaignCostWrite & { organization_id: string; month: string; amount_agorot: number; currency?: string }, CampaignCostWrite>;
       // BIZ-02: column grants (token is made by the database; the form by the card's trigger)
       business_cards: Table<BusinessCardRow, BusinessCardWrite & { organization_id: string; user_id: string }, BusinessCardWrite>;
+      // BIZ-01: owners and admins only; column grants (token made by the database, the form by the page's trigger); no delete
+      business_pages: Table<BusinessPageRow, BusinessPageWrite & { organization_id: string }, BusinessPageWrite>;
       // BIZ-03: owners and admins only; column grants (token made by the database)
       // INT-02: owners and admins only; column grants (status, secret_set_at and the error are server-kept)
       meta_lead_forms: Table<
@@ -4493,6 +4526,12 @@ export type Database = {
       platform_set_sms_sender_approval: { Args: { p_org: string; p_name: string; p_approved: boolean }; Returns: Json };
       platform_list_sms_sender_pending: { Args: Record<string, never>; Returns: Json };
       business_card_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
+      // BIZ-01: the public business page (service_role only)
+      business_page_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
+      business_page_submit: {
+        Args: { p_token: string; p_payload: Json; p_ip_hash?: string | null; p_user_agent?: string | null; p_is_spam?: boolean };
+        Returns: Json;
+      };
       business_card_submit: {
         Args: { p_token: string; p_payload: Json; p_ip_hash?: string | null; p_user_agent?: string | null; p_is_spam?: boolean };
         Returns: Json;

@@ -853,6 +853,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       // app.service_message_types() / app.message_type_fields() of _instant_reply.sql, app.message_merge_fields() /
       // app.message_notice_template_problem() of _signature_status_reminders.sql and app.plan_key_defaults() of _sms_b_send.sql last
       "_review_requests.sql",
+      // BIZ-01 redefines app.plan_key_defaults() of _review_requests.sql and app.guard_form() of _meta_lead_ads.sql last
+      "_business_page.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

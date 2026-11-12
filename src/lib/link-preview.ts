@@ -89,6 +89,8 @@ export const PREVIEW_TEXTS = {
   booking: { what: "קביעת תור", joiner: "אצל", description: "בוחרים זמן פנוי וקובעים בקישור, בלי הרשמה ובלי אפליקציה." },
   manage: { what: "הפגישה שלך", joiner: "אצל", description: "פרטי הפגישה שנקבעה, בקישור אישי." },
   card: { what: "כרטיס ביקור", joiner: "של", description: "כרטיס ביקור דיגיטלי: חיוג, WhatsApp ושמירה באנשי הקשר." },
+  // BIZ-01: the business's public page
+  page: { what: "דף העסק", joiner: "של", description: "שעות פעילות, קביעת תור, WhatsApp ופנייה לעסק, בלי הרשמה ובלי אפליקציה." },
   // BAL-04: always generic (no business name either): the page is never read for a preview
   statement: { what: "דף חשבון", joiner: "מאת", description: "פירוט החובות הפתוחים, בקישור אישי." },
   // CNS-09 / CNS-10: always generic as well: the page is never read for a preview (a read counts a call)

@@ -153,6 +153,21 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
     refusal: TEXT_429,
     sender: { leftOut: OUT_42 },
   },
+  // BIZ-01 (owner, 11 November 2026, answer (271) ב): the business page, published to everyone like the card
+  "/f/biz/[token]": {
+    guard: "database",
+    functions: ["business_page_public", "link_preview_public"],
+    limit: "60 views per sender per page (keyed IP hash, scope bizpage, re-scoped per page) in 10 min, after the lookup; no page-wide cap (like the card and the widget); " + PREVIEW,
+    refusal: PAGE_TEXT,
+    sender: { leftOut: OUT_42 },
+  },
+  "/api/forms/biz/[token]": {
+    guard: "database",
+    functions: ["business_page_submit"],
+    limit: "business_page_submit goes through intake_submit in the database: its limits on the page's own form (sender scoped per page)",
+    refusal: JSON_429,
+    sender: { leftOut: OUT_42 },
+  },
   "/f/widget/[token]": {
     guard: "database",
     functions: ["site_widget_public"],

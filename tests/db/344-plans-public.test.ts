@@ -12,7 +12,10 @@ afterAll(closePool);
 // md5(prosrc) of the reviewed body (migration 20261006021232_plans_public.sql; 6c246066dbf154393d0f4a05288c67f4)
 // RET-02 (migration 20261006021235_review_requests.sql): 021232's body with 'review_requests' added to the closed landing list
 // after 'sms'; rechecked: nothing else changed (no new field, table, argument or grant). Needs the fresh review the header asks for.
-const REVIEWED_BODY_MD5 = "f6fe40e4956b37f2ca09bae33678504c";
+// BIZ-01 (migration 20261006021237_business_page.sql; f6fe40e4956b37f2ca09bae33678504c before): 021235's body with
+// 'public_page' added to the closed landing list after 'business_card'; rechecked: nothing else changed (no new field, table,
+// argument or grant). Needs the fresh review the header asks for.
+const REVIEWED_BODY_MD5 = "a87ed637b1a911cabd027e80bb0f45ac";
 
 type PublicPlan = Record<string, unknown> & { key: string; availability: string; limits: Record<string, unknown>; features: string[] };
 

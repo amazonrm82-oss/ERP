@@ -74,6 +74,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "library_items", file: "library_items.csv" },
   // BIZ-02: the business cards (token = the card's link: /f/card/<token>)
   { table: "business_cards", file: "business_cards.csv" },
+  // BIZ-01: the business page's settings (token = the page's link: /f/biz/<token>); its view counts are in schema app, not exported
+  { table: "business_pages", file: "business_pages.csv" },
   // BIZ-03: the QR codes (token = the code's link: /f/q/<token>); the daily scan counts are in schema app, not exported
   { table: "qr_codes", file: "qr_codes.csv" },
   // SPD-07: the site widgets (token = the widget's public script and form; its view counts are in schema app, not exported)

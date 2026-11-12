@@ -2,7 +2,7 @@
 // temporary "everything open, high values" defaults). Mirrors migrations plan_pricing
 // (the seed), plan_trial_built_with (the changes of the owner's later decisions) and
 // plan_review_fixes, lead_distribution_plan, campaign_costs_plan, punch_cards_plan, meta_leads_plan, meeting_customer_reminders and document_templates (the latest app.plan_key_defaults()): PLAN_VALUES = the seed with
-// plan_review_fixes, lead_distribution_plan, campaign_costs_plan, punch_cards_plan, meta_leads_plan, meeting_customer_reminders, document_templates, sms_b_send and review_requests (the latest app.plan_key_defaults()): PLAN_VALUES = the seed with
+// plan_review_fixes, lead_distribution_plan, campaign_costs_plan, punch_cards_plan, meta_leads_plan, meeting_customer_reminders, document_templates, sms_b_send, review_requests and business_page (the latest app.plan_key_defaults()): PLAN_VALUES = the seed with
 // those changes, PLAN_KEY_FALLBACK = the latest app.plan_key_defaults().
 // tests/unit/plan-keys.test.ts reads the migrations and compares; keep them in step.
 //
@@ -134,6 +134,8 @@ const FEATURES: Record<string, Record<SoldPlan, boolean>> = {
   consents: ALL,
   segments: ALL,
   business_card: ALL,
+  // BIZ-01 (owner, 3 November 2026, answer (70) ב): every plan, its own key
+  public_page: ALL,
   qr_codes: ALL,
   site_widget: ALL,
   retention: ALL,
@@ -184,6 +186,8 @@ const WAVE2_FEATURE_LIST = [
   "sms",
   // RET-02 (migration review_requests)
   "review_requests",
+  // BIZ-01 (migration business_page)
+  "public_page",
 ] as const;
 const WAVE2_LIMIT_LIST = [
   "max_products", "max_price_lists", "max_quote_templates", "max_booking_pages", "max_booking_pages_per_user",

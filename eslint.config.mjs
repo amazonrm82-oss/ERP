@@ -97,6 +97,8 @@ const serviceKeyAllowList = {
     "src/features/statements/public-server.ts",
     // LIB-02: a library item sent by a tracked link, approved public secret-link pattern (owner, 11 November 2026)
     "src/features/library-links/public-server.ts",
+    // BIZ-01: the public business page, approved public secret-link pattern (owner, 11 November 2026, answer (271) ב)
+    "src/features/business-page/public-server.ts",
     // CNS-09 / CNS-10: the customer's preferences page and unsubscribe link, approved public secret-link pattern (owner's
     // answer (225) א, 10 November 2026)
     "src/features/preferences/public-server.ts",

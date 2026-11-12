@@ -202,6 +202,8 @@ describe("tenant isolation", () => {
       await q("insert into public.campaign_costs (organization_id, campaign, month, amount_agorot) values ($1, 'קמפיין של א', '2026-10-01', 50000)", [orgA]);
       // BIZ-02: a's business card (its form is made by the card's trigger)
       await q("insert into public.business_cards (organization_id, user_id, job_title) values ($1, $2, 'יועץ')", [orgA, a.id]);
+      // BIZ-01: A's business page (its form is made by the page's trigger)
+      await q("insert into public.business_pages (organization_id, is_active, about) values ($1, true, 'דף של א')", [orgA]);
       // BIZ-03: a QR code of A that opens A's form
       await q("insert into public.qr_codes (organization_id, name, target_kind, form_id) values ($1, 'שלט בחנות', 'form', $2)", [orgA, ids.formA]);
       // BIZ-03: a QR code of A that opens a link
@@ -516,6 +518,8 @@ describe("tenant isolation", () => {
     "library_items",
     // BIZ-02
     "business_cards",
+    // BIZ-01
+    "business_pages",
     // BIZ-03
     "qr_codes",
     // SPD-07
@@ -784,6 +788,8 @@ describe("tenant isolation", () => {
       library_categories: "name = name",
       library_items: "title = title",
       business_cards: "job_title = job_title",
+      // BIZ-01: no delete grant at all (switching off takes the page down): a permission error is the expected outcome
+      business_pages: "about = about",
       qr_codes: "name = name",
       site_widgets: "name = name",
       integrations: "name = name",
@@ -979,6 +985,7 @@ describe("tenant isolation", () => {
       // LIB-01: a file on A's library item
       ["insert into public.files (organization_id, library_item_id, name, mime_type, size_bytes) values ($1, $2, 'x.pdf', 'application/pdf', 1)", [orgA, ids.libraryFileA]],
       ["insert into public.business_cards (organization_id, user_id) values ($1, $2)", [orgA, a.id]],
+      ["insert into public.business_pages (organization_id) values ($1)", [orgA]],
       ["insert into public.qr_codes (organization_id, name, target_kind, form_id) values ($1, 'x', 'form', $2)", [orgA, ids.formA]],
       ["insert into public.qr_codes (organization_id, name, target_kind, target_url) values ($1, 'x', 'url', 'https://a.example.com/')", [orgA]],
       ["insert into public.site_widgets (organization_id, name) values ($1, 'x')", [orgA]],
@@ -1133,6 +1140,7 @@ describe("tenant isolation", () => {
       ["library_categories", "position = 777", "position = 777"],
       ["library_items", "description = 'HACKED'", "description = 'HACKED'"],
       ["business_cards", "job_title = 'HACKED'", "job_title = 'HACKED'"],
+      ["business_pages", "about = 'HACKED'", "about = 'HACKED'"],
       ["qr_codes", "name = 'HACKED'", "name = 'HACKED'"],
       ["site_widgets", "name = 'HACKED'", "name = 'HACKED'"],
       ["integrations", "name = 'HACKED'", "name = 'HACKED'"],

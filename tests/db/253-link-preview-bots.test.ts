@@ -526,6 +526,9 @@ describe("link previews for preview bots (WAB-05)", () => {
     "public.booking_page_public(text,date,text)": "7ce1280bdcd77f4b22212665c9ce9481",
     "public.booking_manage_public(text,date,text)": "8b489cfee0bed9f5ea592d22df63a70a",
     "public.business_card_public(text,text)": "3ec340a7db5b5d5cf50f79bd49f8a1d4",
+    // BIZ-01 (021237): kind 'page'; its not-found rule is app.business_page_open, shared with link_preview_public (test 348)
+    // review fix (12 November 2026): the page-wide view cap removed; the not-found branch is unchanged (rechecked)
+    "public.business_page_public(text,text)": "717977c68a40bc4b0640cc93069cd53d",
   };
 
   it("the page functions are the ones its rule was checked against (review M1)", async () => {

@@ -48,6 +48,7 @@ export const ENTITY_LABELS: Record<string, string> = {
   library_categories: "קטגוריה בספריית התוכן",
   library_items: "פריט בספריית התוכן",
   business_cards: "כרטיס ביקור",
+  business_pages: "דף העסק",
   // BIZ-03
   qr_codes: "קוד QR",
   // SPD-07

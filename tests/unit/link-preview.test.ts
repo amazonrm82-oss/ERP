@@ -227,6 +227,17 @@ describe("the page and its preview read once per request (WAB-05)", () => {
     expect(flat(m)).not.toContain("050-1234567");
   });
 
+  it("business page (BIZ-01): business_page_public runs once; the preview carries the business and its own words", async () => {
+    replies.business_page_public = {
+      data: { business: "סטודיו דנה", brand: { logo: LOGO, color: null }, about: "פילאטיס בתל אביב", phone: "050-1234567", booking: [], form: false },
+      error: null,
+    };
+    const m = await render((await import("@/app/f/biz/[token]/page")) as unknown as PageModule);
+    expect(calls).toEqual(["business_page_public"]);
+    expect(m.openGraph).toMatchObject({ title: "דף העסק של סטודיו דנה", siteName: "סטודיו דנה", description: "פילאטיס בתל אביב", images: [{ url: LOGO_URL }] });
+    expect(flat(m)).not.toContain("050-1234567");
+  });
+
   it("web form: intake_form runs once", async () => {
     replies.intake_form = { data: { inactive: true }, error: null };
     await render((await import("@/app/f/[token]/page")) as unknown as PageModule);
@@ -243,6 +254,8 @@ const PAGES: Array<{ kind: string; path: string; read: string; token: string; ti
   { kind: "booking", path: "@/app/f/book/[token]/page", read: "booking_page_public", token: TOKEN32, title: "קביעת תור אצל נגריית הצפון" },
   { kind: "booking_manage", path: "@/app/f/book/manage/[token]/page", read: "booking_manage_public", token: TOKEN64, title: "הפגישה שלך אצל נגריית הצפון" },
   { kind: "card", path: "@/app/f/card/[token]/page", read: "business_card_public", token: TOKEN32, title: "כרטיס ביקור של דנה לוי · נגריית הצפון" },
+  // BIZ-01
+  { kind: "page", path: "@/app/f/biz/[token]/page", read: "business_page_public", token: TOKEN32, title: "דף העסק של נגריית הצפון" },
 ];
 const pageModules: Record<string, () => Promise<unknown>> = {
   "@/app/f/[token]/page": () => import("@/app/f/[token]/page"),
@@ -251,6 +264,7 @@ const pageModules: Record<string, () => Promise<unknown>> = {
   "@/app/f/book/[token]/page": () => import("@/app/f/book/[token]/page"),
   "@/app/f/book/manage/[token]/page": () => import("@/app/f/book/manage/[token]/page"),
   "@/app/f/card/[token]/page": () => import("@/app/f/card/[token]/page"),
+  "@/app/f/biz/[token]/page": () => import("@/app/f/biz/[token]/page"),
 };
 
 describe("a listed preview bot gets the preview only (WAB-05)", () => {

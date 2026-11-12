@@ -33,6 +33,8 @@ const CUSTOMER_PAGES = [
   "src/app/f/unsub/[token]/page.tsx",
   // LIB-02
   "src/app/f/lib/[token]/page.tsx",
+  // BIZ-01
+  "src/app/f/biz/[token]/page.tsx",
 ];
 
 // pages whose own header is the family header (quote, order and statement documents draw their own letterhead)
@@ -46,6 +48,7 @@ const HEADER_PAGES = [
   "src/app/f/prefs/[token]/page.tsx",
   "src/app/f/unsub/[token]/page.tsx",
   "src/app/f/lib/[token]/page.tsx",
+  "src/app/f/biz/[token]/page.tsx",
   // the status pages of a closed quote or a cancelled order
   "src/app/f/quote/[token]/page.tsx",
   "src/app/f/order/[token]/page.tsx",

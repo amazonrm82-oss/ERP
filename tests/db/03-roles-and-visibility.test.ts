@@ -2849,6 +2849,36 @@ describe("business cards by role", () => {
   });
 });
 
+// BIZ-01: the business page is managed and seen by owners and admins only (the rest is in 348-business-page)
+describe("business page by role", () => {
+  let org: string;
+  const people: Record<string, { id: string; email: string }> = {};
+
+  beforeAll(async () => {
+    const owner = await createUser("bizpage-owner");
+    org = await createOrg(owner.id);
+    people.owner = owner;
+    for (const role of ["admin", "manager", "member", "viewer"] as const) {
+      people[role] = await addMember(org, owner.id, role, `bizpage-${role}`);
+    }
+  });
+
+  it("only owners and admins make, see and change it; nobody deletes it", async () => {
+    for (const role of ["manager", "member", "viewer"]) {
+      expect((await pgError(asUser(people[role].id, (q) => q("insert into public.business_pages (organization_id) values ($1)", [org])))).code, role).toBe("42501");
+    }
+    await asUser(people.admin.id, (q) => q("insert into public.business_pages (organization_id, about) values ($1, 'דף')", [org]));
+    for (const role of ["owner", "admin", "manager", "member", "viewer"]) {
+      const allowed = role === "owner" || role === "admin";
+      const seen = await asUser(people[role].id, (q) => count(q, "select 1 from public.business_pages where organization_id = $1", [org]));
+      expect(seen, role).toBe(allowed ? 1 : 0);
+      const changed = await asUser(people[role].id, async (q) => (await q("update public.business_pages set about = about where organization_id = $1", [org])).rowCount);
+      expect(changed, role).toBe(allowed ? 1 : 0);
+      expect((await pgError(asUser(people[role].id, (q) => q("delete from public.business_pages where organization_id = $1", [org])))).code, role).toBe("42501");
+    }
+  });
+});
+
 // BIZ-03: QR codes are managed and seen by owners and admins only (the rest is in 154-qr-codes)
 describe("QR codes by role", () => {
   let org: string;

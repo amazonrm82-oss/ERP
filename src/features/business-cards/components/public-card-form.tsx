@@ -13,8 +13,11 @@ import { cardSubmitPath } from "../paths";
 
 type Reply = { ok: true } | { ok: false; message: string };
 
-/** BIZ-02: "leave details" on a business card; posts to /api/forms/card/<token>, and the lead goes to the card's rep. */
-export function PublicCardForm({ token, rep }: { token: string; rep: string }) {
+/**
+ * BIZ-02: "leave details" on a business card; posts to /api/forms/card/<token>, and the lead goes to the card's rep.
+ * BIZ-01 reuses it on the business page with its own route (`submitPath`) and thank-you line (`doneLine`).
+ */
+export function PublicCardForm({ token, rep, submitPath, doneLine }: { token: string; rep: string; submitPath?: string; doneLine?: string }) {
   const [startedAt] = useState(() => Date.now());
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +45,7 @@ export function PublicCardForm({ token, rep }: { token: string; rep: string }) {
     }
     setPending(true);
     try {
-      const res = await fetch(cardSubmitPath(token), {
+      const res = await fetch(submitPath ?? cardSubmitPath(token), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -73,7 +76,7 @@ export function PublicCardForm({ token, rep }: { token: string; rep: string }) {
           <CheckIcon className="size-6" />
         </span>
         <p className="text-lead font-semibold">הפרטים נשלחו</p>
-        <p className="mt-1 text-md text-ink-soft">{rep} יחזרו אליכם בהקדם.</p>
+        <p className="mt-1 text-md text-ink-soft">{doneLine ?? `${rep} יחזרו אליכם בהקדם.`}</p>
       </div>
     );
   }

@@ -21,6 +21,7 @@ import {
 import { anomalyAlertSettingsPath } from "@/features/anomaly-alerts/paths";
 import { bookingPagesPath } from "@/features/booking/paths";
 import { businessCardSettingsPath } from "@/features/business-cards/paths";
+import { businessPageSettingsPath } from "@/features/business-page/paths";
 import { calendarSettingsPath } from "@/features/calendar-days/paths";
 import { cardLayoutSettingsPath } from "@/features/card-layout/paths";
 import { consentBlocklistPath } from "@/features/consent-blocklist/paths";
@@ -238,6 +239,10 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         { href: bookingPagesPath(orgId), label: "דפי קביעת תור", description: "קישור שבו לקוחות קובעים פגישה בזמן פנוי", icon: CalendarIcon },
         // BIZ-02: each person their own card; owners and admins every card
         { href: businessCardSettingsPath(orgId), label: "כרטיס ביקור", description: "קישור וקוד QR לכרטיס דיגיטלי, עם טופס שנכנס כליד שלך", icon: UsersIcon },
+        // BIZ-01: owners and admins only
+        ...(access.admin
+          ? [{ href: businessPageSettingsPath(orgId), label: "דף העסק", description: "דף ציבורי עם שעות פעילות, קביעת תור, WhatsApp וטופס פנייה", icon: BuildingIcon }]
+          : []),
         // SPD-07: owners and admins only
         ...(access.admin
           ? [{ href: siteWidgetSettingsPath(orgId), label: "כפתור באתר", description: "כפתור צף לאתר שלכם: WhatsApp, חיוג וטופס קצר שנכנס כליד", icon: ChatIcon }]
