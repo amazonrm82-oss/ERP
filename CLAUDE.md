@@ -268,7 +268,7 @@ and build this CRM here instead. The old code is preserved on the branch
   `handleIntake()` of the form at `SUPPORT.formUrl` (no new service-key use), Turnstile action `contact`, business type to the custom
   field named by server env `CONTACT_BUSINESS_TYPE_FIELD` (343 ב; unset = into the message), consent wording `contact-draft-1` (DRAFT).
   In use (LND-13 notify-me, owner 13 October 2026, hard rule 5's conditions; built 12 November 2026 with LND-20 v3; migrations 021250 and
-  021251 (021251 to be pasted by hand); an independent review and a delta review): the landing page's "תודיעו לי כשנפתח"
+  021251 (021251 pasted by hand by the owner, md5 checked 12 November 2026); an independent review and a delta review): the landing page's "תודיעו לי כשנפתח"
   (`src/features/landing/waitlist-server.ts`, route `POST /api/forms/plan-notify`) calls only `public.landing_waitlist_submit()`
   (definer, service_role only): email (trimmed, lower case), plan (only one `coming_soon` now), consent and its DRAFT wording version
   (`app.landing_waitlist_wording_known`, `waitlist-draft-1`) and the date in `app.landing_waitlist` (no grants; one row per email and plan;
