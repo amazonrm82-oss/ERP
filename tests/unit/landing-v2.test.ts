@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -164,7 +164,7 @@ describe("LND-20 v2 page", () => {
   });
 
   it("the waitlist's wording version is one the database accepts", () => {
-    expect(read("supabase/migrations/20261006021249_landing_waitlist.sql")).toContain(`'${WAITLIST_CONSENT_VERSION}'`);
+    expect(read(`supabase/migrations/${readdirSync(path.join(process.cwd(), "supabase/migrations")).find((f) => f.endsWith("_landing_waitlist.sql"))}`)).toContain(`'${WAITLIST_CONSENT_VERSION}'`);
     expect(read("eslint.config.mjs")).toContain('"src/features/landing/waitlist-server.ts"');
   });
 
