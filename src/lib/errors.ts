@@ -33,9 +33,9 @@ export const BUSINESS_EMAIL_LATIN = "את כתובת האימייל של העס�
 export const CAPTCHA_FAILED = "בדיקת האבטחה לא הושלמה. חכו שהבדיקה מעל הכפתור תסתיים ונסו שוב.";
 export const CAPTCHA_UNAVAILABLE = "לא הצלחנו להשלים את בדיקת האבטחה כרגע. נסו שוב בעוד דקה.";
 export const NETWORK_ERROR = "אין חיבור לשרת כרגע. בדקו את החיבור לאינטרנט ונסו שוב.";
-export const NO_PERMISSION = "אין לכם הרשאה לבצע את הפעולה הזו.";
-export const NOT_FOUND = "הרשומה לא נמצאה. ייתכן שנמחקה או שאין לכם גישה אליה.";
-export const SESSION_EXPIRED = "החיבור פג. יש להתחבר מחדש.";
+export const NO_PERMISSION = "אין לכם הרשאה לבצע את הפעולה הזו. אם צריך, בקשו מבעלי העסק או ממנהל מערכת.";
+export const NOT_FOUND = "הרשומה לא נמצאה. ייתכן שנמחקה או שאין לכם גישה אליה. רעננו את הדף ונסו שוב.";
+export const SESSION_EXPIRED = "החיבור פג. התחברו מחדש כדי להמשיך.";
 // RVW-13: functions on a user's own data (notification settings, devices, the
 // signed agreement, backup codes) refuse a session that has not passed the
 // second step (app.session_verified(): 42501, hint mfa:aal2_required).
@@ -51,7 +51,7 @@ export function needsSecondStep(error: unknown): boolean {
 
 // An UPDATE that RLS filters out succeeds with zero rows, so "nothing changed"
 // means either "not found" or "not allowed"; the database does not say which.
-export const NOT_FOUND_OR_FORBIDDEN = "לא ניתן לעדכן את הרשומה. ייתכן שנמחקה או שאין לכם הרשאה לערוך אותה.";
+export const NOT_FOUND_OR_FORBIDDEN = "לא ניתן לעדכן את הרשומה. ייתכן שנמחקה או שאין לכם הרשאה לערוך אותה. רעננו את הדף ונסו שוב.";
 
 // TAX-03: no VAT rate is known for a document's date (before the first row of public.vat_rates)
 export const VAT_BEFORE_TABLE = 'תאריך המסמך מוקדם מכל שיעורי המע"מ שבמערכת, ולכן אי אפשר לחשב לו מע"מ. בחרו תאריך מאוחר יותר.';
@@ -176,7 +176,7 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "cheque:status": "מצב של תשלום בצ'ק נקבע לפי מצב הצ'ק. שנו את מצב הצ'ק.",
   "cheque:bounced": "החזרת צ'ק ממצב \"חזר\" רק לבעלים ולמנהלי מערכת. בקשו מאחד מהם לעשות את זה.",
   "cheque:reason": "יש לכתוב למה הצ'ק חוזר ממצב \"חזר\" (עד 500 תווים).",
-  "cheque:refunded": "צ'ק של תשלום שהוחזר נשאר כפי שהוא.",
+  "cheque:refunded": "צ'ק של תשלום שהוחזר נשאר כפי שהוא. אם ההחזר נרשם בטעות, בטלו קודם את ההחזר ואז שנו את הצ'ק.",
   "feature:payments": "רישום תשלומים אינו כלול בחבילה הנוכחית. בעלי העסק רואים את השימוש ב\"הגדרות > חבילה ושימוש\", ושם גם איך מגדילים את החבילה.",
   "feature:balances": "כרטסת הלקוח אינה כלולה בחבילה הנוכחית. בעלי העסק רואים את השימוש ב\"הגדרות > חבילה ושימוש\", ושם גם איך מגדילים את החבילה.",
   // COL-05
@@ -188,7 +188,7 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "payment_promise:date": "תאריך ההבטחה הוא מהיום ועד שנה קדימה. בחרו תאריך בטווח הזה.",
   "payment_promise:fixed": "הבטחת תשלום נשארת על המסמך או הלקוח שלה. כדי להעביר אותה, מחקו אותה ורשמו הבטחה חדשה.",
   "payment_promise:customer": "ללקוח ששייך לחברה רושמים את ההבטחה על החברה. פתחו את כרטיס החברה ורשמו אותה שם.",
-  "payment_promise:nothing_open": "אין ללקוח מסמכים פתוחים, ולכן אין על מה לרשום הבטחה.",
+  "payment_promise:nothing_open": "אין ללקוח מסמכים פתוחים, ולכן אין על מה לרשום הבטחה. אפשר לרשום הבטחה כשיש ללקוח חשבונית מס, חשבון עסקה או יתרת חוב פתוחים.",
   "feature:collection": "מסך הגבייה אינו כלול בחבילה הנוכחית. בעלי העסק רואים את השימוש ב\"הגדרות > חבילה ושימוש\", ושם גם איך מגדילים את החבילה.",
   "feature:money_waiting": "המסך \"כסף שמחכה\" אינו כלול בחבילה הנוכחית. בעלי העסק רואים את השימוש ב\"הגדרות > חבילה ושימוש\", ושם גם איך מגדילים את החבילה.",
   "feature:money_waiting_actions": "בחבילה הנוכחית המסך \"כסף שמחכה\" הוא לקריאה בלבד. את הפעולות אפשר לעשות מדף הרשומה. בעלי העסק רואים את השימוש ב\"הגדרות > חבילה ושימוש\", ושם גם איך מגדילים את החבילה.",
@@ -333,7 +333,7 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "banner:not_dismissable": "את ההודעה הזו אי אפשר לסגור. היא תיעלם לבד בסוף התקופה שלה.",
   // TRU-01 (migration roadmap): the business's one vote is cast by an owner or admin of an open business, on an item not done
   "roadmap:vote_admin": "רק בעלים ומנהלי מערכת מצביעים בשם העסק. בקשו מאחד מהם להצביע.",
-  "roadmap:closed": "העסק סגור כרגע, ולכן אי אפשר להצביע.",
+  "roadmap:closed": "העסק סגור כרגע, ולכן אי אפשר להצביע. בעלי העסק רואים את הפרטים ב\"הגדרות > חבילה ושימוש\".",
   "roadmap:done": "הפריט הזה כבר נבנה, וההצבעה עליו הסתיימה.",
   // USR-12 (migration support_requests): 5 requests per person per hour
   "support:rate": `שלחתם כבר 5 פניות בשעה האחרונה. נסו שוב מאוחר יותר, או פנו אלינו ישירות: ${SUPPORT_LINE}.`,
@@ -412,14 +412,14 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "quote:empty": "אי אפשר לשלוח הצעה בלי שורות. הוסיפו לפחות שורה אחת.",
   "quote:vat_unknown": 'עוד לא נקבע המעמד של העסק במע"מ, ולכן אי אפשר לשלוח את ההצעה. בעלי העסק קובעים אותו ב"הגדרות > מע"מ ופרטים למסמכים".',
   "quote_pdf:draft": "לטיוטה אין קובץ PDF. שלחו את ההצעה, והקובץ יישמר.",
-  "quote_pdf:closed": "קובץ PDF נשמר רק להצעה שנשלחה ועדיין פתוחה (נשלחה או נצפתה).",
+  "quote_pdf:closed": "קובץ PDF נשמר רק להצעה שנשלחה ועדיין פתוחה (נשלחה או נצפתה). להצעה שנדחתה או שתוקפה עבר אפשר ליצור גרסה חדשה ולשלוח אותה.",
   "quote_pdf:invalid": "קובץ ה-PDF לא נשמר. נסו שוב בעוד רגע.",
   // QUO-09 signed PDF
-  "quote_pdf:not_accepted": "PDF חתום נשמר רק להצעה שהלקוח אישר וחתם עליה.",
+  "quote_pdf:not_accepted": "PDF חתום נשמר רק להצעה שהלקוח אישר וחתם עליה. הוא נשמר לבד כשהלקוח מאשר את ההצעה.",
   "quote_pdf:version": "קובץ ה-PDF של ההצעה לא נשמר. נסו שוב בעוד רגע.",
   // ORD-05 PDF (migration order_pdfs)
   "order_pdf:draft": "לטיוטה אין קובץ PDF. אשרו את ההזמנה, והקובץ יישמר כשהיא מקבלת מספר.",
-  "order_pdf:closed": "קובץ PDF נשמר רק להזמנה ממוספרת שלא בוטלה.",
+  "order_pdf:closed": "קובץ PDF חדש לא נשמר להזמנה שבוטלה או שהלקוח שלה נמחק. קבצים שנשמרו קודם נשארים בהזמנה, ואם צריך אפשר ליצור הזמנה חדשה.",
   "order_pdf:invalid": "קובץ ה-PDF לא נשמר. נסו שוב בעוד רגע.",
   "order_pdf:version": "קובץ ה-PDF של ההזמנה עודכן בינתיים. נסו שוב בעוד רגע.",
   "quote:frozen": "אי אפשר לשנות מחירים, הנחה או מע\"מ בהצעה שכבר אינה טיוטה. כדי לשנות, צרו גרסה חדשה של ההצעה.",
@@ -434,24 +434,24 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // QUO-12: versions of a sent quote
   "quote:no_redraft": "הצעה שנשלחה לא חוזרת לטיוטה. כדי לשנות אותה, צרו גרסה חדשה.",
   "quote_version:draft": "זו טיוטה: אפשר לערוך אותה ישירות.",
-  "quote_version:closed": "ההצעה כבר אושרה, נדחתה, בוטלה או פגה, ולכן אי אפשר ליצור לה גרסה חדשה.",
+  "quote_version:closed": "ההצעה כבר אושרה או בוטלה, ולכן אי אפשר ליצור לה גרסה חדשה. להצעה שאושרה אפשר ליצור תוספת בכפתור \"תוספת להצעה\".",
   // QUO-11: cancelling a sent quote (public.quote_cancel)
   "quote_cancel:draft": "טיוטה לא מבטלים. אפשר למחוק אותה.",
   "quote_cancel:accepted": "אי אפשר לבטל כאן הצעה שהלקוח כבר אישר. בקשו מבעלים או ממנהל מערכת לבטל אותה עם סיבה.",
-  "quote_cancel:closed": "ההצעה כבר נדחתה או בוטלה.",
+  "quote_cancel:closed": "ההצעה כבר נדחתה או בוטלה. רעננו את הדף כדי לראות את המצב שלה.",
   // QUO-11: cancelling an accepted quote (public.quote_cancel_accepted, owners and admins)
-  "quote_cancel:not_accepted": "רק הצעה שהלקוח אישר מבטלים כאן.",
+  "quote_cancel:not_accepted": "רק הצעה שהלקוח אישר מבטלים כאן. כדי לבטל הצעה שעוד לא אושרה, לחצו על \"ביטול ההצעה\".",
   "quote_cancel:reason": "יש לכתוב סיבה לביטול (עד 500 תווים).",
   "quote_version:exists": "להצעה הזאת כבר יש גרסה חדשה. המשיכו לעבוד על הגרסה החדשה.",
   "quote_version:not_sent": "גרסה חדשה נוצרת רק מהצעה שנשלחה. אפשר לערוך את הטיוטה ישירות.",
-  "quote_version:parent": "גרסה חדשה שייכת לאותה עסקה ולאותו איש קשר.",
-  "quote_version:fixed": "אי אפשר לשנות לאיזו הצעה הגרסה שייכת.",
+  "quote_version:parent": "גרסה חדשה שייכת לאותה עסקה ולאותו איש קשר. צרו אותה בכפתור \"עריכה בגרסה חדשה\" בהצעה עצמה.",
+  "quote_version:fixed": "אי אפשר לשנות לאיזו הצעה הגרסה שייכת. כדי להתחיל הצעה נפרדת, שכפלו את ההצעה בכפתור \"שכפול\".",
   // GAP-10: addenda to an accepted quote
-  "quote_addendum:not_accepted": "תוספת נוצרת רק להצעה שהלקוח אישר.",
+  "quote_addendum:not_accepted": "תוספת נוצרת רק להצעה שהלקוח אישר. לפני האישור אפשר לשנות את ההצעה בכפתור \"עריכה בגרסה חדשה\".",
   "quote_addendum:of_addendum": "אי אפשר ליצור תוספת לתוספת. צרו תוספת נוספת להצעה המקורית.",
-  "quote_addendum:parent": "תוספת שייכת לאותה עסקה ולאותו איש קשר של ההצעה המקורית.",
-  "quote_addendum:version": "גרסה חדשה של תוספת נשארת תוספת לאותה הצעה.",
-  "quote_addendum:fixed": "אי אפשר להעביר תוספת להצעה אחרת.",
+  "quote_addendum:parent": "תוספת שייכת לאותה עסקה ולאותו איש קשר של ההצעה המקורית. צרו אותה בכפתור \"תוספת להצעה\" בהצעה המקורית.",
+  "quote_addendum:version": "גרסה חדשה של תוספת נשארת תוספת לאותה הצעה. לתוספת להצעה אחרת, צרו תוספת חדשה מההצעה ההיא.",
+  "quote_addendum:fixed": "אי אפשר להעביר תוספת להצעה אחרת. צרו תוספת חדשה מההצעה הנכונה.",
   // ORD-01 / ORD-02 / ORD-03
   "order:confirm": "טיוטה מקבלת מספר רק בכפתור \"אישור ההזמנה\". לחצו עליו כשההזמנה מוכנה.",
   "order:no_redraft": "הזמנה שאושרה לא חוזרת לטיוטה. אפשר לבטל אותה וליצור הזמנה חדשה.",
@@ -464,7 +464,7 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "order:numbered": "הזמנה שאושרה לא נמחקת. אפשר לבטל אותה.",
   "order:empty": "אי אפשר לאשר הזמנה בלי שורות. הוסיפו לפחות שורה אחת.",
   "order:vat_unknown": 'עוד לא נקבע המעמד של העסק במע"מ, ולכן אי אפשר לאשר את ההזמנה. בעלי העסק קובעים אותו ב"הגדרות > מע"מ ופרטים למסמכים".',
-  "order:quote_not_accepted": "הזמנה נוצרת מהצעה שהלקוח אישר.",
+  "order:quote_not_accepted": "הזמנה נוצרת מהצעה שהלקוח אישר. חכו לאישור הלקוח, או צרו הזמנה בכפתור \"הזמנה חדשה\" בכרטיס הרשומה.",
   "order:exists": "כבר נוצרה הזמנה מזה. פתחו אותה מכרטיס ההזמנות.",
   "order:deal_not_won": "הזמנה מעסקה נוצרת רק מעסקה שנסגרה בהצלחה. סגרו קודם את העסקה בהצלחה.",
   "order:use_quote": "לעסקה יש הצעת מחיר שאושרה. צרו את ההזמנה מההצעה, כדי שהשורות והמחירים יהיו כפי שהלקוח אישר.",
@@ -481,8 +481,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // ORD-06 part two: documents and payments of an order
   "order_money:draft": "מסמכים ותשלומים רושמים רק בהזמנה שאושרה וקיבלה מספר. אשרו קודם את ההזמנה.",
   "order_money:parent": "מסמך או תשלום של הזמנה נרשם על העסקה או איש הקשר של ההזמנה עצמה. בחרו אחד מהם.",
-  "order_link:cancelled": "להזמנה שבוטלה לא יוצרים קישור חדש.",
-  "order_link:customer_deleted": "הלקוח של ההזמנה נמחק, ולכן אין לה קישור.",
+  "order_link:cancelled": "להזמנה שבוטלה לא יוצרים קישור חדש. אם צריך, צרו הזמנה חדשה ושלחו לה קישור.",
+  "order_link:customer_deleted": "הלקוח של ההזמנה נמחק, ולכן אין לה קישור. אם צריך, צרו הזמנה חדשה ללקוח קיים.",
   // BAL-04: the customer's statement link
   "consent_link:no_address": "לרשומה אין כתובת לערוץ הזה. הוסיפו אימייל או טלפון, ואז צרו את הקישור.",
   "consent_link:no_key": "אי אפשר ליצור קישור להעדפות כרגע: מפתח ההגנה של ההסכמות עוד לא הוגדר. פנו לתמיכה.",
@@ -516,7 +516,7 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "quote_lines:order": "סדר השורות לא תקין. רעננו את הדף ונסו שוב.",
   // QUO-03 (migration number_sequences)
   "number_sequences:start_locked": "כבר ניתן מספר בסדרה הזו, ולכן אי אפשר לשנות את המספר ההתחלתי. אפשר לשנות את הקידומת.",
-  "number_sequences:last_number": "אי אפשר להחזיר את המספור אחורה.",
+  "number_sequences:last_number": "אי אפשר להחזיר את המספור אחורה. אפשר לקבוע רק מספר גבוה יותר למספר הבא.",
   "number_sequences:fixed": "אי אפשר להעביר סדרת מספור לסוג אחר.",
   "number_sequences:not_forward": "המספר הבא החדש צריך להיות גבוה מהמספר הבא הנוכחי. רעננו את הדף ונסו שוב.",
   "number_sequences:not_used": "עדיין לא ניתן מספר בסדרה הזו. אפשר לשנות את המספר ההתחלתי.",
@@ -668,7 +668,7 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // PRK-06 (trigger org_privacy_settings_check)
   "privacy_officer:member": "אחראי הפרטיות צריך להיות משתמש פעיל בעסק. בחרו משתמש אחר.",
   // PRK-02 (trigger privacy_requests_check; privacy_request_submit)
-  "privacy_request:closed": "הבקשה כבר נסגרה, ואי אפשר לשנות אותה.",
+  "privacy_request:closed": "הבקשה כבר נסגרה, ואי אפשר לשנות אותה. אם האדם פונה שוב, שלחו לו את הקישור לבקשות שב\"הגדרות > בקשות פרטיות\", כדי שיגיש בקשה חדשה.",
   "privacy_request:verified": "אימות הזהות כבר סומן, ואי אפשר לשנות אותו.",
   "privacy_request:verify_method": "יש לבחור איך אומתה הזהות.",
   "privacy_request:not_verified": "קודם מסמנים שהזהות אומתה, ואז מטפלים בבקשה. סמנו איך אומתה הזהות.",
@@ -694,7 +694,7 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "library_items:max": "אפשר לשמור עד 1,000 פריטים בספריית התוכן. מחקו פריטים ישנים כדי להוסיף חדשים.",
   "library:file_kind": "אפשר לצרף קובץ רק לפריט מסוג קובץ בספריית התוכן. צרו פריט מסוג קובץ.",
   // CON-06 (trigger contact_relations_check, contact_relation_types_cap)
-  "contact_relation:exists": "הקשר הזה כבר רשום בין שני אנשי הקשר.",
+  "contact_relation:exists": "הקשר הזה כבר רשום בין שני אנשי הקשר. רעננו את הדף כדי לראות אותו.",
   "contact_relation:type": "סוג הקשר הזה כבר לא ברשימה. בחרו סוג אחר.",
   "contact_relation:max": "אפשר לשמור עד 50 קשרים לאיש קשר. מחקו קשר כדי להוסיף חדש.",
   "contact_relation:lead_type": "ליד נרשם רק כמי שהפנה איש קשר. בחרו את סוג הקשר של הפניה.",
@@ -760,46 +760,46 @@ const LIMIT_MESSAGES: Record<string, string> = {
 
 // P0001 raised without a hint: recognised by the (stable) English message.
 const RAISED_MESSAGES: Array<[RegExp, string]> = [
-  [/already converted/i, "הליד כבר הומר."],
-  [/no open stage/i, "אין בתהליך המכירה שלב פתוח לשים בו את העסקה. יש להוסיף שלב בהגדרות."],
+  [/already converted/i, "הליד כבר הומר. רעננו את הדף כדי לראות את איש הקשר והעסקה שנוצרו ממנו."],
+  [/no open stage/i, "אין בתהליך המכירה שלב פתוח לשים בו את העסקה. הוסיפו שלב פתוח ב\"הגדרות > תהליכי מכירה\"."],
 ];
 
 // Exceptions our own functions and triggers raise with other codes, recognised
 // by their (stable) English message. Checked before the generic code mapping.
 const OWN_MESSAGES: Array<[RegExp, string]> = [
-  [/only the owner can (change|remove) another admin/i, "רק הבעלים יכול לשנות או להסיר מנהל מערכת אחר."],
-  [/only the owner can (make someone|invite) an admin/i, "רק הבעלים יכול למנות מנהל מערכת."],
-  [/cannot change your own role/i, "אי אפשר לשנות את התפקיד או את הסטטוס של עצמך."],
-  [/owner cannot be (removed|suspended)|ownership changes only/i, "אי אפשר לשנות את הבעלים. אפשר להעביר בעלות."],
-  [/already a member/i, "המשתמש כבר חבר בעסק."],
+  [/only the owner can (change|remove) another admin/i, "רק הבעלים יכול לשנות או להסיר מנהל מערכת אחר. בקשו מהבעלים לעשות את זה."],
+  [/only the owner can (make someone|invite) an admin/i, "רק הבעלים יכול למנות מנהל מערכת. בקשו מהבעלים לעשות את זה."],
+  [/cannot change your own role/i, "אי אפשר לשנות את התפקיד או את הסטטוס של עצמך. בקשו מהבעלים של העסק לעשות את זה."],
+  [/owner cannot be (removed|suspended)|ownership changes only/i, "אי אפשר לשנות או להסיר את הבעלים. הבעלים עצמו יכול להעביר את הבעלות: אפשר לעשות את זה ב\"הגדרות > משתמשים\"."],
+  [/already a member/i, "המשתמש כבר חבר בעסק. אפשר לשנות את התפקיד שלו ב\"הגדרות > משתמשים\"."],
   [/invitation is invalid or has expired/i, "ההזמנה אינה בתוקף. בקשו ממי שהזמין אתכם לשלוח הזמנה חדשה."],
   [/invitation was sent to a different email/i, "ההזמנה נשלחה לכתובת אימייל אחרת. התחברו עם החשבון של הכתובת שאליה נשלחה ההזמנה."],
-  [/new owner must be an active member/i, "הבעלים החדש צריך להיות משתמש פעיל עם מושב מלא."],
-  [/invalid email address/i, "כתובת האימייל אינה תקינה."],
+  [/new owner must be an active member/i, "הבעלים החדש צריך להיות משתמש פעיל עם מושב מלא. בחרו משתמש כזה."],
+  [/invalid email address/i, "כתובת האימייל אינה תקינה. בדקו את הכתובת ונסו שוב."],
   // REC-05: trigger activities_edit_window (hint note:edit_window)
-  [/note edit window closed/i, "אפשר לערוך הערה רק ב-24 השעות הראשונות. אחרי זה רק מנהל מערכת יכול לערוך אותה."],
+  [/note edit window closed/i, "אפשר לערוך הערה רק ב-24 השעות הראשונות. אחרי זה רק בעלים או מנהל מערכת יכולים לערוך אותה. אפשר להוסיף הערה חדשה."],
   // REC-01: trigger activities_edit_window (hint note:pin_only), a team manager on a colleague's entry
-  [/note pin only/i, "אפשר לנעוץ את הרשומה הזו, אבל רק מי שכתב אותה או מנהל מערכת יכולים לערוך אותה."],
+  [/note pin only/i, "אפשר לנעוץ את הרשומה הזו, אבל רק מי שכתב אותה, בעלים או מנהל מערכת יכולים לערוך אותה. אפשר להוסיף הערה חדשה."],
   // RVW-1: trigger activities_verify_meeting_entry (hint meeting:entry); the app never sends the key
-  [/meeting entry link is set by the server/i, "את הקישור לפגישה המערכת קובעת. אי אפשר לשנות אותו."],
+  [/meeting entry link is set by the server/i, "את הקישור לפגישה המערכת קובעת. אי אפשר לשנות אותו. רעננו את הדף ונסו שוב."],
   // CAL-01: trigger meetings_check_links
-  [/meeting linked to a record the user cannot see/i, "אי אפשר לקשר את הפגישה לרשומה שאין לכם גישה אליה."],
-  [/meeting organizer must be an active member/i, "מארגן הפגישה צריך להיות משתמש פעיל בעסק."],
+  [/meeting linked to a record the user cannot see/i, "אי אפשר לקשר את הפגישה לרשומה שאין לכם גישה אליה. בחרו רשומה אחרת."],
+  [/meeting organizer must be an active member/i, "מארגן הפגישה צריך להיות משתמש פעיל בעסק. בחרו מארגן אחר."],
   // CAL-07, GAP-01: hint org:suspended (a suspended, cancelled or deleted organization)
-  [/the organization is not active/i, `העסק אינו פעיל כרגע. לבירור: ${SUPPORT_LINE}.`],
-  [/not allowed to change the meeting organizer/i, "רק מי שמארגן את הפגישה, מי שקבע אותה, בעלי העסק ומנהלי המערכת יכולים לקבוע מי מארגן אותה."],
+  [/the organization is not active/i, `העסק אינו פעיל כרגע. לבירור פנו לתמיכה: ${SUPPORT_LINE}.`],
+  [/not allowed to change the meeting organizer/i, "רק מי שמארגן את הפגישה, מי שקבע אותה, בעלי העסק ומנהלי המערכת יכולים לקבוע מי מארגן אותה. בקשו מאחד מהם."],
 ];
 
 const AUTH_MESSAGES: Record<string, string> = {
-  invalid_credentials: "האימייל או הסיסמה שגויים.",
+  invalid_credentials: "האימייל או הסיסמה שגויים. בדקו ונסו שוב, או לחצו על \"שכחתי סיסמה\".",
   email_not_confirmed: "כתובת האימייל עוד לא אומתה. חפשו את הודעת האימות בתיבת הדואר.",
   user_already_exists: "כבר קיים חשבון עם כתובת האימייל הזו. אפשר להתחבר.",
   email_exists: "כבר קיים חשבון עם כתובת האימייל הזו. אפשר להתחבר.",
   weak_password: "הסיסמה חלשה מדי, או שהיא הופיעה בדליפת מידע מוכרת. בחרו סיסמה אחרת, ארוכה יותר.",
-  same_password: "הסיסמה החדשה זהה לקודמת.",
-  email_address_invalid: "כתובת האימייל אינה תקינה.",
-  signup_disabled: "ההרשמה סגורה כרגע.",
-  user_banned: `החשבון חסום. לבירור: ${SUPPORT_LINE}.`,
+  same_password: "הסיסמה החדשה זהה לקודמת. בחרו סיסמה אחרת.",
+  email_address_invalid: "כתובת האימייל אינה תקינה. בדקו את הכתובת ונסו שוב.",
+  signup_disabled: `ההרשמה סגורה כרגע. נסו שוב מאוחר יותר, או פנו לתמיכה: ${SUPPORT_LINE}.`,
+  user_banned: `החשבון חסום. לבירור פנו לתמיכה: ${SUPPORT_LINE}.`,
   over_request_rate_limit: "יותר מדי ניסיונות. המתינו דקה ונסו שוב.",
   over_email_send_rate_limit: "נשלחו יותר מדי הודעות אימייל. המתינו כמה דקות ונסו שוב.",
   session_not_found: SESSION_EXPIRED,
@@ -809,7 +809,7 @@ const AUTH_MESSAGES: Record<string, string> = {
   flow_state_expired: "קישור האימות פג. בקשו קישור חדש.",
   otp_expired: "קישור האימות פג. בקשו קישור חדש.",
   insufficient_aal: "כדי לשנות את זה צריך קודם להזין את קוד האימות הדו-שלבי. התנתקו, התחברו שוב והזינו את הקוד.",
-  reauthentication_needed: "מטעמי אבטחה צריך להתחבר מחדש לפני שינוי הסיסמה.",
+  reauthentication_needed: "מטעמי אבטחה צריך להתחבר מחדש לפני שינוי הסיסמה. התנתקו, התחברו שוב ושנו את הסיסמה.",
   mfa_verification_failed: "הקוד לא התאים. נסו את הקוד הבא באפליקציה.",
   bad_code_verifier: "קישור האימות נפתח בדפדפן אחר מזה שבו נרשמתם. פתחו אותו באותו דפדפן.",
 };
@@ -956,7 +956,7 @@ export function dbErrorMessage(error: unknown, fallback: string = GENERIC_ERROR)
     case "PGRST116":
       return NOT_FOUND;
     case "23505":
-      return "כבר קיימת רשומה כזו.";
+      return "כבר קיימת רשומה כזו. בדקו את הפרטים, או חפשו את הרשומה הקיימת.";
     case "23503":
       return "אחד הערכים שנבחרו כבר לא קיים. רעננו את הדף ונסו שוב.";
     case "23514":

@@ -106,8 +106,8 @@ describe("meeting errors from the database (CAL-01)", () => {
     const inactive = dbErrorMessage({ code: "23503", message: "meeting organizer must be an active member" });
     const hidden = dbErrorMessage({ code: "42501", message: "meeting linked to a record the user cannot see" });
     expect(organizer).toContain("מי מארגן אותה");
-    expect(inactive).toBe("מארגן הפגישה צריך להיות משתמש פעיל בעסק.");
-    expect(hidden).toBe("אי אפשר לקשר את הפגישה לרשומה שאין לכם גישה אליה.");
+    expect(inactive).toBe("מארגן הפגישה צריך להיות משתמש פעיל בעסק. בחרו מארגן אחר.");
+    expect(hidden).toBe("אי אפשר לקשר את הפגישה לרשומה שאין לכם גישה אליה. בחרו רשומה אחרת.");
     for (const text of [organizer, inactive, hidden]) expect(text).not.toBe(NO_PERMISSION);
   });
 });

@@ -3,7 +3,10 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { dbErrorMessage } from "@/lib/errors";
+import { authErrorMessage, dbErrorMessage } from "@/lib/errors";
+
+import rewritten from "./fixtures/ux04-rewritten-messages.json";
+import { OTHER_CASES, REWRITTEN_HINTS } from "./ux04-cases";
 
 // UX-04: a refusal says what happened and what the user can do next. Every hint message in src/lib/errors.ts is
 // non-empty and its last sentence tells an action (an imperative, "אפשר ל…", "יש ל…", or where the owners fix it),
@@ -34,42 +37,19 @@ const NOTHING_TO_DO = new Set([
   "activity:record_link_entry",
   "activity:punch_card_entry",
   "import:original_date_fixed",
-  "number_sequences:last_number",
   "number_sequences:fixed",
   "number_sequences:delete",
-  "privacy_request:closed",
   "privacy_request:verified",
   // a state that is already final
-  "cheque:refunded",
-  "payment_promise:nothing_open",
-  "quote_pdf:closed",
   "quote_pdf:not_accepted",
-  "order_pdf:closed",
-  "quote_version:closed",
-  "quote_version:parent",
-  "quote_version:fixed",
-  "quote_cancel:closed",
-  "quote_cancel:not_accepted",
-  "quote_addendum:not_accepted",
-  "quote_addendum:parent",
-  "quote_addendum:version",
-  "quote_addendum:fixed",
-  "order:quote_not_accepted",
-  "order_link:cancelled",
-  "order_link:customer_deleted",
   "quote_deal:no_deal",
-  "contact_relation:exists",
   "contact_channel:primary",
   "banner:not_dismissable",
-  "roadmap:closed",
   "roadmap:done",
   // only the person themselves can lift these (privacy), and the message says how
   "consent:erasure_block",
   "consent:optout_locked",
   "consent:address_blocked",
-  // the shared "no permission" text (raised as 42501)
-  "record_email:not_permitted",
-  "record_sms:not_permitted",
   // the owner's own wording (CAP-11, CLAUDE.md), pinned by test 304
   "integration:taken",
 ]);
@@ -79,7 +59,7 @@ const ACTION = new RegExp(
     // imperatives (plural, the app's voice)
     "רעננו|נסו|בחרו|הוסיפו|מחקו|בדקו|פנו|בקשו|כתבו|צרו|הסירו|בטלו|העלו|סמנו|תקנו|הזינו|שנו|חכו|המתינו|פתחו|חלקו|רשמו",
     "הורידו|התחילו|ערכו|קצרו|אשרו|שמרו|לחצו|העבירו|מזגו|נתקו|קשרו|שייכו|צרפו|מלאו|הקטינו|אחדו|שחזרו|סגרו|השאירו|העתיקו",
-    "ייצאו|המשיכו|עבדו|החליפו|הגדירו|הפעילו|קבעו|מכרו|הקלידו|שלחו|השלימו",
+    "ייצאו|המשיכו|עבדו|החליפו|הגדירו|הפעילו|קבעו|מכרו|הקלידו|שלחו|השלימו|שכפלו|התחברו|התנתקו",
     // an alternative, an instruction, or where the owners fix it
     "אפשר ל",
     "יש ל",
@@ -130,6 +110,44 @@ describe("refusal messages say what to do (UX-04)", () => {
   it("every exempt hint is still a real hint", () => {
     for (const hint of NOTHING_TO_DO) {
       expect(MAP_HINTS, hint).toContain(hint);
+    }
+  });
+});
+
+// UX-04 second pass: the messages outside the hint map, and the pinned wording of what was rewritten
+describe("refusal messages outside the hint map (UX-04)", () => {
+  const HEBREW = /[\u05d0-\u05ea]/;
+  const textOf = (name: string) => {
+    const c = OTHER_CASES[name];
+    return c.kind === "auth" ? authErrorMessage(c.error, "__fallback__") : dbErrorMessage(c.error, "__fallback__");
+  };
+
+  it("every hint message and every other case is Hebrew", () => {
+    for (const hint of MAP_HINTS) expect(HEBREW.test(message(hint)), hint).toBe(true);
+    for (const name of Object.keys(OTHER_CASES)) expect(HEBREW.test(textOf(name)), name).toBe(true);
+  });
+
+  it("the shared answers, the raised and own messages and the Auth codes end with what to do", () => {
+    for (const name of Object.keys(OTHER_CASES)) {
+      const text = textOf(name);
+      expect(text, name).not.toBe("__fallback__");
+      expect(ACTION.test(lastSentence(text)), `${name}: ${text}`).toBe(true);
+    }
+  });
+
+  it("the rewritten wording is pinned (an edit shows up here)", () => {
+    const hints: Record<string, string> = {};
+    for (const hint of REWRITTEN_HINTS) hints[hint] = message(hint);
+    const other: Record<string, string> = {};
+    for (const name of Object.keys(OTHER_CASES)) other[name] = textOf(name);
+    expect({ hints, other }).toEqual(rewritten);
+  });
+
+  it("a rewritten hint is not exempt from saying what to do, unless it only explains", () => {
+    for (const hint of REWRITTEN_HINTS) {
+      expect(MAP_HINTS, hint).toContain(hint);
+      if (NOTHING_TO_DO.has(hint)) continue;
+      expect(ACTION.test(lastSentence(message(hint))), hint).toBe(true);
     }
   });
 });
