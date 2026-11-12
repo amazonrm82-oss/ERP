@@ -142,6 +142,11 @@ export const FIELD_TYPE_SWITCHES: Record<string, SwitchPlace> = {
     decisions: { rich_text: "excluded", duration: "excluded", status: "excluded" , ...B_EXCLUDED },
     note: "the templates use the older types only. Part B: the templates use the older types only",
   },
+  "src/features/industry-templates/kits.ts": {
+    what: "industry kits (VRT-01)",
+    decisions: { rich_text: "excluded", duration: "excluded", status: "excluded", ...B_EXCLUDED },
+    note: "the kits' fields use the older types only (their template part has TemplateFieldType of templates.ts)",
+  },
   "src/features/intake/fields.ts": {
     what: "public form fields (FORM_EXCLUDED_TYPES)",
     decisions: { rich_text: "excluded", duration: "excluded", status: "excluded" , ...B_ADDRESS_ONLY },

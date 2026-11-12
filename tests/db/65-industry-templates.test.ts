@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { INDUSTRY_KITS } from "@/features/industry-templates/kits";
 import { INDUSTRY_TEMPLATES, previewTemplate, TEMPLATE_PRODUCTS, templateProducts } from "@/features/industry-templates/templates";
 import { INDUSTRIES } from "@/features/onboarding/options";
 
@@ -84,6 +85,20 @@ describe("industry templates: data (FLD-05)", () => {
     expect(await asAdmin(async (q) => (await q<{ t: unknown }>("select app.industry_template('nope') as t")).rows[0].t)).toBeNull();
   });
 
+  it("the database's kits equal INDUSTRY_KITS in src/features/industry-templates/kits.ts (VRT-01)", async () => {
+    for (const kit of INDUSTRY_KITS) {
+      const db = await asAdmin(async (q) => (await q<{ t: unknown }>("select app.industry_kit($1) as t", [kit.template.industry])).rows[0].t);
+      expect(db, kit.template.industry).toEqual(JSON.parse(JSON.stringify(kit)));
+      // a kit key is never an FLD-05 template key
+      expect(await asAdmin(async (q) => (await q<{ t: unknown }>("select app.industry_template($1) as t", [kit.template.industry])).rows[0].t)).toBeNull();
+    }
+    for (const key of ["services", "health", "nope"]) {
+      expect(await asAdmin(async (q) => (await q<{ t: unknown }>("select app.industry_kit($1) as t", [key])).rows[0].t)).toBeNull();
+    }
+    const owner = await createUser("tpl-kit-data");
+    expect((await pgError(asUser(owner.id, (q) => q("select app.industry_kit('clinic')")))).code).toBe("42501");
+  });
+
   it("the database's sample products equal TEMPLATE_PRODUCTS (FLD-05, wave 2)", async () => {
     for (const template of INDUSTRY_TEMPLATES) {
       const db = await asAdmin(async (q) => (await q<{ t: unknown }>("select app.industry_template_products($1) as t", [template.industry])).rows[0].t);
@@ -152,6 +167,11 @@ describe("apply_industry_template (FLD-05)", () => {
       fields: template.fields.length,
       automations: template.automations.length,
       products: (await hasProducts(org)) ? templateProducts("real_estate").length : 0,
+      meeting_types: 0,
+      message_templates: 0,
+      whatsapp_templates: 0,
+      forms: 0,
+      views: 0,
     });
 
     const after = await snapshot(org);
@@ -178,7 +198,7 @@ describe("apply_industry_template (FLD-05)", () => {
   it("applying again adds nothing", async () => {
     const before = await snapshot(org);
     const result = await apply(admin.id, org, "real_estate");
-    expect(result).toEqual({ added: { pipelines: 0, stages: 0, statuses: 0, sources: 0, fields: 0, automations: 0, products: 0 }, limits: [] });
+    expect(result).toEqual({ added: { pipelines: 0, stages: 0, statuses: 0, sources: 0, fields: 0, automations: 0, products: 0, meeting_types: 0, message_templates: 0, whatsapp_templates: 0, forms: 0, views: 0 }, limits: [] });
     expect(await snapshot(org)).toEqual(before);
     expect(await applied(org)).toEqual(["real_estate"]);
   });
@@ -245,6 +265,12 @@ describe("apply_industry_template (FLD-05)", () => {
       fields: preview.fields.length,
       automations: preview.automations.length,
       products: preview.products.length,
+      // VRT-01: a kit's extras; none for an FLD-05 template
+      meeting_types: 0,
+      message_templates: 0,
+      whatsapp_templates: 0,
+      forms: 0,
+      views: 0,
     });
     expect(preview.sources).toEqual(["שלט על הנכס"]);
     expect(preview.statuses).toEqual(template.statuses);
@@ -344,6 +370,38 @@ describe("apply_industry_template and plan limits (FLD-05)", () => {
     expect(second.added).toMatchObject({ pipelines: 1, stages: template.pipeline!.stages.length, statuses: 0, sources: 0, automations: 0 });
     expect(second.added.fields).toBe(template.fields.length - 2);
     expect(await applied(org)).toEqual(["real_estate"]);
+  });
+});
+
+describe("apply_industry_template and the privacy class of a template field (owner (350) ג)", () => {
+  const fieldClass = (org: string, key: string) =>
+    asAdmin(async (q) =>
+      (await q<{ privacy_class: string | null; label: string }>(
+        "select privacy_class, label from public.field_definitions where organization_id = $1 and object_type = 'contact' and key = $2", [org, key])).rows,
+    );
+
+  it("the health template's health-fund field is created as sensitive; other template fields are not classified", async () => {
+    const health = INDUSTRY_TEMPLATES.find((t) => t.industry === "health")!;
+    expect(health.fields.find((f) => f.key === "health_fund")?.privacy_class).toBe("sensitive");
+    const owner = await createUser("tpl-privacy");
+    const org = await createOrg(owner.id);
+    await apply(owner.id, org, "health");
+    expect(await fieldClass(org, "health_fund")).toEqual([{ privacy_class: "sensitive", label: "קופת חולים" }]);
+    const others = await asAdmin(async (q) =>
+      Number((await q<{ n: string }>(
+        "select count(*) as n from public.field_definitions where organization_id = $1 and key <> 'health_fund' and privacy_class is not null", [org])).rows[0].n),
+    );
+    expect(others).toBe(0);
+  });
+
+  it("an existing field of the same key is not changed (no backfill)", async () => {
+    const owner = await createUser("tpl-privacy-old");
+    const org = await createOrg(owner.id);
+    await asUser(owner.id, (q) =>
+      q("insert into public.field_definitions (organization_id, object_type, key, label, field_type) values ($1, 'contact', 'health_fund', 'קופה', 'text')", [org]),
+    );
+    await apply(owner.id, org, "health");
+    expect(await fieldClass(org, "health_fund")).toEqual([{ privacy_class: null, label: "קופה" }]);
   });
 });
 

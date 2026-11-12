@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { applyTemplate } from "@/features/industry-templates/apply";
-import { describeApplyResult } from "@/features/industry-templates/schema";
-import { industryTemplate } from "@/features/industry-templates/templates";
+import { anyTemplate, suggestedTemplateKey } from "@/features/industry-templates/kits";
+import { describeApplyResult, templateKeyArg } from "@/features/industry-templates/schema";
 import { ORG_STATUS_NOTICES } from "@/features/shell/labels";
 import { actionContext } from "@/lib/action-context";
 import { INVALID_ARGS, validArg } from "@/lib/action-args";
@@ -160,7 +160,14 @@ export async function saveSetupIndustryAction(orgId: string, _prev: FormState, f
     return invalid(parsed.error, formData);
   }
   const industry = parsed.data.industry || null;
-  const template = formData.get("apply") === "1" ? industryTemplate(industry) : null;
+  // VRT-01: the kit or template picked in the step (an unknown key is refused), else the industry's own
+  const picked = formData.get("template");
+  const pickedKey = typeof picked === "string" && picked !== "" ? picked : null;
+  if (formData.get("apply") === "1" && pickedKey !== null && !templateKeyArg.safeParse(pickedKey).success) {
+    const message = "יש לבחור ערכה או תבנית מהרשימה.";
+    return fail(message, { fieldErrors: { template: message }, values: formValues(formData) });
+  }
+  const template = formData.get("apply") === "1" ? anyTemplate(pickedKey ?? suggestedTemplateKey(industry)) : null;
   if (formData.get("apply") === "1" && !template) {
     const message = "יש לבחור ענף כדי להחיל את התבנית שלו.";
     return fail(message, { fieldErrors: { industry: message }, values: formValues(formData) });

@@ -5,7 +5,8 @@ import { must } from "@/lib/db-read";
 import { readAllPages } from "@/lib/paged-read";
 import { createClient } from "@/lib/supabase/server";
 
-import { INDUSTRY_TEMPLATES, previewTemplate, type ExistingLists, type TemplatePreview } from "./templates";
+import { ALL_TEMPLATES, previewAny, type AnyTemplatePreview, type KitExisting } from "./kits";
+import type { ExistingLists } from "./templates";
 
 /** The organization's lists the templates are compared with (names only). */
 export async function getExistingLists(orgId: string): Promise<ExistingLists> {
@@ -42,10 +43,36 @@ export async function getExistingLists(orgId: string): Promise<ExistingLists> {
   };
 }
 
-/** What each template would add to the organization now, by industry key. */
-export async function getTemplatePreviews(orgId: string): Promise<Record<string, TemplatePreview>> {
-  const existing = await getExistingLists(orgId);
-  return Object.fromEntries(INDUSTRY_TEMPLATES.map((t) => [t.industry, previewTemplate(t, existing)]));
+/** VRT-01: the organization's names the kits' extras are compared with. */
+export async function getKitExisting(orgId: string): Promise<KitExisting> {
+  const supabase = await createClient();
+  const [meetingTypes, messageTemplates, whatsappTemplates, forms, views, punchCards] = await Promise.all([
+    supabase.from("meeting_types").select("name").eq("organization_id", orgId).order("id"),
+    supabase.from("message_templates").select("name").eq("organization_id", orgId).order("id"),
+    supabase.from("whatsapp_templates").select("name").eq("organization_id", orgId).order("id"),
+    supabase.from("forms").select("name").eq("organization_id", orgId).order("id"),
+    supabase.from("saved_views").select("name").eq("organization_id", orgId).eq("object_type", "lead").eq("scope", "org").order("id"),
+    orgHasFeature(orgId, "punch_cards"),
+  ]);
+  return {
+    meetingTypes: must(meetingTypes, "meeting_types").map((r) => r.name),
+    messageTemplates: must(messageTemplates, "message_templates").map((r) => r.name),
+    whatsappTemplates: must(whatsappTemplates, "whatsapp_templates").map((r) => r.name),
+    forms: must(forms, "forms").map((r) => r.name),
+    leadViews: must(views, "saved_views").map((r) => r.name),
+    punchCards,
+  };
+}
+
+/** What each template and kit would add to the organization now, by key. */
+export async function getTemplatePreviews(orgId: string): Promise<Record<string, AnyTemplatePreview>> {
+  const [existing, kitExisting] = await Promise.all([getExistingLists(orgId), getKitExisting(orgId)]);
+  const entries: Array<[string, AnyTemplatePreview]> = [];
+  for (const t of ALL_TEMPLATES) {
+    const result = previewAny(t.industry, existing, kitExisting);
+    if (result) entries.push([t.industry, result]);
+  }
+  return Object.fromEntries(entries);
 }
 
 /** The industry templates already applied to the organization (keys). */

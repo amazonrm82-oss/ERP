@@ -26,6 +26,8 @@ export type TemplateField = {
   label: string;
   field_type: TemplateFieldType;
   options: string[];
+  // PRK-01 (owner (350) ג): written on the new field only; absent = not classified
+  privacy_class?: "personal" | "sensitive";
 };
 
 // The rule as the automation engine stores it (no ids: nothing to resolve per organization).
@@ -194,7 +196,7 @@ export const INDUSTRY_TEMPLATES: readonly IndustryTemplate[] = [
     sources: ["גוגל", "הפניה מגורם מקצועי"],
     fields: [
       { object_type: "lead", key: "treatment_type", label: "סוג טיפול", field_type: "select", options: ["פגישה ראשונה", "המשך טיפול", "ייעוץ"] },
-      { object_type: "contact", key: "health_fund", label: "קופת חולים", field_type: "select", options: ["כללית", "מכבי", "מאוחדת", "לאומית"] },
+      { object_type: "contact", key: "health_fund", label: "קופת חולים", field_type: "select", options: ["כללית", "מכבי", "מאוחדת", "לאומית"], privacy_class: "sensitive" },
       { object_type: "deal", key: "sessions_count", label: "מספר מפגשים", field_type: "number", options: [] },
     ],
     automations: [NEW_LEAD_CALL, wonTask("סדרת טיפולים הסתיימה: מעקב", "שיחת מעקב אחרי {{name}}", 14, "call")],

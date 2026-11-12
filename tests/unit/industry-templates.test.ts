@@ -201,10 +201,10 @@ describe("previewTemplate (FLD-05)", () => {
 });
 
 describe("describeApplyResult (FLD-05)", () => {
-  const zero = { pipelines: 0, stages: 0, statuses: 0, sources: 0, fields: 0, automations: 0, products: 0 };
+  const zero = { pipelines: 0, stages: 0, statuses: 0, sources: 0, fields: 0, automations: 0, products: 0, meeting_types: 0, message_templates: 0, whatsapp_templates: 0, forms: 0, views: 0 };
 
   it("says what was added, in Hebrew", () => {
-    expect(describeApplyResult({ added: { pipelines: 1, stages: 6, statuses: 1, sources: 2, fields: 1, automations: 2, products: 0 }, limits: [] })).toBe(
+    expect(describeApplyResult({ added: { ...zero, pipelines: 1, stages: 6, statuses: 1, sources: 2, fields: 1, automations: 2 }, limits: [] })).toBe(
       "נוספו: תהליך מכירה, 6 שלבים, סטטוס אחד, 2 מקורות, שדה אחד, 2 אוטומציות (כבויות, מפעילים אותן בהגדרות).",
     );
     expect(describeApplyResult({ added: { ...zero, products: 3 }, limits: ["limit:max_products"] })).toBe(

@@ -9,41 +9,41 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 
 import { applyIndustryTemplateAction } from "../actions";
-import { INDUSTRY_TEMPLATES, industryTemplate, type TemplatePreview } from "../templates";
+import { ALL_TEMPLATES, anyTemplate, suggestedTemplateKey, type AnyTemplatePreview } from "../kits";
 import { TemplatePreviewList } from "./template-preview";
 
 type Props = {
   orgId: string;
   // the organization's industry: the template offered first
   industry: string | null;
-  previews: Record<string, TemplatePreview>;
+  previews: Record<string, AnyTemplatePreview>;
   applied: string[];
 };
 
 /** Business details page (FLD-05): add an industry template's lists at any time. */
 export function IndustryTemplateCard({ orgId, industry, previews, applied }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(applyIndustryTemplateAction.bind(null, orgId), null);
-  const [chosen, setChosen] = useState(industryTemplate(industry)?.industry ?? INDUSTRY_TEMPLATES[0].industry);
+  const [chosen, setChosen] = useState(suggestedTemplateKey(industry) ?? ALL_TEMPLATES[0].industry);
   const preview = previews[chosen];
-  const appliedTitles = applied.map((key) => industryTemplate(key)?.title).filter((t): t is string => Boolean(t));
+  const appliedTitles = applied.map((key) => anyTemplate(key)?.title).filter((t): t is string => Boolean(t));
 
   return (
     <Card aria-labelledby="industry-template-title">
-      <CardHeader id="industry-template-title" title="תבנית ענף" />
+      <CardHeader id="industry-template-title" title="ערכה או תבנית ענף" />
       <CardBody>
         <p className="mb-4 text-md text-ink-soft">
-          תבנית מוסיפה לעסק תהליך מכירה, סטטוסים, מקורות, שדות ואוטומציות שמתאימים לענף. היא לא מוחקת ולא משנה שום דבר קיים, ואפשר לשנות כל מה שנוסף.
+          תבנית מוסיפה לעסק תהליך מכירה, סטטוסים, מקורות, שדות ואוטומציות שמתאימים לענף. ערכה מוסיפה גם מוצרים, סוגי פגישות, תבניות הודעה, טופס לידים ותצוגות שמורות. שום דבר קיים לא נמחק ולא משתנה, ואפשר להוסיף ערכה נוספת בכל זמן.
         </p>
         {appliedTitles.length > 0 ? <p className="mb-4 text-sm text-ink-soft">{`תבניות שכבר הוחלו: ${appliedTitles.join(", ")}.`}</p> : null}
         <form action={formAction} className="space-y-4" noValidate>
           <SelectField
-            label="תבנית"
+            label="ערכה או תבנית"
             name="template"
             value={chosen}
             onChange={(event) => setChosen(event.target.value)}
             error={state && !state.ok ? state.fieldErrors?.template : undefined}
           >
-            {INDUSTRY_TEMPLATES.map((t) => (
+            {ALL_TEMPLATES.map((t) => (
               <option key={t.industry} value={t.industry}>
                 {t.title}
               </option>
@@ -53,7 +53,7 @@ export function IndustryTemplateCard({ orgId, industry, previews, applied }: Pro
             <h3 id="industry-template-preview" className="mb-2 font-semibold">
               מה יתווסף
             </h3>
-            {preview ? <TemplatePreviewList preview={preview} headingId="industry-template-preview" /> : null}
+            {preview ? <TemplatePreviewList preview={preview.preview} kit={preview.kit} headingId="industry-template-preview" /> : null}
           </section>
           <FormError message={state && !state.ok ? state.message : null} />
           <FormNotice message={state?.ok ? state.message : null} />

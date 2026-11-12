@@ -2,13 +2,15 @@ import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/format";
 import { RECORD_TYPES } from "@/lib/record-types";
 
+import { kitPreviewIsEmpty, type KitPreview } from "../kits";
 import { previewIsEmpty, type TemplatePreview } from "../templates";
 
-type Props = { preview: TemplatePreview; headingId: string };
+// kit: VRT-01, a kit's extras (null for an FLD-05 template)
+type Props = { preview: TemplatePreview; kit?: KitPreview | null; headingId: string };
 
 /** What applying a template would add: one short list per kind, nothing about what is already there. */
-export function TemplatePreviewList({ preview, headingId }: Props) {
-  if (previewIsEmpty(preview)) {
+export function TemplatePreviewList({ preview, kit = null, headingId }: Props) {
+  if (previewIsEmpty(preview) && kitPreviewIsEmpty(kit)) {
     return <p className="text-sm text-ink-soft">כל מה שבתבנית הזו כבר קיים אצלכם. אין מה להוסיף.</p>;
   }
   const groups: Array<{ title: string; names: string[] }> = [
@@ -25,6 +27,12 @@ export function TemplatePreviewList({ preview, headingId }: Props) {
       title: 'מוצרים לדוגמה (מחיר לפני מע"מ)',
       names: preview.products.map((p) => `${p.name}: ${formatMoney(p.price_agorot)}${p.billing === "monthly" ? " לחודש" : ""}`),
     },
+    // VRT-01: a kit's extras
+    { title: "סוגי פגישות", names: kit?.meetingTypes ?? [] },
+    { title: "תבניות הודעה (נוסח טיוטה)", names: kit?.messageTemplates ?? [] },
+    { title: "תבניות וואטסאפ", names: kit?.whatsappTemplates ?? [] },
+    { title: "טופס לידים (נוסף כבוי)", names: kit?.form ? [kit.form] : [] },
+    { title: "תצוגות שמורות של לידים", names: kit?.views ?? [] },
   ].filter((g) => g.title && g.names.length > 0);
 
   return (

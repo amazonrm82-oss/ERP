@@ -1334,6 +1334,16 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   three sample products per industry from `app.industry_template_products(key)` (mirrors `TEMPLATE_PRODUCTS`, test 65), only with the
   `products` flag; `public.apply_industry_template` was last redefined there. "My day" (TASK-09, no
   migration) uses `report_stuck_deals`' `no_next_step`, the same rule as the board.
+  Industry kits (VRT-01, migration 021252; owner (274) א + ב, (348)-(351); an independent review and a delta review): `app.industry_kit(key)`
+  (`clinic`, `studio`, no grants) mirrors `INDUSTRY_KITS` in `src/features/industry-templates/kits.ts` (test 65). `public.apply_industry_template`
+  (last redefined in 021252, same signature, every FLD-05 rule kept) takes a kit's template part and, for a kit, adds its products (punch cards
+  only with `punch_cards`, after the meeting types), meeting types, MARKETING message templates only (DRAFT, `wording_version` 'kit-draft-1'),
+  WhatsApp templates, one web form switched off (348 א; only the business's active `cf:` lead fields of a type public forms show, the SQL list
+  compared with `FORM_EXCLUDED_TYPES`) and org-wide lead views by status. Names compared by btrim (lower(btrim) where the unique index folds
+  case); never overwritten. A full 50-item list says "לא נוסף: הרשימה מלאה (50)", "מגבלת החבילה" only for plan keys (351 ב). The clinics kit
+  holds no health or medical content (test 356, closed medical word list). A template field may carry `privacy_class`, written only when a
+  new field is inserted; the FLD-05 "health" template marks "קופת חולים" sensitive (350 ג); `app.industry_template` was last redefined in
+  021252. The setup wizard's "ערכה או תבנית" defaults to the kit for health/education (349 א), the old template stays in the same select.
 - Call-back time (SPD-05, migration 0119): `forms.callback_choice` (owners/admins, column grants) adds "now" or a slot today
   or tomorrow (09-12, 12-15, 15-18, 18-20, org time zone; `src/features/intake/callback.ts` mirrors `app.intake_callback_*`).
   `intake_submit` refuses an unknown or ended slot (22023, hint `callback:invalid` / `callback:past`) and creates a call task
