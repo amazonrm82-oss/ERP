@@ -46,7 +46,7 @@ export const FEATURES: Feature[] = [
   { key: "import", status: "live", icon: UploadIcon, title: "ייבוא מאקסל", text: "מעלים קובץ Excel או CSV, ממפים עמודות, ומדלגים על כפולים. אפשר לבטל ייבוא." },
   { key: "files", status: "live", icon: FormIcon, title: "קבצים", text: "הצעות מחיר, תמונות ומסמכים על כל רשומה, במקום אחד." },
   { key: "search", status: "live", icon: SearchIcon, title: "חיפוש", text: "חיפוש אחד על כל המערכת, שמבין עברית: ניקוד, אותיות סופיות וגרשיים לא מפריעים לו." },
-  { key: "mobile", status: "live", icon: BellIcon, title: "אפליקציה לטלפון עם התראות", text: "מתקינים מהדפדפן למסך הבית, ומקבלים התראה על ליד חדש ועל תזכורת." },
+  { key: "mobile", status: "live", icon: BellIcon, title: "אפליקציה לטלפון עם התראות", text: "מתקינים מהדפדפן למסך הבית, בלי חנות אפליקציות, ומקבלים התראה על ליד חדש ועל תזכורת." },
   { key: "teams", status: "live", icon: UsersIcon, title: "צוותים והרשאות", text: "כל אחד רואה את מה שלו, מנהל צוות את הצוות שלו, ומנהלים את הכול." },
   { key: "security", status: "live", icon: LockIcon, title: "אבטחה ואימות דו-שלבי", text: "אימות דו-שלבי, יומן ביקורת של כל שינוי, והפרדה מלאה בין עסקים." },
   { key: "quotes", status: "live", icon: QuoteIcon, title: "הצעות מחיר", text: "הצעה מקטלוג המוצרים, PDF ממותג וקישור ללקוח שמאשר וחותם מהטלפון." },

@@ -12,6 +12,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const url = (path: string) => new URL(path, site).toString();
   return [
     { url: url(paths.landing), changeFrequency: "weekly", priority: 1 },
+    { url: url(paths.features), changeFrequency: "monthly" },
     { url: url(paths.help), changeFrequency: "monthly" },
     { url: url(paths.roadmap), changeFrequency: "monthly" },
     ...PUBLIC_HELP_ARTICLES.map((article) => ({ url: url(paths.helpArticle(article.slug)), changeFrequency: "monthly" as const })),

@@ -50,6 +50,22 @@ const TEXT_PAIRS: Array<[string, string]> = [
   ["warning", "canvas"],
   ["success", "success-soft"],
   ["on-brand", "brand"],
+  // LND-20 v2: the landing pages (always dark, the same values in both themes)
+  ...["ln-navy", "ln-bg", "ln-bg2", "ln-card"].flatMap((ground) => [
+    ["ln-fg", ground] as [string, string],
+    ["ln-muted", ground] as [string, string],
+    ["ln-link", ground] as [string, string],
+    ["ln-ok", ground] as [string, string],
+  ]),
+  ["ln-hero-muted", "ln-navy"],
+  ["ln-tag", "ln-navy"],
+  ["ln-link", "ln-accent-soft"],
+  ["ln-on-accent", "ln-accent"],
+  ["ln-warn", "ln-card"],
+  ["ln-white", "ln-blue"],
+  ["ln-white", "ln-violet"],
+  ["ln-white", "ln-cyan"],
+  ["ln-bg", "ln-white"],
 ];
 
 // DSN-13: chart marks against what they sit on (3:1, WCAG 1.4.11 non-text contrast): their track, a card, the page

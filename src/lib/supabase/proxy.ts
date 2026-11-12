@@ -20,7 +20,8 @@ export const SESSION_COOKIE = { secure: process.env.NODE_ENV === "production", s
 // center, the legal documents, and robots.txt / sitemap.xml for search engines (LND-11).
 // Reached without a session at exactly these paths (no prefix match: /api/healthz or /api/health/x stay private).
 // OPS-05: the uptime check (external monitor, no session); answers only ok or not ok.
-const PUBLIC_EXACT = ["/api/health"];
+// LND-20 v2: the public list of everything the system does (the landing page links to it).
+const PUBLIC_EXACT = ["/api/health", "/features"];
 
 const PUBLIC_PREFIXES = [
   "/auth/",

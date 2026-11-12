@@ -236,13 +236,14 @@ and build this CRM here instead. The old code is preserved on the branch
   `tests/unit/auth-forwarding.test.ts` proves no client component reaches the file, the name is never `NEXT_PUBLIC_`, and lint refuses it
   elsewhere. Sessions started this way carry the User-Agent `mexuz-server` at Auth.
   In use (CAP-12 / FXS-12 Turnstile, owner (275) א and (319) א, 12 November 2026; no migration; an independent review): Cloudflare
-  Turnstile on sign-in, sign-up, sign-up's "send again" and forgot-password (actions `login`, `signup`, `resend`, `forgot_password`),
+  Turnstile on sign-in, sign-up, sign-up's "send again", forgot-password and the landing page's contact form (actions `login`, `signup`,
+  `resend`, `forgot_password`, `contact`; `contact` since LND-20, owner (340) ב),
   verified by OUR server (`src/features/auth/turnstile-server.ts`, server-only, the ONLY reader of `TURNSTILE_SECRET_KEY`; lint refuses
   the name elsewhere) after the zod check and before any Supabase call: siteverify with secret, token and `remoteip` (never stored or
   logged), 3 s timeout; ok only with success, a hostname on the closed list (mexuzsystem.com, erp-3yft.vercel.app, the host of
   `NEXT_PUBLIC_SITE_URL`) and the form's own action; a missing or malformed token is always refused. When Cloudflare cannot be asked
-  (timeout, network, 5xx, not JSON, internal-error, our secret refused) sign-in passes and logs `turnstile.unavailable` (no user details;
-  `secret_rejected` at error level); the other three answer "נסו שוב בעוד דקה". Without both keys (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`,
+  (timeout, network, 5xx, not JSON, internal-error, our secret refused) sign-in and the contact form pass and log `turnstile.unavailable`
+  (no user details; `secret_rejected` at error level); the other three answer "נסו שוב בעוד דקה". Without both keys (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`,
   `TURNSTILE_SECRET_KEY`, Production only) nothing is shown or checked. The widget (explicit render, Hebrew) resets only after an answer
   that used the token (`turnstileTokenUsed`). CSP (`src/lib/csp.ts`, `proxy.ts`) adds `https://challenges.cloudflare.com` to script-src and
   frame-src on every page but `/f/` while the site key is set (client navigation keeps the first page's policy). Supabase's own CAPTCHA
@@ -259,6 +260,28 @@ and build this CRM here instead. The old code is preserved on the branch
   md5, the settings, the grants and the answer; flipping `built` in `capabilities.ts` needs a migration that redefines the function and a
   fresh review. The advisor's anon/authenticated definer findings on it are expected. Owner (304) ב: the page also lists the capabilities on
   their way, marked "בקרוב", read from `src/features/roadmap/public-items.ts` (`src/features/landing/upcoming.ts`; no database change).
+  LND-20 v3 (owner's prototype, 12 November 2026, answers (338)-(345); an independent review and a delta review) replaced the page: always
+  dark navy (`--mx-ln-*` / `--color-ln-*` tokens, landing only), Canvas 2D hero, flip price cards reading monthly AND annual prices and
+  `price_unit` from `plans_public` (338 ב); "בקרוב" on a capability whose real provider is not configured, judged on the server by
+  `src/features/landing/provider-readiness.ts` (booleans only; InforU keys through `inforuAccountReady()` in inforu.ts; 339 ב; the
+  roadmap section is gone, 341 א); the contact form `#contact` (`POST /api/forms/contact`, `contact-server.ts`) goes through the existing
+  `handleIntake()` of the form at `SUPPORT.formUrl` (no new service-key use), Turnstile action `contact`, business type to the custom
+  field named by server env `CONTACT_BUSINESS_TYPE_FIELD` (343 ב; unset = into the message), consent wording `contact-draft-1` (DRAFT).
+  In use (LND-13 notify-me, owner 13 October 2026, hard rule 5's conditions; built 12 November 2026 with LND-20 v3; migrations 021250 and
+  021251 (021251 to be pasted by hand); an independent review and a delta review): the landing page's "תודיעו לי כשנפתח"
+  (`src/features/landing/waitlist-server.ts`, route `POST /api/forms/plan-notify`) calls only `public.landing_waitlist_submit()`
+  (definer, service_role only): email (trimmed, lower case), plan (only one `coming_soon` now), consent and its DRAFT wording version
+  (`app.landing_waitlist_wording_known`, `waitlist-draft-1`) and the date in `app.landing_waitlist` (no grants; one row per email and plan;
+  cascades with the plan); always `{status:'received'}`, `{status:'invalid', field}` or `{rate_limited:true}`, the same for a new or known
+  address. Limits: 5 per sender in 10 minutes (keyed IP hash scope `waitlist` of `publicSenderAddress()`, IPv6 by its /64; only a bucket
+  number in `app.landing_waitlist_counts`), and system-wide 200 new rows an hour and 1,000 a day (`app.landing_waitlist_totals`,
+  `app.landing_waitlist_cap`; accepted: someone with many addresses can fill the cap and refuse real visitors for the hour). No hash (no
+  secret or no address) = refused, nothing stored. The honeypot (any non-empty value) is answered like a success before the database. No
+  cookies or visitor id. Reads only through `platform_landing_waitlist_counts()` (staff) and `platform_landing_waitlist(plan)` (platform
+  owner, logged `landing_waitlist.read`). Rows are deleted after 12 months by `app.purge_old_landing_waitlist` (021251, pg_cron
+  `crm-landing-waitlist-purge` 02:51 UTC). THE FUTURE SENDER sends one message with an unsubscribe link, deletes the row after it, and
+  needs its own "In use" line. In the eslint allow-list. The advisor's findings on the three app tables and the two platform definers
+  are expected.
   Built, no service-key use yet (RET-02, migration 021235; owner (271) ב, (273): plan key `review_requests` from basic up; an independent
   review and two delta reviews): review requests. `public.review_request_settings` (one row per business: switch, the Google review link,
   triggers deal won / meeting held, delay 0..30 days, server-only `enabled_at`; owners/admins of a writable business through column grants,

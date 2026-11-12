@@ -108,7 +108,9 @@ describe("UX-06 public help center: static and public", () => {
 
   it("is reached from the landing page footer and the in-app help center", () => {
     expect(read("src/components/public-shell.tsx")).toMatch(/href=\{paths\.help\}/);
-    expect(read("src/app/page.tsx")).toContain("<SiteFooter");
+    // LND-20 v2: the landing page's own footer (the prototype's), with the help center link
+    expect(read("src/app/page.tsx")).toContain("<LandingFooter");
+    expect(read("src/features/landing/components/sections.tsx")).toMatch(/href=\{paths\.help\}/);
     expect(read("src/app/o/[orgId]/help/page.tsx")).toContain("paths.help}");
   });
 

@@ -14,7 +14,9 @@ export const TURNSTILE_FIELD = "cf-turnstile-response";
 
 /** The action each form's widget carries; the server accepts a token only for the same form. */
 // `resend`: sign-up's "send again" of the confirmation email (behaves like sign-up)
-export const TURNSTILE_ACTIONS = { signIn: "login", signUp: "signup", forgotPassword: "forgot_password", resend: "resend" } as const;
+// `contact`: the landing page's "נחזור אליכם" form (LND-20 v2), which then goes through the ordinary public intake; like
+// sign-up, it is refused while Cloudflare cannot be asked
+export const TURNSTILE_ACTIONS = { signIn: "login", signUp: "signup", forgotPassword: "forgot_password", resend: "resend", contact: "contact" } as const;
 
 export type TurnstileAction = (typeof TURNSTILE_ACTIONS)[keyof typeof TURNSTILE_ACTIONS];
 

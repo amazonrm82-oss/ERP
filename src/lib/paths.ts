@@ -3,6 +3,8 @@
 export const paths = {
   // the public landing page (LND-01); the app itself starts at `home`
   landing: "/",
+  // LND-20 v2: every capability, from the landing catalog (public)
+  features: "/features",
   home: "/app",
   login: "/login",
   loginMfa: "/login/mfa",

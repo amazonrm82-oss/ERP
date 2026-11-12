@@ -87,9 +87,17 @@ const fail = (code: string, final: boolean): ProviderResult => ({ ok: false, err
 // owner (326) ב: not sent (checked before the request, no connection made, or refused by InforU), so the count goes back
 const notSent = (code: string, final: boolean): ProviderResult => ({ ok: false, error: `inforu ${code}`, code, final, notSent: true });
 
+/** Whether the platform's InforU account keys are set (the adapter's own condition, below). Answers a boolean only: the landing
+ * page's "בקרוב" marks read it (owner (339) ב), never a key's value. */
+export function inforuAccountReady(env: Env = process.env): boolean {
+  return smsAccountReady(INFORU, env);
+}
+
 export function createInforuProvider(env: Env = process.env, deps: { fetch?: Fetch } = {}): MessagingProvider | null {
-  if (!smsAccountReady(INFORU, env)) return null;
-  const auth = `Basic ${Buffer.from(`${env.INFORU_USERNAME?.trim()}:${env.INFORU_API_TOKEN?.trim()}`, "utf8").toString("base64")}`;
+  if (!inforuAccountReady(env)) return null;
+  // the credentials as the adapter always read them; the header is built by inforu-send.ts, loaded only when a message goes out
+  const username = `${env.INFORU_USERNAME?.trim()}`;
+  const token = `${env.INFORU_API_TOKEN?.trim()}`;
   const platformSender = env.INFORU_SENDER;
   const callback = deliveryUrl(env);
   const doFetch: Fetch = deps.fetch ?? ((input, init) => fetch(input, init));
@@ -108,6 +116,14 @@ export function createInforuProvider(env: Env = process.env, deps: { fetch?: Fet
       // there would block the number for all of them); our blocklist and consents, judged by the database, are the only list
       const settings: Record<string, unknown> = { Sender: sender, CustomerMessageID: message.jobId, AllowDuplicates: false, IgnoreUnsubscribeCheck: true };
       if (callback) settings.DeliveryNotificationUrl = callback;
+      let auth: string;
+      try {
+        const { inforuBasicAuth } = await import("./inforu-send");
+        auth = inforuBasicAuth(username, token);
+      } catch {
+        // nothing reached InforU: not sent, so the count is given back and the job may be tried again
+        return notSent("network", false);
+      }
       let response: Response;
       try {
         response = await doFetch(INFORU_SEND_URL, {

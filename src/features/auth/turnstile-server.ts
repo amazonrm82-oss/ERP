@@ -19,7 +19,8 @@ import { TURNSTILE_FIELD, type TurnstileAction } from "./turnstile";
 // form per minute.
 // Off: without BOTH keys there is no widget and no check (the forms work exactly as before; one line per process says so).
 // Cloudflare unreachable (timeout, network error, 5xx, an answer that is not JSON, internal-error, or our secret refused):
-// the sign-in passes (never locked out, as FXS-12's fallback; an attacker cannot make our server's call fail), sign-up and the
+// the sign-in and the landing contact form (owner (340) ב) pass (never locked out, as FXS-12's fallback; an attacker cannot
+// make our server's call fail), sign-up and the
 // reset email are refused with "try again in a minute" (owner (319) א). That case logs event `turnstile.unavailable`.
 // The address is only sent to Cloudflare (remoteip); it is never stored, logged or kept in memory past the request.
 
@@ -132,9 +133,11 @@ export async function checkTurnstileToken({ secret, token, ip, action, hostnames
   return { result: "pass" };
 }
 
-/** The forms that pass while Cloudflare cannot be asked: only the sign-in (never locked out); sign-up, its "send again" and the reset email do not (owner (319) א). */
+/** The forms that pass while Cloudflare cannot be asked: the sign-in (never locked out) and the landing page's contact form
+ * (owner (340) ב; its honeypot and intake_submit's limits still apply); sign-up, its "send again" and the reset email do not
+ * (owner (319) א). Either way the case logs `turnstile.unavailable`. */
 export function passesWhenUnavailable(action: TurnstileAction): boolean {
-  return action === "login";
+  return action === "login" || action === "contact";
 }
 
 // one line per reason and form a minute, so an attack does not flood the log

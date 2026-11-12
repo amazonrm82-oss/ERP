@@ -83,6 +83,8 @@ import { getSupabaseEnv } from "@/lib/env";
  *   - the public privacy-request page (PRK-02, owner 26 October 2026, wave 3 use (3))
  *     (src/features/privacy-requests/public-server.ts): public.privacy_request_page()
  *     and privacy_request_submit() only;
+ *   - the landing page's "notify me" for a coming-soon plan (LND-13, owner 13 October 2026)
+ *     (src/features/landing/waitlist-server.ts): public.landing_waitlist_submit() only;
  *   - the customer's preferences page and unsubscribe link (CNS-09 / CNS-10, owner's answer (225) א)
  *     (src/features/preferences/public-server.ts): public.consent_preferences_public() and
  *     consent_preferences_submit() only;

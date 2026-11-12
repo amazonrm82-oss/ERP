@@ -112,10 +112,12 @@ describe("siteverify judgement", () => {
     });
   });
 
-  it("the default timeout is 3 seconds; only sign-in passes while Cloudflare is unavailable", async () => {
+  it("the default timeout is 3 seconds; sign-in and the landing contact form pass while Cloudflare is unavailable", async () => {
     const mod = await import("@/features/auth/turnstile-server");
     expect(mod.TURNSTILE_TIMEOUT_MS).toBe(3000);
     expect(mod.passesWhenUnavailable("login")).toBe(true);
+    expect(mod.passesWhenUnavailable("contact")).toBe(true);
+    expect(mod.passesWhenUnavailable("resend")).toBe(false);
     expect(mod.passesWhenUnavailable("signup")).toBe(false);
     expect(mod.passesWhenUnavailable("forgot_password")).toBe(false);
   });

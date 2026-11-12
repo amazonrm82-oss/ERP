@@ -62,7 +62,7 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
     guard: "anon-cached",
     functions: ["plans_public"],
     limit:
-      "no visitor input: the price list (LND-13) is one cached read for everyone, an hour in unstable_cache (tag plans-public, expired by the platform's plan actions); a failed read is not cached and backs off a minute; the rest of the page is code",
+      "no visitor input: the price list (LND-13) is one cached read for everyone, an hour in unstable_cache (tag plans-public, expired by the platform's plan actions); a failed read is not cached and backs off a minute; the rest of the page is code (its two forms post to /api/forms/contact and /api/forms/plan-notify)",
     refusal: "the price section without prices",
   },
   "/login": { guard: "supabase-auth", limit: "Supabase Auth sign-in limits per IP (the server forwards X-Forwarded-For)", refusal: "form message (errors.ts over_request_rate_limit)" },
@@ -72,6 +72,8 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
   "/help": { guard: "static", limit: "help center from code", refusal: "none" },
   "/help/[slug]": { guard: "static", limit: "help center from code", refusal: "none" },
   // TRU-01: the public roadmap is a static list in the code; votes are cast inside the system
+  // LND-20 v2: the list of every capability, from the landing catalog in the code
+  "/features": { guard: "static", limit: "capability list from code (src/features/landing/catalog.ts)", refusal: "none" },
   "/help/roadmap": { guard: "static", limit: "roadmap from code (src/features/roadmap/public-items.ts)", refusal: "none" },
   "/legal/[doc]": { guard: "static", limit: "legal texts from code", refusal: "none" },
   "/legal/subprocessors": {
@@ -96,6 +98,22 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
     limit: "10 per sender per form in 10 min and 500 per form an hour (spam and too-large bodies counted), after the token lookup",
     refusal: JSON_429 + " (CORS headers kept)",
     sender: { leftOut: OUT_42 },
+  },
+  // LND-20 v2 (8): Turnstile (action contact), then the same intake code and limits as /api/forms/[token] for Mexuz's own form
+  "/api/forms/contact": {
+    guard: "database",
+    functions: ["intake_form", "intake_submit"],
+    limit: "Turnstile first (action contact; refused while Cloudflare cannot be asked), then the intake form's own: 10 per sender per form in 10 min and 500 per form an hour",
+    refusal: JSON_429,
+    sender: { leftOut: "LND-20 v2: the landing page's own lead form, published to everyone like the lead form ((42) ד), so only its own limits apply" },
+  },
+  // LND-13 (owner, 13 October 2026): the anonymous "notify me" for a coming-soon plan
+  "/api/forms/plan-notify": {
+    guard: "database",
+    functions: ["landing_waitlist_submit"],
+    limit: "5 tries per sender in 10 min (keyed IP hash scope waitlist, only a bucket number kept); the honeypot answers before the database",
+    refusal: JSON_429,
+    sender: { leftOut: "LND-13: a published landing-page form with no token to look up, so only its own limit applies" },
   },
   "/api/in/[token]": {
     guard: "database",

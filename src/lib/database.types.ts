@@ -4193,6 +4193,10 @@ export type Database = {
       health_check: { Args: Record<string, never>; Returns: boolean };
       // LND-13: the public fields of available and coming-soon plans for the landing page's price list (anon and authenticated)
       plans_public: { Args: Record<string, never>; Returns: Json };
+      // LND-13: the landing page's "notify me" (service_role) and its platform reads
+      landing_waitlist_submit: { Args: { p_email: string; p_plan: string; p_consent: boolean; p_wording_version: string; p_ip_hash: string | null }; Returns: Json };
+      platform_landing_waitlist_counts: { Args: Record<string, never>; Returns: Json };
+      platform_landing_waitlist: { Args: { p_plan: string }; Returns: Json };
       create_organization: {
         Args: { p_name: string; p_industry?: string | null; p_team_size?: string | null; p_phone?: string | null };
         Returns: string;

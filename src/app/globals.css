@@ -47,6 +47,28 @@
   --mx-green-300: #7fd49b;
   --mx-green-800: #1b6e3f;
   --mx-green-950: #13301f;
+
+  /* LND-20 v2 (owner's approved prototype, 12 November 2026): the public landing pages ("/" and "/features") are always
+     dark navy, in both device modes. Their own palette; the app, the /f/ pages and their themes never use it. */
+  --mx-ln-navy: #070c1a;
+  --mx-ln-bg: #0c1226;
+  --mx-ln-bg2: #111a33;
+  --mx-ln-card: #162040;
+  --mx-ln-line: #273352;
+  --mx-ln-fg: #eef1f8;
+  --mx-ln-muted: #a3abbf;
+  --mx-ln-hero-muted: #aab3c8;
+  --mx-ln-accent: #3b6cf6;
+  --mx-ln-accent-soft: #1e2a4d;
+  --mx-ln-mark: #ffd84d;
+  --mx-ln-ok: #34d399;
+  --mx-ln-warn: #fbbf24;
+  --mx-ln-blue: #2457f5;
+  --mx-ln-violet: #7c3aed;
+  /* the prototype's cyan (#06b6d4) is too light for white text (2.4:1); the flowing band uses a deeper cyan, 5.4:1 */
+  --mx-ln-cyan: #0e7490;
+  --mx-ln-laptop: #182546;
+  --mx-ln-laptop-base: #24345f;
 }
 
 @theme {
@@ -57,6 +79,21 @@
   --text-caption: 0.8125rem;
   --text-md: 0.9375rem;
   --text-lead: 1.0625rem;
+  /* LND-20 v2: the landing pages' type (the prototype's clamp() sizes) */
+  --text-ln-h1: clamp(2.5rem, 7vw, 5rem);
+  --text-ln-h1--line-height: 1.1;
+  --text-ln-h2: clamp(1.875rem, 4.5vw, 3.25rem);
+  --text-ln-h2--line-height: 1.1;
+  --text-ln-h3: clamp(1.25rem, 2.4vw, 1.625rem);
+  --text-ln-h3--line-height: 1.15;
+  --text-ln-lead: clamp(1.125rem, 2vw, 1.375rem);
+  --text-ln-quote: clamp(1.375rem, 3vw, 2.125rem);
+  --text-ln-money: clamp(2.5rem, 6vw, 4rem);
+  --text-ln-money--line-height: 1;
+  --text-ln-step: 4.5rem;
+  --text-ln-step--line-height: 1;
+  --text-ln-price: 2.75rem;
+  --text-ln-price--line-height: 1;
 
   --color-canvas: var(--mx-grey-50);
   --color-surface: var(--mx-white);
@@ -75,6 +112,31 @@
 
   /* always white, in both themes: behind a QR code or a drawn signature */
   --color-paper: var(--mx-white);
+
+  /* LND-20 v2: the landing pages' roles, the same in both themes (the page is always dark) */
+  --color-ln-navy: var(--mx-ln-navy);
+  --color-ln-bg: var(--mx-ln-bg);
+  --color-ln-bg2: var(--mx-ln-bg2);
+  --color-ln-card: var(--mx-ln-card);
+  --color-ln-line: var(--mx-ln-line);
+  --color-ln-fg: var(--mx-ln-fg);
+  --color-ln-muted: var(--mx-ln-muted);
+  --color-ln-hero-muted: var(--mx-ln-hero-muted);
+  --color-ln-accent: var(--mx-ln-accent);
+  --color-ln-on-accent: var(--mx-white);
+  --color-ln-accent-soft: var(--mx-ln-accent-soft);
+  /* accent-coloured TEXT (links, the swapping word): the light blue, 4.5:1 on every landing ground */
+  --color-ln-link: var(--mx-blue-300);
+  --color-ln-tag: var(--mx-blue-200);
+  --color-ln-mark: var(--mx-ln-mark);
+  --color-ln-ok: var(--mx-ln-ok);
+  --color-ln-warn: var(--mx-ln-warn);
+  --color-ln-white: var(--mx-white);
+  --color-ln-blue: var(--mx-ln-blue);
+  --color-ln-violet: var(--mx-ln-violet);
+  --color-ln-cyan: var(--mx-ln-cyan);
+  --color-ln-laptop: var(--mx-ln-laptop);
+  --color-ln-laptop-base: var(--mx-ln-laptop-base);
 
   /* the logo's navy: the sign-in side panel; the same in both themes */
   --color-brand: var(--mx-blue-900);

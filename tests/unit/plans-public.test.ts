@@ -118,6 +118,6 @@ describe("LND-13: the landing page's price list", () => {
     expect(server).toMatch(/tags: \[PLANS_PUBLIC_CACHE_TAG\]/);
     expect(server).toMatch(/revalidate: 3600/);
     expect(server).not.toMatch(/supabase\/service|createServiceClient/);
-    expect(read("src/app/page.tsx")).toContain("<PriceList plans={plans} />");
+    expect(read("src/app/page.tsx")).toContain("<PricingSection plans={plans} waiting={waiting} />");
   });
 });
