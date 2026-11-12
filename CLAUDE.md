@@ -179,21 +179,29 @@ and build this CRM here instead. The old code is preserved on the branch
   kind to active owners/admins, counts only, `entity_id` = the business, at most once per target a week (campaign: once per month and
   key), `app.anomaly_alerts_sent`; "נוסף" when earlier targets were told that week. Index `activities_org_created_idx`. Interim
   thresholds in the migration header (owner questions 285-286). The advisor's findings on the two app tables are expected.
-  In use (LIB-02, owner 11 November 2026, hard rule 5's pattern; migration 021229; an independent review): a library item sent by a
-  tracked link (`src/features/library-links/public-server.ts`, page `/f/lib/<token>`, route `GET /api/forms/lib/<token>/file`), which
-  calls only `public.library_link_public()` (business display name, logo, colour, built-with, and the item's kind, title, description
-  and https link or its file's name, type and size; never an id or anything of the record; counts the view on `public.library_links`
-  and, once per link and business day, sends kind `library_viewed` to the maker while an active member who reads the record: item
-  title only) and `public.library_link_public_file()` (the current confirmed file's path, name and type only; the route answers a
-  60-second signed link, PDF and raster images inline, anything else a download). One not-found rule `app.library_link_usable`
-  (unknown or revoked token, closed public pages, item off, outside its window or without a confirmed file, record in the bin or
-  gone). Limits after the lookup: 120 per link and 60 per sender (keyed IP hash, scope `library`, re-scoped per link, 1,024 buckets,
-  no hash kept) in 10 minutes, page and file together; OPS-02 shared guard first. Never framed, no-referrer, generic previews,
-  preview bots read nothing, no cookies or visitor id. Staff: `public.library_link_create` (definer: `app.can_write`, writable, a
-  live record the caller reads, an item sendable now, 100 per person an hour; only the token's SHA-256 in `app.library_link_secrets`;
-  audited `library_link` without the token) and `public.library_link_revoke` (maker or owner/admin). A link whose maker left keeps
-  serving with no notice (interim, owner question 296). In the eslint allow-list. The advisor's findings on the two staff definers and
-  the two app tables are expected.
+  In use (LIB-02, owner 11 and 12 November 2026, hard rule 5's pattern, answers (291) א, (292) ב, (293) ב, (294) ב, (296) ג; migrations
+  021229, 021230; independent reviews): a library item sent by a tracked link (`src/features/library-links/public-server.ts`, page
+  `/f/lib/<token>`, routes `GET /f/lib/<token>/go` and `GET /api/forms/lib/<token>/file`), which calls only `public.library_link_public()`
+  (business display name, logo, colour, built-with, and the item's kind, title, description and https link or its file's name, type and
+  size; never an id or anything of the record; no link and `external_blocked` while the platform's outside-link switch
+  `app.qr_external_blocks` holds the business; counts the view on `public.library_links`, writes once per link and business day a `system`
+  timeline entry on the record (kind `library_viewed`, no author, item title only; no person writes, changes or removes it,
+  `app.activities_library_entry_guard`, hint `activity:library_entry`; not contact and not activity), and on the link's FIRST opening only
+  sends kind `library_viewed` to the maker while an active member who reads the record, else to the active owners and admins: item title
+  only), `public.library_link_public_link()` (the page before a link item's site: BIZ-03's "אתם עוברים לאתר [domain]. [business] אחראי
+  לתוכן שלו" of `src/features/qr-codes/interstitial.ts`, never framed, no-referrer; answers only the stored https link and
+  `organizations.name`, a call of the link and not a view; not found for a file item and, counting nothing, while the outside-link switch
+  is on) and `public.library_link_public_file()` (the current confirmed file's path, name and type only; the route answers a 60-second
+  signed link, PDF and raster images inline, anything else a download). One not-found rule `app.library_link_usable` (unknown or revoked
+  token, closed public pages, item off, outside its window or without a confirmed file, record in the bin or gone). Limits after the
+  lookup: 120 per link and 60 per sender (keyed IP hash, scope `library`, re-scoped per link, 1,024 buckets, no hash kept) in 10 minutes,
+  page, `/go` and file together; OPS-02 shared guard first. Never framed, no-referrer, generic previews, preview bots read nothing, no
+  cookies or visitor id. Staff: `public.library_link_create` (definer: `app.can_write`, writable, a live record the caller reads, an item
+  sendable now, 100 per person an hour; only the token's SHA-256 in `app.library_link_secrets`; audited `library_link` without the token)
+  and `public.library_link_revoke` (the maker, an owner/admin, or whoever may edit the record by `app.can_edit_record`, for a record they
+  read). A link whose maker left keeps serving. `app.scheduled_no_activity`, `app.automation_run_facts` and
+  `app.automation_event_still_holds` were last redefined in 021230 (they skip `library_viewed` beside `record_link_removed`). In the eslint
+  allow-list. The advisor's findings on the two staff definers and the two app tables are expected.
   In use (FXS-12, owner 12 November 2026, answer (281) א; no migration; an independent review and a delta review): the sign-in
   forwarding client (`src/lib/supabase/auth-forwarding-server.ts`, server-only, the ONLY reader of `SUPABASE_SECRET_KEY`, which the owner
   sets in Vercel; only a key starting `sb_secret_`; lint refuses the name elsewhere, and only `src/features/auth/actions.ts` may import
