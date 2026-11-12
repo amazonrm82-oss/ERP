@@ -1,10 +1,11 @@
-import type { MessageChannel, MessageType } from "@/features/messaging/providers/types";
+import { messagePurpose, type MessageChannel, type MessageType } from "@/features/messaging/providers/types";
 
 // MSG-02 (owner 3 November 2026, answer (88)): what the SYSTEM adds to every marketing message, whatever the template
 // says, so a business cannot remove it: the word "פרסומת" in front (the subject of an email; the text itself on a channel
 // without a subject), the sender line (name, phone, address) and the unsubscribe line. Pure, so every future sender
 // (AUT-08, campaigns, the provider adapters) calls the same function before filling the merge fields; the settings
-// page's preview uses it now. A service message is returned unchanged. DRAFT wording until the lawyer approves it.
+// page's preview uses it now. A service message is returned unchanged; every other type (review_request included,
+// owner (321) א) gets the envelope. DRAFT wording until the lawyer approves it.
 //
 // Doubling: a template may already hold these parts. "פרסומת" is not put in front twice when the subject (or the text)
 // already starts with it; the sender line is not added when the body already holds that exact line; the unsubscribe line
@@ -28,7 +29,8 @@ function withPrefix(text: string): string {
 
 /** The message as it must go out: unchanged for a service type; for marketing, with the parts the system adds. */
 export function marketingEnvelope(message: EnvelopeInput): EnvelopeOutput {
-  if (message.messageType !== "marketing") return { subject: message.subject, body: message.body };
+  // owner (321) א: every type that is not a service type is marketing (review_request too), as app.sms_job_compose
+  if (messagePurpose(message.messageType) === "service") return { subject: message.subject, body: message.body };
   const hasSubject = message.channel === "email";
   const subject = hasSubject ? withPrefix(message.subject ?? "") : message.subject;
   let body = hasSubject ? message.body : withPrefix(message.body);

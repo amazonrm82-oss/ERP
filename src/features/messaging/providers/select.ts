@@ -8,14 +8,15 @@ type Env = Record<string, string | undefined>;
 /**
  * MSG-01: the adapters, by provider code. Only "fake" sends (no real provider until the owner chooses one); a new
  * provider is one adapter file plus one line here, and no module changes. Each adapter says which channels it serves.
- * SMS-01: InforU and SMS4Free are stubs (built: false): never chosen, whatever the env says, so the SMS channel's jobs
- * wait in the queue unclaimed until a real adapter is written; even then, an adapter without its own env keys is none.
+ * SMS-01: SMS4Free is a stub (built: false): never chosen, whatever the env says. SMS-05: InforU is built (owner (318) א);
+ * an adapter without its own env keys is none, so the SMS channel's jobs wait in the queue unclaimed until the keys are set.
  */
 type Adapter = { channels: readonly MessageChannel[]; built: boolean; create(channel: MessageChannel, env: Env): MessagingProvider | null };
 
 const ADAPTERS: Record<string, Adapter> = {
   fake: { channels: MESSAGE_CHANNELS, built: true, create: (channel) => createFakeProvider({ channel }) },
-  inforu: { channels: ["sms"], built: false, create: (_channel, env) => createInforuProvider(env) },
+  // SMS-05 (owner (318) א): InforU is built; without its keys it is still no provider (createInforuProvider answers null)
+  inforu: { channels: ["sms"], built: true, create: (_channel, env) => createInforuProvider(env) },
   sms4free: { channels: ["sms"], built: false, create: (_channel, env) => createSms4FreeProvider(env) },
 };
 

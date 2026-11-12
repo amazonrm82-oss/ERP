@@ -33,6 +33,8 @@ const PUBLIC_PREFIXES = [
   "/api/jobs/run",
   // CAP-11: the Meta Lead Ads webhook (its own signature check) and its sweep (the shared secret)
   "/api/meta/leads",
+  // SMS-05: InforU's delivery reports and replies (the secret is the last path segment, checked first)
+  "/api/sms/inforu/",
   // CAL-07: calendar apps fetch the personal feed with no session; the route checks its own secret token
   "/api/calendar-feed/",
   "/sw.js",

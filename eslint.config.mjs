@@ -64,6 +64,20 @@ const secretKeySelectors = [
   selector,
   message: "SUPABASE_SECRET_KEY is read only by the sign-in forwarding client (src/lib/supabase/auth-forwarding-server.ts), owner (281) א.",
 }));
+// SMS-05 (owner (318) א): the InforU platform account's keys (INFORU_USERNAME, INFORU_API_TOKEN, INFORU_SENDER,
+// INFORU_WEBHOOK_SECRET) are read in ONE file only, the adapter; the webhook routes ask it for the secret check.
+const INFORU_ADAPTER = "src/features/messaging/providers/inforu.ts";
+const inforuKeySelectors = [
+  "MemberExpression[property.name=/^INFORU_/]",
+  "MemberExpression[property.value=/^INFORU_/]",
+  "Property[key.name=/^INFORU_/]",
+  "Property[key.value=/^INFORU_/]",
+  "Literal[value=/^INFORU_/]",
+  "TemplateElement[value.raw=/INFORU_[A-Z]/]",
+].map((selector) => ({
+  selector,
+  message: "The InforU keys are read only by the adapter (src/features/messaging/providers/inforu.ts), owner (318) א.",
+}));
 const authForwarderPattern = {
   regex: "(^@/lib/supabase/auth-forwarding-server$|/auth-forwarding-server$)",
   message: "Only the auth actions (src/features/auth/actions.ts) use the sign-in forwarding client (FXS-12, owner (281) א).",
@@ -129,6 +143,9 @@ const serviceKeyAllowList = {
     "src/features/orders/pdf-public-server.ts",
     // CAP-11 (owner, 4 November 2026, answer (126) א): the Meta Lead Ads webhook and its sweep
     "src/features/meta-leads/webhook-server.ts",
+    // SMS-05 (owner (318) א, wave 3 use (2)): InforU's delivery reports and replies (public.sms_delivery_status,
+    // public.sms_inbound_reply), after the secret in the path is checked
+    "src/features/inforu-callbacks/webhook-server.ts",
     // INT-01 (owner, 10 November 2026, answer (227) ב): "test connection" with the stored token
     // (public.integration_test_claim, public.integration_test_finish), after the owner's or admin's session was checked
     "src/features/integrations/test-server.ts",
@@ -170,23 +187,27 @@ const eslintConfig = defineConfig([
   ...nextTs,
   {
     files: ["src/**/*.ts", "src/**/*.tsx"],
-    ignores: [JWT_SECRET_SIGNER, AUTH_FORWARDER, TURNSTILE_VERIFIER],
+    ignores: [JWT_SECRET_SIGNER, AUTH_FORWARDER, TURNSTILE_VERIFIER, INFORU_ADAPTER],
     rules: {
-      "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors, ...secretKeySelectors, ...turnstileSecretSelectors],
+      "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors, ...secretKeySelectors, ...turnstileSecretSelectors, ...inforuKeySelectors],
     },
+  },
+  {
+    files: [INFORU_ADAPTER],
+    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors, ...secretKeySelectors, ...turnstileSecretSelectors] },
   },
   // the signer, the forwarder and the Turnstile check keep every other rule of the block above
   {
     files: [JWT_SECRET_SIGNER],
-    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...secretKeySelectors, ...turnstileSecretSelectors] },
+    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...secretKeySelectors, ...turnstileSecretSelectors, ...inforuKeySelectors] },
   },
   {
     files: [AUTH_FORWARDER],
-    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors, ...turnstileSecretSelectors] },
+    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors, ...turnstileSecretSelectors, ...inforuKeySelectors] },
   },
   {
     files: [TURNSTILE_VERIFIER],
-    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors, ...secretKeySelectors] },
+    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors, ...secretKeySelectors, ...inforuKeySelectors] },
   },
   // FXC-08 (the service key), IMP-04 (the person's token) and FXS-12 (the sign-in forwarder): one rule, so the allow-lists
   // are judged together

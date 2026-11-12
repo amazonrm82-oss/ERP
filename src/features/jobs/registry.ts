@@ -24,7 +24,8 @@ export type ClaimedJob = {
  * MSG-03: what the provider answered, kept on the job by finish_job (codes and ids only): its code with its message id
  * (sent) or its short error code (failed).
  */
-export type ProviderReceipt = { provider: string; providerMessageId?: string; errorCode?: string };
+export type ProviderReceipt = { provider: string | null; providerMessageId?: string; errorCode?: string };
+// SMS-05: provider null = the composer refused before any provider was asked (errorCode = its code)
 
 /**
  * What a handler reports:

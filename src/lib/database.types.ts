@@ -4799,6 +4799,12 @@ export type Database = {
       sms_sender_verify_start: { Args: { p_org: string }; Returns: Json };
       sms_sender_verify: { Args: { p_org: string; p_code: string }; Returns: Json };
       sms_sender_code_issue: { Args: { p_job: string; p_lease: string }; Returns: Json };
+      // SMS-05: the InforU sender's composer (service_role only, migration sms_compose)
+      sms_job_compose: { Args: { p_job: string; p_lease: string; p_site_url: string }; Returns: Json };
+      sms_quota_return: { Args: { p_job: string; p_lease: string }; Returns: Json };
+      // SMS-05: InforU's callbacks (service_role only, migration sms_inforu_callbacks)
+      sms_delivery_status: { Args: { p_provider: string; p_items: Json }; Returns: Json };
+      sms_inbound_reply: { Args: { p_provider: string; p_phone: string; p_body: string }; Returns: Json };
       // CNS-09 / CNS-10: the customer's preferences link (owners/admins mint; the public page and its routes, service_role only)
       consent_preference_link_create: { Args: { p_org: string; p_kind: string; p_id: string; p_channel: string }; Returns: string };
       consent_preference_link_for_job: { Args: { p_job: string; p_lease: string }; Returns: Json };

@@ -51,7 +51,7 @@ describe("SMS-01: the sender name rule (shared fixture with app.sms_sender_name_
   });
 });
 
-describe("SMS-01: the InforU and SMS4Free adapters are stubs", () => {
+describe("SMS-01: SMS4Free is a stub; SMS-05: InforU is built but needs its own keys", () => {
   const inforuKeys = { INFORU_USERNAME: "u", INFORU_API_TOKEN: "t" };
   const sms4freeKeys = { SMS4FREE_KEY: "k", SMS4FREE_USER: "u", SMS4FREE_PASS: "p" };
 
@@ -65,10 +65,10 @@ describe("SMS-01: the InforU and SMS4Free adapters are stubs", () => {
     expect(createSms4FreeProvider(inforuKeys)).toBeNull();
   });
 
-  it("with their keys, send nothing and answer a retryable failure", async () => {
-    const inforu = createInforuProvider(inforuKeys);
-    expect(inforu).toMatchObject({ name: "inforu", channel: "sms" });
-    const result = await inforu!.send({
+  it("SMS4Free with its keys sends nothing and answers a retryable failure", async () => {
+    const sms4free = createSms4FreeProvider(sms4freeKeys);
+    expect(sms4free).toMatchObject({ name: "sms4free", channel: "sms" });
+    const result = await sms4free!.send({
       jobId: "j",
       organizationId: "o",
       channel: "sms",
@@ -78,15 +78,16 @@ describe("SMS-01: the InforU and SMS4Free adapters are stubs", () => {
       recordId: "r",
     });
     expect(result).toEqual({ ok: false, error: "the adapter is not built yet", code: "adapter_not_built", final: false });
-    expect(createSms4FreeProvider(sms4freeKeys)).toMatchObject({ name: "sms4free", channel: "sms" });
   });
 
-  it("are never chosen by the provider layer, even with their keys (not built)", () => {
-    expect(messagingProviderFor("sms", { MESSAGING_PROVIDER_SMS: "inforu", ...inforuKeys })).toBeNull();
+  it("the provider layer chooses InforU only with its keys, SMS4Free never, and neither for another channel", () => {
+    expect(messagingProviderFor("sms", { MESSAGING_PROVIDER_SMS: "inforu" })).toBeNull();
+    expect(messagingProviderFor("sms", { MESSAGING_PROVIDER_SMS: "inforu", ...inforuKeys, VERCEL_ENV: "production" })?.name).toBe("inforu");
     expect(messagingProviderFor("sms", { MESSAGING_PROVIDER_SMS: "sms4free", ...sms4freeKeys })).toBeNull();
-    // and never for another channel
     expect(messagingProviderFor("email", { MESSAGING_PROVIDER: "inforu", ...inforuKeys })).toBeNull();
     expect(messagingProviderFor("sms", { MESSAGING_PROVIDER_SMS: "fake" })?.name).toBe("fake");
+    // the fake stays the default: nothing named = no provider
+    expect(messagingProviderFor("sms", { ...inforuKeys })).toBeNull();
   });
 
   it("send under the business's sender name when it is valid, else the platform's default", () => {
@@ -98,7 +99,7 @@ describe("SMS-01: the InforU and SMS4Free adapters are stubs", () => {
   });
 
   it("only the adapter files read the providers' keys", () => {
-    const names = ["INFORU_USERNAME", "INFORU_API_TOKEN", "INFORU_SENDER", "SMS4FREE_KEY", "SMS4FREE_USER", "SMS4FREE_PASS", "SMS4FREE_SENDER"];
+    const names = ["INFORU_USERNAME", "INFORU_API_TOKEN", "INFORU_SENDER", "INFORU_WEBHOOK_SECRET", "SMS4FREE_KEY", "SMS4FREE_USER", "SMS4FREE_PASS", "SMS4FREE_SENDER"];
     const walk = (dir: string): string[] =>
       readdirSync(dir, { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? walk(join(dir, d.name)) : /\.tsx?$/.test(d.name) ? [join(dir, d.name)] : []));
     const allowed = new Set(["inforu.ts", "sms4free.ts"].map((f) => join(root, "src", "features", "messaging", "providers", f)));

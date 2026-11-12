@@ -4,6 +4,7 @@ import {
   isMessageChannel,
   isMessageType,
   messagePurpose,
+  type ComposedSms,
   type MessageChannel,
   type MessagingProvider,
   type RecordEmailParts,
@@ -14,6 +15,26 @@ import {
 export type MaySendAnswer = { may_send: true } | { may_send: false; reason: string };
 
 export type MaySendCall = (job: { id: string; lease: string }) => Promise<unknown>;
+
+/** SMS-05: public.sms_job_compose for this job's live lease (service_role; the worker passes the site's origin). */
+export type ComposeCall = (job: { id: string; lease: string }) => Promise<unknown>;
+
+export type ComposeAnswer = { ok: true; content: ComposedSms } | { ok: false; code: string };
+
+const CODE = /^[A-Za-z0-9_.:-]{1,64}$/;
+// the composer's refusals that are not final (the job waits and is tried again)
+const RETRY_REFUSALS = new Set(["paused", "site_url"]);
+
+/** Parses the composer's answer; anything malformed is null (a failed try, never a send). */
+export function parseComposed(data: unknown): ComposeAnswer | null {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const r = data as Record<string, unknown>;
+  if (typeof r.refused === "string") return CODE.test(r.refused) ? { ok: false, code: r.refused } : null;
+  if (typeof r.to !== "string" || !/^[+][0-9]{8,15}$/.test(r.to)) return null;
+  if (typeof r.text !== "string" || r.text.trim() === "") return null;
+  if (r.sender !== null && typeof r.sender !== "string") return null;
+  return { ok: true, content: { to: r.to, sender: r.sender, text: r.text } };
+}
 
 function parseAnswer(data: unknown): MaySendAnswer | null {
   if (!data || typeof data !== "object") return null;
@@ -97,6 +118,10 @@ function target(job: ClaimedJob) {
 export function createSendHandler(deps: {
   maySend: MaySendCall;
   providerFor: (channel: MessageChannel) => MessagingProvider | null | undefined;
+  // SMS-05: asked only for a provider that composes (InforU), after the send check said yes
+  compose?: ComposeCall;
+  // owner (326) ב: public.sms_quota_return, for an SMS the provider says never reached it
+  returnQuota?: ComposeCall;
 }): JobHandler {
   return async (job) => {
     const to = target(job);
@@ -106,10 +131,28 @@ export function createSendHandler(deps: {
     const answer = parseAnswer(await deps.maySend(job));
     if (!answer) return { status: "failed", error: "send check answered nothing" };
     if (!answer.may_send) return { status: "ended", reason: answer.reason };
-    const result = await provider.send({ jobId: job.id, organizationId: job.organization_id, ...to });
+    let content: ComposedSms | undefined;
+    if (provider.composes) {
+      // SMS-05: the number, the sender and the text come from the database, for this lease only; a refusal ends the job
+      // (no provider was asked: provider null, the composer's code kept on the message)
+      if (to.channel !== "sms" || !deps.compose) return { status: "failed", error: "no composer for channel" };
+      const composed = parseComposed(await deps.compose(job));
+      if (!composed) return { status: "failed", error: "composer answered nothing" };
+      if (!composed.ok) {
+        if (composed.code === "stale") return { status: "failed", error: "stale lease" };
+        // SMS-05 review (3): a paused business or a missing site address waits; the job is tried again later
+        if (RETRY_REFUSALS.has(composed.code)) return { status: "failed", error: `waiting ${composed.code}` };
+        return { status: "failed", error: `refused ${composed.code}`, final: true, receipt: { provider: null, errorCode: composed.code } };
+      }
+      content = composed.content;
+    }
+    const result = await provider.send({ jobId: job.id, organizationId: job.organization_id, ...to, ...(content ? { content } : {}) });
     // MSG-03: the provider's code with its message id (sent) or its error code (failed) go back to the queue, which
     // records the message; the database drops a value of the wrong shape
     if (result.ok) return { status: "done", receipt: { provider: provider.name, providerMessageId: result.providerId } };
+    // owner (326) ב: a message that never reached the provider gives its SMS count back (a later try is counted again);
+    // a failure to give it back never changes the job's outcome
+    if (result.notSent && to.channel === "sms" && deps.returnQuota) await deps.returnQuota(job).catch(() => undefined);
     return {
       status: "failed",
       error: result.error,

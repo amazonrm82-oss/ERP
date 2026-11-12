@@ -100,7 +100,8 @@ describe("OPS-04: the worker route", () => {
   it("calls only its queue functions and touches no table or storage", () => {
     const code = read("src/features/jobs/run-server.ts");
     const rpcs = [...code.matchAll(/\.rpc\(\s*"([a-z_]+)"/g)].map((m) => m[1]).sort();
-    expect(rpcs).toEqual(["background_job_begin", "background_job_end", "background_job_progress", "claim_jobs", "finish_job", "job_message_may_send"]);
+    // SMS-05 (owner (318) א): the InforU sender's composer, sms_job_compose (wave 3 use (1))
+    expect(rpcs).toEqual(["background_job_begin", "background_job_end", "background_job_progress", "claim_jobs", "finish_job", "job_message_may_send", "sms_job_compose", "sms_quota_return"]);
     expect(code).not.toMatch(/\.from\(|\.storage\b|\.schema\(/);
     expect(read("src/app/api/jobs/run/route.ts")).toContain("runJobsRoute");
   });

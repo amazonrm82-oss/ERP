@@ -1,0 +1,190 @@
+{
+ "cases": [
+  {
+   "name": "plain fields",
+   "text": "שלום {שם פרטי}, כאן {שם העסק}.",
+   "values": {
+    "שם פרטי": "דנה",
+    "שם העסק": "מקסוז"
+   },
+   "gender": null,
+   "envelope": false,
+   "expected": "שלום דנה, כאן מקסוז."
+  },
+  {
+   "name": "field without a value stays",
+   "text": "סכום: {סכום}",
+   "values": {
+    "סכום": null
+   },
+   "gender": null,
+   "envelope": false,
+   "expected": "סכום: {סכום}"
+  },
+  {
+   "name": "empty value stays",
+   "text": "סכום: {סכום}",
+   "values": {
+    "סכום": "  "
+   },
+   "gender": null,
+   "envelope": false,
+   "expected": "סכום: {סכום}"
+  },
+  {
+   "name": "optional part with value",
+   "text": "נתראה{, ב-{מיקום}}.",
+   "values": {
+    "מיקום": "תל אביב"
+   },
+   "gender": null,
+   "envelope": false,
+   "expected": "נתראה, ב-תל אביב."
+  },
+  {
+   "name": "optional part given empty",
+   "text": "נתראה{, ב-{מיקום}}.",
+   "values": {
+    "מיקום": ""
+   },
+   "gender": null,
+   "envelope": false,
+   "expected": "נתראה."
+  },
+  {
+   "name": "optional part not given",
+   "text": "נתראה{, ב-{מיקום}}.",
+   "values": {},
+   "gender": null,
+   "envelope": false,
+   "expected": "נתראה{, ב-{מיקום}}."
+  },
+  {
+   "name": "optional part unknown name",
+   "text": "נתראה{, ב-{משהו}}.",
+   "values": {
+    "משהו": "x"
+   },
+   "gender": null,
+   "envelope": false,
+   "expected": "נתראה{, ב-{משהו}}."
+  },
+  {
+   "name": "gender female",
+   "text": "{זכר: תודה שפנית | נקבה: תודה שפנית | ניטרלי: תודה על הפנייה} {שם פרטי}",
+   "values": {
+    "שם פרטי": "רות"
+   },
+   "gender": "female",
+   "envelope": false,
+   "expected": "תודה שפנית רות"
+  },
+  {
+   "name": "gender unknown takes neutral",
+   "text": "{זכר: יקר | נקבה: יקרה | ניטרלי: לקוח יקר}",
+   "values": {},
+   "gender": "unknown",
+   "envelope": false,
+   "expected": "לקוח יקר"
+  },
+  {
+   "name": "gender none takes neutral",
+   "text": "{זכר: יקר | ניטרלי: לקוח יקר}",
+   "values": {},
+   "gender": null,
+   "envelope": false,
+   "expected": "לקוח יקר"
+  },
+  {
+   "name": "broken block left as is",
+   "text": "{זכר: יקר | נקבה: יקרה}",
+   "values": {},
+   "gender": "male",
+   "envelope": false,
+   "expected": "{זכר: יקר | נקבה: יקרה}"
+  },
+  {
+   "name": "a value is never read as a field",
+   "text": "{שם פרטי} {שם מלא}",
+   "values": {
+    "שם פרטי": "{שם מלא}",
+    "שם מלא": "דנה כהן"
+   },
+   "gender": null,
+   "envelope": false,
+   "expected": "{שם מלא} דנה כהן"
+  },
+  {
+   "name": "unknown braces stay",
+   "text": "{לא שדה} {שם העסק}",
+   "values": {
+    "שם העסק": "מקסוז"
+   },
+   "gender": null,
+   "envelope": false,
+   "expected": "{לא שדה} מקסוז"
+  },
+  {
+   "name": "value trimmed",
+   "text": "[{שם פרטי}]",
+   "values": {
+    "שם פרטי": "  דנה \n"
+   },
+   "gender": null,
+   "envelope": false,
+   "expected": "[דנה]"
+  },
+  {
+   "name": "marketing envelope",
+   "text": "  מבצע חדש ל{שם פרטי}",
+   "values": {
+    "שם פרטי": "דנה",
+    "שם העסק": "מקסוז",
+    "טלפון העסק": "03-1234567",
+    "כתובת העסק": "הרצל 1, תל אביב",
+    "קישור הסרה": "https://x.test/f/unsub/abc"
+   },
+   "gender": null,
+   "envelope": true,
+   "expected": "פרסומת: מבצע חדש לדנה\n\nמקסוז · 03-1234567 · הרצל 1, תל אביב\nלהסרה מרשימת התפוצה: https://x.test/f/unsub/abc"
+  },
+  {
+   "name": "marketing already prefixed and with link",
+   "text": "פרסומת: שלום\n{שם העסק} · {טלפון העסק} · {כתובת העסק}\nהסרה: {קישור הסרה}",
+   "values": {
+    "שם העסק": "א",
+    "טלפון העסק": "1",
+    "כתובת העסק": "ב",
+    "קישור הסרה": "L"
+   },
+   "gender": null,
+   "envelope": true,
+   "expected": "פרסומת: שלום\nא · 1 · ב\nהסרה: L"
+  },
+  {
+   "name": "marketing trailing spaces",
+   "text": "שלום   \n\n",
+   "values": {
+    "שם העסק": "א",
+    "טלפון העסק": "1",
+    "כתובת העסק": "ב",
+    "קישור הסרה": "L"
+   },
+   "gender": null,
+   "envelope": true,
+   "expected": "פרסומת: שלום\n\nא · 1 · ב\nלהסרה מרשימת התפוצה: L"
+  },
+  {
+   "name": "a value holding braces is never read as a field or a block",
+   "text": "שלום {שם פרטי}{, ב-{מיקום}}, {זכר: ברוך הבא | נקבה: ברוכה הבאה | ניטרלי: ברוכים הבאים}.",
+   "values": {
+    "שם פרטי": "{שם העסק}",
+    "מיקום": "{זכר: א | נקבה: ב | ניטרלי: ג}",
+    "שם העסק": "מקסוז"
+   },
+   "gender": "male",
+   "envelope": false,
+   "expected": "שלום {שם העסק}, ב-{זכר: א | נקבה: ב | ניטרלי: ג}, ברוך הבא."
+  }
+ ]
+}

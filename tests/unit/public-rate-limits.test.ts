@@ -372,6 +372,22 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
     refusal: JSON_429 + " (Meta sends it again; what was taken is not taken twice); 401 / 403 / 413 / 503",
     sender: { leftOut: "(43) א: server-to-server from Meta's servers, which post for many businesses from shared addresses; the signature is the secret" },
   },
+  "/api/sms/inforu/status/[secret]": {
+    guard: "database",
+    functions: ["sms_delivery_status"],
+    limit:
+      "SMS-05: refused (404) BEFORE the body is read unless the last path segment is INFORU_WEBHOOK_SECRET (timing-safe; InforU signs nothing), bodies over 256 KB refused (413), 500 items a post; then 20,000 items a minute in total (app.sms_callback_counts); updates only public.messages of provider inforu still 'sent'; a report before the message row answers 503",
+    refusal: "503 + Retry-After (InforU posts again; no 429 so it retries); 400 / 404 / 413",
+    sender: { leftOut: "(43) א: server-to-server from InforU's servers; the path secret is the secret" },
+  },
+  "/api/sms/inforu/inbound/[secret]": {
+    guard: "database",
+    functions: ["sms_inbound_reply"],
+    limit:
+      "SMS-05: refused (404) BEFORE the body is read unless the last path segment is INFORU_WEBHOOK_SECRET (timing-safe), bodies over 256 KB refused (413), 50 replies a post; only an opt-out reply is judged; 5 per number in 10 minutes (app.sms_inbound_number_counts, buckets only), then 1,200 a minute in total (app.sms_callback_counts), then public.sms_inbound_optout's 600 a minute per business",
+    refusal: "503 + Retry-After (InforU posts again; a repeated opt-out changes nothing); 400 / 404 / 413",
+    sender: { leftOut: "(43) א: server-to-server from InforU's servers; the path secret is the secret" },
+  },
   "/api/meta/leads/sweep": { guard: "secret", limit: "Bearer PUSH_DISPATCH_SECRET (timing-safe); woken by pg_cron every 5 minutes while a Meta lead is due", refusal: "401" },
 };
 
@@ -584,6 +600,8 @@ describe("OPS-02: every public path has a named limit", () => {
       "src/lib/errors.ts",
       "src/features/auth/actions.ts",
       "src/app/o/[orgId]/reports/[report]/export/route.ts",
+      // SMS-05: the InforU adapter reads InforU's own throttle answers (HTTP 429, StatusId -429); it answers nobody
+      "src/features/messaging/providers/inforu.ts",
     ]);
     const offenders = sourceFiles(join(ROOT, "src"))
       .map((file) => relative(ROOT, file))

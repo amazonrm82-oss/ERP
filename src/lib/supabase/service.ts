@@ -40,6 +40,12 @@ import { getSupabaseEnv } from "@/lib/env";
  *   public.background_job_begin(), public.background_job_token(),
  *   public.background_job_progress() and public.background_job_end(); the work itself
  *   runs under a short token for the ordering person, never with the service key;
+ * - InforU's delivery reports and replies (src/features/inforu-callbacks/webhook-server.ts,
+ *   routes /api/sms/inforu/status/<secret> and /api/sms/inforu/inbound/<secret>; SMS-05,
+ *   owner (318) א, wave 3 use (2)): the client is made only after the secret in the path
+ *   passed (timing-safe), and calls only public.sms_delivery_status() and
+ *   public.sms_inbound_reply(); the OPS-04 worker also calls public.sms_job_compose() and
+ *   public.sms_quota_return() (owner (326) ב) for the InforU sender;
  * - the Meta Lead Ads webhook and its sweep (src/features/meta-leads/webhook-server.ts,
  *   routes /api/meta/leads and /api/meta/leads/sweep; CAP-11, owner 4 November 2026,
  *   answer (126) א): the client is made only after the X-Hub-Signature-256 check (or the

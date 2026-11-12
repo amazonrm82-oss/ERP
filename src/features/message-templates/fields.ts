@@ -90,7 +90,14 @@ export function fillOptionalParts(text: string, values: MergeValues): string {
  * every merge field that has a value. A field without a value stays as it is, so the reader sees what a sender fills.
  */
 export function fillMessage(text: string, values: MergeValues): string {
-  return pickVariants(fillOptionalParts(text, values), values.gender).replace(MERGE_FIELD_PATTERN, (token, name: string) => {
+  // SMS-05 review (7): an optional part with a value keeps its field token here; every value goes in only in the last
+  // pass, so a value holding "{...}" is never read as a field or a gender block (app.sms_fill does the same)
+  const parts = text.replace(OPTIONAL_PART_PATTERN, (token, before: string, name: string, after: string) => {
+    const key = NAME_TO_KEY.get(name);
+    if (!key || !(key in values)) return token;
+    return values[key]?.trim() ? `${before}{${name}}${after}` : "";
+  });
+  return pickVariants(parts, values.gender).replace(MERGE_FIELD_PATTERN, (token, name: string) => {
     const key = NAME_TO_KEY.get(name);
     const value = key ? values[key]?.trim() : undefined;
     return value ? value : token;

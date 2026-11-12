@@ -62,7 +62,12 @@ export type OutgoingMessage = {
   // (the record is then the deal's contact), and who queued it. Ids only; the sender name (SMS-01) and the text are read by
   // a real adapter through its own approved path. Absent on every other message.
   sms?: SmsParts;
+  // SMS-05: what a composing provider (InforU) sends, as public.sms_job_compose answered it for this job's live lease: the
+  // record's current number, the sender (null = the platform's default) and the filled text. Never logged or kept.
+  content?: ComposedSms;
 };
+
+export type ComposedSms = { to: string; sender: string | null; text: string };
 
 export type SmsParts = {
   templateId: string | null;
@@ -88,12 +93,16 @@ export type RecordEmailParts = {
  */
 export type ProviderResult =
   | { ok: true; providerId: string }
-  | { ok: false; error: string; final?: boolean; code?: string };
+  // notSent (SMS-05, owner (326) ב): the message never reached the provider (no connection, nothing it could send), so the
+  // business's SMS count is given back (public.sms_quota_return); never set when it may have been sent
+  | { ok: false; error: string; final?: boolean; code?: string; notSent?: boolean };
 
 /** An adapter for one provider on one channel. `name` is the provider's code, kept on every message it sent. */
 export type MessagingProvider = {
   name: string;
   channel: MessageChannel;
+  // SMS-05: a provider that sends real text: the send handler asks the database's composer first and hands it `content`
+  composes?: boolean;
   send(message: OutgoingMessage): Promise<ProviderResult>;
 };
 

@@ -13,6 +13,15 @@ describe("marketingEnvelope (MSG-02, owner (88))", () => {
     }
   });
 
+  it("wraps a review request like marketing (owner (321) א), and leaves the newer service types unchanged", () => {
+    const wrapped = marketingEnvelope({ channel: "sms", messageType: "review_request", subject: null, body: "נשמח לביקורת" });
+    expect(wrapped.body).toBe(marketingEnvelope({ channel: "sms", messageType: "marketing", subject: null, body: "נשמח לביקורת" }).body);
+    expect(wrapped.body.startsWith("פרסומת: ")).toBe(true);
+    for (const messageType of ["punch_card_notice", "instant_reply"] as const) {
+      expect(marketingEnvelope({ channel: "sms", messageType, subject: null, body: "גוף" })).toEqual({ subject: null, body: "גוף" });
+    }
+  });
+
   it("an email: prefixes the subject once and appends the sender and unsubscribe lines", () => {
     expect(
       marketingEnvelope({ channel: "email", messageType: "marketing", subject: "חדש ב{שם העסק}", body: "שלום {שם פרטי}, {תוכן העדכון}" }),

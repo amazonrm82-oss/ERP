@@ -25,6 +25,9 @@ const TOKEN_PREFIXES = [
   "/api/forms/unsub/",
   "/api/forms/widget/",
   "/api/calendar-feed/",
+  // SMS-05: the InforU callbacks carry the webhook secret as their last segment
+  "/api/sms/inforu/inbound/",
+  "/api/sms/inforu/status/",
   "/api/in/",
   "/f/book/manage/",
   "/f/book/",
