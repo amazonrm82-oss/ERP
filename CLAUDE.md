@@ -139,7 +139,10 @@ and build this CRM here instead. The old code is preserved on the branch
   saving an instant reply that holds an offer is refused (`app.message_offer` = `messageOffer()`: NFKC, Cf/Mn and fillers stripped,
   look-alike and Arabic-Indic digit folds, ₪ $ € £, ש"ח / שח next to a number, % next to a digit, a closed word list with up to 3 prefix
   letters; hint `message_template:offer`; an outside link `message_template:instant_reply_link`); the rule judges the text as written,
-  not filled fields. `message_templates_fixed_notice` is a no-op trigger since 021233.
+  not filled fields. `message_templates_fixed_notice` is a no-op trigger since 021233. Since 021238 (owner (305) ב, lead's choice for the
+  plurals) the bare words מבצע / מבצעים / הנחה / הנחות no longer count; the list holds במבצע, חינם, מחיר, מחירים, הטבה and the rest, and three
+  phrase checks catch "הנחה של", "% הנחה" and "רק היום" (first word with up to 3 prefix letters); `app.message_offer_words`,
+  `app.message_offer_not_words` and `app.message_offer` were last redefined in 021238; tests 64 and 88 end with `_instant_reply_offer_words.sql`.
   `org_message_settings.instant_reply_default` gives a new web form its switch. THE FUTURE SENDER re-checks the `instant_reply`
   key and the form's switch, re-reads the submission, sends nothing unless the record's address still equals the typed one, and
   needs its own "In use" line. `app.job_payload_ok` was redefined in 021225 (then 021226).
@@ -239,7 +242,8 @@ and build this CRM here instead. The old code is preserved on the branch
   `plans-public`, expired by `updatePlanAction` and `setPlanAvailabilityAction`), which protects only the page; a failed read is not cached,
   backs off a minute, logs one redacted line, and the section shows without prices. `/` renders per request. Test 344 pins the body by
   md5, the settings, the grants and the answer; flipping `built` in `capabilities.ts` needs a migration that redefines the function and a
-  fresh review. The advisor's anon/authenticated definer findings on it are expected.
+  fresh review. The advisor's anon/authenticated definer findings on it are expected. Owner (304) ב: the page also lists the capabilities on
+  their way, marked "בקרוב", read from `src/features/roadmap/public-items.ts` (`src/features/landing/upcoming.ts`; no database change).
   Built, no service-key use yet (RET-02, migration 021235; owner (271) ב, (273): plan key `review_requests` from basic up; an independent
   review and two delta reviews): review requests. `public.review_request_settings` (one row per business: switch, the Google review link,
   triggers deal won / meeting held, delay 0..30 days, server-only `enabled_at`; owners/admins of a writable business through column grants,
@@ -266,7 +270,9 @@ and build this CRM here instead. The old code is preserved on the branch
   `created_at`; granted to authenticated only for the report; test 347 is its speed bound): leads the server gave their owner, tasks an
   automation made, reminder tasks (collection, signature, contract renewal), automatic customer messages queued/sent by type (a person's
   send or press left out), and debts paid within 14 days after a collection stage that really reminded. A failed read shows one line on
-  the card, never breaks the page. The monthly email (`digest.send`) is not built: it waits for owner question 311.
+  the card, never breaks the page. Since owner (312) ב the same card also shows on My day (owners/admins, the current month, no
+  migration). Owner (311) ב: the monthly email will hold only fixed text and a link; the card is computed when the person opens it, with
+  their own session; no background job reads with a recipient's rights (not built: it waits for the email sender).
   In use (BIZ-01, owner 3 and 11 November 2026, answers (70) ב and (271) ב; migration 021237; an independent review and a delta review):
   the public business page (`src/features/business-page/public-server.ts`, page `/f/biz/<token>`, route `POST /api/forms/biz/<token>`),
   which calls only `public.business_page_public()` (display name `organizations.name`, logo, colour, built-with, the page's description
