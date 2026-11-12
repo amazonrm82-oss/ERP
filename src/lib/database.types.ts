@@ -995,6 +995,34 @@ export type PunchCardAlertSettingsRow = {
   updated_at: string;
 };
 
+// MNY-04 (285) ג: a switch and a threshold per anomaly alert (migration anomaly_alert_settings); no row = every alert on.
+export type AnomalyAlertSettingsRow = {
+  id: string;
+  organization_id: string;
+  lead_drop_on: boolean;
+  lead_drop_percent: number;
+  idle_rep_on: boolean;
+  idle_rep_days: number;
+  quiet_form_on: boolean;
+  quiet_form_min_inquiries: number;
+  campaign_jump_on: boolean;
+  campaign_jump_percent: number;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type AnomalyAlertSettingsValues = {
+  lead_drop_on?: boolean;
+  lead_drop_percent?: number;
+  idle_rep_on?: boolean;
+  idle_rep_days?: number;
+  quiet_form_on?: boolean;
+  quiet_form_min_inquiries?: number;
+  campaign_jump_on?: boolean;
+  campaign_jump_percent?: number;
+};
+
 // HEB-09: the business's pause of automatic sending to customers (migration customer_sending_pause); no row = not paused.
 export type OrgSendingPausesRow = {
   id: string;
@@ -3735,6 +3763,8 @@ export type Database = {
         { organization_id: string; low_entries?: number; expiry_days?: number; customer_messages?: boolean; notices_to?: string },
         { low_entries?: number; expiry_days?: number; customer_messages?: boolean; notices_to?: string }
       >;
+      // MNY-04 (285) ג: column grants (the switches and the numbers); no delete
+      anomaly_alert_settings: Table<AnomalyAlertSettingsRow, { organization_id: string } & AnomalyAlertSettingsValues, AnomalyAlertSettingsValues>;
       // HEB-09: column grants (paused, reason); the stamps are the server's; no delete
       org_sending_pauses: Table<
         OrgSendingPausesRow,

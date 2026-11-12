@@ -18,6 +18,7 @@ import {
   UploadIcon,
   UsersIcon,
 } from "@/components/ui/icons";
+import { anomalyAlertSettingsPath } from "@/features/anomaly-alerts/paths";
 import { bookingPagesPath } from "@/features/booking/paths";
 import { businessCardSettingsPath } from "@/features/business-cards/paths";
 import { calendarSettingsPath } from "@/features/calendar-days/paths";
@@ -226,6 +227,10 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         { href: distributionSettingsPath(orgId), label: "חלוקת לידים", description: "סבב, משקל, עומס פתוח, וכללים לפי מקור ומוצר", icon: UsersIcon },
         // CAP-10: everyone reads it; owners and admins change it
         { href: responseSettingsPath(orgId), label: "יעד זמן תגובה", description: "תוך כמה זמן עונים לליד חדש, ומה קורה כשלא", icon: BellIcon },
+        // MNY-04 (285) ג: owners and admins switch each anomaly alert and set its number
+        ...(access.admin
+          ? [{ href: anomalyAlertSettingsPath(orgId), label: "התראות חריגה", description: "ירידה בפניות, מי שלא עדכן רשומות, טופס שנעצר וקמפיין שהתייקר", icon: BellIcon }]
+          : []),
         // CAL-10: each person their own pages; owners and admins all
         { href: bookingPagesPath(orgId), label: "דפי קביעת תור", description: "קישור שבו לקוחות קובעים פגישה בזמן פנוי", icon: CalendarIcon },
         // BIZ-02: each person their own card; owners and admins every card

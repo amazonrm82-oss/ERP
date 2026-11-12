@@ -846,6 +846,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // SPD-04 (282) ב redefines app.message_notice_template_problem() of _signature_status_reminders.sql,
       // app.message_send_refusal_text() of _glued_address.sql and app.message_templates_fixed_notice() of _instant_reply.sql last
       "_instant_reply_editable.sql",
+      // MNY-04 (285) ג, (286) ב redefines the anomaly detectors, app.anomaly_alert_notify() and app.send_anomaly_alerts() of
+      // _anomaly_alerts.sql last
+      "_anomaly_alert_settings.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

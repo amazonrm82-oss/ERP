@@ -148,6 +148,8 @@ const RERUN = [
   migrationFile("_signature_answers.sql"),
   // SPD-04 (282) ב redefines the template rule and app.message_templates_fixed_notice() of _instant_reply.sql last
   migrationFile("_instant_reply_editable.sql"),
+  // MNY-04 (285) ג, (286) ב redefines the anomaly detectors of _anomaly_alerts.sql last
+  migrationFile("_anomaly_alert_settings.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

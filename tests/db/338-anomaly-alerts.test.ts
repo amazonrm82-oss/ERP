@@ -439,4 +439,175 @@ describe("anomaly alerts (MNY-04)", () => {
     }
     expect(warnings.filter((w) => w === `crm-anomaly-alerts: organization ${shop.org} failed (SQLSTATE P0001)`)).toHaveLength(4);
   });
+
+  // MNY-04, owner (285) ג: a switch and a threshold per alert (public.anomaly_alert_settings; no row = all on, 021228's numbers)
+  const settings = (orgId: string, set: string) =>
+    asAdmin(async (q) => {
+      await q("insert into public.anomaly_alert_settings (organization_id) values ($1) on conflict (organization_id) do nothing", [orgId]);
+      await q(`update public.anomaly_alert_settings set ${set} where organization_id = $1`, [orgId]);
+    });
+  const idleOf = (orgId: string) =>
+    asAdmin(async (q) =>
+      (await q<{ u: string }>("select u::text from app.anomaly_idle_reps($1, date '2026-11-11', 'Asia/Jerusalem') u", [orgId])).rows.map((r) => r.u).sort(),
+    );
+  // a person with a history 20..25 days ago and nothing in the last working days
+  const history = async (orgId: string, userId: string) => {
+    await backdateMembership(orgId, userId, 90);
+    for (let i = 0; i < 6; i++) await audit(orgId, userId, ago(20 + i));
+  };
+
+  it("(285) ג: no row means every alert on with the default numbers", async () => {
+    const shop = await newOrg("עסק ברירת מחדל");
+    const cfg = await asAdmin(async (q) =>
+      (
+        await q(
+          `select s.lead_drop_on, s.lead_drop_percent, s.idle_rep_on, s.idle_rep_days, s.quiet_form_on, s.quiet_form_min_inquiries,
+                  s.campaign_jump_on, s.campaign_jump_percent from app.anomaly_settings_of($1) s`,
+          [shop.org],
+        )
+      ).rows[0],
+    );
+    expect(cfg).toEqual({
+      lead_drop_on: true, lead_drop_percent: 50, idle_rep_on: true, idle_rep_days: 3,
+      quiet_form_on: true, quiet_form_min_inquiries: 4, campaign_jump_on: true, campaign_jump_percent: 100,
+    });
+    // the defaults of a saved row are the same numbers
+    await settings(shop.org, "idle_rep_on = true");
+    const row = await asAdmin(async (q) =>
+      (await q("select lead_drop_percent, idle_rep_days, quiet_form_min_inquiries, campaign_jump_percent from public.anomaly_alert_settings where organization_id = $1", [shop.org])).rows[0],
+    );
+    expect(row).toEqual({ lead_drop_percent: 50, idle_rep_days: 3, quiet_form_min_inquiries: 4, campaign_jump_percent: 100 });
+    expect((await pgError(asUser(owner.id, (q) => q("select app.anomaly_settings_of($1)", [org])))).code).toBe("42501");
+  });
+
+  it("(285) ג: a switched-off alert is not looked for; the idle days and their wording follow the business", async () => {
+    const team = await newOrg("עסק מתגים");
+    const idle = await addMember(team.org, team.owner.id, "member", "idle");
+    await history(team.org, idle.id);
+    await settings(team.org, "idle_rep_on = false");
+    expect(await run([team.org])).toBe(1);
+    expect(await notices(team.org, "anomaly_idle_rep")).toHaveLength(0);
+    // one working day: a change on Monday 9 November no longer counts (the window is Tuesday 10 only)
+    await audit(team.org, idle.id, "2026-11-09 10:00:00+02");
+    expect(await idleOf(team.org)).toEqual([]);
+    await settings(team.org, "idle_rep_on = true, idle_rep_days = 1");
+    expect(await idleOf(team.org)).toEqual([idle.id]);
+    expect(await run([team.org], "2026-11-12 10:00:00+02")).toBe(1);
+    // Thursday 12: the last working day is Wednesday 11, also without a change
+    const got = await notices(team.org, "anomaly_idle_rep");
+    expect(got.map((n) => n.body)).toEqual(["חבר צוות אחד לא עדכן אף רשומה ביום העבודה האחרון שלו"]);
+    await settings(team.org, "idle_rep_days = 5");
+    expect(await idleOf(team.org)).toEqual([]);
+  });
+
+  it("(285) ג: the lead drop percent, the form's inquiries and the campaign percent are the business's", async () => {
+    const shop = await newOrg("עסק ספים");
+    const s = await regularSource(shop.org, "מקור");
+    // 5 a week before; 2 in the last 7 days: fewer than half (2.5), not fewer than 30% (1.5)
+    for (let i = 0; i < 2; i++) await lead(shop.org, ago(2 + i), { source_id: s });
+    expect(await drops(shop.org)).toEqual([s]);
+    await settings(shop.org, "lead_drop_percent = 70");
+    expect(await drops(shop.org)).toEqual([]);
+    await settings(shop.org, "lead_drop_percent = 30");
+    expect(await drops(shop.org)).toEqual([s]);
+    // switched off: the job does not tell it
+    await settings(shop.org, "lead_drop_on = false");
+    expect(await run([shop.org])).toBe(1);
+    expect(await notices(shop.org, "anomaly_lead_drop")).toHaveLength(0);
+
+    // a form with 2 inquiries in two of the four weeks: regular only from 2
+    const form = await asUser(shop.owner.id, async (q) => (await q<{ id: string }>("insert into public.forms (organization_id, name) values ($1, 'טופס קטן') returning id", [shop.org])).rows[0].id);
+    await raw("update public.forms set created_at = $2 where id = $1 returning id", [form, ago(60)]);
+    for (const d of [33, 19]) await raw("insert into public.form_submissions (organization_id, form_id, status, created_at) values ($1, $2, 'accepted', $3) returning id", [shop.org, form, ago(d)]);
+    const quiet = () =>
+      asAdmin(async (q) => (await q<{ f: string }>("select f::text from app.anomaly_quiet_forms($1, date '2026-11-11', 'Asia/Jerusalem') f", [shop.org])).rows.map((r) => r.f));
+    expect(await quiet()).toEqual([]);
+    await settings(shop.org, "quiet_form_min_inquiries = 2");
+    expect(await quiet()).toEqual([form]);
+    await settings(shop.org, "quiet_form_min_inquiries = 3");
+    expect(await quiet()).toEqual([]);
+
+    // the texts follow the numbers
+    const week = await asAdmin(async (q) =>
+      (await q<{ w: string }>("select to_char(current_date - extract(dow from current_date)::int, 'YYYY-MM-DD') as w")).rows[0].w,
+    );
+    await settings(shop.org, "lead_drop_percent = 70, campaign_jump_percent = 150");
+    for (const kind of ["lead_drop", "campaign_jump"]) {
+      await asAdmin((q) => q("select app.anomaly_alert_notify($1, $2, $3::date, 'UTC', array['k']) as n", [shop.org, kind, week]));
+    }
+    expect((await notices(shop.org, "anomaly_lead_drop")).map((n) => n.body)).toEqual([
+      "מקור אחד: ב-7 הימים האחרונים הגיעו ממנו פחות מ-30% מהממוצע השבועי של 4 השבועות שלפניהם",
+    ]);
+    expect((await notices(shop.org, "anomaly_campaign_jump")).map((n) => n.body)).toEqual([
+      "קמפיין או מקור אחד: בחודש שעבר העלות לפנייה הייתה גבוהה לפחות ב-150% מהממוצע של 3 החודשים שלפניו",
+    ]);
+  });
+
+  it("(285) ג: the campaign percent decides the jump", async () => {
+    const shop = await newOrg("עסק קפיצה");
+    await asAdmin((q) =>
+      q("update public.subscriptions set feature_overrides = coalesce(feature_overrides, '{}'::jsonb) || '{\"campaign_costs\": true}' where organization_id = $1", [shop.org]),
+    );
+    // 100,000 agorot a month; 5 leads a month, then 3 in October: cost per lead 200, then 333 (+67%)
+    for (const [month, day] of [["2026-07-01", "2026-07-15"], ["2026-08-01", "2026-08-15"], ["2026-09-01", "2026-09-15"], ["2026-10-01", "2026-10-15"]]) {
+      await raw("insert into public.campaign_costs (organization_id, campaign, month, amount_agorot) values ($1, 'Autumn', $2, 100000) returning id", [shop.org, month]);
+      for (let i = 0; i < (month === "2026-10-01" ? 3 : 5); i++) await lead(shop.org, `${day} 12:00:00+03`, { campaign: "Autumn" });
+    }
+    const keys = () =>
+      asAdmin(async (q) => (await q<{ k: string }>("select k from app.anomaly_campaign_jumps($1, date '2026-11-11', 'Asia/Jerusalem') k", [shop.org])).rows.map((r) => r.k));
+    expect(await keys()).toEqual([]);
+    await settings(shop.org, "campaign_jump_percent = 60");
+    expect(await keys()).toEqual(["|autumn|2026-10"]);
+    await settings(shop.org, "campaign_jump_on = false");
+    expect(await run([shop.org])).toBe(1);
+    expect(await notices(shop.org, "anomaly_campaign_jump")).toHaveLength(0);
+  });
+
+  it("(286) ב: an idle owner or admin is counted, and told only to the other owners and admins", async () => {
+    const team = await newOrg("עסק בעלים");
+    const second = await addMember(team.org, team.owner.id, "admin", "second");
+    const member = await addMember(team.org, team.owner.id, "member", "worker");
+    for (const u of [team.owner, second, member]) await history(team.org, u.id);
+    // the admin changed a record on Tuesday 10 November: only the owner and the member are idle
+    await audit(team.org, second.id, ago(1));
+    expect(await idleOf(team.org)).toEqual([team.owner.id, member.id].sort());
+    expect(await run([team.org])).toBe(1);
+    const got = await notices(team.org, "anomaly_idle_rep");
+    // the owner hears of the member only; the admin of both; the member nothing
+    expect(got.map((n) => [n.user_id, n.body]).sort()).toEqual(
+      [
+        [team.owner.id, "חבר צוות אחד לא עדכן אף רשומה ב-3 ימי העבודה האחרונים שלו"],
+        [second.id, "2 חברי צוות לא עדכנו אף רשומה ב-3 ימי העבודה האחרונים שלהם"],
+      ].sort(),
+    );
+
+    // alone: an owner with nobody else to tell gets nothing about themself
+    const solo = await newOrg("עסק לבד");
+    await history(solo.org, solo.owner.id);
+    expect(await idleOf(solo.org)).toEqual([solo.owner.id]);
+    expect(await run([solo.org])).toBe(1);
+    expect(await notices(solo.org, "anomaly_idle_rep")).toHaveLength(0);
+    // the owner is still marked told for the week
+    const told = await asAdmin(async (q) =>
+      (await q<{ n: number }>("select count(*)::int as n from app.anomaly_alerts_sent where organization_id = $1 and kind = 'idle_rep'", [solo.org])).rows[0].n,
+    );
+    expect(told).toBe(1);
+
+    // "further" is judged per recipient: an owner never told about anyone but themself hears of the next person as the first
+    const week = await asAdmin(async (q) =>
+      (await q<{ w: string }>("select to_char(current_date - extract(dow from current_date)::int, 'YYYY-MM-DD') as w")).rows[0].w,
+    );
+    const pair = await newOrg("עסק זוג");
+    const partner = await addMember(pair.org, pair.owner.id, "admin", "partner");
+    const notify = (keys: string[]) =>
+      asAdmin(async (q) => (await q<{ n: number }>("select app.anomaly_alert_notify($1, 'idle_rep', $2::date, 'UTC', $3) as n", [pair.org, week, keys])).rows[0].n);
+    expect(await notify([pair.owner.id])).toBe(1);
+    expect(await notify(["someone-else"])).toBe(1);
+    const bodies = (await notices(pair.org, "anomaly_idle_rep")).map((n) => [n.user_id, n.body]);
+    expect(bodies.filter(([u]) => u === pair.owner.id).map(([, b]) => b)).toEqual(["חבר צוות אחד לא עדכן אף רשומה ב-3 ימי העבודה האחרונים שלו"]);
+    expect(bodies.filter(([u]) => u === partner.id).map(([, b]) => b)).toEqual([
+      "חבר צוות אחד לא עדכן אף רשומה ב-3 ימי העבודה האחרונים שלו",
+      "חבר צוות נוסף לא עדכן אף רשומה ב-3 ימי העבודה האחרונים שלו",
+    ]);
+  });
 });

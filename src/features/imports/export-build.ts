@@ -176,6 +176,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "customer_status_settings", file: "customer-status-settings.csv" },
   // PKG-03
   { table: "punch_card_alert_settings", file: "punch-card-alert-settings.csv" },
+  // MNY-04
+  { table: "anomaly_alert_settings", file: "anomaly-alert-settings.csv" },
   // HEB-09
   { table: "org_sending_pauses", file: "sending_pause.csv" },
   // MSG-05/MSG-06

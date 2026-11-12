@@ -1193,6 +1193,44 @@ describe("roles and record visibility", () => {
     await asUser(owner.id, (q) => q("update public.punch_card_alert_settings set low_entries = 2, expiry_days = 14 where organization_id = $1", [org]));
   });
 
+  it("the anomaly alert settings: everyone reads them, only owners and admins of a writable business set them, nobody deletes them (MNY-04)", async () => {
+    for (const u of [manager, m1, viewer]) {
+      expect(
+        (await pgError(asUser(u.id, (q) => q("insert into public.anomaly_alert_settings (organization_id, idle_rep_on) values ($1, false)", [org])))).code,
+        u.email,
+      ).toBe("42501");
+    }
+    await asUser(admin.id, (q) => q("insert into public.anomaly_alert_settings (organization_id, idle_rep_on) values ($1, false)", [org]));
+    for (const u of [owner, admin, manager, m1, viewer]) {
+      const rows = await asUser(u.id, async (q) =>
+        (await q<{ idle_rep_on: boolean; idle_rep_days: number }>("select idle_rep_on, idle_rep_days from public.anomaly_alert_settings where organization_id = $1", [org])).rows,
+      );
+      expect(rows, u.email).toEqual([{ idle_rep_on: false, idle_rep_days: 3 }]);
+    }
+    for (const u of [manager, m1, viewer]) {
+      expect(await asUser(u.id, async (q) => (await q("update public.anomaly_alert_settings set idle_rep_days = 5 where organization_id = $1", [org])).rowCount), u.email).toBe(0);
+    }
+    expect(await asUser(owner.id, async (q) => (await q("update public.anomaly_alert_settings set lead_drop_percent = 70 where organization_id = $1", [org])).rowCount)).toBe(1);
+    expect((await pgError(asUser(owner.id, (q) => q("delete from public.anomaly_alert_settings where organization_id = $1", [org])))).code).toBe("42501");
+    // only the switches and the numbers are written by a client, in their bounds
+    expect((await pgError(asUser(owner.id, (q) => q("update public.anomaly_alert_settings set updated_by = null where organization_id = $1", [org])))).code).toBe("42501");
+    for (const set of ["lead_drop_percent = 95", "idle_rep_days = 0", "quiet_form_min_inquiries = 501", "campaign_jump_percent = 10"]) {
+      expect((await pgError(asUser(owner.id, (q) => q(`update public.anomaly_alert_settings set ${set} where organization_id = $1`, [org])))).code, set).toBe("23514");
+    }
+    // a read-only business keeps them readable and frozen, for owners too
+    const status = await asAdmin(async (q) => (await q<{ status: string }>("select status from public.organizations where id = $1", [org])).rows[0].status);
+    await asAdmin((q) => q("update public.organizations set status = 'read_only' where id = $1", [org]));
+    try {
+      expect(await asUser(m1.id, (q) => count(q, "select 1 from public.anomaly_alert_settings where organization_id = $1", [org]))).toBe(1);
+      for (const u of [owner, admin]) {
+        expect(await asUser(u.id, async (q) => (await q("update public.anomaly_alert_settings set idle_rep_days = 6 where organization_id = $1", [org])).rowCount), u.email).toBe(0);
+      }
+    } finally {
+      await asAdmin((q) => q("update public.organizations set status = $1 where id = $2", [status, org]));
+    }
+    await asUser(owner.id, (q) => q("update public.anomaly_alert_settings set idle_rep_on = true, lead_drop_percent = 50 where organization_id = $1", [org]));
+  });
+
   it("the sending pause: everyone reads it, owners and admins pause and resume it even read-only, never while closed (HEB-09)", async () => {
     for (const u of [manager, m1, viewer]) {
       expect(
