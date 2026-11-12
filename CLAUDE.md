@@ -678,6 +678,15 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `app.agreement_texts` for that version (hint `agreement:changed`); a new LEGAL_VERSION, or a filled-in detail, ships with a
   migration registering its texts (test 127 fails otherwise; the unit fixture pins each version's wording). Apply that
   migration before the code that serves the new text.
+  LEGAL-2 (owner 12 November 2026; migrations 021244-021246; an independent review): LEGAL_VERSION 2026-11-12 (terms, privacy policy,
+  DPA rewritten after the legal review; registered by 021244), the business is "בעל השליטה במאגר" and Mexuz "מחזיק", storage in Ireland,
+  24-hour incident notice, seven subprocessors with country (Anthropic, Cloudflare, InforU, Resend, Meta added to `public.subprocessors`
+  by 021244 through the internal steps of `platform_add_subprocessor`, from 26 November 2026, announced once). Every public form shows the
+  section-11 notice (`publicFormNotice`, `notice-draft-3`); `public.intake_form`, `public.site_widget_public` and `public.booking_page_public`
+  were last redefined in 021245 (added key `notice` from `app.privacy_notice_contact(org)`, definer, no grants: display name, documents
+  email, documents-or-business phone; test 253's pins rechecked). A person cannot create or switch a template to kind health_declaration
+  until PRV-05 (trigger `document_templates_health_closed`, hint `document_template:health_closed`, 021246). Test 64 ends with
+  `_privacy_notice_public_pages.sql`. Placeholders still open: privacy officer name, court city.
 - Global search (migration 0017): `public.search_records()` is **security invoker** (RLS decides, like
   reports). `app.search_norm()` folds niqqud, quotes and final letters; trigram indexes on the same
   expressions (`extensions.gin_trgm_ops`), so the index expressions and the query must stay identical.
