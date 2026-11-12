@@ -157,6 +157,10 @@ const RERUN = [
   migrationFile("_business_page.sql"),
   // SPD-04 (305) ב redefines the offer rule of _instant_reply_editable.sql last
   migrationFile("_instant_reply_offer_words.sql"),
+  // RET-02 (307) ב redefines app.review_url_ok() last
+  migrationFile("_review_url_any_https.sql"),
+  // RET-02 (309) ב redefines app.job_payload_ok() and the review request job last
+  migrationFile("_review_requests_leads.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

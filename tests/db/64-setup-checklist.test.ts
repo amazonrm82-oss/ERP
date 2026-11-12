@@ -858,6 +858,11 @@ describe("setup checklist and sample data (USR-04)", () => {
       // SPD-04 (305) ב redefines app.message_offer_words() / app.message_offer_not_words() / app.message_offer() of
       // _instant_reply_editable.sql last
       "_instant_reply_offer_words.sql",
+      // RET-02 (307) ב redefines app.review_url_ok() of _review_requests.sql last (the QR link rule)
+      "_review_url_any_https.sql",
+      // RET-02 (309) ב redefines app.job_payload_ok(), app.merge_review_requests(), app.review_request_one() and
+      // app.send_review_requests() of _review_requests.sql last
+      "_review_requests_leads.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

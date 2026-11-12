@@ -7,23 +7,26 @@ import { messageTemplatesPath } from "@/features/message-templates/paths";
 import { ReviewRequestSettingsForm } from "@/features/review-requests/components/review-request-settings-form";
 import { getReviewRequestSettings, hasActiveReviewTemplate } from "@/features/review-requests/queries";
 import { REVIEW_REQUEST_GAP_DAYS } from "@/features/review-requests/review-url";
+import { qrExternalBlocked } from "@/features/qr-codes/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { orgHasFeature } from "@/features/settings/queries";
 import { sendingPauseSettingsPath } from "@/features/sending-pause/paths";
 import { getOrgContext } from "@/features/shell/queries";
+import { SUPPORT } from "@/lib/support";
 
 export const metadata: Metadata = { title: "בקשת ביקורת" };
 
 type Props = { params: Promise<{ orgId: string }> };
 
-// RET-02: a request for a Google review after a won deal or a held meeting. Everyone reads; owners and admins change.
+// RET-02: a request for a review (Google, Facebook, easy, Zap or any https link; owner (307) ב) after a won deal or a held meeting. Everyone reads; owners and admins change.
 export default async function ReviewRequestSettingsPage({ params }: Props) {
   const { orgId } = await params;
-  const [{ role, canWrite }, settings, inPlan, hasTemplate] = await Promise.all([
+  const [{ role, canWrite }, settings, inPlan, hasTemplate, externalOff] = await Promise.all([
     getOrgContext(orgId),
     getReviewRequestSettings(orgId),
     orgHasFeature(orgId, "review_requests"),
     hasActiveReviewTemplate(orgId),
+    qrExternalBlocked(orgId),
   ]);
   const editable = isAdminRole(role) && canWrite;
   // review (8): on, but nothing to send from (the templates were switched off or deleted)
@@ -34,14 +37,21 @@ export default async function ReviewRequestSettingsPage({ params }: Props) {
         <TextLink href={messageTemplatesPath(orgId)}>תבניות ההודעה</TextLink>.
       </p>
     ) : null;
+  // review (1): the platform's outside-link switch (BIZ-03) stops review requests too
+  const externalNotice = externalOff ? (
+    <p role="status" className="rounded-md bg-danger-soft px-3 py-2.5 text-sm text-danger">
+      הקישורים החיצוניים של העסק כובו על ידי צוות המערכת, ולכן לא נשלחות בקשות ביקורת ואי אפשר להפעיל אותן או לשנות את הקישור. לפרטים פנו
+      לתמיכה בטלפון <span dir="ltr">{SUPPORT.phone}</span>.
+    </p>
+  ) : null;
 
   const rules = (
     <Card aria-labelledby="review-requests-rules-title">
       <CardHeader id="review-requests-rules-title" title="איך זה עובד" />
       <CardBody className="space-y-3 text-sm">
         <p>
-          כמה ימים אחרי שעסקה נסגרה בהצלחה, או אחרי פגישה שהתקיימה, הלקוח מקבל הודעה עם הקישור לביקורת של העסק ב-Google. ההודעה יוצאת לאיש הקשר של
-          העסקה או של הפגישה: בערוץ המועדף שלו, ואם אין, ב-SMS או באימייל. כל לקוח מקבל בקשה אחת לכל היותר ב-{REVIEW_REQUEST_GAP_DAYS} יום.
+          כמה ימים אחרי שעסקה נסגרה בהצלחה, או אחרי פגישה שהתקיימה, הלקוח מקבל הודעה עם הקישור לדף הביקורות של העסק (ב-Google, בפייסבוק, ב-easy, בזאפ או בכל אתר אחר). ההודעה יוצאת לאיש הקשר של
+          העסקה או של הפגישה, ואם לפגישה יש רק ליד, לליד: בערוץ המועדף שלו, ואם אין, ב-SMS או באימייל. כל לקוח מקבל בקשה אחת לכל היותר ב-{REVIEW_REQUEST_GAP_DAYS} יום.
         </p>
         <p>
           כל לקוח מקבל את אותה הבקשה. המערכת לא שואלת קודם אם הלקוח מרוצה ולא בוחרת למי לשלוח לפי זה, כי הכללים של Google אוסרים לבקש ביקורות רק
@@ -63,6 +73,7 @@ export default async function ReviewRequestSettingsPage({ params }: Props) {
   if (editable) {
     return (
       <div className="space-y-5">
+        {externalNotice}
         {noTemplate}
         <ReviewRequestSettingsForm orgId={orgId} settings={settings} inPlan={inPlan} />
         {rules}
@@ -71,6 +82,7 @@ export default async function ReviewRequestSettingsPage({ params }: Props) {
   }
   return (
     <div className="space-y-5">
+      {externalNotice}
       {noTemplate}
       <Card aria-labelledby="review-requests-title">
         <CardHeader id="review-requests-title" title="בקשת ביקורת מלקוחות" />

@@ -1046,7 +1046,7 @@ export type ReviewRequestSettingsRow = {
   id: string;
   organization_id: string;
   enabled: boolean;
-  // a Google review link (app.review_url_ok); required while enabled
+  // the review link, any https link (app.review_url_ok = the QR link rule); required while enabled
   review_url: string | null;
   on_deal_won: boolean;
   on_meeting_held: boolean;

@@ -34,14 +34,14 @@ export function ReviewRequestSettingsForm({ orgId, settings, inPlan }: Props) {
             hint={inPlan ? "ההודעה נשלחת רק ללקוחות שהסכימו לקבל הודעות שיווקיות בערוץ הזה." : "בקשת ביקורת לא כלולה בחבילה של העסק."}
           />
           <TextField
-            label="הקישור לביקורת ב-Google"
+            label="הקישור לדף הביקורות"
             name="review_url"
             type="url"
             inputMode="url"
             dir="ltr"
             autoComplete="off"
             placeholder="https://g.page/r/…/review"
-            hint={'בפרופיל העסק ב-Google לוחצים על "קבלת ביקורות" ומעתיקים את הקישור.'}
+            hint={'קישור לדף שבו כותבים ביקורת על העסק: ב-Google, בפייסבוק, ב-easy, בזאפ או בכל אתר אחר, שמתחיל ב-https://. ב-Google: בפרופיל העסק לוחצים על "קבלת ביקורות" ומעתיקים את הקישור.'}
             defaultValue={values?.review_url ?? settings.reviewUrl ?? ""}
             error={errors.review_url}
           />

@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_REVIEW_REQUEST_TEMPLATES, REVIEW_REQUEST_WORDING_VERSION } from "../../src/features/message-templates/templates";
 import cases from "../unit/fixtures/review-urls.json";
 
-import { addMember, asAdmin, asService, asUser, closePool, count, createOrg, createUser, defaultPipeline, pgError, type Query } from "./helpers";
+import { addMember, asAdmin, asService, asUser, closePool, count, createOrg, createUser, defaultLeadStatus, defaultPipeline, pgError, type Query } from "./helpers";
 
 afterAll(closePool);
 
@@ -80,8 +80,8 @@ describe("review requests (RET-02)", () => {
   const requests = (o: string) =>
     asAdmin(async (q) =>
       (
-        await q<{ source_kind: string; source_id: string; contact_id: string | null; outcome: string; channel: string | null; job_id: string | null }>(
-          "select source_kind, source_id, contact_id, outcome, channel, job_id from app.review_requests where organization_id = $1 order by created_at, id",
+        await q<{ source_kind: string; source_id: string; lead_id: string | null; contact_id: string | null; outcome: string; channel: string | null; job_id: string | null }>(
+          "select source_kind, source_id, lead_id, contact_id, outcome, channel, job_id from app.review_requests where organization_id = $1 order by created_at, id",
           [o],
         )
       ).rows,
@@ -140,14 +140,16 @@ describe("review requests (RET-02)", () => {
     }
   });
 
-  it("switching on needs the key, a Google link and a trigger; the start time is the server's; the templates come with it", async () => {
+  it("switching on needs the key, an https link and a trigger; the start time is the server's; the templates come with it", async () => {
     const other = await createUser("rr-noplan");
     const noPlan = await createOrg(other.id, "עסק בלי ביקורות");
     await features(noPlan, { review_requests: false });
     // off is always allowed, even without the key
     await settings(noPlan, { review_url: URL, delay_days: 2 }, other);
     expect((await pgError(settings(noPlan, { enabled: true }, other))).hint).toBe("feature:review_requests");
-    expect((await pgError(settings(org, { enabled: true, review_url: "https://example.com/review" }))).hint).toBe("review_request:url");
+    // owner (307) ב: any https link the QR rule accepts; http, a user name or a host without a dot is still refused
+    expect((await pgError(settings(org, { enabled: true, review_url: "http://www.facebook.com/biz/reviews" }))).hint).toBe("review_request:url");
+    expect((await pgError(settings(org, { enabled: true, review_url: "https://user@www.easy.co.il/x" }))).hint).toBe("review_request:url");
     expect((await pgError(settings(org, { enabled: true }))).hint).toBe("review_request:incomplete");
     expect((await pgError(settings(org, { enabled: true, review_url: URL, on_deal_won: false, on_meeting_held: false }))).hint).toBe("review_request:incomplete");
     // a member cannot
@@ -338,16 +340,194 @@ describe("review requests (RET-02)", () => {
     expect((await requests(org)).find((r) => r.source_id === d2)?.outcome).toBe("recent");
   });
 
-  it("the payload key review_request_id goes only with its type, on a contact, without files or a sender", async () => {
+  it("the payload key review_request_id goes only with its type, on a contact or a lead, without files or a sender", async () => {
     const ok = (payload: Row) =>
       asAdmin(async (q) => (await one<{ ok: boolean }>(q, "select app.job_payload_ok('message.send', $1) as ok", [JSON.stringify(payload)])).ok);
     const id = "11111111-1111-4111-8111-111111111111";
     const base = { channel: "sms", contact_id: id, message_type: "review_request", review_request_id: id };
     expect(await ok(base)).toBe(true);
     expect(await ok({ ...base, message_type: "marketing" })).toBe(false);
-    expect(await ok({ ...base, contact_id: undefined, lead_id: id })).toBe(false);
+    // (309) ב: on a lead too, never on both
+    expect(await ok({ channel: "sms", lead_id: id, message_type: "review_request", review_request_id: id })).toBe(true);
+    expect(await ok({ ...base, lead_id: id })).toBe(false);
     expect(await ok({ ...base, channel: "whatsapp" })).toBe(false);
     expect(await ok({ ...base, automation_id: id })).toBe(false);
     expect(await ok({ ...base, review_request_id: "x" })).toBe(false);
+  });
+
+  describe("(309) ב: a lead with a held meeting", () => {
+    let lorg: string;
+    let lowner: U;
+    let lpipe: { pipelineId: string; stages: { id: string; kind: string }[] };
+    let status: string;
+    const lead = (email: string | null, phone: string | null = null) =>
+      asUser(lowner.id, async (q) =>
+        (await one<{ id: string }>(q, "insert into public.leads (organization_id, status_id, full_name, owner_id, email, phone) values ($1, $5, 'רון', $2, $3, $4) returning id", [lorg, lowner.id, email, phone, status])).id,
+      );
+    const leadGrant = (l: string, channel = "email") =>
+      asAdmin((q) => q("insert into public.consents (organization_id, lead_id, channel, state, source) values ($1, $2, $3, 'granted', 'form')", [lorg, l, channel]));
+    const heldMeeting = (links: { lead_id?: string; contact_id?: string }) =>
+      asUser(lowner.id, async (q) => {
+        const id = (
+          await one<{ id: string }>(
+            q,
+            "insert into public.meetings (organization_id, title, starts_at, ends_at, lead_id, contact_id) values ($1, 'פגישה', now() - interval '2 hours', now() - interval '1 hour', $2, $3) returning id",
+            [lorg, links.lead_id ?? null, links.contact_id ?? null],
+          )
+        ).id;
+        await q("update public.meetings set status = 'held' where id = $1", [id]);
+        return id;
+      });
+
+    beforeAll(async () => {
+      lowner = await createUser("rr-lead-owner");
+      lorg = await createOrg(lowner.id, "עסק הלידים והביקורות");
+      lpipe = await defaultPipeline(lorg);
+      status = await defaultLeadStatus(lorg);
+      await features(lorg);
+      await settings(lorg, { enabled: true, review_url: "https://www.facebook.com/biz/reviews", on_deal_won: true, on_meeting_held: true, delay_days: 0 }, lowner);
+      await backdate("update public.review_request_settings set enabled_at = now() - interval '1 day' where organization_id = $1", [lorg]);
+    });
+
+    it("a lead with a held meeting is queued, ids only; a lead without a grant is not", async () => {
+      const ron = await lead("ron-rr@example.test");
+      await leadGrant(ron);
+      const m1 = await heldMeeting({ lead_id: ron });
+      const noGrant = await lead("nogrant-rr@example.test");
+      const m2 = await heldMeeting({ lead_id: noGrant });
+      await job(lorg);
+      const rows = await requests(lorg);
+      expect(rows.find((r) => r.source_id === m1)).toMatchObject({ source_kind: "meeting", lead_id: ron, contact_id: null, outcome: "queued", channel: "email" });
+      expect(rows.find((r) => r.source_id === m2)).toMatchObject({ lead_id: noGrant, outcome: "no_consent", job_id: null });
+      const queued = (await jobs(lorg)).find((j) => j.id === rows.find((r) => r.source_id === m1)?.job_id) as { payload: Row };
+      expect(Object.keys(queued.payload).sort()).toEqual(["channel", "event_at", "lead_id", "message_type", "review_request_id", "template_id"]);
+      expect(queued.payload).toMatchObject({ lead_id: ron, message_type: "review_request" });
+      // a second held meeting within 90 days: recent
+      const m3 = await heldMeeting({ lead_id: ron });
+      await job(lorg);
+      expect((await requests(lorg)).find((r) => r.source_id === m3)?.outcome).toBe("recent");
+    });
+
+    it("the 90 days follow the lead to its contact when it is converted; a converted lead is never asked itself", async () => {
+      const tal = await lead("tal-rr@example.test");
+      await leadGrant(tal);
+      const m1 = await heldMeeting({ lead_id: tal });
+      await job(lorg);
+      expect((await requests(lorg)).find((r) => r.source_id === m1)?.outcome).toBe("queued");
+      const contactId = await asUser(lowner.id, async (q) =>
+        (await one<{ r: { contact_id: string } }>(q, "select public.convert_lead($1, false) as r", [tal])).r.contact_id,
+      );
+      expect(contactId).toBeTruthy();
+      expect((await requests(lorg)).find((r) => r.source_id === m1)).toMatchObject({ lead_id: null, contact_id: contactId });
+      await grant(lorg, contactId);
+      // the contact's won deal within 90 days: recent (the lead's request counts)
+      const d = await wonDeal(lorg, contactId, lpipe, lowner);
+      // a later meeting linked only to the converted lead goes to its contact, also recent
+      const m2 = await heldMeeting({ lead_id: tal });
+      await job(lorg);
+      const rows = await requests(lorg);
+      expect(rows.find((r) => r.source_id === d)).toMatchObject({ contact_id: contactId, outcome: "recent" });
+      expect(rows.find((r) => r.source_id === m2)).toMatchObject({ lead_id: null, contact_id: contactId, outcome: "recent" });
+    });
+
+    it("a meeting linked to a lead and a contact asks the contact, once", async () => {
+      const both = await lead("both-lead-rr@example.test");
+      await leadGrant(both);
+      const c = await contact(lorg, "both-contact-rr@example.test", null, lowner);
+      await grant(lorg, c);
+      const m = await heldMeeting({ lead_id: both, contact_id: c });
+      await job(lorg);
+      await job(lorg);
+      const rows = (await requests(lorg)).filter((r) => r.source_id === m);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ lead_id: null, contact_id: c, outcome: "queued" });
+      expect((await requests(lorg)).some((r) => r.lead_id === both)).toBe(false);
+    });
+
+    it("review (3): a lead converted before its event is judged asks its contact; a contact's 90 days count rows left on its converted lead", async () => {
+      const gil = await lead("gil-rr@example.test");
+      const contactId = await asUser(lowner.id, async (q) =>
+        (await one<{ r: { contact_id: string } }>(q, "select public.convert_lead($1, false) as r", [gil])).r.contact_id,
+      );
+      await grant(lorg, contactId);
+      // the job saw the meeting before the conversion: it hands the lead
+      const source = "22222222-2222-4222-8222-222222222222";
+      const outcome = await asAdmin(async (q) =>
+        (await one<{ o: string }>(q, "select app.review_request_person($1, 'meeting', $2, $3, null, current_date, 'Asia/Jerusalem') as o", [lorg, source, gil])).o,
+      );
+      expect(outcome).toBe("queued");
+      expect((await requests(lorg)).find((r) => r.source_id === source)).toMatchObject({ lead_id: null, contact_id: contactId });
+      // a row still on another lead converted into a contact (written before the move) counts for that contact
+      const hila = await lead("hila-rr@example.test");
+      const hilaContact = await asUser(lowner.id, async (q) =>
+        (await one<{ r: { contact_id: string } }>(q, "select public.convert_lead($1, false) as r", [hila])).r.contact_id,
+      );
+      await grant(lorg, hilaContact);
+      await asAdmin((q) =>
+        q("insert into app.review_requests (organization_id, source_kind, source_id, lead_id, outcome) values ($1, 'meeting', gen_random_uuid(), $2, 'queued')", [lorg, hila]),
+      );
+      const d = await wonDeal(lorg, hilaContact, lpipe, lowner);
+      await job(lorg);
+      expect((await requests(lorg)).find((r) => r.source_id === d)?.outcome).toBe("recent");
+    });
+
+    it("review (2): a request queued to the same address in the last 90 days makes another 'recent', whoever holds it", async () => {
+      const first = await contact(lorg, "shared-rr@example.test", null, lowner);
+      await grant(lorg, first);
+      const d1 = await wonDeal(lorg, first, lpipe, lowner);
+      await job(lorg);
+      const r1 = (await requests(lorg)).find((r) => r.source_id === d1);
+      expect(r1?.outcome).toBe("queued");
+      const hash = await asAdmin(async (q) => (await one<{ h: string | null }>(q, "select address_hash as h from app.review_requests where organization_id = $1 and source_id = $2", [lorg, d1])).h);
+      expect(hash).toMatch(/^[0-9a-f]{64}$/);
+      const second = await contact(lorg, "Shared-RR@example.test", null, lowner);
+      const d2 = await wonDeal(lorg, second, lpipe, lowner);
+      await job(lorg);
+      expect((await requests(lorg)).find((r) => r.source_id === d2)).toMatchObject({ contact_id: second, outcome: "recent", job_id: null });
+    });
+
+    it("review (1): the platform's outside-link switch stops the job and refuses switching on or a new link", async () => {
+      const block = (blocked: boolean) =>
+        asAdmin((q) =>
+          q(
+            "insert into app.qr_external_blocks (organization_id, blocked, reason) values ($1, $2, 'בדיקה') on conflict (organization_id) do update set blocked = excluded.blocked",
+            [lorg, blocked],
+          ),
+        );
+      const c = await contact(lorg, "blocked-rr@example.test", null, lowner);
+      await grant(lorg, c);
+      const d = await wonDeal(lorg, c, lpipe, lowner);
+      await block(true);
+      try {
+        expect(await job(lorg)).toBe(0);
+        expect((await requests(lorg)).some((r) => r.source_id === d)).toBe(false);
+        expect((await pgError(settings(lorg, { review_url: "https://www.easy.co.il/page/1" }, lowner))).hint).toBe("review_request:external_off");
+        // the other settings and switching off stay allowed; switching on again is refused
+        await settings(lorg, { delay_days: 0 }, lowner);
+        await settings(lorg, { enabled: false }, lowner);
+        expect((await pgError(settings(lorg, { enabled: true }, lowner))).hint).toBe("review_request:external_off");
+      } finally {
+        await block(false);
+      }
+      await settings(lorg, { enabled: true }, lowner);
+      await backdate("update public.review_request_settings set enabled_at = now() - interval '1 day' where organization_id = $1", [lorg]);
+      await job(lorg);
+      expect((await requests(lorg)).find((r) => r.source_id === d)?.outcome).toBe("queued");
+    });
+
+    it("review (5): a new or changed link is at most 300 characters", async () => {
+      const long = `https://www.facebook.com/${"a".repeat(300)}`;
+      expect((await pgError(settings(lorg, { review_url: long }, lowner))).hint).toBe("review_request:url_long");
+    });
+
+    it("a lead merge moves the duplicate's requests to the kept lead", async () => {
+      const dup = await lead("dup-lead-rr@example.test");
+      await leadGrant(dup);
+      const m = await heldMeeting({ lead_id: dup });
+      await job(lorg);
+      const keep = await lead("keep-lead-rr@example.test");
+      await asUser(lowner.id, (q) => q("select public.merge_records($1, 'lead', $2, $3, '{}')", [lorg, keep, dup]));
+      expect((await requests(lorg)).find((r) => r.source_id === m)).toMatchObject({ lead_id: keep, outcome: "queued" });
+    });
   });
 });

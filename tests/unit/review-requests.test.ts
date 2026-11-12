@@ -8,10 +8,11 @@ import { JUDGED_TYPE_FIELDS, messageTemplateProblem, SERVICE_BODY_MAX } from "@/
 import { DEFAULT_REVIEW_REQUEST_TEMPLATES, isSystemOnlyType, MESSAGE_TYPE_LABELS, REVIEW_REQUEST_WORDING_VERSION } from "@/features/message-templates/templates";
 import { MESSAGE_TYPES, messagePurpose, SERVICE_MESSAGE_TYPES } from "@/features/messaging/providers/types";
 import { PLAN_CAPABILITIES } from "@/features/plans/capabilities";
-import { normalizeReviewUrl, REVIEW_REQUEST_GAP_DAYS, reviewRequestSettingsSchema, reviewUrlOk } from "@/features/review-requests/review-url";
+import { normalizeReviewUrl, REVIEW_REQUEST_GAP_DAYS, REVIEW_URL_LONG_MESSAGE, REVIEW_URL_MAX, reviewRequestSettingsSchema, reviewUrlOk } from "@/features/review-requests/review-url";
 import { dbErrorMessage } from "@/lib/errors";
 import { PLAN_VALUES } from "@/lib/plan-keys";
 
+import qrCases from "./fixtures/qr-target-urls.json";
 import cases from "./fixtures/review-urls.json";
 
 const dir = join(__dirname, "..", "..", "supabase", "migrations");
@@ -26,13 +27,21 @@ describe("RET-02: review requests", () => {
     expect(reviewUrlOk(c.url)).toBe(c.ok);
   });
 
-  it("the database's rule holds the same shapes and the same 90 days", () => {
-    for (const host of ["'g.page'", "'search.google.com'", "'www.google.co.il'", "'maps.app.goo.gl'", "'g.co'"]) expect(migration).toContain(host);
-    expect(migration).toContain("x.port in ('', ':443')");
-    expect(migration).toContain("!~* '(^|&)(q|url|continue|adurl|pcurl|redirect|dest|next)='");
-    expect(migration).toContain("position('%' in x.path) = 0");
-    expect(migration).toContain("x.path !~ '(^|/)[.]{1,2}(/|$)'");
+  it("the database's rule is the QR link rule, reused (owner (307) ב), and the same 90 days", () => {
+    const urlMigration = (() => {
+      const file = readdirSync(dir).find((f) => f.endsWith("_review_url_any_https.sql"));
+      if (!file) throw new Error("review_url_any_https migration missing");
+      return readFileSync(join(dir, file), "utf8");
+    })();
+    expect(urlMigration).toContain("select coalesce(app.qr_target_url_ok(p_url), false)");
+    // review (5): the same 300-character cap
+    expect(urlMigration).toContain(`as $$ select ${REVIEW_URL_MAX} $$`);
     expect(migration).toContain(`select ${REVIEW_REQUEST_GAP_DAYS} $$`);
+  });
+
+  it("the link rule equals the QR link rule on the QR fixture too", () => {
+    for (const url of qrCases.ok) expect(reviewUrlOk(url), url).toBe(true);
+    for (const url of qrCases.bad) expect(reviewUrlOk(url), url).toBe(false);
   });
 
   it("is a marketing type, offered to nobody, with its own closed field list", () => {
@@ -72,9 +81,12 @@ describe("RET-02: review requests", () => {
     expect(PLAN_CAPABILITIES.find((c) => c.feature === "review_requests")?.built).toBe(true);
   });
 
-  it("the settings form: a Google link is needed to switch on, and the errors are Hebrew", () => {
+  it("the settings form: a link is needed to switch on, and the errors are Hebrew", () => {
     expect(normalizeReviewUrl("g.page/r/abc/review")).toEqual({ ok: true, url: "https://g.page/r/abc/review" });
-    expect(normalizeReviewUrl("https://example.com").ok).toBe(false);
+    expect(normalizeReviewUrl("www.facebook.com/mybiz/reviews")).toEqual({ ok: true, url: "https://www.facebook.com/mybiz/reviews" });
+    expect(normalizeReviewUrl("http://example.com").ok).toBe(false);
+    expect(normalizeReviewUrl(`https://example.com/${"a".repeat(REVIEW_URL_MAX)}`)).toEqual({ ok: false, message: REVIEW_URL_LONG_MESSAGE });
+    expect(normalizeReviewUrl(`https://example.com/${"a".repeat(REVIEW_URL_MAX - 20)}`).ok).toBe(true);
     const on = reviewRequestSettingsSchema.safeParse({ enabled: "on", review_url: "", on_deal_won: "on", delay_days: "1" });
     expect(on.success).toBe(false);
     const none = reviewRequestSettingsSchema.safeParse({ enabled: "on", review_url: "https://g.page/r/abc/review", delay_days: "1" });
@@ -82,7 +94,7 @@ describe("RET-02: review requests", () => {
     const good = reviewRequestSettingsSchema.safeParse({ enabled: "on", review_url: "https://g.page/r/abc/review", on_meeting_held: "on", delay_days: "0" });
     expect(good.success && good.data).toEqual({ enabled: true, review_url: "https://g.page/r/abc/review", on_deal_won: false, on_meeting_held: true, delay_days: 0 });
     expect(reviewRequestSettingsSchema.safeParse({ review_url: "", delay_days: "31" }).success).toBe(false);
-    for (const hint of ["review_request:url", "review_request:incomplete", "feature:review_requests"]) {
+    for (const hint of ["review_request:url", "review_request:url_long", "review_request:external_off", "review_request:incomplete", "feature:review_requests"]) {
       expect(dbErrorMessage({ code: "P0001", message: "x", hint }), hint).not.toBe(dbErrorMessage({ code: "P0001", message: "x", hint: "nothing:here" }));
     }
   });
