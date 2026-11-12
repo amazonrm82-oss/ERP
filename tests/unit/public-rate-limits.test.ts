@@ -26,7 +26,12 @@ type Guard =
    * no limit on purpose: it answers a constant and reads nothing. The functions it names are called with the anon key, take no
    * argument, read no table and answer a constant (checked by the test; tests/db/289 pins the body and grants)
    */
-  | "constant";
+  | "constant"
+  /**
+   * LND-13 (owner, 11 November 2026): a read of public fields with the anon key, no argument and no visitor input, through an
+   * hour-long unstable_cache; the functions are granted to anon (test 01 names them; tests/db/344 pins the body and grants)
+   */
+  | "anon-cached";
 
 type Entry = {
   guard: Guard;
@@ -53,7 +58,13 @@ const OUT_42 = "(42) ד: published to everyone (lead form, widget, booking page;
 const PREVIEW = "a listed preview bot (src/lib/preview-bots.ts) gets only link_preview_public: 300/min in total, 120 per sender across all links and 30 per sender and link in 10 min, counted BEFORE the lookup (not found included); refused = the generic preview";
 
 export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
-  "/": { guard: "static", limit: "landing page, no database read", refusal: "none" },
+  "/": {
+    guard: "anon-cached",
+    functions: ["plans_public"],
+    limit:
+      "no visitor input: the price list (LND-13) is one cached read for everyone, an hour in unstable_cache (tag plans-public, expired by the platform's plan actions); a failed read is not cached and backs off a minute; the rest of the page is code",
+    refusal: "the price section without prices",
+  },
   "/login": { guard: "supabase-auth", limit: "Supabase Auth sign-in limits per IP (the server forwards X-Forwarded-For)", refusal: "form message (errors.ts over_request_rate_limit)" },
   "/signup": { guard: "supabase-auth", limit: "Supabase Auth sign-up and e-mail send limits", refusal: "form message (over_email_send_rate_limit)" },
   "/forgot-password": { guard: "supabase-auth", limit: "Supabase Auth e-mail send limit (429 is shown, 'no such user' is not)", refusal: "form message" },
@@ -465,6 +476,24 @@ describe("OPS-02: every public path has a named limit", () => {
               new RegExp(`grant execute on function public\\.${fn}\\s*\\(\\) to anon`),
             );
           }
+        }
+        continue;
+      }
+      if (entry.guard === "anon-cached") {
+        // LND-13: the anon key only, no argument, through an hour-long unstable_cache, only the named functions
+        expect(entry.sender, path).toBeUndefined();
+        expect(entry.functions?.length, path).toBeGreaterThan(0);
+        const code = [...importClosure(entryFile(path)).values()].join("\n");
+        expect(code, `${path} never uses the service key`).not.toMatch(/supabase\/service|SERVICE_ROLE|createServiceClient/);
+        const rpcs = [...code.matchAll(/\.rpc\(\s*([^)]*)\)/g)].map((m) => m[1].trim());
+        for (const call of rpcs) expect((entry.functions ?? []).map((fn) => `"${fn}"`), `${path}: .rpc(${call}) takes no argument`).toContain(call);
+        expect(code, `${path} reads no table`).not.toMatch(/\.from\(/);
+        expect(code, `${path} touches no auth`).not.toMatch(/\.auth\./);
+        expect(code, `${path} caches the read for an hour`).toMatch(/unstable_cache\([\s\S]*revalidate: 3600/);
+        for (const fn of entry.functions ?? []) {
+          expect(rpcs, `${path} calls .rpc("${fn}")`).toContain(`"${fn}"`);
+          expect(migrations, `${path}: public.${fn}() takes no argument`).toMatch(new RegExp(`function public\\.${fn}\\(\\)`));
+          expect(migrations, `${path}: public.${fn} granted to anon`).toMatch(new RegExp(`grant execute on function public\\.${fn}\\(\\) to anon`));
         }
         continue;
       }

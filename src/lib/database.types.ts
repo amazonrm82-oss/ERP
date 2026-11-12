@@ -4100,6 +4100,8 @@ export type Database = {
     Functions: {
       // OPS-05: the uptime route's check, called with the anon key; answers true and reads nothing
       health_check: { Args: Record<string, never>; Returns: boolean };
+      // LND-13: the public fields of available and coming-soon plans for the landing page's price list (anon and authenticated)
+      plans_public: { Args: Record<string, never>; Returns: Json };
       create_organization: {
         Args: { p_name: string; p_industry?: string | null; p_team_size?: string | null; p_phone?: string | null };
         Returns: string;

@@ -4,6 +4,7 @@ import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
+import { PLANS_PUBLIC_CACHE_TAG } from "@/features/plans/public-plans";
 import { fail, formValues, type ActionResult, type FormState } from "@/lib/action-result";
 import { booleanArg, INVALID_ARGS, validArg } from "@/lib/action-args";
 import { sessionCheck } from "@/lib/auth";
@@ -135,6 +136,8 @@ export async function updatePlanAction(planKey: string, _prev: FormState, formDa
   });
   if (error) return fail(platformError(error), { values: formValues(formData) });
   revalidatePath(paths.adminPlans);
+  // LND-13: the landing page's price list reads the plans through an hour-long cache; a saved change shows at once
+  updateTag(PLANS_PUBLIC_CACHE_TAG);
   return { ok: true, message: "נשמר." };
 }
 
@@ -146,6 +149,7 @@ export async function setPlanAvailabilityAction(planKey: string, _prev: FormStat
   const { error } = await supabase.rpc("platform_set_plan_availability", { p_key: planKey, p_availability: availability.data });
   if (error) return fail(platformError(error), { values: formValues(formData) });
   revalidatePath(paths.adminPlans);
+  updateTag(PLANS_PUBLIC_CACHE_TAG);
   return { ok: true, message: "נשמר." };
 }
 

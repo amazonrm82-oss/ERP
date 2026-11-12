@@ -1,28 +1,10 @@
 import { ActionButton } from "@/components/action-button";
 import { Badge } from "@/components/ui/badge";
-import { formatNumber } from "@/lib/format";
-
 import { joinPlanWaitlistAction } from "../actions";
 import { planCapabilities } from "../capabilities";
 import { annualPriceLabel, monthlyPriceLabel, VAT_NOTE } from "../price";
+import { planQuotaLines as quotaLines } from "../public-plans";
 import type { PlanCard } from "../queries";
-
-function limitOf(limits: unknown, key: string): number | null | undefined {
-  const all = limits && typeof limits === "object" && !Array.isArray(limits) ? (limits as Record<string, unknown>) : {};
-  const value = all[key];
-  return typeof value === "number" ? value : value === null ? null : undefined;
-}
-
-function quotaLines(limits: unknown): string[] {
-  const users = limitOf(limits, "max_users");
-  const records = limitOf(limits, "max_records");
-  const storage = limitOf(limits, "storage_gb");
-  const lines: string[] = [];
-  if (users !== undefined) lines.push(users === null ? "משתמשים בלי תקרה" : `עד ${formatNumber(users)} משתמשים`);
-  if (records !== undefined) lines.push(records === null ? "רשומות בלי תקרה" : `עד ${formatNumber(records)} רשומות`);
-  if (storage !== undefined && storage !== null) lines.push(`אחסון ${formatNumber(storage)} GB`);
-  return lines;
-}
 
 /**
  * The plans a business can see (owner's pricing, 13 October 2026): price per business

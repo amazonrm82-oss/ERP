@@ -7,7 +7,9 @@ import { ButtonLink, buttonClasses } from "@/components/ui/button";
 import { ChatIcon } from "@/components/ui/icons";
 import { Wordmark } from "@/components/wordmark";
 import { LIVE_FEATURES, SOON_FEATURES } from "@/features/landing/catalog";
+import { PriceList } from "@/features/landing/components/price-list";
 import { StandaloneRedirect } from "@/features/landing/components/standalone-redirect";
+import { readPublicPlans } from "@/features/landing/price-list-server";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/app";
 import { paths } from "@/lib/paths";
 import { SUPPORT } from "@/lib/support";
@@ -28,7 +30,11 @@ const CONTACT_FORM_URL = SUPPORT.formUrl;
 // The public landing page (LND-01 to LND-05, LND-09 to LND-12). A signed-in
 // visitor never sees it: the proxy sends them into the app first (LND-06).
 // What it lists comes from one catalog, and only what works is "available".
-export default function LandingPage() {
+// LND-13: the price list comes from the plans table through public.plans_public() (anon), cached an hour. The page is
+// rendered per request so a failed read is never kept in a prerendered page; the data itself is cached.
+export const dynamic = "force-dynamic";
+export default async function LandingPage() {
+  const plans = await readPublicPlans();
   return (
     <div className="flex min-h-dvh flex-col bg-surface">
       <StandaloneRedirect />
@@ -125,6 +131,8 @@ export default function LandingPage() {
             </ul>
           </div>
         </section>
+
+        <PriceList plans={plans} />
 
         <section aria-labelledby="start-title" className="mx-auto w-full max-w-6xl px-4 py-14 text-center sm:px-6 sm:py-20">
           <h2 id="start-title" className="text-2xl font-semibold">
