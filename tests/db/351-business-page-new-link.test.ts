@@ -7,7 +7,7 @@ afterAll(closePool);
 type U = { id: string; email: string };
 
 /**
- * BIZ-01, the owner's answer (316) ב of 12 November 2026 (migration 021240): owners and admins replace the business page's
+ * BIZ-01, the owner's answer (316) ב of 12 November 2026 (migration 021243): owners and admins replace the business page's
  * secret link; the old link answers "not found" at once, the new one works, and the audit log never holds a token.
  */
 describe("business page: a new link (316) ב", () => {

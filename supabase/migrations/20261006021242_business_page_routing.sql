@@ -1,5 +1,5 @@
 -- =============================================================================
--- 021239 BIZ-01: who gets the leads of the business page's form (owner, 12 November 2026, answer (314) ב)
+-- 021242 BIZ-01: who gets the leads of the business page's form (owner, 12 November 2026, answer (314) ב)
 -- =============================================================================
 -- Owners and admins choose, on /settings/business-page, who gets the leads from the page's contact form:
 -- * by default (both columns null) the business's regular lead distribution, as before (assign_mode round_robin, no team);

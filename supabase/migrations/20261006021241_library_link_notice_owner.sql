@@ -1,5 +1,5 @@
 -- =============================================================================
--- 021238 LIB-02: the first-opening notice when the maker cannot be told (owner, 12 November 2026, answer (299) ב)
+-- 021241 LIB-02: the first-opening notice when the maker cannot be told (owner, 12 November 2026, answer (299) ב)
 -- =============================================================================
 -- The first opening of a tracked library link tells, in this order:
 -- * the link's maker, while an active member who reads the record (unchanged, 021230);

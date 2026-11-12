@@ -11,7 +11,7 @@ type U = { id: string; email: string };
 const sha256 = (text: string) => createHash("sha256").update(text, "utf8").digest("hex");
 
 /**
- * LIB-02, the owner's answer (299) ב of 12 November 2026 (migration 021238): the first opening of a tracked library link
+ * LIB-02, the owner's answer (299) ב of 12 November 2026 (migration 021241): the first opening of a tracked library link
  * tells the maker while an active member who reads the record; else the record's current owner while an active member who
  * is not a viewer and reads the record; else the active owners and admins.
  */

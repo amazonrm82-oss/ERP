@@ -8,7 +8,7 @@ type U = { id: string; email: string };
 type Form = { owner_id: string | null; team_id: string | null; assign_mode: string };
 
 /**
- * BIZ-01, the owner's answer (314) ב of 12 November 2026 (migration 021239): owners and admins choose who gets the leads of
+ * BIZ-01, the owner's answer (314) ב of 12 November 2026 (migration 021242): owners and admins choose who gets the leads of
  * the business page's form: the regular distribution (default), one active non-viewer member, or one team. The choice is
  * kept on the page's own form (owner_id / team_id / assign_mode), which intake_submit honours as for any form; a chosen
  * person who leaves, is suspended or becomes a viewer falls back to the regular distribution.

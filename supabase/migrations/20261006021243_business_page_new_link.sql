@@ -1,5 +1,5 @@
 -- =============================================================================
--- 021240 BIZ-01: a new link for the business page (owner, 12 November 2026, answer (316) ב)
+-- 021243 BIZ-01: a new link for the business page (owner, 12 November 2026, answer (316) ב)
 -- =============================================================================
 -- Owners and admins of a writable business may replace the page's secret link ("קישור חדש"): the server makes a new token
 -- and the old link answers "not found" at once (every public function looks the page up by its current token). The page's
