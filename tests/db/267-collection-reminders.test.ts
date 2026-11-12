@@ -321,6 +321,10 @@ describe("collection reminders (COL-04)", () => {
     const org2 = await createOrg(other.id, "עסק שני");
     await asAdmin((q) => q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [org2, JSON.stringify(FEATURES)]));
     await asAdmin((q) => q("update public.organizations set timezone = $2 where id = $1", [org2, zone]));
+    // no rest days here either, as for the first business: otherwise a Friday in the picked zone makes no reminder
+    await run(other, (q) =>
+      q("insert into public.org_calendar_settings (organization_id, rest_weekdays, holidays_rest, holiday_eves_rest, rest_occasions) values ($1, $2, false, false, $3)", [org2, [], []]),
+    );
     const c2 = await run(other, async (q) => (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name) values ($1, 'שני') returning id", [org2])).id);
     const theirs = await run(other, async (q) =>
       (await one<{ id: string }>(q, "insert into public.accounting_documents (organization_id, contact_id, doc_type, number, doc_date, amount_agorot) values ($1, $2, 'tax_invoice', 'T-1', current_date - 40, 1000) returning id", [org2, c2])).id,
