@@ -434,6 +434,34 @@ and build this CRM here instead. The old code is preserved on the branch
    sender a day, then 50 stored per link a day. The sender is the keyed IP hash with scope `privacy` (IPv6 by its /64), re-scoped per
    business; only bucket numbers are kept (`app.privacy_request_counts`). No cookies or visitor id. Embeddable, and left out of OPS-02's
    shared not-found limit (published like the lead form; lead's choice). In the eslint allow-list.
+   In use (SMS-05 sender, owner (318) א and (320)-(326), wave 3 use (1); migration 021247; an independent review and two delta reviews):
+   the OPS-04 worker (same route and secret) sends SMS through InforU (`src/features/messaging/providers/inforu.ts`, the ONLY reader of
+   `INFORU_USERNAME|_API_TOKEN|_SENDER|_WEBHOOK_SECRET`; lint and a unit scan refuse the names elsewhere; `MESSAGING_PROVIDER_SMS=inforu`;
+   without the keys SMS jobs wait unclaimed). After `job_message_may_send` it calls only `public.sms_job_compose()` and
+   `public.sms_quota_return()` (both service_role). The composer is a wrapper over `app.sms_compose_core` (no grants): only on the live
+   lease the send check passed, a counted job, once per lease (`app.jobs.composed_lease`), job row FOR UPDATE; it stamps the counted day
+   (`app.jobs.sms_counted_on`); re-reads the record FOR KEY SHARE (its `phone_e164` must be its typed phone, normalized) and judges consent
+   again on that number (`consent_service_blocked` for service types, else `consent_suppressed` + `consent_granted`; null = refused);
+   re-reads the business (writable, HEB-09), the template (`app.message_template_sendable`) and every type's FUTURE SENDER condition
+   (CAL-12, SGN-03, COL-07, PKG-03 incl. `customer_messages`, SPD-04, RET-02 incl. the outside-link switch, SMS-01b); marketing types
+   (review_request too, owner (321)) get the envelope and `{קישור הסרה}`; fill `app.sms_fill` = `fillMessage()` (values only in the last
+   pass; an unfilled field refuses, owner (322)), then `app.message_filled_problem`; links minted last (first callers of
+   `meeting_reminder_link`, `app.signature_link_issue`, `consent_preference_link_for_job`, `sms_sender_code_issue`). Answers only `{to,
+   sender, text}` or `{refused}`; `paused`, `site_url`, `stale` wait. Owner (326) ב: a refusal (not stale), and `sms_quota_return` when the
+   adapter answers notSent (nothing sent, no connection, an explicit InforU refusal), give the count back to the stamped day/month
+   (`app.sms_usage_give_back`). The adapter: InforU v2 SendSms, Basic auth, 10 s, the job id is CustomerMessageID and the provider id,
+   AllowDuplicates false, IgnoreUnsubscribeCheck true (owner (325) ב); only throttles and pre-connect failures retry; anything that may
+   have gone out ends `unknown_*` and is never sent twice. Phone, text and token never logged. Pinned by md5 in test 352 (sms-compose).
+   In use (SMS-05 callbacks, wave 3 use (2); migration 021248; same reviews): `src/features/inforu-callbacks/webhook-server.ts`, routes
+   `POST /api/sms/inforu/status/<secret>` and `/api/sms/inforu/inbound/<secret>` (public prefix in proxy.ts, segment redacted, OPS-02 list).
+   InforU signs nothing: the last segment is `INFORU_WEBHOOK_SECRET` (32+ characters), compared timing-safe before the body is read (wrong =
+   404, nothing read or logged; over 256 KB = 413; counts-only logs; the secret appears in Vercel's own request logs, accepted).
+   `public.sms_delivery_status()` updates only inforu `public.messages` (still sent by provider id, or ended unknown_* by job_id; never
+   backwards; non-uuid ids ignored; 500 a post, 20,000 a minute; a report for a job queued or finished within 15 minutes with no message row
+   = pending → 503). `public.sms_inbound_reply()` judges an opt-out only: 5 per number in 10 minutes (HMAC buckets with consent_hash_key),
+   1,200 a minute in total; every business that texted the number through InforU in 90 days (owner (320) א), in pages of 100, through
+   `public.sms_inbound_optout` (its first caller, idempotent); any limit → 503. Pinned by md5 in test 353. The advisor's findings on
+   `app.sms_callback_counts` and `app.sms_inbound_number_counts` are expected.
    In use (OPS-04, owner 26 October 2026, answer (א) and wave 3 use (1); conditions of 2 November 2026, answers (52)-(55); migration
    `_jobs_queue.sql`): the background job worker (`src/features/jobs/run-server.ts`, route `POST /api/jobs/run`, public prefix in
    `src/lib/supabase/proxy.ts`), woken by `app.wake_job_worker()` (pg_cron `crm-jobs-wake`, pg_net; `app.settings` `jobs_run_url`,
