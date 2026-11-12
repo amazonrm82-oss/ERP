@@ -141,6 +141,9 @@ const RERUN = [
   migrationFile("_in_person_signing.sql"),
   // LIB-02 redefines app.sample_untouched() of _punch_card_recipients.sql last
   migrationFile("_library_links.sql"),
+  // LIB-02's answers (292)-(296) redefine app.scheduled_no_activity(), app.automation_run_facts() and
+  // app.automation_event_still_holds() last (library_viewed is not activity)
+  migrationFile("_library_link_answers.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

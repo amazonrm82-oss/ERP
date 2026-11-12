@@ -5,11 +5,14 @@ export const LIBRARY_PAGE_TEXTS = {
   openLink: "פתיחת הקישור",
   opensSite: "הקישור פותח את האתר",
   openFile: "פתיחת הקובץ",
+  // BIZ-03's emergency switch is on for the business: the outside site is not offered
+  linkOff: "הקישור לאתר אינו זמין כרגע.",
 } as const;
 
 export const LIBRARY_CARD_TEXTS = {
   title: "חומרים מהספרייה",
-  intro: "שולחים ללקוח פריט מספריית התוכן בקישור אישי, ורואים מתי הוא פתח אותו. כשהלקוח פותח את הקישור תקבלו התראה, פעם ביום לכל קישור.",
+  intro:
+    "שולחים ללקוח פריט מספריית התוכן בקישור אישי, ורואים מתי הוא פתח אותו. בפתיחה הראשונה תקבלו התראה, וכל יום שבו הקישור נפתח נרשם בציר הזמן.",
   noItems: "אין כרגע בספרייה פריטים שאפשר לשלוח (פעילים ובתוקף).",
   toLibrary: "לספריית התוכן",
   pick: "פריט לשליחה",

@@ -31,8 +31,11 @@ export type LibraryLinksCardData = {
 
 const SHOWN = 20;
 
-/** LIB-02: the record's tracked library links (RLS: whoever reads the record) and the items that may be sent now. */
-export async function getLibraryLinksCard(orgId: string, record: LibraryRecord): Promise<LibraryLinksCardData> {
+/**
+ * LIB-02: the record's tracked library links (RLS: whoever reads the record) and the items that may be sent now.
+ * `canEditRecord` is the page's hint that the viewer may edit the record (owner (294) ב: they may turn a link off too).
+ */
+export async function getLibraryLinksCard(orgId: string, record: LibraryRecord, canEditRecord = false): Promise<LibraryLinksCardData> {
   const supabase = await createClient();
   const [context, library, rows] = await Promise.all([
     getOrgContext(orgId),
@@ -65,7 +68,7 @@ export async function getLibraryLinksCard(orgId: string, record: LibraryRecord):
       revokedAt: r.revoked_at,
       viewCount: r.view_count,
       lastViewedAt: r.last_viewed_at,
-      canRevoke: r.revoked_at === null && context.role !== "viewer" && (isAdmin || r.created_by === context.user.id),
+      canRevoke: r.revoked_at === null && context.role !== "viewer" && (isAdmin || r.created_by === context.user.id || canEditRecord),
     })),
   };
 }

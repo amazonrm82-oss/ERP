@@ -836,6 +836,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // LIB-02 redefines app.sample_untouched() of _punch_card_recipients.sql last (a library link is real work) and sets the
       // notification kind constraints of _signature_status_reminders.sql last (the library_viewed kind)
       "_library_links.sql",
+      // LIB-02's answers (292)-(296) redefine app.scheduled_no_activity() of _share_note_rules.sql and
+      // app.automation_run_facts() / app.automation_event_still_holds() of _dormant_customers.sql last (library_viewed is not activity)
+      "_library_link_answers.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

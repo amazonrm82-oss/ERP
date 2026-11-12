@@ -285,7 +285,7 @@ export default async function DealPage({ params, searchParams }: Props) {
           {/* SGN-02: documents sent from this deal for signature, and the signed PDFs */}
           <RecordSignaturesCard orgId={orgId} kind="deal" recordId={deal.id} canEdit={canEdit} />
           {/* LIB-02: library items sent by a tracked link, and when the customer opened them */}
-          <LibraryLinksCard orgId={orgId} record={{ kind: "deal", id: deal.id }} recipient={{ name: null, phoneE164: null, email: null }} />
+          <LibraryLinksCard orgId={orgId} record={{ kind: "deal", id: deal.id }} recipient={{ name: null, phoneE164: null, email: null }} canEditRecord={canEdit} />
           <RecordOrdersCard orgId={orgId} subject={{ kind: "deal", id: deal.id }} canCreate={canEdit} dealWon={deal.status === "won"} />
           {/* DOC-01: documents issued outside the system and recorded here */}
           <RecordDocumentsCard orgId={orgId} subject={{ kind: "deal", id: deal.id }} />

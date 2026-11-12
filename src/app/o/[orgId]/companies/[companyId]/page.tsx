@@ -218,7 +218,7 @@ export default async function CompanyPage({ params, searchParams }: Props) {
           {/* SGN-02: documents sent from this company for signature, and the signed PDFs */}
           <RecordSignaturesCard orgId={orgId} kind="company" recordId={company.id} canEdit={canEditRecordHint(context, company.owner_id)} phoneE164={company.phone_e164} />
           {/* LIB-02: library items sent by a tracked link, and when the customer opened them */}
-          <LibraryLinksCard orgId={orgId} record={{ kind: "company", id: company.id }} recipient={{ name: company.name, phoneE164: company.phone_e164, email: company.email }} />
+          <LibraryLinksCard orgId={orgId} record={{ kind: "company", id: company.id }} recipient={{ name: company.name, phoneE164: company.phone_e164, email: company.email }} canEditRecord={canEditRecordHint(context, company.owner_id)} />
           <RecordOrdersCard orgId={orgId} subject={{ kind: "company", id: company.id }} canCreate={canEditRecordHint(context, company.owner_id)} />
           {/* COL-05: "לא למכור עד הסדרת חוב" */}
           <CustomerHoldCard orgId={orgId} subject={{ kind: "company", id: company.id }} />

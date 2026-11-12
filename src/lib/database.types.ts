@@ -4709,6 +4709,8 @@ export type Database = {
       library_link_revoke: { Args: { p_org: string; p_link: string }; Returns: boolean };
       library_link_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       library_link_public_file: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
+      // LIB-02 (293) ב: the page before a link item's site (the stored link and the business's name only)
+      library_link_public_link: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       // PRK-02: the business's privacy-request link (owners/admins) and the public page (service_role only)
       privacy_request_link_create: { Args: { p_org: string }; Returns: string };
       privacy_request_link_revoke: { Args: { p_org: string }; Returns: boolean };

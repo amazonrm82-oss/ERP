@@ -12,6 +12,8 @@ type Props = {
   orgId: string;
   record: LibraryRecord;
   recipient: { name: string | null; phoneE164: string | null; email: string | null };
+  // the page's hint that the viewer may edit the record (owner (294) ב); the database decides
+  canEditRecord?: boolean;
 };
 
 /**
@@ -19,8 +21,8 @@ type Props = {
  * tracked link, and see when the customer opened it (QUO-10's way). Whoever reads the record sees the list; whoever writes in
  * the business sends; the database decides the rest.
  */
-export async function LibraryLinksCard({ orgId, record, recipient }: Props) {
-  const [data, context] = await Promise.all([getLibraryLinksCard(orgId, record), getOrgContext(orgId)]);
+export async function LibraryLinksCard({ orgId, record, recipient, canEditRecord = false }: Props) {
+  const [data, context] = await Promise.all([getLibraryLinksCard(orgId, record, canEditRecord), getOrgContext(orgId)]);
   const titleId = `library-links-${record.id}`;
   return (
     <Card aria-labelledby={titleId} className="print:hidden">

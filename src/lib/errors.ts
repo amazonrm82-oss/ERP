@@ -410,6 +410,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "activity:order_entry": "תשובת הלקוח להזמנה בציר הזמן נכתבת על ידי המערכת, ואי אפשר ליצור, לשנות או למחוק אותה.",
   "activity:money_entry": "רישום של מסמך או תשלום בציר הזמן נכתב על ידי המערכת, ואי אפשר ליצור, לשנות או למחוק אותו.",
   "activity:record_link_entry": "רישום על קישור שהוסר בציר הזמן נכתב על ידי המערכת, ואי אפשר ליצור, לשנות או למחוק אותו.",
+  // LIB-02 (293)-(296): the customer opened a link from the library
+  "activity:library_entry": "רישום על פתיחת קישור מהספרייה בציר הזמן נכתב על ידי המערכת, ואי אפשר ליצור, לשנות או למחוק אותו.",
   // QUO-12: versions of a sent quote
   "quote:no_redraft": "הצעה שנשלחה לא חוזרת לטיוטה. כדי לשנות אותה, צרו גרסה חדשה.",
   "quote_version:draft": "זו טיוטה: אפשר לערוך אותה ישירות.",

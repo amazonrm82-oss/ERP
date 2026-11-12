@@ -353,7 +353,7 @@ export default async function LeadPage({ params, searchParams }: Props) {
           {/* SGN-02: documents sent from this lead for signature, and the signed PDFs */}
           <RecordSignaturesCard orgId={orgId} kind="lead" recordId={lead.id} canEdit={canEditRecordHint(context, lead.owner_id)} phoneE164={lead.phone_e164} />
           {/* LIB-02: library items sent by a tracked link, and when the customer opened them */}
-          <LibraryLinksCard orgId={orgId} record={{ kind: "lead", id: lead.id }} recipient={{ name, phoneE164: lead.phone_e164, email: lead.email }} />
+          <LibraryLinksCard orgId={orgId} record={{ kind: "lead", id: lead.id }} recipient={{ name, phoneE164: lead.phone_e164, email: lead.email }} canEditRecord={canEditRecordHint(context, lead.owner_id)} />
 
           <div className="print:hidden">
             <RecordConsents

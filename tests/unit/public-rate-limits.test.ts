@@ -286,6 +286,14 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
     refusal: PAGE_TEXT,
     sender: "first",
   },
+  // owner (293) ב: a link item's site only through BIZ-03's page before it, from the stored link
+  "/f/lib/[token]/go": {
+    guard: "database",
+    functions: ["public_sender_check", "public_sender_miss", "library_link_public_link"],
+    limit: SENDER + "a call of the link (the page's counters: 120 per link and 60 per sender in 10 min, after the lookup; not a view)",
+    refusal: TEXT_429,
+    sender: "first",
+  },
   "/api/forms/lib/[token]/file": {
     guard: "database",
     functions: ["public_sender_check", "public_sender_miss", "library_link_public_file"],

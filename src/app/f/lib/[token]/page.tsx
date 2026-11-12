@@ -7,7 +7,7 @@ import { PublicBrandHeader, PublicPageFooter } from "@/features/branding/compone
 import { logoPublicUrl } from "@/features/branding/logo";
 import { formatBytes } from "@/features/files/types";
 import { LIBRARY_PAGE_TEXTS } from "@/features/library-links/texts";
-import { linkHost, publicLibraryFilePath } from "@/features/library-links/public";
+import { linkHost, publicLibraryFilePath, publicLibraryGoPath } from "@/features/library-links/public";
 import { getPublicLibraryItem, LIBRARY_MESSAGES } from "@/features/library-links/public-server";
 import { isPreviewBotRequest } from "@/features/link-preview/bot-request";
 import { clientIp } from "@/lib/keyed-ip-hash";
@@ -28,8 +28,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /**
  * LIB-02: a library item (a catalog, price list, presentation, video) a rep sent by a personal link: no sign-in and no
- * cookies; the business's name and brand, and the item's title, description and its link or file. Opening it counts a view
- * and tells the rep once a day.
+ * cookies; the business's name and brand, and the item's title, description and its link or file. Opening it counts a view,
+ * writes one timeline entry a day and tells the rep on the first opening (owner (292) ב).
  */
 export default async function PublicLibraryPage({ params }: Props) {
   const { token } = await params;
@@ -66,9 +66,9 @@ export default async function PublicLibraryPage({ params }: Props) {
           {page.description ? <p className="text-md whitespace-pre-line break-words">{page.description}</p> : null}
           {page.kind === "link" && page.url ? (
             <div className="space-y-2">
-              <a href={page.url} target="_blank" rel="noopener noreferrer nofollow" className={buttonClasses("primary", "md")}>
+              {/* owner (293) ב: never straight to the site; first the page that names it and the business (BIZ-03's page) */}
+              <a href={publicLibraryGoPath(token)} rel="nofollow noreferrer" referrerPolicy="no-referrer" className={buttonClasses("primary", "md")}>
                 {LIBRARY_PAGE_TEXTS.openLink}
-                <span className="sr-only"> (נפתח בחלון חדש)</span>
               </a>
               {host ? (
                 <p className="text-sm text-ink-soft">
@@ -77,6 +77,7 @@ export default async function PublicLibraryPage({ params }: Props) {
               ) : null}
             </div>
           ) : null}
+          {page.kind === "link" && page.externalBlocked ? <p className="text-sm text-ink-soft">{LIBRARY_PAGE_TEXTS.linkOff}</p> : null}
           {page.kind === "file" && page.file ? (
             <div className="space-y-2">
               <a href={publicLibraryFilePath(token)} rel="nofollow" className={buttonClasses("primary", "md")}>

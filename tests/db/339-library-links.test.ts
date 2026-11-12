@@ -11,7 +11,7 @@ type Page = {
   business: string;
   brand: { logo: string | null; color: string | null };
   built_with: boolean;
-  item: { kind: string; title: string; description: string | null; url: string | null; file: { name: string; mime_type: string; size_bytes: number } | null };
+  item: { kind: string; title: string; description: string | null; url: string | null; external_blocked?: boolean; file: { name: string; mime_type: string; size_bytes: number } | null };
   rate_limited?: boolean;
 };
 
@@ -134,7 +134,7 @@ describe("library items sent by a tracked link (LIB-02)", () => {
       business: "עסק הקישורים",
       brand: { logo: null, color: "#336699" },
       built_with: expect.any(Boolean),
-      item: { kind: "link", title: "מחירון 2027", description: "הקטלוג המלא", url: "https://example.com/catalog", file: null },
+      item: { kind: "link", title: "מחירון 2027", description: "הקטלוג המלא", url: "https://example.com/catalog", external_blocked: false, file: null },
     });
     const text = JSON.stringify(answer);
     // no ids, no token, nothing of the record
@@ -150,7 +150,7 @@ describe("library items sent by a tracked link (LIB-02)", () => {
     expect(again.first_viewed_at).toEqual(row.first_viewed_at);
   });
 
-  it("tells the maker once a business day, with the item's title and the record's type only", async () => {
+  it("tells the maker on the first opening only, with the item's title and the record's type only (owner (292) ב)", async () => {
     const item = await linkItem("מצגת החברה");
     const leadId = await lead(other.id);
     const token = await create(other, item, "lead", leadId);
@@ -162,18 +162,21 @@ describe("library items sent by a tracked link (LIB-02)", () => {
     expect(after.length - before).toBe(1);
     const notice = after[after.length - 1];
     expect(notice).toEqual({ title: "הלקוח פתח את הקישור ששלחת מהספרייה", body: "מצגת החברה", entity_type: "lead", entity_id: leadId });
-    // the next business day tells again
+    // the next business day is written on the timeline only, never told again
     await asAdmin((q) => q("update app.library_link_secrets set notified_on = notified_on - 1 where token_hash = $1", [sha256(token)]));
     await page(token);
-    expect((await notices(other)).length - before).toBe(2);
-    // a maker who left the business is not told
+    expect((await notices(other)).length - before).toBe(1);
+    // owner (296) ג: a maker who left the business is not told; the owners and admins are, and the link keeps serving
     const leaver = await addMember(org, owner.id, "member", "ll-leaver");
     const lead2 = await lead(leaver.id);
     const t2 = await create(leaver, item, "lead", lead2);
     await asAdmin((q) => q("update public.memberships set status = 'suspended' where organization_id = $1 and user_id = $2", [org, leaver.id]));
-    // interim lead's choice (owner question 296): the link keeps serving, and no notice is sent
+    const ownerBefore = (await notices(owner)).length;
+    const adminBefore = (await notices(admin)).length;
     expect((await page(t2)).item.title).toBe("מצגת החברה");
     expect(await notices(leaver)).toHaveLength(0);
+    expect((await notices(owner)).length - ownerBefore).toBe(1);
+    expect((await notices(admin)).length - adminBefore).toBe(1);
   });
 
   it("anything else answers not found: unknown, turned off, item off or out of its window, record in the bin, closed pages", async () => {
@@ -268,7 +271,7 @@ describe("library items sent by a tracked link (LIB-02)", () => {
 
     const token = await create(member, item, "contact", contactId);
     const answer = await page(token);
-    expect(answer.item).toEqual({ kind: "file", title: "קטלוג PDF", description: null, url: null, file: { name: "catalog.pdf", mime_type: "application/pdf", size_bytes: 1000 } });
+    expect(answer.item).toEqual({ kind: "file", title: "קטלוג PDF", description: null, url: null, external_blocked: false, file: { name: "catalog.pdf", mime_type: "application/pdf", size_bytes: 1000 } });
     const served = await asService(async (q) => (await one<{ r: Record<string, unknown> }>(q, "select public.library_link_public_file($1, $2) as r", [token, sender(5000)])).r);
     expect(served).toEqual({ path: file.storage_path, name: "catalog.pdf", mime_type: "application/pdf" });
     // a download is not a view
