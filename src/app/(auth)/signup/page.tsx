@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { SignupForm } from "@/features/auth/components/signup-form";
+import { turnstileSiteKey } from "@/features/auth/turnstile-server";
 import { paths, safeNextPath } from "@/lib/paths";
 
 export const metadata: Metadata = { title: "הרשמה" };
@@ -22,7 +23,7 @@ export default async function SignupPage({ searchParams }: Props) {
       <p className="mt-1 mb-6 text-ink-soft">
         {invited ? "יוצרים חשבון אישי, ואחרי אימות האימייל מצטרפים לעסק שהזמין אתכם." : "14 ימי ניסיון, בלי כרטיס אשראי."}
       </p>
-      <SignupForm next={next} />
+      <SignupForm next={next} turnstileSiteKey={turnstileSiteKey()} />
       <p className="mt-6 text-md text-ink-soft">
         כבר יש לכם חשבון?{" "}
         <Link href={loginHref} className="font-medium text-accent underline underline-offset-4 hover:text-accent-strong">

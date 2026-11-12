@@ -44,7 +44,8 @@ export function fieldErrorsFrom(error: ZodError): Record<string, string> {
 }
 
 /** String entries of a submitted form, minus sensitive fields and React internals. */
-export function formValues(formData: FormData, omit: string[] = ["password"]): Record<string, string> {
+// the password and the Turnstile token (single use, owner (275) א) never go back to the page
+export function formValues(formData: FormData, omit: string[] = ["password", "cf-turnstile-response"]): Record<string, string> {
   const values: Record<string, string> = {};
   for (const [key, value] of formData.entries()) {
     if (typeof value === "string" && !key.startsWith("$ACTION") && !omit.includes(key)) {

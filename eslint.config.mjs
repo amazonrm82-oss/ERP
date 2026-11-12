@@ -69,6 +69,21 @@ const authForwarderPattern = {
   message: "Only the auth actions (src/features/auth/actions.ts) use the sign-in forwarding client (FXS-12, owner (281) א).",
 };
 
+// Owner (275) א: TURNSTILE_SECRET_KEY (Cloudflare Turnstile's secret) is read in ONE server file only, the check the auth
+// actions run before Supabase. Its name anywhere else in src is refused.
+const TURNSTILE_VERIFIER = "src/features/auth/turnstile-server.ts";
+const turnstileSecretSelectors = [
+  "MemberExpression[property.name='TURNSTILE_SECRET_KEY']",
+  "MemberExpression[property.value='TURNSTILE_SECRET_KEY']",
+  "Property[key.name='TURNSTILE_SECRET_KEY']",
+  "Property[key.value='TURNSTILE_SECRET_KEY']",
+  "Literal[value='TURNSTILE_SECRET_KEY']",
+  "TemplateElement[value.raw=/TURNSTILE_SECRET_KEY/]",
+].map((selector) => ({
+  selector,
+  message: "TURNSTILE_SECRET_KEY is read only by the Turnstile check (src/features/auth/turnstile-server.ts), owner (275) א.",
+}));
+
 // FXC-08: the service-role key has only the uses listed (CLAUDE.md, hard rule 5); a new one is the owner's decision
 const serviceKeyAllowList = {
   ignores: [
@@ -155,17 +170,23 @@ const eslintConfig = defineConfig([
   ...nextTs,
   {
     files: ["src/**/*.ts", "src/**/*.tsx"],
-    ignores: [JWT_SECRET_SIGNER, AUTH_FORWARDER],
-    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors, ...secretKeySelectors] },
+    ignores: [JWT_SECRET_SIGNER, AUTH_FORWARDER, TURNSTILE_VERIFIER],
+    rules: {
+      "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors, ...secretKeySelectors, ...turnstileSecretSelectors],
+    },
   },
-  // the signer and the forwarder keep every other rule of the block above
+  // the signer, the forwarder and the Turnstile check keep every other rule of the block above
   {
     files: [JWT_SECRET_SIGNER],
-    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...secretKeySelectors] },
+    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...secretKeySelectors, ...turnstileSecretSelectors] },
   },
   {
     files: [AUTH_FORWARDER],
-    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors] },
+    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors, ...turnstileSecretSelectors] },
+  },
+  {
+    files: [TURNSTILE_VERIFIER],
+    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors, ...secretKeySelectors] },
   },
   // FXC-08 (the service key), IMP-04 (the person's token) and FXS-12 (the sign-in forwarder): one rule, so the allow-lists
   // are judged together

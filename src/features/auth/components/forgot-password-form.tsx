@@ -8,8 +8,10 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 
 import { forgotPasswordAction } from "../actions";
+import { TURNSTILE_ACTIONS } from "../turnstile";
+import { TurnstileWidget } from "./turnstile-widget";
 
-export function ForgotPasswordForm() {
+export function ForgotPasswordForm({ turnstileSiteKey }: { turnstileSiteKey?: string | null }) {
   const [state, formAction] = useActionState<FormState, FormData>(forgotPasswordAction, null);
   const failure = state && !state.ok ? state : null;
   if (state?.ok) {
@@ -29,6 +31,7 @@ export function ForgotPasswordForm() {
         defaultValue={failure?.values?.email}
         error={failure?.fieldErrors?.email}
       />
+      {turnstileSiteKey ? <TurnstileWidget siteKey={turnstileSiteKey} action={TURNSTILE_ACTIONS.forgotPassword} resetSignal={state} /> : null}
       <SubmitButton pendingText="שולחים…" className="w-full">
         שליחת קישור
       </SubmitButton>

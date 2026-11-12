@@ -11,8 +11,10 @@ import { paths } from "@/lib/paths";
 
 import { signInAction } from "../actions";
 import { GOOGLE_ENABLED, GoogleButton } from "./google-button";
+import { TURNSTILE_ACTIONS } from "../turnstile";
+import { TurnstileWidget } from "./turnstile-widget";
 
-export function LoginForm({ next, initialError }: { next: string; initialError?: string }) {
+export function LoginForm({ next, initialError, turnstileSiteKey }: { next: string; initialError?: string; turnstileSiteKey?: string | null }) {
   const [state, formAction] = useActionState<FormState, FormData>(signInAction, null);
   const failure = state && !state.ok ? state : null;
 
@@ -52,6 +54,7 @@ export function LoginForm({ next, initialError }: { next: string; initialError?:
             שכחתי סיסמה
           </Link>
         </p>
+        {turnstileSiteKey ? <TurnstileWidget siteKey={turnstileSiteKey} action={TURNSTILE_ACTIONS.signIn} resetSignal={state} /> : null}
         <SubmitButton pendingText="מתחברים…" className="w-full">
           כניסה
         </SubmitButton>

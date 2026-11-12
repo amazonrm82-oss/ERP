@@ -44,6 +44,11 @@ const PUBLIC_PREFIXES = [
   "/legal/",
 ];
 
+/** Whether a page's policy allows Cloudflare Turnstile: the site key is set and the page is not a customer page under /f/. */
+export function turnstileAllowed(pathname: string, siteKey: string | undefined): boolean {
+  return Boolean(siteKey?.trim()) && !pathname.startsWith("/f/") && pathname !== "/f";
+}
+
 export function isPublicPath(pathname: string): boolean {
   // "/" is the public landing page (LND-01)
   return (
@@ -67,6 +72,11 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     supabaseUrl: env?.url ?? null,
     isDev: process.env.NODE_ENV === "development",
     publicForm: isEmbeddablePublicPath(request.nextUrl.pathname),
+    // owner (275) א: Turnstile's script and frame, only while its site key is set, on every page of the app but the customer
+    // pages under /f/. Not only the three forms that render it: the policy is the one of the document first loaded, and the
+    // forms are often reached by a client-side navigation (a link from the landing page, the redirect after signing out), which
+    // keeps that document's policy; a policy on the three pages alone would block the widget there.
+    turnstile: turnstileAllowed(request.nextUrl.pathname, process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY),
   });
   // OPS-06: one id per request for the server log lines (Vercel's x-vercel-id when valid, else a new one); always set
   // here, so a visitor's own x-crm-request-id never counts

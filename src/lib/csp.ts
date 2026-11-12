@@ -18,7 +18,13 @@ type Options = {
   isDev: boolean;
   // the public lead form: posts back here, then may redirect to the customer's site
   publicForm: boolean;
+  // owner (275) א: the sign-in, sign-up and forgot-password pages while the Turnstile site key is set: its script and its
+  // challenge frame come from TURNSTILE_ORIGIN, and only those pages allow it
+  turnstile?: boolean;
 };
+
+/** Cloudflare Turnstile's origin (= TURNSTILE_ORIGIN in src/features/auth/turnstile.ts; a unit test keeps them equal). */
+export const CSP_TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
 
 /**
  * A public page that may be framed by customers' sites: every /f/ page except the QR scan route, whose page before an
@@ -36,7 +42,7 @@ export function isEmbeddablePublicPath(pathname: string): boolean {
   return pathname.startsWith("/f/") && !NOT_EMBEDDABLE_PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
-export function contentSecurityPolicy({ nonce, supabaseUrl, isDev, publicForm }: Options): string {
+export function contentSecurityPolicy({ nonce, supabaseUrl, isDev, publicForm, turnstile = false }: Options): string {
   const supabase = supabaseUrl ? new URL(supabaseUrl) : null;
   const connect = ["'self'"];
   if (supabase) {
@@ -46,12 +52,15 @@ export function contentSecurityPolicy({ nonce, supabaseUrl, isDev, publicForm }:
   const formAction = publicForm ? ["'self'", "https:"] : ["'self'", ...(supabase ? [supabase.origin] : []), "https://accounts.google.com"];
   const directives = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
+    // the Turnstile origin is for browsers without 'strict-dynamic' (CSP2); newer ones trust the script because the app's own
+    // nonce-trusted code adds it
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${turnstile ? ` ${CSP_TURNSTILE_ORIGIN}` : ""}${isDev ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
     // file thumbnails are signed links to Supabase Storage
     `img-src 'self' blob: data:${supabase ? ` ${supabase.origin}` : ""}`,
     "font-src 'self' data:",
     `connect-src ${connect.join(" ")}`,
+    ...(turnstile ? [`frame-src 'self' ${CSP_TURNSTILE_ORIGIN}`] : []),
     "worker-src 'self'",
     "manifest-src 'self'",
     "object-src 'none'",

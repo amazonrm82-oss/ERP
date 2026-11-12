@@ -15,12 +15,18 @@ import { validArg } from "@/lib/action-args";
 import { z } from "zod";
 
 import { forgotPasswordSchema, newPasswordSchema, signInSchema, signUpSchema } from "./schema";
+import { TURNSTILE_ACTIONS } from "./turnstile";
+import { verifyTurnstile } from "./turnstile-server";
 
 export async function signInAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const parsed = signInSchema.safeParse(pick(formData, ["email", "password"]));
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
+
+  // owner (275) א: Turnstile is checked by our server before any Auth call (with the secret key Auth skips its own CAPTCHA)
+  const captcha = await verifyTurnstile(formData, TURNSTILE_ACTIONS.signIn);
+  if (!captcha.ok) return fail(captcha.message, { values: formValues(formData) });
 
   // FXS-12: the user's address goes to Auth's rate limit (else the user's own client, as before)
   const { error } = await forwardedSignIn(parsed.data);
@@ -42,6 +48,8 @@ export async function forgotPasswordAction(_prev: FormState, formData: FormData)
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
+  const captcha = await verifyTurnstile(formData, TURNSTILE_ACTIONS.forgotPassword);
+  if (!captcha.ok) return fail(captcha.message, { values: formValues(formData) });
   const { error } = await forwardedResetPassword(parsed.data.email, {
     redirectTo: `${await siteOrigin()}/auth/callback?next=${encodeURIComponent(paths.resetPassword)}`,
   });
@@ -75,6 +83,9 @@ export async function signUpAction(_prev: FormState, formData: FormData): Promis
   // where to continue after confirming, e.g. an invitation link
   const next = safeNextPath(formData.get("next")?.toString());
   const callback = next === "/" ? "/auth/callback" : `/auth/callback?next=${encodeURIComponent(next)}`;
+
+  const captcha = await verifyTurnstile(formData, TURNSTILE_ACTIONS.signUp);
+  if (!captcha.ok) return fail(captcha.message, { values: formValues(formData) });
 
   const { data, error } = await forwardedSignUp({
     email: parsed.data.email,

@@ -13,8 +13,10 @@ import { paths } from "@/lib/paths";
 import { resendConfirmationAction, signUpAction } from "../actions";
 import { GOOGLE_ENABLED, GoogleButton } from "./google-button";
 import { PASSWORD_MIN } from "../schema";
+import { TURNSTILE_ACTIONS } from "../turnstile";
+import { TurnstileWidget } from "./turnstile-widget";
 
-export function SignupForm({ next }: { next: string }) {
+export function SignupForm({ next, turnstileSiteKey }: { next: string; turnstileSiteKey?: string | null }) {
   const [state, formAction] = useActionState<FormState, FormData>(signUpAction, null);
   const failure = state && !state.ok ? state : null;
   // the address the confirmation went to, and whether the form is shown again to fix it (FXU-05)
@@ -74,6 +76,7 @@ export function SignupForm({ next }: { next: string }) {
           hint={`לפחות ${PASSWORD_MIN} תווים.`}
           error={failure?.fieldErrors?.password}
         />
+        {turnstileSiteKey ? <TurnstileWidget siteKey={turnstileSiteKey} action={TURNSTILE_ACTIONS.signUp} resetSignal={state} /> : null}
         <SubmitButton pendingText="יוצרים חשבון…" className="w-full">
           יצירת חשבון
         </SubmitButton>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { LoginForm } from "@/features/auth/components/login-form";
+import { turnstileSiteKey } from "@/features/auth/turnstile-server";
 import { paths, safeNextPath } from "@/lib/paths";
 
 export const metadata: Metadata = { title: "כניסה" };
@@ -27,7 +28,7 @@ export default async function LoginPage({ searchParams }: Props) {
       <p className="mt-1 mb-6 text-ink-soft">
         {invited ? "כבר יש לכם חשבון? היכנסו כאן. אין? צרו חשבון בקישור \"הרשמה\" שלמטה, ותצטרפו לעסק מיד אחרי האימות." : "הזינו את האימייל והסיסמה שלכם."}
       </p>
-      <LoginForm next={next} initialError={error} />
+      <LoginForm next={next} initialError={error} turnstileSiteKey={turnstileSiteKey()} />
       <p className="mt-6 text-md text-ink-soft">
         {invited ? "אין לכם חשבון?" : "עוד אין לכם חשבון?"}{" "}
         <Link href={signupHref} className="font-medium text-accent underline underline-offset-4 hover:text-accent-strong">
