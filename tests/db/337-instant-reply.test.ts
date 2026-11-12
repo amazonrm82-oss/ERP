@@ -256,18 +256,42 @@ describe("the instant reply to a web form inquiry (SPD-04)", () => {
     expect(fns).toEqual({ a: false, w: true, v: true });
   });
 
-  it("review 3: the system's templates are fixed; a person only switches them off or on, and cannot delete them", async () => {
+  it("owner (282) ב: the system's templates are edited and switched off, never deleted; an offer or a link is refused", async () => {
     const tpl = await asAdmin(async (q) => (await q<{ id: string }>("select id from public.message_templates where organization_id = $1 and notice_kind = 'instant_reply_open' and channel = 'sms'", [org])).rows[0].id);
-    for (const sql of [
-      "update public.message_templates set body = 'שלום, מבצע!' where id = $1",
-      "update public.message_templates set name = 'אחר' where id = $1",
-      "delete from public.message_templates where id = $1",
-    ]) {
-      expect((await pgError(asUser(owner.id, (q) => q(sql, [tpl])))).hint, sql).toBe("message_template:fixed_notice");
+    const original = await asAdmin(async (q) => (await q<{ body: string; name: string }>("select body, name from public.message_templates where id = $1", [tpl])).rows[0]);
+    const hint = async (sql: string, args: unknown[]) => (await pgError(asUser(owner.id, (q) => q(sql, args)))).hint;
+    for (const body of ["שלום, מבצע!", "רק היום 20% הנחה", "המחיר 100 ש\"ח", "המחיר ₪100", "שירות בחינם", "קופון מתנה", "50 NIS", "100NIS", "20 ٪", "מבְּצָע"]) {
+      expect(await hint("update public.message_templates set body = $2 where id = $1", [tpl, body]), body).toBe("message_template:offer");
     }
+    expect(await hint("update public.message_templates set body = 'ראו www.example.com' where id = $1", [tpl])).toBe("message_template:instant_reply_link");
+    expect(await hint("update public.message_templates set subject = 'https://x.example.com' where id = $1", [tpl])).toBe("message_template:instant_reply_link");
+    expect(await hint("delete from public.message_templates where id = $1", [tpl])).toBe("message_template:instant_reply_delete");
+    // review: the marked template keeps its channel and type for a person's write
+    for (const set of ["channel = 'email', subject = 'נושא'", "message_type = 'marketing'"]) {
+      expect(await hint(`update public.message_templates set ${set} where id = $1`, [tpl]), set).toBe("message_template:instant_reply_kind");
+    }
+    // review: an outsider learns nothing from the refusal helper
+    const outsider = await createUser("outsider");
+    const asked = await asUser(outsider.id, async (q) =>
+      (await q<{ r: string | null }>("select app.instant_reply_template_refusal($1, 'instant_reply', null, 'מבצע') as r", [org])).rows[0].r,
+    );
+    expect(asked).toBeNull();
+    expect(
+      await asUser(owner.id, async (q) =>
+        (await q<{ r: string | null }>("select app.instant_reply_template_refusal($1, 'instant_reply', null, 'מבצע') as r", [org])).rows[0].r,
+      ),
+    ).toBe("offer");
+    // a person edits the wording and the name now
+    expect((await asUser(owner.id, (q) => q("update public.message_templates set name = 'מענה שלנו', body = 'שלום {שם פרטי}, נחזור אליך עד {שעה}. {שם העסק}' where id = $1 returning id", [tpl]))).rowCount).toBe(1);
     expect((await asUser(owner.id, (q) => q("update public.message_templates set is_active = false where id = $1 returning id", [tpl]))).rowCount).toBe(1);
     expect((await asUser(owner.id, (q) => q("update public.message_templates set is_active = true where id = $1 returning id", [tpl]))).rowCount).toBe(1);
-    // a person's own template of the same type is not locked
+    // a server write is refused too (every writer)
+    expect((await pgError(asAdmin((q) => q("update public.message_templates set body = 'מבצע' where id = $1", [tpl])))).hint).toBe("message_template:offer");
+    await asUser(owner.id, (q) => q("update public.message_templates set name = $2, body = $3 where id = $1", [tpl, original.name, original.body]));
+    // a person's own instant reply: the same rule on insert; deleting it is allowed
+    expect(
+      await hint("insert into public.message_templates (organization_id, name, channel, message_type, body) values ($1, 'מענה עם הצעה', 'sms', 'instant_reply', 'קופון לפנייה הבאה')", [org]),
+    ).toBe("message_template:offer");
     const own = await asUser(owner.id, async (q) =>
       (
         await q<{ id: string }>(
@@ -276,7 +300,30 @@ describe("the instant reply to a web form inquiry (SPD-04)", () => {
         )
       ).rows[0].id,
     );
-    expect((await asUser(owner.id, (q) => q("update public.message_templates set body = 'שלום' where id = $1 returning id", [own]))).rowCount).toBe(1);
+    expect(await hint("update public.message_templates set message_type = 'instant_reply', body = 'מחיר: 5$' where id = $1", [own])).toBe("message_template:offer");
+    expect((await asUser(owner.id, (q) => q("delete from public.message_templates where id = $1 returning id", [own]))).rowCount).toBe(1);
+    // every other type keeps its behaviour: saved, the problem only shown
+    const other = await asUser(owner.id, async (q) =>
+      (
+        await q<{ id: string }>(
+          "insert into public.message_templates (organization_id, name, channel, message_type, body) values ($1, 'מבצע החודש', 'sms', 'collection', 'מבצע: 20% הנחה על {סכום}') returning id",
+          [org],
+        )
+      ).rows[0].id,
+    );
+    expect((await asUser(owner.id, (q) => q("delete from public.message_templates where id = $1 returning id", [other]))).rowCount).toBe(1);
+    // the rule answers 'offer' for an instant reply only, so a stored offer is not sent
+    const codes = await asAdmin(
+      async (q) =>
+        (
+          await q<{ a: string | null; b: string | null; c: string }>(
+            `select app.message_template_problem('sms', 'instant_reply', null, 'מבצע!', null, null) as a,
+                    app.message_template_problem('sms', 'collection', null, 'מבצע!', null, null) as b,
+                    app.message_send_refusal_text('offer') as c`,
+          )
+        ).rows[0],
+    );
+    expect(codes).toEqual({ a: "offer", b: null, c: "יש בתבנית מחיר, הנחה או מילה שיווקית" });
   });
 
   it("final review: an email is bucketed by its folded form; the record still matches the address as typed", async () => {

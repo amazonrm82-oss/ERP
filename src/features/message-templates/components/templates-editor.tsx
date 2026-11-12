@@ -9,13 +9,12 @@ import { Checkbox, SelectField, TextareaField, TextField } from "@/components/ui
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { MessageChannel, MessageType } from "@/features/messaging/providers/types";
 import type { FormState } from "@/lib/action-result";
-import { FIXED_NOTICE_TEMPLATE } from "@/lib/errors";
 
 import { addMessageTemplateAction, deleteMessageTemplateAction, updateMessageTemplateAction } from "../actions";
 import type { MessageTemplate } from "../queries";
 import { editedTemplateProblemText, templateProblemText, type OwnAddresses } from "../service-rule";
 import {
-  isFixedNoticeTemplate,
+  isInstantReplyNoticeTemplate,
   isServiceType,
   MESSAGE_TEMPLATE_BODY_MAX,
   MESSAGE_TEMPLATE_NAME_MAX,
@@ -89,6 +88,8 @@ function TemplateFields({
   const [type, setType] = useState<string>(values?.message_type ?? initial.messageType);
   const [subject, setSubject] = useState<string>(values?.subject ?? initial.subject);
   const errors = failure?.fieldErrors;
+  // SPD-04 review: the system's instant replies keep their channel and type (the database refuses a change)
+  const kindFixed = isInstantReplyNoticeTemplate(initial.noticeKind);
   const smsWarning = channel === "sms" ? smsLengthWarning(body.trim()) : null;
   const picked = MESSAGE_TYPE_OPTIONS.find((option) => option.value === type)?.value;
   const typeIsService = picked !== undefined && isServiceType(picked);
@@ -118,7 +119,16 @@ function TemplateFields({
         defaultValue={values?.name ?? initial.name}
         error={errors?.name}
       />
+      {kindFixed ? (
+        <p className="text-sm text-ink-soft">
+          {TEMPLATE_CHANNEL_LABELS[initial.channel]} · {MESSAGE_TYPE_OPTIONS.find((option) => option.value === initial.messageType)?.label}. בתבנית
+          של המערכת אפשר לשנות את הנוסח ולכבות אותה, בלי לשנות ערוץ או סוג.
+          <input type="hidden" name="channel" value={initial.channel} />
+          <input type="hidden" name="message_type" value={initial.messageType} />
+        </p>
+      ) : null}
       <div className="grid gap-3 sm:grid-cols-3">
+        {kindFixed ? null : (
         <SelectField
           label="ערוץ"
           name="channel"
@@ -133,6 +143,8 @@ function TemplateFields({
             </option>
           ))}
         </SelectField>
+        )}
+        {kindFixed ? null : (
         <SelectField
           label="סוג ההודעה"
           name="message_type"
@@ -148,6 +160,7 @@ function TemplateFields({
             </option>
           ))}
         </SelectField>
+        )}
         <SelectField label="שפה" name="locale" required defaultValue={values?.locale ?? initial.locale} error={errors?.locale}>
           {TEMPLATE_LOCALES.map((value: TemplateLocale) => (
             <option key={value} value={value}>
@@ -249,12 +262,11 @@ function ReadRow({ template, own }: { template: MessageTemplate; own: OwnAddress
 function EditableRow({ orgId, template, own }: { orgId: string; template: MessageTemplate; own: OwnAddresses }) {
   const [state, formAction] = useActionState<FormState, FormData>(updateMessageTemplateAction.bind(null, orgId, template.id), null);
   const failure = state && !state.ok ? state : null;
-  // SPD-04 review 3: the system's instant reply templates are fixed (only switched off or on; never deleted)
-  const fixed = isFixedNoticeTemplate(template.noticeKind);
+  // SPD-04, owner (282) ב: the system's instant reply templates are edited or switched off, never deleted
+  const kept = isInstantReplyNoticeTemplate(template.noticeKind);
   return (
     <li className="space-y-3 px-4 py-4 sm:px-5">
       <RowHeading template={template} />
-      {fixed ? <p className="text-sm text-ink-soft">{FIXED_NOTICE_TEMPLATE}</p> : null}
       <SendProblem message={storedProblem(template, own)} />
       <form action={formAction} className="space-y-3" noValidate>
         <FormError message={failure && !failure.fieldErrors ? failure.message : null} />
@@ -282,7 +294,7 @@ function EditableRow({ orgId, template, own }: { orgId: string; template: Messag
           ) : null}
         </div>
       </form>
-      {fixed ? null : (
+      {kept ? null : (
       <ActionButton
         action={deleteMessageTemplateAction.bind(null, orgId, template.id)}
         pendingText="מוחקים…"

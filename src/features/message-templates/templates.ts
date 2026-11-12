@@ -243,7 +243,8 @@ export const DEFAULT_SIGNATURE_REMINDER_TEMPLATES: ReadonlyArray<{
 // outside them (server-only mark notice_kind), seeded by app.seed_instant_reply_templates with the wording version below
 // when a form's switch is first turned on; tests/unit/instant-reply.test.ts keeps the two equal. DRAFT wording until the
 // lawyer edits it. {שעה} is the return time in the business's zone; outside working hours "ביום העבודה הבא עד {שעה}" (owner
-// (261) א). The two marked templates are fixed: a person only switches them off or on (hint message_template:fixed_notice).
+// (261) א). Owner (282) ב: a person edits or switches off the marked templates, never deletes them (hint
+// message_template:instant_reply_delete); saving one that holds an offer or an external link is refused.
 export const INSTANT_REPLY_WORDING_VERSION = "instant-reply-draft-1";
 
 export type InstantReplyNoticeKind = "instant_reply_open" | "instant_reply_closed";
@@ -273,8 +274,8 @@ export const DEFAULT_INSTANT_REPLY_TEMPLATES: ReadonlyArray<{
   },
 ];
 
-/** SPD-04 review 3: a template the system sends as an instant reply; its wording is fixed (= trigger message_templates_fixed_notice). */
-export function isFixedNoticeTemplate(noticeKind: string | null | undefined): boolean {
+/** SPD-04: a template the system sends as an instant reply; it is edited or switched off, never deleted (owner (282) ב). */
+export function isInstantReplyNoticeTemplate(noticeKind: string | null | undefined): boolean {
   return noticeKind === "instant_reply_open" || noticeKind === "instant_reply_closed";
 }
 

@@ -6,8 +6,8 @@ import { describe, expect, it } from "vitest";
 import { instantReplyChannels, INSTANT_REPLY_MARKER } from "@/features/intake/instant-reply";
 import { unknownMergeFields } from "@/features/message-templates/fields";
 import { messageTemplateProblem, SERVICE_BODY_MAX, SERVICE_TYPE_FIELDS } from "@/features/message-templates/service-rule";
-import { DEFAULT_INSTANT_REPLY_TEMPLATES, INSTANT_REPLY_WORDING_VERSION, isFixedNoticeTemplate, MESSAGE_TYPE_LABELS } from "@/features/message-templates/templates";
-import { dbErrorMessage, FIXED_NOTICE_TEMPLATE } from "@/lib/errors";
+import { DEFAULT_INSTANT_REPLY_TEMPLATES, INSTANT_REPLY_WORDING_VERSION, isInstantReplyNoticeTemplate, MESSAGE_TYPE_LABELS } from "@/features/message-templates/templates";
+import { dbErrorMessage, INSTANT_REPLY_DELETE, INSTANT_REPLY_LINK, INSTANT_REPLY_OFFER } from "@/lib/errors";
 import { SERVICE_MESSAGE_TYPES } from "@/features/messaging/providers/types";
 import { PLAN_CAPABILITIES } from "@/features/plans/capabilities";
 
@@ -44,11 +44,13 @@ describe("SPD-04: the instant reply", () => {
     expect(SERVICE_TYPE_FIELDS.instant_reply).toEqual(["firstName", "businessName", "businessPhone", "time"]);
     // (261) א: outside working hours "ביום העבודה הבא עד {שעה}"
     expect(DEFAULT_INSTANT_REPLY_TEMPLATES.filter((d) => d.noticeKind === "instant_reply_closed").every((d) => d.body.includes("ביום העבודה הבא עד {שעה}"))).toBe(true);
-    // review 3: the marked templates are fixed, with a Hebrew message
-    for (const d of DEFAULT_INSTANT_REPLY_TEMPLATES) expect(isFixedNoticeTemplate(d.noticeKind)).toBe(true);
-    expect(isFixedNoticeTemplate("signature_reminder")).toBe(false);
-    expect(isFixedNoticeTemplate(null)).toBe(false);
-    expect(dbErrorMessage({ code: "P0001", message: "x", hint: "message_template:fixed_notice" })).toBe(FIXED_NOTICE_TEMPLATE);
+    // owner (282) ב: the marked templates are kept (never deleted) and editable; an offer or a link is refused, in Hebrew
+    for (const d of DEFAULT_INSTANT_REPLY_TEMPLATES) expect(isInstantReplyNoticeTemplate(d.noticeKind)).toBe(true);
+    expect(isInstantReplyNoticeTemplate("signature_reminder")).toBe(false);
+    expect(isInstantReplyNoticeTemplate(null)).toBe(false);
+    expect(dbErrorMessage({ code: "P0001", message: "x", hint: "message_template:instant_reply_delete" })).toBe(INSTANT_REPLY_DELETE);
+    expect(dbErrorMessage({ code: "P0001", message: "x", hint: "message_template:offer" })).toBe(INSTANT_REPLY_OFFER);
+    expect(dbErrorMessage({ code: "P0001", message: "x", hint: "message_template:instant_reply_link" })).toBe(INSTANT_REPLY_LINK);
     expect(messageTemplateProblem({ channel: "sms", messageType: "instant_reply", subject: null, body: "ראו www.example.com" })).toBe("external_link");
   });
 

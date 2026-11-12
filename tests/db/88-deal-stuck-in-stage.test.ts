@@ -146,6 +146,8 @@ const RERUN = [
   migrationFile("_library_link_answers.sql"),
   // the owner's answers of 12 November 2026 redefine app.send_contract_renewals() and the in-person functions last
   migrationFile("_signature_answers.sql"),
+  // SPD-04 (282) ב redefines the template rule and app.message_templates_fixed_notice() of _instant_reply.sql last
+  migrationFile("_instant_reply_editable.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

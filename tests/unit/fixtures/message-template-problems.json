@@ -2620,5 +2620,742 @@
     "body": "המסמך {שם המסמך}",
     "noticeKind": "signature_reminder",
     "problem": "field_not_allowed"
+  },
+  {
+    "note": "SPD-04 (282): the seeded wording passes",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "שלום {שם פרטי}, קיבלנו את הפנייה שלך ל-{שם העסק}. נחזור אליך עד השעה {שעה}. {שם העסק}, {טלפון העסק}",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (282): a shekel sign",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "החבילה ב-₪199 בלבד",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): a dollar sign",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "רק 5$ לחודש",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): a euro sign",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "€20",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): a pound sign",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "£20",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): ש\"ח with a straight quote",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "המחיר 100 ש\"ח",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): ש״ח with gershayim",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "המחיר 100 ש״ח",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): ש''ח with two apostrophes",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "המחיר 100 ש''ח",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): a percent after a number",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "20% על הכל",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): a percent with a space",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "20 % על הכל",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): a percent before a number",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "%30 לחברים",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): a percent after any number is an offer",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "שאלות? 100%  בטוח",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): a percent with no digit",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "שירות % אמין",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (282): the word מבצע",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "יש לנו מבצע",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): plural מבצעים",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "מבצעים חמים",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): הנחה",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "הנחה למצטרפים",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): with a prefix: בחינם",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "ייעוץ בחינם",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): two prefixes: ובהנחה",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "ובהנחה",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: הזדמנות is left out (בהזדמנות)",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "נדבר בהזדמנות",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (282): בלעדית",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "הצעה בלעדית",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): קופון",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "קיבלת קופון",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): הטבה",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "הטבה למצטרפים",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): אחוזים",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "עשרים אחוזים",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): שקלים",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "מאה שקלים",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): weight is not a shekel: משקל",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "נבדוק את המשקל",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (282): a plain reply",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "תודה, נחזור אליך בהקדם",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (282): NIS in capitals",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "50 NIS",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: free is left out (feel free)",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "Feel free to call",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (282): freedom is another word",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "freedom",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (282): niqqud inside the word",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "מִבְצָע",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): a zero-width space inside the word",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "מב​צע",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): in the email subject",
+    "channel": "email",
+    "messageType": "instant_reply",
+    "subject": "מבצע לפונים",
+    "body": "שלום {שם פרטי}",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): a field of another type comes first",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "{סכום} מבצע",
+    "problem": "field_not_allowed"
+  },
+  {
+    "note": "SPD-04 (282): an offer before a link",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "מבצע www.example.com",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): a link stays external_link",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "ראו www.example.com",
+    "problem": "external_link"
+  },
+  {
+    "note": "SPD-04 (282): the own site is allowed",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "ראו www.biz.co.il",
+    "ownDomain": "biz.co.il",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (282): another service type is not judged for an offer",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "מבצע 20% על {סכום}",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (282): a meeting reminder is not judged for an offer",
+    "channel": "sms",
+    "messageType": "meeting_reminder",
+    "subject": null,
+    "body": "הנחה בפגישה ב-{תאריך}",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (282): marketing is never judged",
+    "channel": "sms",
+    "messageType": "marketing",
+    "subject": null,
+    "body": "מבצע 50% ₪",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (282): recently is not an offer",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "פנית אלינו לאחרונה, נחזור אליך",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (282): weights are not shekels: משקלים",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "משקלים ושקלים",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282): weights alone: משקלים",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "נביא משקלים",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (282) review: fullwidth letters fold by NFKC",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "ＳＡＬＥ היום",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: fullwidth digits and percent fold by NFKC",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "２０％ לכולם",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: a Hebrew presentation form folds by NFKC",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "מבּצע",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: a Hebrew presentation letter with niqqud",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "אַז",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (282) review: a word joiner inside a word",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "מב⁠צע",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: a bidi mark inside a word",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "הנ‏חה",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: an Arabic letter mark inside a word",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "חי؜נם",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: a combining grapheme joiner inside a word",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "קופ͏ון",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: a variation selector inside a word",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "מבצ️ע",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: a tag character inside a word",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "מבצ󠁁ע",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: Cyrillic look-alikes of sale",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "sаlе now",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: Cyrillic look-alikes of promo",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "prоmо",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: Greek look-alikes of coupon",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "cοupοn",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: a no-break space before percent",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "20 %",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: a narrow no-break space before percent",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "20 %",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: a tab before percent",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "20\t%",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: an Arabic percent sign",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "20٪",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: a fullwidth percent sign",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "20％",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: ש“ח with a left double quote",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "100 ש“ח",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: ש„ח with a low double quote",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "100 ש„ח",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: ש″ח with a double prime",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "100 ש″ח",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: a bare שח after a number",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "המחיר 100 שח",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: a bare שח glued to a number",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "100שח",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: a bare שח before a number",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "שח 100",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: a bare שח with no number",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "נשחק שח",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (282) review: שח inside a word next to a number is not a bare שח",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "5 שחקנים",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (282) review: a number glued to NIS",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "100NIS",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: NIS glued to a number",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "nis100",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: a number glued to ILS",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "50ILS",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: a number glued to שקל",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "100שקל",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: the prefix מ before a list word: מהמבצע",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "מהמבצע הזה",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: three prefix letters: כשבמבצע",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "כשבמבצע",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: four prefix letters are too many",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "וכשבמבצע",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (282) review: weight is not a shekel: משקל",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "המשקל שלך",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (282) review: weights with two prefixes: והמשקלים",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "והמשקלים",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (282) review: the shekel with the article: השקל",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "השקל",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: to hold is not a percent: לאחוז",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "קשה לאחוז",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (282) review: in percents: באחוזים",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "באחוזים",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) review: from a discount: מהנחה",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "מהנחה",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) delta review: Arabic-Indic digits and the Arabic percent",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "٥٠٪ על הכל",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) delta review: Arabic-Indic digits and a percent",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "٥٠%",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) delta review: Extended Arabic-Indic digits and a percent",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "۵۰%",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) delta review: Arabic-Indic digits and a bare שח",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "٥٠ שח",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) delta review: a combining acute inside a word",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "מב́צע",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) delta review: a sof pasuq inside a word",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "מב׃צע",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) delta review: a Hangul filler inside a word",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "מבㅤצע",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) delta review: a halfwidth Hangul filler inside a word (NFKC to U+1160)",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "מבﾠצע",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) delta review: a Hangul choseong filler inside a word",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "מבᅟצע",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) delta review: a braille blank inside a word",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "מב⠀צע",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (282) delta review: Arabic-Indic digits alone are no offer",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "נחזור עד ١٤:٠٠",
+    "problem": null
   }
 ]

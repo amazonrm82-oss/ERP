@@ -2,8 +2,15 @@ import { MENTION_MAX } from "@/features/mentions/token";
 import { VARIANT_PROBLEM_MESSAGES } from "@/features/whatsapp/variants";
 import { SUPPORT_LINE } from "@/lib/support-phone";
 
-/** SPD-04 review 3: the system's instant reply templates (notice_kind instant_reply_open|closed) are fixed. */
-export const FIXED_NOTICE_TEMPLATE = "את התבנית הזו המערכת שולחת כמענה מיידי לפנייה, והנוסח שלה קבוע. אפשר לכבות אותה או להפעיל אותה מחדש, בלי לשנות את הנוסח.";
+/** SPD-04, owner (282) ב: an instant reply that holds a price, a percent discount or a marketing word is not saved. */
+export const INSTANT_REPLY_OFFER =
+  "התבנית לא תישמר: במענה מיידי אין מחיר, אחוז הנחה או מילים שיווקיות (כמו מבצע, הנחה, חינם, הטבה). הורידו אותם מהנוסח ושמרו שוב.";
+/** SPD-04, owner (282) ב: an instant reply that holds an external link is not saved. */
+export const INSTANT_REPLY_LINK = "התבנית לא תישמר: במענה מיידי אין קישור חיצוני. אפשר לכתוב רק את האתר והאימייל של העסק.";
+/** SPD-04 review: the system's instant reply templates keep their channel and message type. */
+export const INSTANT_REPLY_KIND = "בתבנית המענה המיידי של המערכת אי אפשר לשנות ערוץ או סוג הודעה. אפשר לערוך את הנוסח, או להוסיף תבנית חדשה.";
+/** SPD-04, owner (282) ב: the system's instant reply templates are edited or switched off, never deleted. */
+export const INSTANT_REPLY_DELETE = "את תבנית המענה המיידי של המערכת אי אפשר למחוק. אפשר לערוך את הנוסח או לכבות אותה.";
 
 // Maps Postgres / PostgREST / Supabase Auth errors to short Hebrew messages.
 // Raw database messages are never shown to the user.
@@ -515,8 +522,11 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "message_template:field": "בנוסח יש שדה שהמערכת לא מכירה. אפשר להשתמש רק בשדות שברשימה, כתובים בדיוק כך, למשל {שם פרטי}.",
   "message_template:variant": VARIANT_PROBLEM_MESSAGES.variant,
   "message_template:neutral": VARIANT_PROBLEM_MESSAGES.neutral,
-  // SPD-04 review 3: the system's instant reply templates are fixed
-  "message_template:fixed_notice": FIXED_NOTICE_TEMPLATE,
+  // SPD-04, owner (282) ב: an instant reply holds no offer or external link; the system's templates are not deleted
+  "message_template:offer": INSTANT_REPLY_OFFER,
+  "message_template:instant_reply_link": INSTANT_REPLY_LINK,
+  "message_template:instant_reply_delete": INSTANT_REPLY_DELETE,
+  "message_template:instant_reply_kind": INSTANT_REPLY_KIND,
   // EML-02 (migration record_email)
   "record_email:not_found": "הרשומה לא נמצאה, או שאין לכם גישה אליה. רעננו את הדף ונסו שוב.",
   "record_email:kind": "אפשר לשלוח אימייל רק מכרטיס של ליד, איש קשר או עסקה.",

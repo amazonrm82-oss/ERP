@@ -74,7 +74,8 @@ describe("Hebrew messages for the database's hints (RVW-50 ב)", () => {
   // raised only by server paths no person reaches (a merge copying consents between records of the business)
   // consent:cancel: only app.import_consents_cancel writes a cancelling entry (CNS-05 undo); no person reaches it
   // quote_sent_state:frozen: app.quote_sent_states has no client grant; only an update by a server path could raise it (021190)
-  const SERVER_ONLY = new Set(["consent:copy", "consent:cancel", "quote_sent_state:frozen"]);
+  // message_template:fixed_notice: only 021225's interim body raised it; 021232 (SPD-04, owner (282) ב) made it a pass-through
+  const SERVER_ONLY = new Set(["consent:copy", "consent:cancel", "quote_sent_state:frozen", "message_template:fixed_notice"]);
 
   it("every P0001 hint the migrations raise has a message, is answered by its screen, or is server-only", () => {
     const hints = new Set([...sql.matchAll(/errcode = 'P0001', hint = '([a-z_:]+)'/g)].map((m) => m[1]));

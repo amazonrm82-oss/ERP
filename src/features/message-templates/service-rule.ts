@@ -1,6 +1,8 @@
 import { isPublicEmailDomain, registeredDomain, websiteDomain } from "@/features/company-domain/domains";
 import { SERVICE_MESSAGE_TYPES, type MessageChannel, type MessageType } from "@/features/messaging/providers/types";
 
+import { INSTANT_REPLY_LINK, INSTANT_REPLY_OFFER } from "@/lib/errors";
+
 import { marketingEnvelope, type EnvelopeInput } from "./envelope";
 import { MERGE_FIELD_PATTERN, MESSAGE_MERGE_FIELDS, type MergeFieldKey } from "./fields";
 
@@ -13,7 +15,7 @@ import { MERGE_FIELD_PATTERN, MESSAGE_MERGE_FIELDS, type MergeFieldKey } from ".
 // Every future sender (AUT-08, the quote screen, the reminder senders, the OPS-04 message.send path) calls
 // assertTemplateSendable() (or app.message_template_sendable in SQL) right before it sends, and never sends on a problem.
 
-export type TemplateProblem = "field_not_allowed" | "glued_address" | "external_link" | "too_long";
+export type TemplateProblem = "field_not_allowed" | "offer" | "glued_address" | "external_link" | "too_long";
 export type ServiceMessageType = (typeof SERVICE_MESSAGE_TYPES)[number];
 
 const NAMES: readonly MergeFieldKey[] = ["firstName", "fullName", "userName", "businessName", "businessPhone", "businessAddress"];
@@ -498,11 +500,183 @@ export function fieldsNotAllowed(template: TemplateText): string[] {
   return [...found];
 }
 
+// SPD-04, owner (282) ב (11 November 2026): an instant reply holds no price, percent discount or marketing word, and saving
+// one that does is refused (with an external link too). = app.message_offer (migration instant_reply_editable, whose header
+// lists the rule step by step); both run the shared fixture message-template-problems.json. It judges the template's text as
+// written, never the filled fields.
+
+/** The closed list of marketing words (= app.message_offer_words; mirrored between the markers, unit test). */
+export const OFFER_WORDS: readonly string[] = [
+  // offer-words:start
+  "מבצע", "מבצעים", "הנחה", "הנחות", "חינם", "הטבה", "הטבות", "קופון", "קופונים", "בלעדי", "בלעדית", "בלעדיים",
+  "בלעדיות", "אחוז", "אחוזים", "שקל", "שקלים", "דולר", "דולרים", "יורו", "nis", "ils", "usd", "eur", "sale", "discount",
+  "coupon", "promo",
+  // offer-words:end
+];
+
+/** Ordinary words a prefix letter and a list word make (= app.message_offer_not_words): "משקל" is weight, "לאחוז" to hold. */
+export const OFFER_NOT_WORDS: readonly string[] = [
+  // offer-not-words:start
+  "משקל", "משקלים", "לאחוז",
+  // offer-not-words:end
+];
+
+/** Cyrillic and Greek look-alikes of Latin letters, folded one to one (= the two strings of app.message_offer). */
+// offer-fold:start
+export const OFFER_FOLD_FROM = "аАвВеЕёЁкКмМнНоОрРсСтТуУхХіІјЈѕЅԁԀӏӀαΑβΒεΕηΗιΙκΚμΜνΝοΟρΡτΤυΥχΧΖ";
+export const OFFER_FOLD_TO = "aabbeeeekkmmhhooppccttyyxxiijjssddllaabbeenhiikkumvnooppttuyxxz";
+// offer-fold:end
+
+/** The format characters (Unicode Cf) the rule removes, as code point ranges (= app.message_offer's list; unit test). */
+export const OFFER_CF_RANGES: ReadonlyArray<readonly [number, number]> = [
+  [0xad, 0xad], [0x600, 0x605], [0x61c, 0x61c], [0x6dd, 0x6dd], [0x70f, 0x70f], [0x890, 0x891], [0x8e2, 0x8e2],
+  [0x180e, 0x180e], [0x200b, 0x200f], [0x202a, 0x202e], [0x2060, 0x2064], [0x2066, 0x206f], [0xfeff, 0xfeff],
+  [0xfff9, 0xfffb], [0x110bd, 0x110bd], [0x110cd, 0x110cd], [0x13430, 0x1343f], [0x1bca0, 0x1bca3], [0x1d173, 0x1d17a],
+  [0xe0001, 0xe0001], [0xe0020, 0xe007f],
+];
+
+/** Every combining mark (Unicode Mn) the rule removes, as code point ranges (= app.message_offer's list; unit test). */
+export const OFFER_MN_RANGES: ReadonlyArray<readonly [number, number]> = [
+  [0x300, 0x36f], [0x483, 0x487], [0x591, 0x5bd], [0x5bf, 0x5bf], [0x5c1, 0x5c2], [0x5c4, 0x5c5],
+  [0x5c7, 0x5c7], [0x610, 0x61a], [0x64b, 0x65f], [0x670, 0x670], [0x6d6, 0x6dc], [0x6df, 0x6e4],
+  [0x6e7, 0x6e8], [0x6ea, 0x6ed], [0x711, 0x711], [0x730, 0x74a], [0x7a6, 0x7b0], [0x7eb, 0x7f3],
+  [0x7fd, 0x7fd], [0x816, 0x819], [0x81b, 0x823], [0x825, 0x827], [0x829, 0x82d], [0x859, 0x85b],
+  [0x897, 0x89f], [0x8ca, 0x8e1], [0x8e3, 0x902], [0x93a, 0x93a], [0x93c, 0x93c], [0x941, 0x948],
+  [0x94d, 0x94d], [0x951, 0x957], [0x962, 0x963], [0x981, 0x981], [0x9bc, 0x9bc], [0x9c1, 0x9c4],
+  [0x9cd, 0x9cd], [0x9e2, 0x9e3], [0x9fe, 0x9fe], [0xa01, 0xa02], [0xa3c, 0xa3c], [0xa41, 0xa42],
+  [0xa47, 0xa48], [0xa4b, 0xa4d], [0xa51, 0xa51], [0xa70, 0xa71], [0xa75, 0xa75], [0xa81, 0xa82],
+  [0xabc, 0xabc], [0xac1, 0xac5], [0xac7, 0xac8], [0xacd, 0xacd], [0xae2, 0xae3], [0xafa, 0xaff],
+  [0xb01, 0xb01], [0xb3c, 0xb3c], [0xb3f, 0xb3f], [0xb41, 0xb44], [0xb4d, 0xb4d], [0xb55, 0xb56],
+  [0xb62, 0xb63], [0xb82, 0xb82], [0xbc0, 0xbc0], [0xbcd, 0xbcd], [0xc00, 0xc00], [0xc04, 0xc04],
+  [0xc3c, 0xc3c], [0xc3e, 0xc40], [0xc46, 0xc48], [0xc4a, 0xc4d], [0xc55, 0xc56], [0xc62, 0xc63],
+  [0xc81, 0xc81], [0xcbc, 0xcbc], [0xcbf, 0xcbf], [0xcc6, 0xcc6], [0xccc, 0xccd], [0xce2, 0xce3],
+  [0xd00, 0xd01], [0xd3b, 0xd3c], [0xd41, 0xd44], [0xd4d, 0xd4d], [0xd62, 0xd63], [0xd81, 0xd81],
+  [0xdca, 0xdca], [0xdd2, 0xdd4], [0xdd6, 0xdd6], [0xe31, 0xe31], [0xe34, 0xe3a], [0xe47, 0xe4e],
+  [0xeb1, 0xeb1], [0xeb4, 0xebc], [0xec8, 0xece], [0xf18, 0xf19], [0xf35, 0xf35], [0xf37, 0xf37],
+  [0xf39, 0xf39], [0xf71, 0xf7e], [0xf80, 0xf84], [0xf86, 0xf87], [0xf8d, 0xf97], [0xf99, 0xfbc],
+  [0xfc6, 0xfc6], [0x102d, 0x1030], [0x1032, 0x1037], [0x1039, 0x103a], [0x103d, 0x103e], [0x1058, 0x1059],
+  [0x105e, 0x1060], [0x1071, 0x1074], [0x1082, 0x1082], [0x1085, 0x1086], [0x108d, 0x108d], [0x109d, 0x109d],
+  [0x135d, 0x135f], [0x1712, 0x1714], [0x1732, 0x1733], [0x1752, 0x1753], [0x1772, 0x1773], [0x17b4, 0x17b5],
+  [0x17b7, 0x17bd], [0x17c6, 0x17c6], [0x17c9, 0x17d3], [0x17dd, 0x17dd], [0x180b, 0x180d], [0x180f, 0x180f],
+  [0x1885, 0x1886], [0x18a9, 0x18a9], [0x1920, 0x1922], [0x1927, 0x1928], [0x1932, 0x1932], [0x1939, 0x193b],
+  [0x1a17, 0x1a18], [0x1a1b, 0x1a1b], [0x1a56, 0x1a56], [0x1a58, 0x1a5e], [0x1a60, 0x1a60], [0x1a62, 0x1a62],
+  [0x1a65, 0x1a6c], [0x1a73, 0x1a7c], [0x1a7f, 0x1a7f], [0x1ab0, 0x1abd], [0x1abf, 0x1add], [0x1ae0, 0x1aeb],
+  [0x1b00, 0x1b03], [0x1b34, 0x1b34], [0x1b36, 0x1b3a], [0x1b3c, 0x1b3c], [0x1b42, 0x1b42], [0x1b6b, 0x1b73],
+  [0x1b80, 0x1b81], [0x1ba2, 0x1ba5], [0x1ba8, 0x1ba9], [0x1bab, 0x1bad], [0x1be6, 0x1be6], [0x1be8, 0x1be9],
+  [0x1bed, 0x1bed], [0x1bef, 0x1bf1], [0x1c2c, 0x1c33], [0x1c36, 0x1c37], [0x1cd0, 0x1cd2], [0x1cd4, 0x1ce0],
+  [0x1ce2, 0x1ce8], [0x1ced, 0x1ced], [0x1cf4, 0x1cf4], [0x1cf8, 0x1cf9], [0x1dc0, 0x1dff], [0x20d0, 0x20dc],
+  [0x20e1, 0x20e1], [0x20e5, 0x20f0], [0x2cef, 0x2cf1], [0x2d7f, 0x2d7f], [0x2de0, 0x2dff], [0x302a, 0x302d],
+  [0x3099, 0x309a], [0xa66f, 0xa66f], [0xa674, 0xa67d], [0xa69e, 0xa69f], [0xa6f0, 0xa6f1], [0xa802, 0xa802],
+  [0xa806, 0xa806], [0xa80b, 0xa80b], [0xa825, 0xa826], [0xa82c, 0xa82c], [0xa8c4, 0xa8c5], [0xa8e0, 0xa8f1],
+  [0xa8ff, 0xa8ff], [0xa926, 0xa92d], [0xa947, 0xa951], [0xa980, 0xa982], [0xa9b3, 0xa9b3], [0xa9b6, 0xa9b9],
+  [0xa9bc, 0xa9bd], [0xa9e5, 0xa9e5], [0xaa29, 0xaa2e], [0xaa31, 0xaa32], [0xaa35, 0xaa36], [0xaa43, 0xaa43],
+  [0xaa4c, 0xaa4c], [0xaa7c, 0xaa7c], [0xaab0, 0xaab0], [0xaab2, 0xaab4], [0xaab7, 0xaab8], [0xaabe, 0xaabf],
+  [0xaac1, 0xaac1], [0xaaec, 0xaaed], [0xaaf6, 0xaaf6], [0xabe5, 0xabe5], [0xabe8, 0xabe8], [0xabed, 0xabed],
+  [0xfb1e, 0xfb1e], [0xfe00, 0xfe0f], [0xfe20, 0xfe2f], [0x101fd, 0x101fd], [0x102e0, 0x102e0], [0x10376, 0x1037a],
+  [0x10a01, 0x10a03], [0x10a05, 0x10a06], [0x10a0c, 0x10a0f], [0x10a38, 0x10a3a], [0x10a3f, 0x10a3f], [0x10ae5, 0x10ae6],
+  [0x10d24, 0x10d27], [0x10d69, 0x10d6d], [0x10eab, 0x10eac], [0x10efa, 0x10eff], [0x10f46, 0x10f50], [0x10f82, 0x10f85],
+  [0x11001, 0x11001], [0x11038, 0x11046], [0x11070, 0x11070], [0x11073, 0x11074], [0x1107f, 0x11081], [0x110b3, 0x110b6],
+  [0x110b9, 0x110ba], [0x110c2, 0x110c2], [0x11100, 0x11102], [0x11127, 0x1112b], [0x1112d, 0x11134], [0x11173, 0x11173],
+  [0x11180, 0x11181], [0x111b6, 0x111be], [0x111c9, 0x111cc], [0x111cf, 0x111cf], [0x1122f, 0x11231], [0x11234, 0x11234],
+  [0x11236, 0x11237], [0x1123e, 0x1123e], [0x11241, 0x11241], [0x112df, 0x112df], [0x112e3, 0x112ea], [0x11300, 0x11301],
+  [0x1133b, 0x1133c], [0x11340, 0x11340], [0x11366, 0x1136c], [0x11370, 0x11374], [0x113bb, 0x113c0], [0x113ce, 0x113ce],
+  [0x113d0, 0x113d0], [0x113d2, 0x113d2], [0x113e1, 0x113e2], [0x11438, 0x1143f], [0x11442, 0x11444], [0x11446, 0x11446],
+  [0x1145e, 0x1145e], [0x114b3, 0x114b8], [0x114ba, 0x114ba], [0x114bf, 0x114c0], [0x114c2, 0x114c3], [0x115b2, 0x115b5],
+  [0x115bc, 0x115bd], [0x115bf, 0x115c0], [0x115dc, 0x115dd], [0x11633, 0x1163a], [0x1163d, 0x1163d], [0x1163f, 0x11640],
+  [0x116ab, 0x116ab], [0x116ad, 0x116ad], [0x116b0, 0x116b5], [0x116b7, 0x116b7], [0x1171d, 0x1171d], [0x1171f, 0x1171f],
+  [0x11722, 0x11725], [0x11727, 0x1172b], [0x1182f, 0x11837], [0x11839, 0x1183a], [0x1193b, 0x1193c], [0x1193e, 0x1193e],
+  [0x11943, 0x11943], [0x119d4, 0x119d7], [0x119da, 0x119db], [0x119e0, 0x119e0], [0x11a01, 0x11a0a], [0x11a33, 0x11a38],
+  [0x11a3b, 0x11a3e], [0x11a47, 0x11a47], [0x11a51, 0x11a56], [0x11a59, 0x11a5b], [0x11a8a, 0x11a96], [0x11a98, 0x11a99],
+  [0x11b60, 0x11b60], [0x11b62, 0x11b64], [0x11b66, 0x11b66], [0x11c30, 0x11c36], [0x11c38, 0x11c3d], [0x11c3f, 0x11c3f],
+  [0x11c92, 0x11ca7], [0x11caa, 0x11cb0], [0x11cb2, 0x11cb3], [0x11cb5, 0x11cb6], [0x11d31, 0x11d36], [0x11d3a, 0x11d3a],
+  [0x11d3c, 0x11d3d], [0x11d3f, 0x11d45], [0x11d47, 0x11d47], [0x11d90, 0x11d91], [0x11d95, 0x11d95], [0x11d97, 0x11d97],
+  [0x11ef3, 0x11ef4], [0x11f00, 0x11f01], [0x11f36, 0x11f3a], [0x11f40, 0x11f40], [0x11f42, 0x11f42], [0x11f5a, 0x11f5a],
+  [0x13440, 0x13440], [0x13447, 0x13455], [0x1611e, 0x16129], [0x1612d, 0x1612f], [0x16af0, 0x16af4], [0x16b30, 0x16b36],
+  [0x16f4f, 0x16f4f], [0x16f8f, 0x16f92], [0x16fe4, 0x16fe4], [0x1bc9d, 0x1bc9e], [0x1cf00, 0x1cf2d], [0x1cf30, 0x1cf46],
+  [0x1d167, 0x1d169], [0x1d17b, 0x1d182], [0x1d185, 0x1d18b], [0x1d1aa, 0x1d1ad], [0x1d242, 0x1d244], [0x1da00, 0x1da36],
+  [0x1da3b, 0x1da6c], [0x1da75, 0x1da75], [0x1da84, 0x1da84], [0x1da9b, 0x1da9f], [0x1daa1, 0x1daaf], [0x1e000, 0x1e006],
+  [0x1e008, 0x1e018], [0x1e01b, 0x1e021], [0x1e023, 0x1e024], [0x1e026, 0x1e02a], [0x1e08f, 0x1e08f], [0x1e130, 0x1e136],
+  [0x1e2ae, 0x1e2ae], [0x1e2ec, 0x1e2ef], [0x1e4ec, 0x1e4ef], [0x1e5ee, 0x1e5ef], [0x1e6e3, 0x1e6e3], [0x1e6e6, 0x1e6e6],
+  [0x1e6ee, 0x1e6ef], [0x1e6f5, 0x1e6f5], [0x1e8d0, 0x1e8d6], [0x1e944, 0x1e94a], [0xe0100, 0xe01ef],
+];
+
+/** The Hebrew sof pasuq and the invisible fillers, also removed (= app.message_offer). */
+export const OFFER_EXTRA_STRIP: readonly number[] = [0x5c3, 0x115f, 0x1160, 0x3164, 0x2800];
+
+/** The Arabic-Indic and Extended Arabic-Indic digits, folded to 0-9 (= the two strings of app.message_offer). */
+// offer-digits:start
+export const OFFER_DIGITS_FROM = "٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹";
+export const OFFER_DIGITS_TO = "01234567890123456789";
+// offer-digits:end
+
+const OFFER_SET = new Set(OFFER_WORDS);
+const OFFER_NOT_SET = new Set(OFFER_NOT_WORDS);
+const OFFER_PREFIX = "ובלהשכמ";
+const OFFER_FOLD = new Map([
+  ...[...OFFER_FOLD_FROM].map((ch, i) => [ch, [...OFFER_FOLD_TO][i]] as const),
+  ...[...OFFER_DIGITS_FROM].map((ch, i) => [ch, OFFER_DIGITS_TO[i]] as const),
+]);
+const offerRange = ([a, b]: readonly [number, number]) =>
+  a === b ? `\\u{${a.toString(16)}}` : `\\u{${a.toString(16)}}-\\u{${b.toString(16)}}`;
+const OFFER_STRIP = new RegExp(
+  `[${[...OFFER_CF_RANGES, ...OFFER_MN_RANGES].map(offerRange).join("")}${OFFER_EXTRA_STRIP.map((cp) => offerRange([cp, cp])).join("")}]`,
+  "gu",
+);
+const OFFER_SPACE = /[\t-\r\u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]/g;
+const OFFER_CURRENCY = /[\u20AA$\u20AC\u00A3]/;
+const OFFER_SHEKEL = /\u05E9["'\u05F4\u05F3\u201C\u201D\u201E\u2033\u2032\u2018\u2019]{1,2}\u05D7/;
+const OFFER_BARE_SHEKEL = /[0-9] *\u05E9\u05D7([^\u05D0-\u05EA]|$)|(^|[^\u05D0-\u05EA])\u05E9\u05D7 *[0-9]/;
+const OFFER_PERCENT = /[0-9] *[%\u066A]|[%\u066A] *[0-9]/;
+const OFFER_WORD = /[\u05D0-\u05EA]+|[a-z]+/g;
+
+/** The rule's plain text: NFKC, format characters and niqqud out, whitespace to spaces, look-alikes folded, ASCII lower case. */
+export function offerPlainText(text: string): string {
+  const stripped = text.normalize("NFKC").replace(OFFER_STRIP, "").replace(OFFER_SPACE, " ");
+  return asciiLower([...stripped].map((ch) => OFFER_FOLD.get(ch) ?? ch).join(""));
+}
+
+function offerWord(word: string): boolean {
+  const chars = [...word];
+  for (let k = 0; k <= 3 && k < chars.length; k += 1) {
+    if (k > 0 && !OFFER_PREFIX.includes(chars[k - 1])) return false;
+    const rest = chars.slice(k).join("");
+    if (OFFER_SET.has(rest) && (k === 0 || !OFFER_NOT_SET.has(chars[k - 1] + rest))) return true;
+  }
+  return false;
+}
+
+/** Whether a text reads as an offer (= app.message_offer; the migration's header lists the rule). */
+export function messageOffer(text: string): boolean {
+  if (!text) return false;
+  const plain = offerPlainText(text);
+  if (OFFER_CURRENCY.test(plain) || OFFER_SHEKEL.test(plain) || OFFER_BARE_SHEKEL.test(plain) || OFFER_PERCENT.test(plain)) return true;
+  for (const match of plain.matchAll(OFFER_WORD)) {
+    if (offerWord(match[0])) return true;
+  }
+  return false;
+}
+
+/**
+ * Owner (282) ב: why saving an instant_reply template is refused ('offer' or 'external_link'), null when it may be saved
+ * and for every other type (= app.instant_reply_template_refusal, which the trigger message_templates_instant_reply asks).
+ */
+export function instantReplyRefusal(template: TemplateText): "offer" | "external_link" | null {
+  if (template.messageType !== "instant_reply") return null;
+  const text = `${template.subject ?? ""}\n${template.body}`;
+  if (messageOffer(text)) return "offer";
+  const own = template.ownDomain ?? null;
+  const email = template.businessEmail ?? null;
+  if (messageAddressGlue(text, own, email) === "external_link" || messageExternalLink(text, own, email)) return "external_link";
+  return null;
+}
+
 /** null when the template may be sent; else the first problem, in the database's order. Marketing is never judged here. */
 export function messageTemplateProblem(template: TemplateText): TemplateProblem | null {
   if (!isService(template.messageType)) return null;
   if (fieldsNotAllowed(template).length > 0) return "field_not_allowed";
   const text = `${template.subject ?? ""}\n${template.body}`;
+  // SPD-04 (282) ב: judged for an instant reply only
+  if (template.messageType === "instant_reply" && messageOffer(text)) return "offer";
   const glue = messageAddressGlue(text, template.ownDomain ?? null, template.businessEmail ?? null);
   if (glue === "glued_address") return "glued_address";
   if (glue === "external_link" || messageExternalLink(text, template.ownDomain ?? null, template.businessEmail ?? null)) {
@@ -528,6 +702,9 @@ export function editedTemplateProblemText(
 export function templateProblemText(template: TemplateText): string | null {
   const problem = messageTemplateProblem(template);
   if (!problem || !isService(template.messageType)) return null;
+  // SPD-04 (282) ב: an instant reply with an offer or an external link is not saved at all
+  if (problem === "offer") return INSTANT_REPLY_OFFER;
+  if (problem === "external_link" && template.messageType === "instant_reply") return INSTANT_REPLY_LINK;
   if (problem === "field_not_allowed") {
     const allowed = allowedFields({ messageType: template.messageType, noticeKind: template.noticeKind })
       .map((key) => MESSAGE_MERGE_FIELDS[key].token)
@@ -594,5 +771,6 @@ export const SEND_REFUSAL_LABELS: Record<TemplateProblem | "inactive", string> =
   field_not_allowed: "שדה שלא מתאים לסוג ההודעה",
   glued_address: "כתובת צמודה לטקסט",
   external_link: "קישור חיצוני",
+  offer: "מחיר או מילה שיווקית",
   inactive: "התבנית כבויה",
 };

@@ -13,6 +13,17 @@ import {
   messageAddressGlue,
   messageExternalLink,
   messageFilledProblem,
+  messageOffer,
+  instantReplyRefusal,
+  OFFER_CF_RANGES,
+  OFFER_DIGITS_FROM,
+  OFFER_DIGITS_TO,
+  OFFER_EXTRA_STRIP,
+  OFFER_MN_RANGES,
+  OFFER_FOLD_FROM,
+  OFFER_FOLD_TO,
+  OFFER_NOT_WORDS,
+  OFFER_WORDS,
   ownDomainOk,
   PLATFORM_DOMAINS,
   SHARED_SITE_HOSTS,
@@ -37,6 +48,7 @@ const sql = latestMigration("create or replace function app.message_type_fields(
 const sendSql = latestMigration("create or replace function app.message_filled_problem(")?.sql ?? "";
 const tldSql = latestMigration("create or replace function app.message_link_tld(")?.sql ?? "";
 const gluedSql = latestMigration("create or replace function app.message_glue_boundary(")?.sql ?? "";
+const offerSql = latestMigration("create or replace function app.message_offer_words(")?.sql ?? "";
 
 describe("service template rule (MSG-02, owner (90) ג)", () => {
   it.each(cases.map((c) => [c.note, c]))("%s", (_note, c) => {
@@ -215,6 +227,69 @@ describe("service template rule (MSG-02, owner (90) ג)", () => {
     for (const text of hostile) {
       const started = performance.now();
       messageExternalLink(text, "biz.co.il", "a@b.co");
+      expect(performance.now() - started).toBeLessThan(500);
+    }
+  });
+
+  it("SPD-04 (282) ב: the marketing words equal app.message_offer_words, each once, lower case", () => {
+    const block = offerSql.split("-- offer-words:start")[1]?.split("-- offer-words:end")[0] ?? "";
+    expect(block).not.toBe("");
+    expect([...block.matchAll(/'([^']+)'/g)].map((m) => m[1])).toEqual([...OFFER_WORDS]);
+    expect(new Set(OFFER_WORDS).size).toBe(OFFER_WORDS.length);
+    for (const word of OFFER_WORDS) expect(word, word).toMatch(/^([\u05D0-\u05EA]+|[a-z]+)$/);
+  });
+
+  it("SPD-04 (282) ב review: the ordinary words, the look-alike fold and the format characters equal the migration's", () => {
+    const block = (marker: string) => offerSql.split(`-- ${marker}:start`)[1]?.split(`-- ${marker}:end`)[0] ?? "";
+    expect([...block("offer-not-words").matchAll(/'([^']+)'/g)].map((m) => m[1])).toEqual([...OFFER_NOT_WORDS]);
+    expect([...block("offer-fold").matchAll(/'([^']+)'/g)].map((m) => m[1])).toEqual([OFFER_FOLD_FROM, OFFER_FOLD_TO]);
+    expect([...OFFER_FOLD_FROM].length).toBe([...OFFER_FOLD_TO].length);
+    expect(OFFER_FOLD_TO).toMatch(/^[a-z]+$/);
+    // every not-word is a prefix letter and a list word
+    for (const word of OFFER_NOT_WORDS) expect(OFFER_WORDS, word).toContain([...word].slice(1).join(""));
+    // the format characters are exactly the runtime's \p{Cf}
+    const cf: number[] = [];
+    for (let cp = 0; cp <= 0x10ffff; cp += 1) if (/\p{Cf}/u.test(String.fromCodePoint(cp))) cf.push(cp);
+    const listed = OFFER_CF_RANGES.flatMap(([a, b]) => Array.from({ length: b - a + 1 }, (_, i) => a + i));
+    expect(listed).toEqual(cf);
+    // and the migration names each range by its code points
+    for (const [a, b] of OFFER_CF_RANGES) {
+      expect(offerSql, a.toString(16)).toContain(a === b ? `chr(${a})` : `chr(${a}) || '-' || chr(${b})`);
+    }
+    // delta review: the combining marks are exactly the runtime's \p{Mn}, and the SQL strip names each range
+    const mn: number[] = [];
+    for (let cp = 0; cp <= 0x10ffff; cp += 1) if (/\p{Mn}/u.test(String.fromCodePoint(cp))) mn.push(cp);
+    expect(OFFER_MN_RANGES.flatMap(([a, b]) => Array.from({ length: b - a + 1 }, (_, i) => a + i))).toEqual(mn);
+    const strip = offerSql.split("v_strip := ")[1]?.split("v_text := regexp_replace(v_text, v_strip")[0] ?? "";
+    expect(strip).not.toBe("");
+    for (const [a, b] of [...OFFER_CF_RANGES, ...OFFER_MN_RANGES, ...OFFER_EXTRA_STRIP.map((cp) => [cp, cp] as const)]) {
+      expect(strip, a.toString(16)).toMatch(new RegExp(a === b ? `chr\\(${a}\\)(?! \\|\\| '-')` : `chr\\(${a}\\) \\|\\| '-' \\|\\| chr\\(${b}\\)`));
+    }
+    // the Arabic-Indic digits fold to 0-9, the same strings in the migration
+    expect([...block("offer-digits").matchAll(/'([^']+)'/g)].map((m) => m[1])).toEqual([OFFER_DIGITS_FROM, OFFER_DIGITS_TO]);
+    expect([...OFFER_DIGITS_FROM].map((ch) => ch.codePointAt(0))).toEqual([
+      ...Array.from({ length: 10 }, (_, i) => 0x660 + i),
+      ...Array.from({ length: 10 }, (_, i) => 0x6f0 + i),
+    ]);
+    expect(OFFER_DIGITS_TO).toBe("01234567890123456789");
+  });
+
+  it("SPD-04 (282) ב: saving an instant reply is refused for an offer or an external link only", () => {
+    const base = { channel: "sms" as const, messageType: "instant_reply" as const, subject: null };
+    expect(instantReplyRefusal({ ...base, body: "שלום {שם פרטי}" })).toBeNull();
+    expect(instantReplyRefusal({ ...base, body: "{סכום} מבצע" })).toBe("offer");
+    expect(instantReplyRefusal({ ...base, body: "ראו www.example.com" })).toBe("external_link");
+    expect(instantReplyRefusal({ ...base, body: "ראו www.biz.co.il", ownDomain: "biz.co.il" })).toBeNull();
+    expect(instantReplyRefusal({ ...base, messageType: "collection", body: "מבצע www.example.com" })).toBeNull();
+    expect(templateProblemText({ ...base, body: "מבצע" })).toContain("לא תישמר");
+    expect(templateProblemText({ ...base, body: "ראו www.example.com" })).toContain("לא תישמר");
+    expect(SEND_REFUSAL_LABELS.offer).toBe("מחיר או מילה שיווקית");
+  });
+
+  it("SPD-04 (282) ב: the offer rule is linear on long hostile text", () => {
+    for (const text of ["ש\"".repeat(100_000), "ו".repeat(200_000), "1 ".repeat(100_000) + "x", " %".repeat(100_000), "מבצ ".repeat(50_000)]) {
+      const started = performance.now();
+      messageOffer(text);
       expect(performance.now() - started).toBeLessThan(500);
     }
   });
