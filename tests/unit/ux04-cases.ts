@@ -13,6 +13,9 @@ export const REWRITTEN_HINTS = [
   "quote_version:fixed",
   "quote_cancel:closed",
   "quote_cancel:not_accepted",
+  // owner (347) ב: a closing line each
+  "quote_deal:no_deal",
+  "contact_channel:primary",
   "quote_addendum:not_accepted",
   "quote_addendum:parent",
   "quote_addendum:version",

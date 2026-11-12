@@ -41,8 +41,8 @@ const NOTHING_TO_DO = new Set([
   "number_sequences:delete",
   "privacy_request:verified",
   // a state that is already final
+  // owner (347) ב: the owner's closing lines explain; nothing more to do
   "quote_pdf:not_accepted",
-  "quote_deal:no_deal",
   "contact_channel:primary",
   "banner:not_dismissable",
   "roadmap:done",
@@ -149,5 +149,19 @@ describe("refusal messages outside the hint map (UX-04)", () => {
       if (NOTHING_TO_DO.has(hint)) continue;
       expect(ACTION.test(lastSentence(message(hint))), hint).toBe(true);
     }
+  });
+});
+
+describe("own role refusal (owner (346) ב)", () => {
+  it("is recognised, and the owner's wording points to transferring ownership", async () => {
+    const errors = await import("@/lib/errors");
+    expect(errors.isOwnRoleRefusal({ code: "42501", message: "you cannot change your own role, seat or status" })).toBe(true);
+    expect(errors.isOwnRoleRefusal({ code: "42501", message: "only the owner can change another admin" })).toBe(false);
+    expect(errors.OWN_ROLE_OWNER_MESSAGE).toContain("הגדרות > משתמשים > העברת בעלות");
+    expect(errors.dbErrorMessage({ code: "42501", message: "you cannot change your own role, seat or status" }, "x")).toBe(errors.OWN_ROLE_MESSAGE);
+  });
+  it("the users actions use the owner's wording", () => {
+    const actions = readFileSync(join(process.cwd(), "src/features/settings/actions.ts"), "utf8");
+    expect(actions.match(/ownRoleRefusal\(context, orgId, error,/g)?.length).toBe(2);
   });
 });

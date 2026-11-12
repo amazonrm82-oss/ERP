@@ -7,7 +7,7 @@ import { actionContext } from "@/lib/action-context";
 import { INVALID_ARGS, booleanArg, validArg } from "@/lib/action-args";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import type { MembershipStatus } from "@/lib/database.types";
-import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
+import { dbErrorMessage, isOwnRoleRefusal, NOT_FOUND_OR_FORBIDDEN, OWN_ROLE_OWNER_MESSAGE } from "@/lib/errors";
 import { isUuid, paths } from "@/lib/paths";
 import { siteOrigin } from "@/lib/site-origin";
 import { pick } from "@/lib/validation";
@@ -152,7 +152,7 @@ export async function changeMemberRoleAction(
     .eq("user_id", userId)
     .select("id");
   if (error) {
-    return fail(dbErrorMessage(error, "לא הצלחנו לשנות את התפקיד. נסו שוב."));
+    return fail(await ownRoleRefusal(context, orgId, error, "לא הצלחנו לשנות את התפקיד. נסו שוב."));
   }
   if (data.length === 0) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
@@ -177,7 +177,7 @@ export async function setMemberStatusAction(orgId: string, userId: string, statu
     .eq("user_id", userId)
     .select("id");
   if (error) {
-    return fail(dbErrorMessage(error, "לא הצלחנו לעדכן את המשתמש. נסו שוב."));
+    return fail(await ownRoleRefusal(context, orgId, error, "לא הצלחנו לעדכן את המשתמש. נסו שוב."));
   }
   if (data.length === 0) {
     return fail(NOT_FOUND_OR_FORBIDDEN);
@@ -460,4 +460,26 @@ export async function transferRecordsAction(orgId: string, fromUserId: string, _
     ok: true,
     message: `הועברו ${moved.leads ?? 0} לידים, ${moved.contacts ?? 0} אנשי קשר, ${moved.companies ?? 0} חברות, ${moved.deals ?? 0} עסקאות, ${moved.tasks ?? 0} משימות, ${moved.meetings ?? 0} פגישות, ${moved.quotes ?? 0} הצעות מחיר ו-${moved.orders ?? 0} הזמנות.`,
   };
+}
+
+/**
+ * Owner (346) ב: the "you cannot change your own role, seat or status" refusal points the owner to transferring ownership;
+ * everyone else keeps "ask the owner". Any other error goes through dbErrorMessage as before.
+ */
+async function ownRoleRefusal(
+  context: Extract<Awaited<ReturnType<typeof actionContext>>, { ok: true }>,
+  orgId: string,
+  error: unknown,
+  fallback: string,
+): Promise<string> {
+  if (isOwnRoleRefusal(error)) {
+    const { data, error: roleError } = await context.supabase
+      .from("memberships")
+      .select("role")
+      .eq("organization_id", orgId)
+      .eq("user_id", context.user.id)
+      .maybeSingle();
+    if (!roleError && data?.role === "owner") return OWN_ROLE_OWNER_MESSAGE;
+  }
+  return dbErrorMessage(error, fallback);
 }

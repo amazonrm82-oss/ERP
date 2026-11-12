@@ -415,7 +415,7 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "quote_pdf:closed": "קובץ PDF נשמר רק להצעה שנשלחה ועדיין פתוחה (נשלחה או נצפתה). להצעה שנדחתה או שתוקפה עבר אפשר ליצור גרסה חדשה ולשלוח אותה.",
   "quote_pdf:invalid": "קובץ ה-PDF לא נשמר. נסו שוב בעוד רגע.",
   // QUO-09 signed PDF
-  "quote_pdf:not_accepted": "PDF חתום נשמר רק להצעה שהלקוח אישר וחתם עליה. הוא נשמר לבד כשהלקוח מאשר את ההצעה.",
+  "quote_pdf:not_accepted": "PDF חתום נשמר רק להצעה שהלקוח אישר וחתם עליה. PDF חתום נוצר רק אחרי שהלקוח מאשר את ההצעה.",
   "quote_pdf:version": "קובץ ה-PDF של ההצעה לא נשמר. נסו שוב בעוד רגע.",
   // ORD-05 PDF (migration order_pdfs)
   "order_pdf:draft": "לטיוטה אין קובץ PDF. אשרו את ההזמנה, והקובץ יישמר כשהיא מקבלת מספר.",
@@ -505,7 +505,7 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // RVW-50: an order line's price source and its price list must match (ORD-01, PL-03)
   "order_lines:price_list": "מקור המחיר והמחירון של השורה לא תואמים. רעננו את הדף ונסו שוב.",
   // RVW-50: the won window of an accepted quote (QUO-13, public.quote_win_deal / quote_lines_to_deal)
-  "quote_deal:no_deal": "ההצעה לא שייכת לעסקה, ולכן אין עסקה לעדכן לפיה.",
+  "quote_deal:no_deal": "ההצעה לא שייכת לעסקה, ולכן אין עסקה לעדכן לפיה. אפשר ליצור עסקה מכרטיס איש הקשר ולשייך אליה את ההצעה.",
   "quote_deal:not_accepted": "רק הצעה שהלקוח אישר מעדכנת את העסקה. רעננו את הדף ובדקו את מצב ההצעה.",
   // RVW-50 (found by the hint guard): a business in read-only mode, and a closed status picked as the default
   "org:read_only": "העסק במצב קריאה בלבד, ולכן אי אפשר לשמור שינויים. בעלי העסק רואים את הפרטים ב\"הגדרות > חבילה ושימוש\".",
@@ -681,7 +681,7 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "mention:forbidden": "אפשר לאזכר רק מי שרשאי לראות את הרשומה. הסירו את האזכור ונסו שוב.",
   "mention:too_many": `אפשר לאזכר עד ${MENTION_MAX} אנשים בהערה אחת. הסירו חלק מהאזכורים.`,
   // CON-01 (trigger contact_channels_payload_check)
-  "contact_channel:primary": "המספר או הכתובת כבר רשומים כראשיים של איש הקשר.",
+  "contact_channel:primary": "המספר או הכתובת כבר רשומים כראשיים של איש הקשר. אין צורך להוסיף אותו שוב.",
   "contact_channel:max": "אפשר לשמור עד 10 טלפונים נוספים ו-10 אימיילים נוספים לאיש קשר. מחקו אחד כדי להוסיף חדש.",
   // CON-05 (trigger contact_companies_check)
   "contact_company:primary": "את החברה הראשית לא מסירים מכאן. החליפו או הסירו אותה בעריכת הפרטים של איש הקשר.",
@@ -758,6 +758,16 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "sample:no_status": "אין סטטוס פתוח ללידים. הוסיפו סטטוס ב\"הגדרות > סטטוסים ומקורות\" ונסו שוב.",
 };
 
+// Owner (346) ב: everyone who changes their own role, seat or status is told to ask the owner; the owner, who gets the same
+// database message, is pointed to transferring ownership instead (ownRoleRefusal() in the users actions picks it).
+export const OWN_ROLE_MESSAGE = "אי אפשר לשנות את התפקיד או את הסטטוס של עצמך. בקשו מהבעלים של העסק לעשות את זה.";
+export const OWN_ROLE_OWNER_MESSAGE = "אי אפשר לשנות את התפקיד או את הסטטוס של עצמך. כדי להעביר את הבעלות: הגדרות > משתמשים > העברת בעלות.";
+/** True when a database error is the "you cannot change your own role, seat or status" refusal. */
+export function isOwnRoleRefusal(error: unknown): boolean {
+  const message = typeof error === "object" && error !== null && "message" in error ? String((error as { message: unknown }).message) : "";
+  return /cannot change your own role/i.test(message);
+}
+
 // P0001 raised without a hint: recognised by the (stable) English message.
 const RAISED_MESSAGES: Array<[RegExp, string]> = [
   [/already converted/i, "הליד כבר הומר. רעננו את הדף כדי לראות את איש הקשר והעסקה שנוצרו ממנו."],
@@ -769,7 +779,7 @@ const RAISED_MESSAGES: Array<[RegExp, string]> = [
 const OWN_MESSAGES: Array<[RegExp, string]> = [
   [/only the owner can (change|remove) another admin/i, "רק הבעלים יכול לשנות או להסיר מנהל מערכת אחר. בקשו מהבעלים לעשות את זה."],
   [/only the owner can (make someone|invite) an admin/i, "רק הבעלים יכול למנות מנהל מערכת. בקשו מהבעלים לעשות את זה."],
-  [/cannot change your own role/i, "אי אפשר לשנות את התפקיד או את הסטטוס של עצמך. בקשו מהבעלים של העסק לעשות את זה."],
+  [/cannot change your own role/i, OWN_ROLE_MESSAGE],
   [/owner cannot be (removed|suspended)|ownership changes only/i, "אי אפשר לשנות או להסיר את הבעלים. הבעלים עצמו יכול להעביר את הבעלות: אפשר לעשות את זה ב\"הגדרות > משתמשים\"."],
   [/already a member/i, "המשתמש כבר חבר בעסק. אפשר לשנות את התפקיד שלו ב\"הגדרות > משתמשים\"."],
   [/invitation is invalid or has expired/i, "ההזמנה אינה בתוקף. בקשו ממי שהזמין אתכם לשלוח הזמנה חדשה."],
