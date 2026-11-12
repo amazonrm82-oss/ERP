@@ -5,7 +5,6 @@ import {
   BoardIcon,
   BoltIcon,
   ChartIcon,
-  ChatIcon,
   CheckSquareIcon,
   CalendarIcon,
   FormIcon,
@@ -20,7 +19,7 @@ import {
   UsersIcon,
 } from "@/components/ui/icons";
 
-export type FeatureStatus = "live" | "soon";
+export type FeatureStatus = "live";
 
 export type Feature = {
   key: string;
@@ -32,9 +31,9 @@ export type Feature = {
 
 /**
  * Everything the landing page says the system does (LND-03, LND-04). A part
- * is "live" only when it works in the product today; whatever is not built yet
- * is "soon" and is shown apart, never as a promise. A new part that is built is
- * moved to "live" in the same change.
+ * is listed only when it works in the product today; what is on its way is the
+ * public roadmap list (src/features/roadmap/public-items.ts), shown apart as
+ * "בקרוב" (owner, 12 November 2026). A new part is added here when it is built.
  */
 export const FEATURES: Feature[] = [
   { key: "leads", status: "live", icon: InboxIcon, title: "לידים", text: "כל פנייה נכנסת לרשימה אחת, עם מקור, סטטוס ואחראי, ובטלפון חיוג ו-WhatsApp בלחיצה." },
@@ -46,23 +45,19 @@ export const FEATURES: Feature[] = [
   { key: "reports", status: "live", icon: ChartIcon, title: "דוחות", text: "מקורות לידים, ביצועי הצוות ותהליך המכירה, עם ייצוא לאקסל." },
   { key: "import", status: "live", icon: UploadIcon, title: "ייבוא מאקסל", text: "מעלים קובץ Excel או CSV, ממפים עמודות, ומדלגים על כפולים. אפשר לבטל ייבוא." },
   { key: "files", status: "live", icon: FormIcon, title: "קבצים", text: "הצעות מחיר, תמונות ומסמכים על כל רשומה, במקום אחד." },
-  { key: "search", status: "live", icon: SearchIcon, title: "חיפוש", text: "חיפוש אחד על כל המערכת, שמבין גם שגיאות כתיב בעברית." },
+  { key: "search", status: "live", icon: SearchIcon, title: "חיפוש", text: "חיפוש אחד על כל המערכת, שמבין עברית: ניקוד, אותיות סופיות וגרשיים לא מפריעים לו." },
   { key: "mobile", status: "live", icon: BellIcon, title: "אפליקציה לטלפון עם התראות", text: "מתקינים מהדפדפן למסך הבית, ומקבלים התראה על ליד חדש ועל תזכורת." },
   { key: "teams", status: "live", icon: UsersIcon, title: "צוותים והרשאות", text: "כל אחד רואה את מה שלו, מנהל צוות את הצוות שלו, ומנהלים את הכול." },
   { key: "security", status: "live", icon: LockIcon, title: "אבטחה ואימות דו-שלבי", text: "אימות דו-שלבי, יומן ביקורת של כל שינוי, והפרדה מלאה בין עסקים." },
   { key: "quotes", status: "live", icon: QuoteIcon, title: "הצעות מחיר", text: "הצעה מקטלוג המוצרים, PDF ממותג וקישור ללקוח שמאשר וחותם מהטלפון." },
   { key: "orders", status: "live", icon: OrderIcon, title: "הזמנות", text: "הצעה שאושרה הופכת להזמנה, עם מעקב חיוב ותשלום." },
-  { key: "payments", status: "live", icon: ChartIcon, title: "תשלומים וגבייה", text: "רישום תשלומים, צ'קים והחזרים, כרטסת לקוח, גיל חובות ותזכורות גבייה לצוות." },
+  { key: "payments", status: "live", icon: ChartIcon, title: "תשלומים וגבייה", text: "רישום תשלומים, צ'קים והחזרים, כרטסת לקוח, חובות לפי גיל ותזכורות גבייה." },
   { key: "money", status: "live", icon: BoardIcon, title: "כמה כסף מחכה לכם", text: "מספר אחד בשקלים: עסקאות תקועות, הצעות פתוחות וחובות, ולכל שורה פעולה." },
   { key: "booking", status: "live", icon: CalendarIcon, title: "דף קביעת תור", text: "קישור שבו לקוחות קובעים פגישה לפי שעות העבודה שלכם, ומבטלים או מזיזים לבד." },
   { key: "signatures", status: "live", icon: PencilIcon, title: "מסמכים לחתימה", text: "חוזה או טופס הצטרפות מתבנית, נשלח בקישור ונחתם בטלפון, עם PDF חתום." },
   { key: "punch_cards", status: "live", icon: TagIcon, title: "כרטיסיות", text: "כרטיסייה נפתחת עם התשלום, וכל פגישה שהתקיימה מורידה כניסה." },
-  { key: "presence", status: "live", icon: UsersIcon, title: "כרטיס ביקור, דף עסק וקוד QR", text: "כרטיס ביקור דיגיטלי לכל נציג, דף עסק ציבורי וקודי QR, וכל פנייה נכנסת כליד." },
+  { key: "presence", status: "live", icon: UsersIcon, title: "כרטיס ביקור וקוד QR", text: "כרטיס ביקור דיגיטלי לכל נציג וקודי QR, וכל פנייה נכנסת כליד." },
   { key: "goals", status: "live", icon: ChartIcon, title: "יעדים", text: "יעד לעסק, לצוות או לנציג, והתקדמות מול היעד בכל חודש." },
-  // the flags of chapter 18.2 not built yet: shown only as "soon" until each one works
-  { key: "whatsapp", status: "soon", icon: ChatIcon, title: "אף ליד לא מתפספס, והכול ב-WhatsApp", text: "מענה לליד חדש בתוך דקות, ועדכון המערכת מתוך WhatsApp." },
-  { key: "ads", status: "soon", icon: ChartIcon, title: "הפרסום לומד מהמכירות", text: "החזרה לפייסבוק ולגוגל של מי מהלידים נסגר, כדי שהפרסום יביא עוד כאלה." },
 ];
 
 export const LIVE_FEATURES = FEATURES.filter((feature) => feature.status === "live");
-export const SOON_FEATURES = FEATURES.filter((feature) => feature.status === "soon");

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { FEATURES, LIVE_FEATURES, SOON_FEATURES } from "@/features/landing/catalog";
+import { FEATURES, LIVE_FEATURES } from "@/features/landing/catalog";
 
 describe("landing page catalog (LND-03, LND-04)", () => {
   it("lists every part of the system the spec names, each once", () => {
@@ -11,9 +11,8 @@ describe("landing page catalog (LND-03, LND-04)", () => {
     }
   });
 
-  it("keeps what is not built yet apart, never as available", () => {
-    expect(SOON_FEATURES.map((feature) => feature.key)).toEqual(["whatsapp", "ads"]);
-    expect(LIVE_FEATURES.length + SOON_FEATURES.length).toBe(FEATURES.length);
+  it("lists only what works today; what is on its way comes from the public roadmap list (owner, 12 November 2026)", () => {
+    expect(LIVE_FEATURES.length).toBe(FEATURES.length);
   });
 
   it("explains each part in one short sentence", () => {

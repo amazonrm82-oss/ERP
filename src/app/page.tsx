@@ -6,7 +6,7 @@ import { SiteFooter } from "@/components/public-shell";
 import { ButtonLink, buttonClasses } from "@/components/ui/button";
 import { ChatIcon } from "@/components/ui/icons";
 import { Wordmark } from "@/components/wordmark";
-import { LIVE_FEATURES, SOON_FEATURES } from "@/features/landing/catalog";
+import { LIVE_FEATURES } from "@/features/landing/catalog";
 import { PriceList } from "@/features/landing/components/price-list";
 import { StandaloneRedirect } from "@/features/landing/components/standalone-redirect";
 import { readPublicPlans } from "@/features/landing/price-list-server";
@@ -18,7 +18,7 @@ import phoneShot from "@/assets/landing/phone.webp";
 
 export const metadata: Metadata = {
   title: { absolute: `${APP_NAME} | ${APP_DESCRIPTION}` },
-  description: "מערכת לניהול לידים, לקוחות ועסקאות לעסקים קטנים ובינוניים בישראל. בעברית, בטלפון ובמחשב.",
+  description: "Mexuz — מערכת לניהול לידים, לקוחות ועסקאות לעסקים קטנים ובינוניים בישראל. בעברית, בטלפון ובמחשב.",
   // the one page search engines should find (LND-11)
   robots: { index: true, follow: true },
 };
@@ -99,7 +99,7 @@ export default async function LandingPage() {
           <h2 id="features-title" className="text-2xl font-semibold">
             כל מה שיש במערכת
           </h2>
-          <p className="mt-2 max-w-2xl text-md text-ink-soft">כל מה שברשימה הזו עובד היום. מה שעוד לא מוכן מופיע בנפרד למטה.</p>
+          <p className="mt-2 max-w-2xl text-md text-ink-soft">כל מה שברשימה הזו עובד היום. מה שבדרך מופיע בנפרד למטה.</p>
           <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {LIVE_FEATURES.map((feature) => (
               <li key={feature.key} className="flex gap-4 rounded-lg border border-line bg-surface p-5">
@@ -115,22 +115,6 @@ export default async function LandingPage() {
           </ul>
         </section>
 
-        <section aria-labelledby="soon-title" className="border-t border-line bg-canvas">
-          <div className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6">
-            <h2 id="soon-title" className="text-xl font-semibold">
-              בקרוב
-            </h2>
-            <p className="mt-2 max-w-2xl text-md text-ink-soft">בבנייה עכשיו. עוד לא חלק מהמערכת.</p>
-            <ul className="mt-6 grid gap-4 md:grid-cols-3">
-              {SOON_FEATURES.map((feature) => (
-                <li key={feature.key} className="rounded-lg border border-dashed border-line-strong bg-surface p-5">
-                  <h3 className="font-semibold">{feature.title}</h3>
-                  <p className="mt-1 text-md text-ink-soft">{feature.text}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
 
         <PriceList plans={plans} />
 
@@ -141,9 +125,12 @@ export default async function LandingPage() {
           <p className="mx-auto mt-2 max-w-xl text-md text-ink-soft">נרשמים, נותנים שם לעסק, ומוסיפים את הליד הראשון. אפשר לייבא את מה שיש לכם באקסל.</p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <ButtonLink href={paths.signup}>הרשמה</ButtonLink>
-            <ButtonLink href={paths.help} variant="ghost">
-              מרכז עזרה
-            </ButtonLink>
+            {/* owner 12 November 2026: "דברו איתנו" until the public help centre (UX-06) goes live */}
+            {CONTACT_FORM_URL ? (
+              <a href={CONTACT_FORM_URL} className={buttonClasses("ghost")}>
+                דברו איתנו
+              </a>
+            ) : null}
           </div>
         </section>
       </main>

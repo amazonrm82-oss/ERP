@@ -71,12 +71,11 @@ describe("TRU-01 roadmap", () => {
     expect(list).toContain("Changes to this list need the owner's approval (DECISIONS.md, answer 192)");
   });
 
-  it("the public list is exactly the approved one", () => {
+  it("the public list is exactly the approved one (answer 192; the signature item removed by the owner, 12 November 2026)", () => {
     expect(PUBLIC_ROADMAP_ITEMS.map((item) => [item.status, item.title])).toEqual([
       ["building", "שליחת מיילים ו-SMS ללקוחות מתוך המערכת"],
       ["building", "לידים מפייסבוק ומאינסטגרם ישר למערכת"],
       ["building", "תזכורות ואישורי פגישה ללקוחות ב-SMS"],
-      ["planned", "חתימה דיגיטלית על הצעות והזמנות מהטלפון"],
       ["planned", "השהיית מנוי לעסק עונתי"],
     ]);
     expect(PUBLIC_ROADMAP_NOTE).toBe("הסדר והזמנים עשויים להשתנות");

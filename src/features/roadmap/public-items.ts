@@ -12,7 +12,6 @@ export const PUBLIC_ROADMAP_ITEMS: readonly PublicRoadmapItem[] = [
   { key: "provider-messages", title: "שליחת מיילים ו-SMS ללקוחות מתוך המערכת", status: "building" },
   { key: "meta-leads", title: "לידים מפייסבוק ומאינסטגרם ישר למערכת", status: "building" },
   { key: "meeting-messages", title: "תזכורות ואישורי פגישה ללקוחות ב-SMS", status: "building" },
-  { key: "mobile-signature", title: "חתימה דיגיטלית על הצעות והזמנות מהטלפון", status: "planned" },
   { key: "seasonal-pause", title: "השהיית מנוי לעסק עונתי", status: "planned" },
 ];
 
