@@ -259,6 +259,14 @@ and build this CRM here instead. The old code is preserved on the branch
   "In use" line. `app.message_notice_template_problem`, `app.message_types`, `app.message_type_fields`, `app.message_merge_fields`,
   `app.plan_key_defaults` and `public.plans_public` (adds `review_requests` to its closed list; test 344's pin rechecked) were last
   redefined in 021235. The advisor's findings on the three new app tables are expected.
+  Built (MNY-06 part one, migration 021236; owner (273): every plan; an independent review and a delta review): "what the system did for
+  you this month", a counts-only card for owners and admins on the reports page. `public.report_monthly_summary(org, month)` (invoker,
+  `{allowed:false}` unless `app.is_admin`, the month in the business zone) reads nothing itself; every count comes from the definer
+  `app.monthly_summary_counts` (is_admin first, else null; counts only; every read scoped to the business and every audit read bounded by
+  `created_at`; granted to authenticated only for the report; test 347 is its speed bound): leads the server gave their owner, tasks an
+  automation made, reminder tasks (collection, signature, contract renewal), automatic customer messages queued/sent by type (a person's
+  send or press left out), and debts paid within 14 days after a collection stage that really reminded. A failed read shows one line on
+  the card, never breaks the page. The monthly email (`digest.send`) is not built: it waits for owner question 311.
   In use (IMP-04, owner 9 November 2026, answers (155) א, (160) א, (161) א, (162) ב, (163) ב; migration `_background_jobs.sql`; two
    independent reviews): the OPS-04 worker (same route and secret) also claims `import.run` and `export.run` (payload `{request_id,
    user_id}` only) in its own pass (lease 900 s, one job, 40 s budget, then saved and handed back uncounted with
