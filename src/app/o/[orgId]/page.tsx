@@ -39,6 +39,8 @@ import { PEEK_ROW_MARK, peekLinks } from "@/features/lead-peek/model";
 import { cn } from "@/lib/cn";
 import { leadDisplayName } from "@/features/leads/display";
 import { getOrgModules } from "@/features/modules/queries";
+import { MonthlySummaryCard } from "@/features/monthly-summary/components/monthly-summary-card";
+import { getMonthlySummary } from "@/features/monthly-summary/queries";
 import { withReportShape } from "@/features/reports/schemas";
 import { getOrgContext } from "@/features/shell/queries";
 import { CompleteTaskButton } from "@/features/tasks/components/complete-task-button";
@@ -69,7 +71,7 @@ export default async function HomePage({ params, searchParams }: Props) {
   // owners and admins see where the setup wizard stopped (USR-03) until it is finished,
   // and then the setup checklist (USR-04) until they close it
   const setupOwner = isAdminRole(role) && canWrite;
-  const [day, setupStep, goals, modules, teamTasks, terms] = await Promise.all([
+  const [day, setupStep, goals, modules, teamTasks, terms, monthSummary] = await Promise.all([
     getMyDay(orgId, user.id, org.timeZone),
     setupOwner ? getSetupStep(orgId) : Promise.resolve(null),
     // GOL-03: the person's own goals whose period holds today; no goal, no card
@@ -80,6 +82,8 @@ export default async function HomePage({ params, searchParams }: Props) {
     getMyTeamTasks(orgId, user.id, role),
     // AIX-03: the business's words in the reasons
     getOrgTerms(orgId),
+    // MNY-06 (312) ב: what the system did this month, counts only, owners and admins only (never throws: a failed read is one line)
+    isAdminRole(role) ? getMonthlySummary(orgId, null) : Promise.resolve(null),
   ]);
   // AIX-03: the person's own leads nobody answered yet (SPD-02's rule); none while leads are switched off
   const waitingLeads = modules.leads ? await getWaitingLeads(orgId, user.id) : { leads: [], truncated: false };
@@ -210,6 +214,12 @@ export default async function HomePage({ params, searchParams }: Props) {
           </li>
         ))}
       </ul>
+
+      {/* MNY-06 (312) ב: the reports page's card, this month; its month links lead to the reports page */}
+      {monthSummary?.ok && monthSummary.value ? (
+        <MonthlySummaryCard data={monthSummary.value} terms={terms} today={day.today} basePath={paths.reports(orgId)} />
+      ) : null}
+      {monthSummary && !monthSummary.ok ? <p className="mb-6 text-md text-ink-soft">{monthSummary.message}</p> : null}
 
       <div className="grid items-start gap-5 lg:grid-cols-2">
         {closings ? (
