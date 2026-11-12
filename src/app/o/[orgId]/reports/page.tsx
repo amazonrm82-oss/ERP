@@ -21,11 +21,22 @@ import { seesBalances } from "@/features/balances/queries";
 import { getCollectionAccess } from "@/features/collection/queries";
 import { getOrgModules } from "@/features/modules/queries";
 import { getOrgContext } from "@/features/shell/queries";
+import { MonthlySummaryCard } from "@/features/monthly-summary/components/monthly-summary-card";
+import { getMonthlySummary } from "@/features/monthly-summary/queries";
+import { summaryMonth } from "@/features/monthly-summary/summary";
+import { isAdminRole } from "@/features/settings/permissions";
+import { zoneDate } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
 export const metadata: Metadata = { title: "דוחות" };
 
-export default async function ReportsPage({ params }: { params: Promise<{ orgId: string }> }) {
+export default async function ReportsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ orgId: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { orgId } = await params;
   const { role, org } = await getOrgContext(orgId);
   // DLI-06: a report about costs is listed only for those who may see costs
@@ -46,6 +57,10 @@ export default async function ReportsPage({ params }: { params: Promise<{ orgId:
   const reports = REPORTS.filter(
     (report) => (!report.costs || seesCosts) && reportRoleAllows(report, role) && (!report.balances || balances) && (!report.collection || collection) && (!report.feature || hasFeature.get(report.feature) === true) && (report.module !== "leads" || modules.leads),
   );
+  // MNY-06: what the system did this month (or an earlier month from ?month=YYYY-MM), owners and admins only
+  const today = zoneDate(new Date(), org.timeZone);
+  const month = summaryMonth((await searchParams)?.month, today);
+  const summary = isAdminRole(role) ? await getMonthlySummary(orgId, month) : null;
   // the dashboard is for people who manage others; reps get the reports list
   const dashboard = role === "owner" || role === "admin" || role === "manager" ? await withReportShape(() => getDashboard(orgId, role === "owner" || role === "admin" ? { unteamed: { timeZone: org.timeZone } } : {})) : null;
 
@@ -87,6 +102,9 @@ export default async function ReportsPage({ params }: { params: Promise<{ orgId:
           </span>
         }
       />
+      {summary?.ok && summary.value ? <MonthlySummaryCard data={summary.value} terms={terms} today={today} basePath={paths.reports(orgId)} /> : null}
+      {/* a failed read never breaks the page: one short line, the rest of the reports still open */}
+      {summary && !summary.ok ? <p className="mb-6 text-md text-ink-soft">{summary.message}</p> : null}
       {dashboard?.ok ? <ManagerDashboard dashboard={dashboard.value} orgId={orgId} /> : null}
       {dashboard && !dashboard.ok ? <FormError message={dashboard.message} className="mb-6" /> : null}
       <h2 className="mb-3 text-lg font-semibold">כל הדוחות</h2>

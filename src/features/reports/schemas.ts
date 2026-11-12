@@ -56,6 +56,9 @@ const cleanupDeals = z.array(
 // MNY-01: one group of "כסף שמחכה": its count and amount over all rows, and at most 300 rows
 const moneyGroup = <T extends z.ZodTypeAny>(row: T) => z.object({ count, amount, rows: z.array(row) });
 
+// MNY-06: one type of customer message in a month
+const monthlyMessages = z.object({ queued: count, sent: count }).strict();
+
 export const REPORT_SCHEMAS = {
   report_leads_by_source: z.array(
     z.object({ source_id: id, source_name: text, campaign: text, leads: count, converted: count, won: count, revenue: amount }),
@@ -606,6 +609,29 @@ export const REPORT_SCHEMAS = {
             })
             .strict(),
         ),
+      })
+      .strict(),
+    z.object({ allowed: z.literal(false) }).strict(),
+  ]),
+  // MNY-06: what the system did for the business in one month (business zone), counts only; owners and admins, else
+  // {allowed: false}. Customer messages are queued OPS-04 jobs by type (`sent` = the provider took it).
+  report_monthly_summary: z.union([
+    z
+      .object({
+        allowed: z.literal(true),
+        month: day,
+        leads_distributed: count,
+        automation_tasks: count,
+        reminder_tasks: z.object({ collection: count, signature: count, contract_renewal: count }).strict(),
+        customer_messages: z
+          .object({
+            collection: monthlyMessages,
+            meeting_reminder: monthlyMessages,
+            instant_reply: monthlyMessages,
+            review_request: monthlyMessages,
+          })
+          .strict(),
+        collected_after_reminder: z.object({ window_days: count, documents: count, payments: count }).strict(),
       })
       .strict(),
     z.object({ allowed: z.literal(false) }).strict(),

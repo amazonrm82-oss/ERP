@@ -4258,6 +4258,8 @@ export type Database = {
       report_collection: { Args: { p_org: string; p_from: string; p_to: string; p_owner?: string | null }; Returns: Json };
       // PKG-07: active punch cards, utilisation, expiring cards and the money for entries not used yet (invoker; partial when a card is hidden)
       report_punch_cards: { Args: { p_org: string; p_days?: number }; Returns: Json };
+      // MNY-06: what the system did this month, counts only (invoker; owners and admins, {"allowed": false} otherwise)
+      report_monthly_summary: { Args: { p_org: string; p_month?: string | null }; Returns: Json };
       // COL-01: the collection screen's open debt documents (invoker; BAL-01's rights, BAL-03's partial rule)
       collection_documents: {
         Args: {

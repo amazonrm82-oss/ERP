@@ -315,6 +315,7 @@ describe("report result shapes (FXC-12)", () => {
         [org],
       ],
       report_punch_cards: ["public.report_punch_cards($1)", [org]],
+      report_monthly_summary: ["public.report_monthly_summary($1)", [org]],
     };
     for (const name of REPORT_FUNCTIONS) {
       const [sql, params] = calls[name];

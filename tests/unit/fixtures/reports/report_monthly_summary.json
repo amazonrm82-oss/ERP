@@ -1,0 +1,34 @@
+{
+  "allowed": true,
+  "month": "2026-11-01",
+  "leads_distributed": 2,
+  "automation_tasks": 0,
+  "reminder_tasks": {
+    "collection": 0,
+    "signature": 0,
+    "contract_renewal": 0
+  },
+  "customer_messages": {
+    "collection": {
+      "queued": 0,
+      "sent": 0
+    },
+    "meeting_reminder": {
+      "queued": 0,
+      "sent": 0
+    },
+    "instant_reply": {
+      "queued": 1,
+      "sent": 0
+    },
+    "review_request": {
+      "queued": 0,
+      "sent": 0
+    }
+  },
+  "collected_after_reminder": {
+    "window_days": 14,
+    "documents": 1,
+    "payments": 1
+  }
+}
