@@ -134,8 +134,12 @@ and build this CRM here instead. The old code is preserved on the branch
   in `app.instant_replies`). `app.message_window_exempt` (verification_code, instant_reply) is read only by the window line of
   `public.job_message_may_send` and the hours move of `app.message_move_waiting`; `app.message_always_sends` stays
   verification_code only, so an instant reply takes the rates (test 284's pin changed, reviewed 11 November 2026, window line
-  only). The four instant-reply templates are seeded only with the `instant_reply` key and are fixed for a person's write (only
-  is_active; trigger `message_templates_fixed_notice`, hint `message_template:fixed_notice`; interim until owner question 282).
+  only). The four instant-reply templates are seeded only with the `instant_reply` key. Since 021233 (owner (282) ב) a person edits
+  their wording and switch, never their channel, type or notice_kind (hint `message_template:instant_reply_kind`) and never deletes them;
+  saving an instant reply that holds an offer is refused (`app.message_offer` = `messageOffer()`: NFKC, Cf/Mn and fillers stripped,
+  look-alike and Arabic-Indic digit folds, ₪ $ € £, ש"ח / שח next to a number, % next to a digit, a closed word list with up to 3 prefix
+  letters; hint `message_template:offer`; an outside link `message_template:instant_reply_link`); the rule judges the text as written,
+  not filled fields. `message_templates_fixed_notice` is a no-op trigger since 021233.
   `org_message_settings.instant_reply_default` gives a new web form its switch. THE FUTURE SENDER re-checks the `instant_reply`
   key and the form's switch, re-reads the submission, sends nothing unless the record's address still equals the typed one, and
   needs its own "In use" line. `app.job_payload_ok` was redefined in 021225 (then 021226).
@@ -185,8 +189,9 @@ and build this CRM here instead. The old code is preserved on the branch
   read through the partial sender indexes), quiet form (kinds form|webhook), campaign cost-per-lead jump (only with `campaign_costs`;
   imported and sample leads left out). Lead drop and quiet form are skipped in a week with fewer working days. One `system` notice per
   kind to active owners/admins, counts only, `entity_id` = the business, at most once per target a week (campaign: once per month and
-  key), `app.anomaly_alerts_sent`; "נוסף" when earlier targets were told that week. Index `activities_org_created_idx`. Interim
-  thresholds in the migration header (owner questions 285-286). The advisor's findings on the two app tables are expected.
+  key), `app.anomaly_alerts_sent`; "נוסף" when earlier targets were told that week. Index `activities_org_created_idx`. Since 021234 (owner (285) ג, (286) ב) `public.anomaly_alert_settings` (one row per business, a switch
+  and a threshold per alert, defaults = the old rules; members read, owners/admins of a writable business write, audited) through
+  `app.anomaly_settings_of`; owners and admins are counted by the idle-rep alert and a notice about one goes only to the others. The advisor's findings on the two app tables are expected.
   In use (LIB-02, owner 11 and 12 November 2026, hard rule 5's pattern, answers (291) א, (292) ב, (293) ב, (294) ב, (296) ג; migrations
   021229, 021230; independent reviews): a library item sent by a tracked link (`src/features/library-links/public-server.ts`, page
   `/f/lib/<token>`, routes `GET /f/lib/<token>/go` and `GET /api/forms/lib/<token>/file`), which calls only `public.library_link_public()`
