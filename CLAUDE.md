@@ -158,17 +158,25 @@ and build this CRM here instead. The old code is preserved on the branch
   stage's `offset_days` right before sending and needs its own "In use" line. `app.job_payload_ok` was last redefined in 021226
   (`collection_document_id`). Tests 64 and 88 end with `_collection_customer_reminders.sql`. The advisor's finding on
   `app.collection_template_seeds` is expected.
-  In use (SGN-07, owner 11 November 2026, answer (276) א; migration 021227; an independent review and a delta review): in-person
-  signing on the rep's device (`src/features/in-person-signing/`, pages `/o/[org]/signatures/[doc]/sign` and `/o/[org]/quotes/[quote]/sign`).
-  The rep's session signs first through `public.signature_in_person_sign` / `public.quote_in_person_accept` (definer, authenticated:
-  the right that sends the document, `app.signature_managed_document` / `app.quote_editable` with can_write, writable, the key; only
-  with a live link row, whose try window it shares with the customer's link; `in_person` + `in_person_by` + the rep's user agent, no
-  IP; the quote path is `quote_public_answer`'s accepted branch with the JWT claims set aside around the writes). Then, only after
-  `signature_in_person_pdf_allowed` / `quote_in_person_pdf_allowed` with the same session (the rep who was present, within an hour),
-  the existing writers `public.signature_pdf_store` / `public.quote_signed_pdf_store` (service_role) write the signed PDF; they judge the
-  named rep again (`app.signature_in_person_rep` / `app.quote_in_person_rep`, the hour, active non-viewer, `app.signature_pdf_user_may` =
-  `app.quote_pdf_user_may`'s rule). The notice keeps the public title 'מסמך נחתם בקישור' so erasure reaches it. No new service-key file.
-  The advisor's findings on the five new public definers are expected.
+  In use (SGN-07, owner 11 and 12 November 2026, answers (276) א, (287) ב, (288) ב, (289) ב, (290) ב; migrations 021227, 021231;
+  independent reviews): in-person signing on the rep's device (`src/features/in-person-signing/`, pages `/o/[org]/signatures/[doc]/sign`
+  and `/o/[org]/quotes/[quote]/sign`). The rep's session signs first through `public.signature_in_person_sign` /
+  `public.quote_in_person_accept` / `public.quote_in_person_decline` (definer, authenticated: the right that sends the document,
+  `app.signature_managed_document` / `app.quote_editable` with can_write, writable, the key; only with a live link row, whose try window
+  it shares with the customer's link; `in_person` + `in_person_by` + the rep's user agent and device IP, the latter sent by the server in
+  request header `x-crm-device-ip` and kept by `app.in_person_device_ip` only when it looks like an address, a claim like the user agent;
+  the quote paths are `quote_public_answer`'s branches with the JWT claims set aside around the writes). Notices go to the usual
+  recipients minus the rep, else the active owners and admins (`app.in_person_notice_targets`). Then, only after
+  `signature_in_person_pdf_allowed` / `quote_in_person_pdf_allowed` with the same session (the rep who was present, within 24 hours), the
+  existing writers `public.signature_pdf_store` / `public.quote_signed_pdf_store` (service_role) write the signed PDF; they judge the named
+  rep again (`app.signature_in_person_rep` / `app.quote_in_person_rep`, the 24 hours, active non-viewer, `app.signature_pdf_user_may` =
+  `app.quote_pdf_user_may`'s rule). The document notice keeps the public title 'מסמך נחתם בקישור' so erasure reaches it. No new
+  service-key file. The advisor's findings on the six public definers are expected.
+  SGN-04 answer (283) ב (migration 021231): `app.close_expired_contract_renewals` (first step of `app.send_contract_renewals`, in its own
+  exception block) closes the open renewal tasks of a signed contract whose last day passed, "נסגרה: פג תוקף החוזה", unless a person
+  changed or restored the task (`app.contract_renewal_task_touched`, judged again under the lock), and marks
+  `signature_documents.contract_expired_at` (server only; cleared when `valid_until` changes); 200 per business, 2,000 a run, 3 failures
+  per document and last day then skipped (`app.contract_expiry_failures`, whose advisor finding is expected).
   Built (MNY-04, migration 021228; owner (273): every plan; an independent review and two delta reviews): anomaly alerts. pg_cron
   `crm-anomaly-alerts` (hourly :47) runs `app.send_anomaly_alerts` once per business and local day from 08:00, writable businesses,
   in turns, 100 a run, 60 s budget, 3 failures then skipped for the day (`app.anomaly_alert_days`). Four definer detectors (no grants):
