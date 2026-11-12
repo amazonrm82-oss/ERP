@@ -1344,7 +1344,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   holds no health or medical content (test 356, closed medical word list). A template field may carry `privacy_class`, written only when a
   new field is inserted; the FLD-05 "health" template marks "קופת חולים" sensitive (350 ג); `app.industry_template` was last redefined in
   021252. The setup wizard's "ערכה או תבנית" defaults to the kit for health/education (349 א), the old template stays in the same select.
-- Recurring billing (SUB-01..05, migrations 021253, 021254; owner (269) ג, (352)-(357); an independent review and two delta reviews;
+- Recurring billing (SUB-01..05, migrations 021253-021260, one design split in eight parts so each fits one apply call; owner (269) ג, (352)-(357); an independent review and two delta reviews;
   plan key `recurring_billing` pro and business; rights `app.can_record_payments`): tables `recurring_billings`, `_lines`, `_cycles`,
   `_events`; pg_cron `crm-recurring-billings` makes a cycle, a task for the rep and a draft order (owner (352) ב; the order's owner only
   while the rep reads its parent; dated the day it is made). Resume asks whether to make up missed cycles (from the first missed date,
@@ -1354,7 +1354,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   day 29-31 = 0); cancel inside the commitment recorded; `public.report_recurring_billing` for owners/admins/managers by role, amounts
   before and with VAT; a deal merge re-checks the kept deal and unlinks it on a mismatch (`deal_unlinked`). `app.audit_erase_core`,
   `app.sample_untouched`, `app.import_record_worked`, `public.plans_public` (test 344 pin) and `public.log_export` were last redefined in
-  021253/021254; tests 64 and 88 end with `_recurring_billing_links.sql`. The advisor's findings on `app.recurring_billing_failures` and
+  021253-021260; tests 64 and 88 end with the eight parts, `_recurring_billing_links.sql` last. The advisor's findings on `app.recurring_billing_failures` and
   `app.recurring_billing_turns` are expected.
 - Call-back time (SPD-05, migration 0119): `forms.callback_choice` (owners/admins, column grants) adds "now" or a slot today
   or tomorrow (09-12, 12-15, 15-18, 18-20, org time zone; `src/features/intake/callback.ts` mirrors `app.intake_callback_*`).

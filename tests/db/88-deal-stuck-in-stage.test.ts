@@ -169,9 +169,15 @@ const RERUN = [
   migrationFile("_business_page_new_link.sql"),
   // owner (330) א, (331) א redefine app.plan_key_defaults() last
   migrationFile("_free_plan_quotes.sql"),
-  // SUB-01..05 redefine app.plan_key_defaults() and public.log_export() last
+  // SUB-01..05 (eight parts, in name order) redefine app.plan_key_defaults(), public.log_export(), app.audit_erase_core(),
+  // app.sample_untouched() and app.import_record_worked() last
   migrationFile("_recurring_billing.sql"),
-  // SUB-01 redefines app.sample_untouched(), app.import_record_worked() and app.audit_erase_core() last
+  migrationFile("_recurring_billing_rules.sql"),
+  migrationFile("_recurring_billing_lines.sql"),
+  migrationFile("_recurring_billing_cycles.sql"),
+  migrationFile("_recurring_billing_job.sql"),
+  migrationFile("_recurring_billing_report.sql"),
+  migrationFile("_recurring_billing_erase.sql"),
   migrationFile("_recurring_billing_links.sql"),
 ];
 

@@ -15,7 +15,7 @@ afterAll(closePool);
 // BIZ-01 (migration 20261006021237_business_page.sql; f6fe40e4956b37f2ca09bae33678504c before): 021235's body with
 // 'public_page' added to the closed landing list after 'business_card'; rechecked: nothing else changed (no new field, table,
 // argument or grant). Needs the fresh review the header asks for.
-// SUB-01 (migration 20261006021254_recurring_billing_links.sql; a87ed637b1a911cabd027e80bb0f45ac before): 021237's body with
+// SUB-01 (migration 20261006021260_recurring_billing_links.sql; a87ed637b1a911cabd027e80bb0f45ac before): 021237's body with
 // 'recurring_billing' added to the closed landing list after 'punch_cards'; rechecked: nothing else changed (no new field,
 // table, argument or grant). Needs the fresh review the header asks for.
 const REVIEWED_BODY_MD5 = "7255a66cfb01154adbc975ee13d09421";
