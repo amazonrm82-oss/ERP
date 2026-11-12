@@ -1,6 +1,6 @@
 import { byGender, DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
 
-// The built-in reports (SPEC 11.1; source_revenue: SEG-02; campaign_roi: SEG-03; meetings: CAL-11; referrals: CON-06; products, recurring: RPT-01; categories, profit: DLI-06; quotes: QUO-17; debt_aging: BAL-03; collection: COL-06; punch_cards: PKG-07). Shared by the index, the report page and the export.
+// The built-in reports (SPEC 11.1; source_revenue: SEG-02; campaign_roi: SEG-03; meetings: CAL-11; referrals: CON-06; products, recurring: RPT-01; categories, profit: DLI-06; quotes: QUO-17; debt_aging: BAL-03; collection: COL-06; punch_cards: PKG-07; recurring_billing: SUB-05). Shared by the index, the report page and the export.
 
 export type ReportFilter = "period" | "owner" | "pipeline";
 
@@ -15,7 +15,7 @@ export type ReportDefinition = {
   costs?: true;
   // QUO-17: a report of a plan capability, shown, opened and exported only while the business has it (SEG-03: campaign_costs;
   // PKG-07: punch_cards)
-  feature?: "quotes" | "campaign_costs" | "punch_cards";
+  feature?: "quotes" | "campaign_costs" | "punch_cards" | "recurring_billing";
   // BAL-03: shown, opened and exported only by those who open a customer's ledger (BAL-01: owners, admins, managers and
   // holders of record_payments) with the balances, documents and payments keys; the SQL answers {allowed: false} to others
   balances?: true;
@@ -110,6 +110,17 @@ export const REPORTS: ReportDefinition[] = [
     description: "כרטיסיות פעילות, ניצול הכניסות לפי מוצר, כרטיסיות שעומדות לפוג, וכסף שהתקבל על כניסות שעוד לא נוצלו.",
     filters: [],
     feature: "punch_cards",
+    managers: true,
+  },
+  // SUB-05: recurring billings of customers (owner (269) ג: the plans that hold recurring_billing; the SQL answers
+  // {allowed: false} to those who do not record payments)
+  {
+    key: "recurring_billing",
+    title: "חיובים חוזרים",
+    description: "הכנסה חודשית חוזרת מחיובים פעילים, לפני מע\"מ וכולל מע\"מ, לקוחות חדשים ולקוחות שעזבו בכל חודש, והכנסה צפויה לחודש הבא.",
+    filters: ["period"],
+    feature: "recurring_billing",
+    // owner (356) ב: owners, admins and managers by role
     managers: true,
   },
 ];

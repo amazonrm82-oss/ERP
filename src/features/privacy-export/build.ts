@@ -89,6 +89,7 @@ export const PERSON_EXPORT_README = `ייצוא כל המידע על אדם אח
 - accounting_documents: מסמכים חשבונאיים (חשבוניות וקבלות) שהופקו מחוץ למערכת ונרשמו על איש הקשר או העסקאות
 - accounting_document_lines: השורות של המסמכים החשבונאיים
 - payment_promises: הבטחות תשלום שנרשמו על איש הקשר או על המסמכים שלו, עם הערת הגבייה
+- recurring_billings, recurring_billing_lines, recurring_billing_cycles, recurring_billing_events: החיובים החוזרים של איש הקשר, השורות שלהם, המחזורים וההיסטוריה
 - privacy_requests: בקשות פרטיות שקשורות לליד או לאיש הקשר
 - deal_lines: השורות (מוצרים ושירותים) של העסקאות
 - task_checklist_items: השלבים של המשימות
@@ -139,6 +140,10 @@ export const PERSON_EXPORT_TABLES = [
   "punch_card_uses",
   "customer_holds",
   "payment_promises",
+  "recurring_billings",
+  "recurring_billing_lines",
+  "recurring_billing_cycles",
+  "recurring_billing_events",
   "accounting_documents",
   "accounting_document_lines",
   "privacy_requests",

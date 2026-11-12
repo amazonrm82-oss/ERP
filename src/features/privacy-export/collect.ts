@@ -193,6 +193,14 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     .map(paidCardForExport);
   // COL-05: the "do not sell" holds set on the person's contacts
   const customerHolds = await readByIds(supabase, orgId, "customer_holds", "*", "contact_id", contactIds);
+  // SUB-01..05: the person's recurring billings (on one of their contacts), with their lines, cycles and history
+  const recurringBillings = await readByIds(supabase, orgId, "recurring_billings", "*", "contact_id", contactIds);
+  const billingIds = uniqueIds(recurringBillings.map((b) => b.id));
+  const [recurringBillingLines, recurringBillingCycles, recurringBillingEvents] = await Promise.all([
+    readByIds(supabase, orgId, "recurring_billing_lines", "*", "billing_id", billingIds),
+    readByIds(supabase, orgId, "recurring_billing_cycles", "*", "billing_id", billingIds),
+    readByIds(supabase, orgId, "recurring_billing_events", "*", "billing_id", billingIds),
+  ]);
   // and their files (the copy of the paper that was issued), listed and stored like the records' files
   const documentIds = uniqueIds(accountingDocuments.map((d) => d.id));
   files.push(...(await readByIds(supabase, orgId, "files", FILE_COLUMNS, "accounting_document_id", documentIds)));
@@ -294,6 +302,10 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
     accounting_documents: accountingDocuments,
     accounting_document_lines: accountingDocumentLines,
     payment_promises: paymentPromises,
+    recurring_billings: recurringBillings,
+    recurring_billing_lines: recurringBillingLines,
+    recurring_billing_cycles: recurringBillingCycles,
+    recurring_billing_events: recurringBillingEvents,
     privacy_requests: privacyRequests,
     deal_lines: dealLines,
     task_checklist_items: taskChecklistItems,

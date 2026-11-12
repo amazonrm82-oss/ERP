@@ -508,6 +508,39 @@ describe("roles and record visibility", () => {
     expect((await pgError(asUser(m1.id, (q) => q("insert into public.payment_promises (organization_id, document_id, promised_date) values ($1, $2, current_date)", [org, invoice])))).code).toBe("42501");
   });
 
+  it("a recurring billing follows its customer; owners, admins and managers manage it, members and viewers only read (SUB-01)", async () => {
+    await setVisibility("own");
+    await asAdmin((q) => q("update public.subscriptions set feature_overrides = coalesce(feature_overrides, '{}'::jsonb) || '{\"recurring_billing\": true}' where organization_id = $1", [org]));
+    const contact = await asUser(m1.id, async (q) =>
+      (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'מנוי של חבר') returning id", [org])).rows[0].id,
+    );
+    const make = (u: U) =>
+      asUser(u.id, async (q) =>
+        (await q<{ id: string }>("insert into public.recurring_billings (organization_id, contact_id, name, cycle, start_date, billing_day) values ($1, $2, 'ריטיינר', 'monthly', current_date, 3) returning id", [org, contact])).rows[0].id,
+      );
+    const billing = await make(manager);
+    await asUser(manager.id, (q) => q("insert into public.recurring_billing_lines (organization_id, billing_id, description, unit_price_agorot) values ($1, $2, 'שורה', 1000)", [org, billing]));
+    const seen = (u: U) =>
+      asUser(u.id, async (q) => [
+        await count(q, "select 1 from public.recurring_billings where id = $1", [billing]),
+        await count(q, "select 1 from public.recurring_billing_lines where billing_id = $1", [billing]),
+        await count(q, "select 1 from public.recurring_billing_events where billing_id = $1", [billing]),
+      ]);
+    for (const u of [owner, admin, manager, m1]) expect(await seen(u), u.email).toEqual([1, 1, 1]);
+    for (const u of [m2, viewer]) expect(await seen(u), u.email).toEqual([0, 0, 0]);
+    for (const u of [owner, admin]) expect(await make(u), u.email).toBeTruthy();
+    for (const u of [m1, viewer]) expect((await pgError(make(u))).code, u.email).toBe("42501");
+    // m1 reads it (the contact is theirs) but holds no key: changes and removes nothing
+    expect(await asUser(m1.id, async (q) => (await q("update public.recurring_billings set name = 'x' where id = $1", [billing])).rowCount)).toBe(0);
+    expect(await asUser(m1.id, async (q) => (await q("update public.recurring_billing_lines set description = 'x' where billing_id = $1", [billing])).rowCount)).toBe(0);
+    expect(await asUser(m1.id, async (q) => (await q("delete from public.recurring_billing_lines where billing_id = $1", [billing])).rowCount)).toBe(0);
+    await setVisibility("org");
+    expect((await seen(viewer))[0]).toBe(1);
+    expect(await asUser(viewer.id, async (q) => (await q("update public.recurring_billings set name = 'x' where id = $1", [billing])).rowCount)).toBe(0);
+    expect(await asUser(admin.id, async (q) => (await q("update public.recurring_billings set name = 'ריטיינר חדש' where id = $1", [billing])).rowCount)).toBe(1);
+    expect(await asUser(admin.id, async (q) => (await q("delete from public.recurring_billing_lines where billing_id = $1", [billing])).rowCount)).toBe(1);
+  });
+
   it("payments follow their deal; owners, admins and managers record, only owners and admins correct and cancel, nobody deletes (PAY-01, PAY-06)", async () => {
     await setVisibility("own");
     const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;

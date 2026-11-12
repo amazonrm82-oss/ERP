@@ -1,0 +1,28 @@
+{
+  "totals": {
+    "mrr": 50000,
+    "next_month": 50000,
+    "mrr_with_vat": 59000,
+    "active_billings": 1,
+    "failed_billings": 0,
+    "paused_billings": 0,
+    "active_customers": 1,
+    "next_month_cycles": 1,
+    "next_month_with_vat": 59000
+  },
+  "allowed": true,
+  "partial": false,
+  "by_month": [
+    {
+      "month": "2026-11-01",
+      "new_mrr": 50000,
+      "churned_mrr": 0,
+      "new_customers": 1,
+      "new_mrr_with_vat": 59000,
+      "churned_customers": 0,
+      "churned_mrr_with_vat": 0
+    }
+  ],
+  "currency": "ILS",
+  "next_month": "2026-12-01"
+}

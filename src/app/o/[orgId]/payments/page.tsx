@@ -17,6 +17,8 @@ import { prepareListFilter, startListFilterLookups } from "@/features/list-filte
 import { PAYMENT_STATUS_TONES, paymentCounts, paymentHome, PaymentsTable } from "@/features/payments/components/payments-table";
 import { PAYMENT_DEFAULT_SORT, paymentListFilters, paymentListHref, paymentSortStartsAscending, type PaymentSortKey } from "@/features/payments/list";
 import { chequesPath, collectionPath, paymentsPath } from "@/features/payments/paths";
+import { recurringBillingsPath } from "@/features/recurring-billing/paths";
+import { getRecurringAccess } from "@/features/recurring-billing/queries";
 import { getCollectionAccess } from "@/features/collection/queries";
 import { getPaymentsAccess, listPayments, listPaymentTotal, PAYMENT_TOTALS_LIMIT } from "@/features/payments/queries";
 import { PAYMENT_METHOD_LABELS, PAYMENT_METHODS, PAYMENT_STATUS_LABELS, PAYMENT_STATUSES } from "@/features/payments/schema";
@@ -68,7 +70,7 @@ export default async function PaymentsPage({ params, searchParams }: Props) {
   const filters = paymentListFilters(query);
   const sort = filters.sort ?? PAYMENT_DEFAULT_SORT;
   // FXC-09: the columns and the filter's choices load side by side; prepareListFilter reuses the same reads
-  const [granted, listColumns, quickSale, collectionAccess] = await Promise.all([
+  const [granted, listColumns, quickSale, collectionAccess, recurringAccess] = await Promise.all([
     // PRM-01: extra permissions (export)
     getMyPermissions(orgId),
     getListColumns(orgId, "payment"),
@@ -76,6 +78,8 @@ export default async function PaymentsPage({ params, searchParams }: Props) {
     quickSaleOffered(orgId),
     // COL-01: the collection screen, for whoever may open it
     getCollectionAccess(orgId),
+    // SUB-01: recurring billings, while the plan holds them
+    getRecurringAccess(orgId),
     startListFilterLookups(orgId, "payment"),
   ]);
   const collection = collectionAccess.canOpen;
@@ -117,6 +121,12 @@ export default async function PaymentsPage({ params, searchParams }: Props) {
             {collection ? (
               <Link href={collectionPath(orgId)} className={buttonClasses("secondary", "sm")}>
                 גבייה
+              </Link>
+            ) : null}
+            {/* SUB-01 */}
+            {recurringAccess.inPlan ? (
+              <Link href={recurringBillingsPath(orgId)} className={buttonClasses("secondary", "sm")}>
+                חיובים חוזרים
               </Link>
             ) : null}
             {/* PAY-04 answer 7 */}

@@ -1500,6 +1500,66 @@ export async function buildReport(orgId: string, key: string, filters: ReportFil
       };
     }
 
+    case "recurring_billing": {
+      // SUB-05: the business's recurring billings now (MRR, next month) and per month of the period (new and churned
+      // customers); every amount is one cycle before VAT, quarterly / 3 and yearly / 12 per month
+      const data = parseReportData(
+        "report_recurring_billing",
+        await rpc("report_recurring_billing", { p_org: orgId, p_from: period.fromDate.slice(0, 10), p_to: period.toDate.slice(0, 10) }),
+      );
+      if (!data.allowed) {
+        return { kpis: [], sections: [], note: "את הדוח הזה רואים בעלים, מנהלי מערכת ומנהלים, בחבילה שכוללת חיובים חוזרים." };
+      }
+      const { totals } = data;
+      // review M3: a caller who does not read every billing sees the counts of the ones they read, and no amounts
+      const partialNote = "רשימה חלקית: יש חיובים חוזרים שאינכם רואים, ולכן לא מוצגים סכומים. הדוח המלא זמין לבעלים ולמנהלי מערכת.";
+      // owner (357) ג: every amount before VAT and with VAT
+      const both = (net: number, gross: number) => `${formatMoney(net)} לפני מע"מ`.concat(` · ${formatMoney(gross)} כולל מע"מ`);
+      return {
+        ...(totals === null ? { note: partialNote } : {}),
+        kpis:
+          totals === null
+            ? []
+            : [
+                {
+                  label: "הכנסה חודשית חוזרת",
+                  value: formatMoney(totals.mrr),
+                  hint: `לפני מע"מ · ${formatMoney(totals.mrr_with_vat)} כולל מע"מ · ${formatNumber(totals.active_billings)} חיובים פעילים, ${formatNumber(totals.active_customers)} לקוחות`,
+                },
+                { label: "צפוי בחודש הבא", value: formatMoney(totals.next_month), hint: `${both(totals.next_month, totals.next_month_with_vat)} · ${formatNumber(totals.next_month_cycles)} מחזורים` },
+                { label: "מושהים", value: formatNumber(totals.paused_billings), hint: totals.failed_billings > 0 ? `ועוד ${formatNumber(totals.failed_billings)} שנכשלו` : undefined },
+              ],
+        sections: [
+          {
+            title: "לפי חודש",
+            columns: [
+              { key: "month", label: "חודש", kind: "text" },
+              { key: "new_customers", label: "לקוחות חדשים", kind: "number" },
+              { key: "new_mrr", label: "הכנסה חודשית חדשה, לפני מע\"מ", kind: "money" },
+              { key: "new_mrr_with_vat", label: "הכנסה חודשית חדשה, כולל מע\"מ", kind: "money" },
+              { key: "churned_customers", label: "לקוחות שעזבו", kind: "number" },
+              { key: "churned_mrr", label: "הכנסה חודשית שירדה, לפני מע\"מ", kind: "money" },
+              { key: "churned_mrr_with_vat", label: "הכנסה חודשית שירדה, כולל מע\"מ", kind: "money" },
+            ],
+            rows: data.by_month.map(
+              (r): ReportRow => ({
+                month: monthLabel(r.month),
+                new_customers: r.new_customers,
+                new_mrr: r.new_mrr,
+                new_mrr_with_vat: r.new_mrr_with_vat,
+                churned_customers: r.churned_customers,
+                churned_mrr: r.churned_mrr,
+                churned_mrr_with_vat: r.churned_mrr_with_vat,
+              }),
+            ),
+            bar: "new_mrr",
+            empty: "אין חודשים בתקופה הזו.",
+            note: "מע\"מ לפי מצב המחירים של כל חיוב ולפי שיעור היום (בחודש הבא: לפי תאריך המחזור); בעסק שמצב המע\"מ שלו לא הוגדר לא נוסף מע\"מ. לקוח חדש: החיוב הראשון שלו התחיל בחודש. לקוח שעזב: כל החיובים שלו בוטלו או הסתיימו, והאחרון בחודש הזה.",
+          },
+        ],
+      };
+    }
+
     case "punch_cards": {
       // PKG-07: the business's punch cards now; RLS decides which cards are counted, and a caller who does not read every
       // card gets the counts without money (the partial rule in the database)

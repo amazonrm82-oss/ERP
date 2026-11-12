@@ -57,6 +57,8 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "campaign_costs", label: "עלויות קמפיינים, עלות לליד והחזר על ההשקעה", built: true },
   // PKG-01, PKG-02 (owner, 3 November 2026, answer (66) ג): basic and up
   { feature: "punch_cards", label: "כרטיסיות: מספר כניסות, תוקף ויתרה ללקוח", built: true },
+  // SUB-01..05 (owner, 11 November 2026, answer (269) ג): pro and up
+  { feature: "recurring_billing", label: "חיובים חוזרים ללקוחות: ריטיינר ומנוי, עם משימה בכל מחזור", built: true },
   // SEG-01
   { feature: "segments", label: "סגמנטים של לידים ואנשי קשר", built: true },
   { feature: "auto_reassign", label: "העברה אוטומטית של ליד לנציג הבא", built: true },

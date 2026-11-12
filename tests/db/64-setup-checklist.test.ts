@@ -875,6 +875,10 @@ describe("setup checklist and sample data (USR-04)", () => {
       // owner (330) א, (331) א redefine app.plan_key_defaults() of _business_page.sql and public.org_plan_usage() of
       // _automation_run_quota.sql last
       "_free_plan_quotes.sql",
+      // SUB-01..05 redefine app.plan_key_defaults() and public.log_export() last
+      "_recurring_billing.sql",
+      // SUB-01 redefines app.sample_untouched(), app.import_record_worked(), app.audit_erase_core() and public.plans_public() last
+      "_recurring_billing_links.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

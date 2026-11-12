@@ -276,6 +276,21 @@ describe("report result shapes (FXC-12)", () => {
       await q("select public.punch_card_open($1, $2, $3, $4)", [org, card, punch, paid]);
     });
 
+    // SUB-05: an active recurring billing with a line (report_recurring_billing's totals and months)
+    await asAdmin((q) =>
+      q("update public.subscriptions set feature_overrides = coalesce(feature_overrides, '{}'::jsonb) || '{\"recurring_billing\": true}' where organization_id = $1", [org]),
+    );
+    await asUser(owner.id, async (q) => {
+      const c = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'מנוי חודשי') returning id", [org])).rows[0].id;
+      const b = (
+        await q<{ id: string }>(
+          "insert into public.recurring_billings (organization_id, contact_id, name, cycle, start_date, billing_day) values ($1, $2, 'ריטיינר', 'monthly', (now() at time zone 'Asia/Jerusalem')::date, 1) returning id",
+          [org, c],
+        )
+      ).rows[0].id;
+      await q("insert into public.recurring_billing_lines (organization_id, billing_id, description, unit_price_agorot) values ($1, $2, 'ריטיינר', 50000)", [org, b]);
+    });
+
     const range = [org, from(), to()];
     const calls: Record<ReportFunction, [string, unknown[]]> = {
       report_leads_by_source: ["public.report_leads_by_source($1, $2, $3)", range],
@@ -315,6 +330,10 @@ describe("report result shapes (FXC-12)", () => {
         [org],
       ],
       report_punch_cards: ["public.report_punch_cards($1)", [org]],
+      report_recurring_billing: [
+        "public.report_recurring_billing($1, ((now() at time zone 'Asia/Jerusalem')::date - 1), ((now() at time zone 'Asia/Jerusalem')::date + 1))",
+        [org],
+      ],
       report_monthly_summary: ["public.report_monthly_summary($1)", [org]],
     };
     for (const name of REPORT_FUNCTIONS) {

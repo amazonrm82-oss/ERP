@@ -374,6 +374,19 @@ describe("tenant isolation", () => {
       // COL-03 (1) ג: a promise on the whole company, covering its open documents (the server writes the covered set)
       await q("insert into public.payment_promises (organization_id, company_id, promised_date) values ($1, $2, current_date + 9)", [orgA, ids.companyA]);
     });
+    // SUB-01..05: a recurring billing of A's contact with a line, a cycle (server written) and its history (written by triggers)
+    await asAdmin((q) =>
+      q("update public.subscriptions set feature_overrides = coalesce(feature_overrides, '{}'::jsonb) || '{\"recurring_billing\": true}' where organization_id = any($1::uuid[])", [[orgA, orgB]]),
+    );
+    await asUser(a.id, async (q) => {
+      ids.billingA = (
+        await q<{ id: string }>("insert into public.recurring_billings (organization_id, contact_id, name, cycle, start_date, billing_day) values ($1, $2, 'ריטיינר של א', 'monthly', current_date, 1) returning id", [orgA, ids.contactA])
+      ).rows[0].id;
+      await q("insert into public.recurring_billing_lines (organization_id, billing_id, description, unit_price_agorot) values ($1, $2, 'שורה של א', 1000)", [orgA, ids.billingA]);
+    });
+    await asAdmin((q) =>
+      q("insert into public.recurring_billing_cycles (organization_id, billing_id, cycle_on, period_end, net_agorot, vat_agorot, total_agorot) values ($1, $2, current_date - 31, current_date - 1, 1000, 0, 1000)", [orgA, ids.billingA]),
+    );
     // PAY-03: the server's row of A's payment on A's company (kept by triggers; no client grant)
     await asAdmin((q) =>
       q(
@@ -568,6 +581,11 @@ describe("tenant isolation", () => {
     // COL-03
     "payment_promises",
     "payment_promise_documents",
+    // SUB-01..05
+    "recurring_billings",
+    "recurring_billing_lines",
+    "recurring_billing_cycles",
+    "recurring_billing_events",
     // ORD-05
     "order_decisions",
     // SGN-02
@@ -823,6 +841,11 @@ describe("tenant isolation", () => {
       // no delete grant at all (lifted, never deleted): a permission error is the expected outcome for the delete
       customer_holds: "cleared_at = cleared_at",
       payment_promises: "note = note",
+      // SUB-01: no delete grant on billings or cycles, no write grant on events: a permission error is the expected outcome
+      recurring_billings: "name = name",
+      recurring_billing_lines: "description = description",
+      recurring_billing_cycles: "status = status",
+      recurring_billing_events: "kind = kind",
       // no client write grant at all (the server writes the covered set)
       payment_promise_documents: "created_at = created_at",
       // no write grant at all (order_public_decide() writes): a permission error is the expected outcome
@@ -1013,6 +1036,10 @@ describe("tenant isolation", () => {
       ["insert into public.customer_holds (organization_id, company_id, reason) values ($1, $2, 'x')", [orgA, ids.companyA]],
       ["insert into public.payment_promises (organization_id, document_id, promised_date) values ($1, $2, current_date + 1)", [orgA, ids.contactInvoiceA]],
       ["insert into public.payment_promises (organization_id, company_id, promised_date) values ($1, $2, current_date + 1)", [orgA, ids.company2A]],
+      ["insert into public.recurring_billings (organization_id, contact_id, name, cycle, start_date, billing_day) values ($1, $2, 'x', 'monthly', current_date, 1)", [orgA, ids.contactA]],
+      ["insert into public.recurring_billing_lines (organization_id, billing_id, description, unit_price_agorot) values ($1, $2, 'x', 1)", [orgA, ids.billingA]],
+      ["insert into public.recurring_billing_cycles (organization_id, billing_id, cycle_on, period_end, net_agorot, vat_agorot, total_agorot) values ($1, $2, current_date, current_date, 1, 0, 1)", [orgA, ids.billingA]],
+      ["insert into public.recurring_billing_events (organization_id, billing_id, kind) values ($1, $2, 'created')", [orgA, ids.billingA]],
       ["insert into public.payment_promise_documents (organization_id, promise_id, document_id) values ($1, (select id from public.payment_promises where organization_id = $1 and company_id is not null limit 1), $2)", [orgA, ids.contactInvoiceA]],
       ["insert into public.order_decisions (organization_id, order_id, decision, content_sha256) values ($1, $2, 'rejected', repeat('1', 64))", [orgA, ids.orderA]],
       ["insert into public.signature_documents (organization_id, contact_id, title, body, content_sha256) values ($1, $2, 'x', 'x', repeat('1', 64))", [orgA, ids.contactA]],
@@ -1167,6 +1194,10 @@ describe("tenant isolation", () => {
       ["payments", "note = 'HACKED'", "note = 'HACKED'"],
       ["customer_holds", "cleared_at = now()", "cleared_at = now()"],
       ["payment_promises", "note = 'HACKED'", "note = 'HACKED'"],
+      ["recurring_billings", "name = 'HACKED'", "name = 'HACKED'"],
+      ["recurring_billing_lines", "description = 'HACKED'", "description = 'HACKED'"],
+      ["recurring_billing_cycles", "status = 'skipped'", "status = 'skipped'"],
+      ["recurring_billing_events", "kind = 'failed'", "kind = 'failed'"],
       ["payment_promise_documents", "created_at = now() - interval '1 year'", "created_at < now() - interval '300 days'"],
       ["order_decisions", "ip = 'HACKED'", "ip = 'HACKED'"],
       ["signature_documents", "title = 'HACKED'", "title = 'HACKED'"],
@@ -1261,6 +1292,14 @@ describe("tenant isolation", () => {
       ),
     );
     expect(viaCompany.code).toBe("23503");
+
+    // SUB-01: a recurring billing of org B on org A's contact, and a line of org B on org A's billing
+    for (const [sql, params] of [
+      ["insert into public.recurring_billings (organization_id, contact_id, name, cycle, start_date, billing_day) values ($1, $2, 'x', 'monthly', current_date, 1)", [orgB, ids.contactA]],
+      ["insert into public.recurring_billing_lines (organization_id, billing_id, description, unit_price_agorot) values ($1, $2, 'x', 1)", [orgB, ids.billingA]],
+    ] as [string, unknown[]][]) {
+      expect(["23503", "42501"], sql).toContain((await pgError(asUser(b.id, (q) => q(sql, params)))).code);
+    }
 
     // a deal in org B inside org A's pipeline
     const viaPipeline = await pgError(

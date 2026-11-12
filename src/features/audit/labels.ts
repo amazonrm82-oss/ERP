@@ -122,6 +122,10 @@ export const ENTITY_LABELS: Record<string, string> = {
   punch_card_uses: "כניסה בכרטיסייה",
   // COL-03
   payment_promises: "הבטחת תשלום",
+  // SUB-01..05
+  recurring_billings: "חיוב חוזר",
+  recurring_billing_lines: "שורת חיוב חוזר",
+  recurring_billing_cycles: "מחזור חיוב",
   // QUO-04
   quote_templates: "תבנית הצעת מחיר",
   quote_template_lines: "שורה בתבנית הצעת מחיר",

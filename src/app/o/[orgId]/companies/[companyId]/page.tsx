@@ -37,6 +37,7 @@ import { LibraryLinksCard } from "@/features/library-links/components/library-li
 import { CompanyCreditCard } from "@/features/allocations/components/company-credit-card";
 import { CompanyOpeningCard } from "@/features/documents/components/company-opening-card";
 import { CustomerHoldCard } from "@/features/customer-holds/components/customer-hold-card";
+import { RecurringBillingsCard } from "@/features/recurring-billing/components/recurring-billings-card";
 import { CustomerPromiseCard } from "@/features/collection/components/customer-promise-card";
 import { DebtSummary } from "@/features/balances/components/debt-summary";
 import { CustomerStatusSummary } from "@/features/customer-status/components/customer-status-summary";
@@ -220,6 +221,8 @@ export default async function CompanyPage({ params, searchParams }: Props) {
           {/* LIB-02: library items sent by a tracked link, and when the customer opened them */}
           <LibraryLinksCard orgId={orgId} record={{ kind: "company", id: company.id }} recipient={{ name: company.name, phoneE164: company.phone_e164, email: company.email }} canEditRecord={canEditRecordHint(context, company.owner_id)} />
           <RecordOrdersCard orgId={orgId} subject={{ kind: "company", id: company.id }} canCreate={canEditRecordHint(context, company.owner_id)} />
+          {/* SUB-01: the company's recurring billings */}
+          <RecurringBillingsCard orgId={orgId} customer={{ kind: "company", id: company.id }} timeZone={context.org.timeZone} />
           {/* COL-05: "לא למכור עד הסדרת חוב" */}
           <CustomerHoldCard orgId={orgId} subject={{ kind: "company", id: company.id }} />
           {/* COL-03 answer (8) ב: the customer's payment promise */}

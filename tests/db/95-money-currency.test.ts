@@ -106,6 +106,13 @@ describe("currency next to every amount", () => {
     // order; a new table needs its own line in SAMPLE_ROWS.
     const status = await defaultLeadStatus(org);
     const pipe = await defaultPipeline(org);
+    // SUB-01: the billing the line, cycle and event samples hang on (made once, whichever comes first)
+    const sampleBilling = async (q: Query): Promise<string> => {
+      const found = (await q<{ id: string }>("select id from public.recurring_billings where organization_id = $1 limit 1", [org])).rows[0];
+      if (found) return found.id;
+      const contact = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'מנוי לבדיקת מטבע') returning id", [org])).rows[0].id;
+      return (await q<{ id: string }>("insert into public.recurring_billings (organization_id, contact_id, name, cycle, start_date, billing_day, prices_include_vat) values ($1, $2, 'חיוב לבדיקת מטבע', 'monthly', current_date, 1, false) returning id", [org, contact])).rows[0].id;
+    };
     const SAMPLE_ROWS: Record<string, (q: Query) => Promise<void>> = {
       leads: async (q) => {
         await q("insert into public.leads (organization_id, status_id, full_name) values ($1, $2, 'ליד לבדיקת מטבע')", [org, status]);
@@ -239,6 +246,22 @@ describe("currency next to every amount", () => {
       quote_template_lines: async (q) => {
         const template = (await q<{ id: string }>("insert into public.quote_templates (organization_id, name) values ($1, 'תבנית לבדיקת מטבע') returning id", [org])).rows[0].id;
         await q("insert into public.quote_template_lines (organization_id, template_id, name, unit_price_agorot) values ($1, $2, 'שורה', 1000)", [org, template]);
+      },
+      // SUB-01..05: a recurring billing, its line, a cycle and its history (triggers off: the rows as stored)
+      recurring_billings: async (q) => {
+        await sampleBilling(q);
+      },
+      recurring_billing_lines: async (q) => {
+        const billing = await sampleBilling(q);
+        await q("insert into public.recurring_billing_lines (organization_id, billing_id, description, unit_price_agorot) values ($1, $2, 'שורה', 1000)", [org, billing]);
+      },
+      recurring_billing_cycles: async (q) => {
+        const billing = await sampleBilling(q);
+        await q("insert into public.recurring_billing_cycles (organization_id, billing_id, cycle_on, period_end, net_agorot, vat_agorot, total_agorot) values ($1, $2, current_date, current_date, 1000, 0, 1000)", [org, billing]);
+      },
+      recurring_billing_events: async (q) => {
+        const billing = await sampleBilling(q);
+        await q("insert into public.recurring_billing_events (organization_id, billing_id, kind, new_amount_agorot) values ($1, $2, 'price_changed', 1000)", [org, billing]);
       },
       // QUO-08: an acceptance keeps the totals as sent and as accepted
       quote_decisions: async (q) => {

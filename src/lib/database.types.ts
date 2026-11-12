@@ -2427,6 +2427,98 @@ export type CustomerHoldRow = {
 };
 
 // COL-03: a payment promise on an open debt document: the promised date and a collection note (migration payment_promises).
+// SUB-01..05: a customer's recurring billing (migration recurring_billing)
+export type RecurringBillingRow = {
+  id: string;
+  organization_id: string;
+  // exactly one: a contact or a company
+  contact_id: string | null;
+  company_id: string | null;
+  deal_id: string | null;
+  name: string;
+  cycle: string;
+  start_date: string;
+  billing_day: number;
+  end_date: string | null;
+  commitment_months: number;
+  prices_include_vat: boolean;
+  status: string;
+  // server kept: one cycle before VAT, and the next cycle date
+  amount_agorot: number;
+  next_cycle_on: string | null;
+  // owner (353) ג: a resume that makes up the missed cycles makes them up to this day (server only)
+  make_up_until: string | null;
+  paused_at: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+  currency: string;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RecurringBillingLineRow = {
+  id: string;
+  organization_id: string;
+  billing_id: string;
+  position: number;
+  product_id: string | null;
+  description: string;
+  quantity: number;
+  unit_price_agorot: number;
+  discount_bp: number | null;
+  discount_agorot: number | null;
+  total_agorot: number;
+  vat_exempt: boolean;
+  price_source: string;
+  price_list_id: string | null;
+  price_list_name: string | null;
+  currency: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RecurringBillingCycleRow = {
+  id: string;
+  organization_id: string;
+  billing_id: string;
+  cycle_on: string;
+  period_end: string;
+  net_agorot: number;
+  vat_agorot: number;
+  total_agorot: number;
+  vat_rate_bp: number | null;
+  currency: string;
+  status: string;
+  accounting_document_id: string | null;
+  task_id: string | null;
+  // owner (352) ב: the draft order the job made for the cycle (server only)
+  order_id: string | null;
+  documented_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RecurringBillingEventRow = {
+  id: string;
+  organization_id: string;
+  billing_id: string;
+  kind: string;
+  old_amount_agorot: number | null;
+  new_amount_agorot: number | null;
+  effective_on: string | null;
+  currency: string;
+  // cycles_skipped: the billing dates a gap passed over
+  skipped_cycles: number | null;
+  // a cancel's reason and whether it fell inside the commitment (owner (355) א); a resume's choice (owner (353) ג)
+  reason: string | null;
+  in_commitment: boolean | null;
+  make_up: boolean | null;
+  actor_id: string | null;
+  created_at: string;
+};
+
 export type PaymentPromiseRow = {
   id: string;
   organization_id: string;
@@ -3867,6 +3959,63 @@ export type Database = {
       // COL-03: server only (no client write grant)
       payment_promise_documents: ReadOnlyTable<PaymentPromiseDocumentRow>;
       // COL-03: column grants; the subject never changes; a promise is removed by delete
+      // SUB-01..05
+      recurring_billings: Table<
+        RecurringBillingRow,
+        {
+          organization_id: string;
+          contact_id?: string | null;
+          company_id?: string | null;
+          deal_id?: string | null;
+          name: string;
+          cycle: "monthly" | "quarterly" | "yearly";
+          start_date: string;
+          billing_day: number;
+          end_date?: string | null;
+          commitment_months?: number;
+          prices_include_vat?: boolean;
+        },
+        {
+          name?: string;
+          billing_day?: number;
+          end_date?: string | null;
+          commitment_months?: number;
+          status?: "active" | "paused" | "cancelled";
+          cancel_reason?: string | null;
+        }
+      >;
+      recurring_billing_lines: Table<
+        RecurringBillingLineRow,
+        {
+          organization_id: string;
+          billing_id: string;
+          position?: number;
+          product_id?: string | null;
+          description: string;
+          quantity?: number;
+          unit_price_agorot?: number;
+          discount_bp?: number | null;
+          discount_agorot?: number | null;
+          vat_exempt?: boolean;
+          price_source?: "product" | "price_list" | "manual";
+          price_list_id?: string | null;
+          currency?: string;
+        },
+        {
+          position?: number;
+          description?: string;
+          quantity?: number;
+          unit_price_agorot?: number;
+          discount_bp?: number | null;
+          discount_agorot?: number | null;
+          vat_exempt?: boolean;
+          price_source?: "product" | "price_list" | "manual";
+          price_list_id?: string | null;
+        }
+      >;
+      recurring_billing_cycles: Table<RecurringBillingCycleRow, Record<string, never>, { accounting_document_id?: string | null; status?: "due" | "documented" | "skipped" }>;
+      // server written
+      recurring_billing_events: ReadOnlyTable<RecurringBillingEventRow>;
       payment_promises: Table<
         PaymentPromiseRow,
         {
@@ -4315,6 +4464,10 @@ export type Database = {
       };
       // COL-03 answer (6): how many documents each customer promise the caller reads covers (counts only)
       payment_promise_coverage: { Args: { p_org: string; p_promises: string[] }; Returns: Json };
+      // SUB-03, SUB-05
+      recurring_billing_from_deal: { Args: { p_org: string; p_deal: string }; Returns: Json };
+      recurring_billing_resume: { Args: { p_org: string; p_billing: string; p_make_up: boolean }; Returns: boolean };
+      report_recurring_billing: { Args: { p_org: string; p_from: string; p_to: string }; Returns: Json };
       // GOL-03: progress against the goals the caller reads (migration goal_progress)
       report_goal_progress: {
         Args: { p_org: string; p_period?: string | null; p_period_start?: string | null; p_user?: string | null };

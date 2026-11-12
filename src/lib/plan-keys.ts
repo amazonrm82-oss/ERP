@@ -1,7 +1,7 @@
 // Plan keys, prices and states (owner's pricing of 13 October 2026; it replaces the
 // temporary "everything open, high values" defaults). Mirrors migrations plan_pricing
 // (the seed), plan_trial_built_with (the changes of the owner's later decisions) and
-// plan_review_fixes, lead_distribution_plan, campaign_costs_plan, punch_cards_plan, meta_leads_plan, meeting_customer_reminders, document_templates, sms_b_send, review_requests, business_page and free_plan_quotes (the latest app.plan_key_defaults()): PLAN_VALUES = the seed with
+// plan_review_fixes, lead_distribution_plan, campaign_costs_plan, punch_cards_plan, meta_leads_plan, meeting_customer_reminders, document_templates, sms_b_send, review_requests, business_page, free_plan_quotes and recurring_billing (the latest app.plan_key_defaults()): PLAN_VALUES = the seed with
 // those changes, PLAN_KEY_FALLBACK = the latest app.plan_key_defaults().
 // tests/unit/plan-keys.test.ts reads the migrations and compares; keep them in step.
 //
@@ -124,6 +124,8 @@ const FEATURES: Record<string, Record<SoldPlan, boolean>> = {
   custom_objects: PRO_UP,
   remove_built_with: PRO_UP,
   booking_team_pages: PRO_UP,
+  // SUB-01..05 (owner, 11 November 2026, answer (269) ג): a new key, pro and up
+  recurring_billing: PRO_UP,
   // business only
   field_permissions: BUSINESS,
   sso: BUSINESS,
@@ -193,6 +195,8 @@ const WAVE2_FEATURE_LIST = [
   "public_page",
   // owner (330) א (migration free_plan_quotes)
   "money_waiting_actions",
+  // SUB-01 (migration recurring_billing)
+  "recurring_billing",
 ] as const;
 const WAVE2_LIMIT_LIST = [
   "max_products", "max_price_lists", "max_quote_templates", "max_booking_pages", "max_booking_pages_per_user",

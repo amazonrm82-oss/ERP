@@ -551,6 +551,42 @@ export const REPORT_SCHEMAS = {
   // PKG-07: active punch cards by kind, utilisation by product, cards expiring within `days` with entries left, and the
   // money for entries not used yet (paid current cards only); a partial view has every amount null; {allowed: false}
   // without the plan key or for an outsider
+  // SUB-05: MRR of the live recurring billings (before VAT), new and churned customers per month, next month's cycles;
+  // {allowed: false} without the plan key or for someone who does not record payments
+  report_recurring_billing: z.union([
+    z
+      .object({
+        allowed: z.literal(true),
+        // review M3: the caller does not read every billing: no totals and no amounts per month
+        partial: z.boolean(),
+        currency: z.literal("ILS"),
+        next_month: day,
+        totals: z.object({
+          mrr: amount,
+          mrr_with_vat: amount,
+          active_billings: count,
+          active_customers: count,
+          paused_billings: count,
+          failed_billings: count,
+          next_month: amount,
+          next_month_with_vat: amount,
+          next_month_cycles: count,
+        }).nullable(),
+        by_month: z.array(
+          z.object({
+            month: day,
+            new_customers: count,
+            new_mrr: amount.nullable(),
+            new_mrr_with_vat: amount.nullable(),
+            churned_customers: count,
+            churned_mrr: amount.nullable(),
+            churned_mrr_with_vat: amount.nullable(),
+          }),
+        ),
+      })
+      .strict(),
+    z.object({ allowed: z.literal(false) }).strict(),
+  ]),
   report_punch_cards: z.union([
     z
       .object({

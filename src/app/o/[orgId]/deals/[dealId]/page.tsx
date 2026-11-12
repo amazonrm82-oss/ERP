@@ -1,5 +1,7 @@
 import { Suspense } from "react";
 
+import { TextLink } from "@/components/ui/text-link";
+
 import { getOrgTerms } from "@/features/terminology/queries";
 import { createdLineText } from "@/features/imports/history";
 import { ManualAutomationsButton } from "@/features/automations/components/manual-automations-button";
@@ -62,6 +64,9 @@ import { isAdminRole } from "@/features/settings/permissions";
 import { editFocusParam } from "@/features/data-quality/completeness";
 import { CompletenessCard } from "@/features/data-quality/components/completeness-card";
 import { DealLinesCard } from "@/features/deal-lines/components/deal-lines-card";
+import { BillingFromDealButton } from "@/features/recurring-billing/components/billing-forms";
+import { recurringBillingPath } from "@/features/recurring-billing/paths";
+import { getDealBillingId, getRecurringAccess } from "@/features/recurring-billing/queries";
 import { RecordQuotesCard } from "@/features/quotes/components/record-quotes-card";
 import { RecordOrdersCard } from "@/features/orders/components/record-orders-card";
 import { RecordSignaturesCard } from "@/features/signatures/components/record-signatures-card";
@@ -173,6 +178,10 @@ export default async function DealPage({ params, searchParams }: Props) {
   const copyNotice = skippedNotice(copyFields, fields);
   const attention = deal.status === "open" ? (await getDealAttention(orgId, [deal.id]))[deal.id] : undefined;
   const today = zoneDate(new Date(), context.org.timeZone);
+  // SUB-03: a won deal with recurring lines gives a recurring billing in one click (whoever records payments, pro and up)
+  const recurringAccess = await getRecurringAccess(orgId);
+  const hasRecurringLines = lines.some((line) => line.billing !== null && line.billing !== "one_time");
+  const dealBillingId = recurringAccess.inPlan && deal.status === "won" ? await getDealBillingId(orgId, deal.id) : null;
   const stage = deal.stages.find((option) => option.id === deal.stage_id);
   const status = DEAL_STATUS[deal.status];
   const amount = deal.amount_agorot;
@@ -195,6 +204,13 @@ export default async function DealPage({ params, searchParams }: Props) {
             <Badge tone={status.tone}>{status.label}</Badge>
             <PrintButton />
             <FollowButton orgId={orgId} subject={{ kind: "deal", id: deal.id }} state={follow} />
+            {dealBillingId ? (
+              <TextLink href={recurringBillingPath(orgId, dealBillingId)} className="text-sm">
+                החיוב החוזר
+              </TextLink>
+            ) : recurringAccess.canManage && deal.status === "won" && hasRecurringLines ? (
+              <BillingFromDealButton orgId={orgId} dealId={deal.id} />
+            ) : null}
             {context.canWrite ? <ManualAutomationsButton orgId={orgId} entity="deal" recordId={deal.id} /> : null}
             {/* EML-02: an email to the customer from a template, with the record's and the library's files; its reads wait in
                 Suspense so the page renders first */}
