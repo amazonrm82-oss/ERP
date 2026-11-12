@@ -714,7 +714,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   were last redefined in 021245 (added key `notice` from `app.privacy_notice_contact(org)`, definer, no grants: display name, documents
   email, documents-or-business phone; test 253's pins rechecked). A person cannot create or switch a template to kind health_declaration
   until PRV-05 (trigger `document_templates_health_closed`, hint `document_template:health_closed`, 021246). Test 64 ends with
-  `_privacy_notice_public_pages.sql`. Placeholders still open: privacy officer name, court city.
+  `_privacy_notice_public_pages.sql` (then `_free_plan_quotes.sql`). Placeholders still open: privacy officer name, court city.
 - Global search (migration 0017): `public.search_records()` is **security invoker** (RLS decides, like
   reports). `app.search_norm()` folds niqqud, quotes and final letters; trigram indexes on the same
   expressions (`extensions.gin_trgm_ops`), so the index expressions and the query must stay identical.
@@ -1768,8 +1768,10 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   (`files_keep_attached`, `files_delete`, storage `record_files_delete`), except an unconfirmed upload (its uploader, or an owner/admin
   for a quote PDF) and a privacy erasure: `app.audit_erase_core` (last redefined in 020955) calls `app.quote_pdf_drop` (body in the
   pasted 020960, pasted 26 October 2026) for the detached quotes it cleans, under the transaction setting `app.quote_pdf_erase` = the org.
-  Quota `max_pdf_per_month` by `app.pdf_take` (definer, `app.pdf_months`, month in the org zone, 30 a minute `rate:pdf`, one 80% notice);
-  a removed waiting row gives its count back (`files_quote_pdf_return`). `public.confirm_file_upload` and `app.reconcile_pending_files`
+  Since 021249 (owner (337) א) a quote's PDF (as sent, signed or made again) is never counted in `max_pdf_per_month` in any plan
+  (`app.files_quote_pdf` / `_return` last redefined there; no `app.pdf_take` call, so no `rate:pdf` either; accepted: an owner/admin
+  could loop create-and-delete of a waiting row; bounded by one as-sent row per quote and `storage_gb`); `app.pdf_take` (definer,
+  `app.pdf_months`, month in the org zone, 30 a minute `rate:pdf`, one 80% notice) counts order and report PDFs only. `public.confirm_file_upload` and `app.reconcile_pending_files`
   answer a non-PDF quote object `{ok:false, reason:'type'}`. The files policies, `app.files_keep_attached`, `confirm_file_upload` and
   `reconcile_pending_files` were last redefined in 020955. Customer download (020995): `public.quote_public_pdf(token, ip_hash)` (service_role):
   `quote_link_usable`, the shown version only while shown in full, link window shared with the page + 20 per sender in 10 minutes
@@ -3196,6 +3198,13 @@ that back.
   available. `app.show_built_with(org)`: the line shows on trial and unless a paid plan or an override removes it.
   `PLAN_CAPABILITIES` (`src/features/plans/capabilities.ts`) lists what a card shows; flip `built` when a requirement merges.
   A new capability gets its key in the same change (Working agreement, "Plans and capabilities").
+  Free plan (owner (330) א, (331) א, (335) ב, (336) ב, (337) א; migration 021249; an independent review and a delta review): quota key
+  `max_quotes_per_month` (null = no cap in the sold plans; free 3; fallback 0): counted when a quote is SENT, by AFTER trigger
+  `quotes_month_quota` (`app.quotes_month_take`, definer; `app.quote_months` row FOR UPDATE; refused with hint
+  `limit:max_quotes_per_month`, the send rolls back); a new version (`previous_id` set) is never counted, an addendum is. Flag
+  `money_waiting_actions` (off in free): "כסף שמחכה" shows its numbers but no row actions (app-only; nothing refused in the database).
+  Free `max_pdf_per_month` = 0, so order and report PDF buttons show "זמין מחבילת אישית" (`pdfQuotaZero`, `src/features/plans/pdf-quota.ts`).
+  `app.plan_key_defaults` and `public.org_plan_usage` were last redefined in 021249; tests 64 and 88 end with `_free_plan_quotes.sql`.
 
 ### Application code
 
