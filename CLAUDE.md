@@ -218,6 +218,9 @@ and build this CRM here instead. The old code is preserved on the branch
   read). A link whose maker left keeps serving. `app.scheduled_no_activity`, `app.automation_run_facts` and
   `app.automation_event_still_holds` were last redefined in 021230 (they skip `library_viewed` beside `record_link_removed`). In the eslint
   allow-list. The advisor's findings on the two staff definers and the two app tables are expected.
+  Since 021241 (owner (299) ב) the first-opening notice goes to the maker while they read the record, else to the record's current
+  owner while an active non-viewer who reads it (`app.user_can_read_record`), else to the active owners and admins;
+  `app.library_link_mark_viewed` was last redefined in 021241.
   In use (FXS-12, owner 12 November 2026, answer (281) א; no migration; an independent review and a delta review): the sign-in
   forwarding client (`src/lib/supabase/auth-forwarding-server.ts`, server-only, the ONLY reader of `SUPABASE_SECRET_KEY`, which the owner
   sets in Vercel; only a key starting `sb_secret_`; lint refuses the name elsewhere, and only `src/features/auth/actions.ts` may import
@@ -263,6 +266,18 @@ and build this CRM here instead. The old code is preserved on the branch
   "In use" line. `app.message_notice_template_problem`, `app.message_types`, `app.message_type_fields`, `app.message_merge_fields`,
   `app.plan_key_defaults` and `public.plans_public` (adds `review_requests` to its closed list; test 344's pin rechecked) were last
   redefined in 021235. The advisor's findings on the three new app tables are expected.
+  Since 021239 (owner (307) ב) the review link is any https link by the QR rule (`app.review_url_ok` = `app.qr_target_url_ok`,
+  `reviewUrlOk()` = `qrTargetUrlOk()`), at most 300 characters when set or changed (`app.review_request_url_max`, hint
+  `review_request:url_long`), refused while the platform's outside-link switch holds the business (`app.qr_external_off`, hint
+  `review_request:external_off`), and the job skips such a business; `app.review_request_settings_check` was last redefined there.
+  Since 021240 (owner (309) ב; lead's choices: imported leads count, the leads-module switch is not read) a "meeting held" event goes to the
+  meeting's contact (else its deal's, else a converted lead's contact) and only without one to an unconverted lead
+  (`app.review_requests.lead_id`, one person per queued row; `app.review_request_person`); a conversion moves the lead's rows to the contact
+  (trigger `leads_review_requests_convert`), a lead merge to the kept lead; 90 days also per address (`app.review_requests.address_hash`,
+  HMAC with `consent_hash_key`: one more set the key-replacement procedure must recompute; no key = this check skipped). THE FUTURE SENDER
+  re-reads the request by `review_request_id` and business only, takes person and address from the row (never the payload) and re-checks the
+  outside-link switch. `app.job_payload_ok`, `app.merge_review_requests`, `app.review_request_one`, `app.send_review_requests` were last
+  redefined in 021240; tests 64 and 88 end with `_review_requests_leads.sql`.
   Built (MNY-06 part one, migration 021236; owner (273): every plan; an independent review and a delta review): "what the system did for
   you this month", a counts-only card for owners and admins on the reports page. `public.report_monthly_summary(org, month)` (invoker,
   `{allowed:false}` unless `app.is_admin`, the month in the business zone) reads nothing itself; every count comes from the definer
@@ -288,6 +303,15 @@ and build this CRM here instead. The old code is preserved on the branch
   by the server (`app.guard_form`, `app.forms_page_lock`), outside `max_forms`. `app.guard_form`, `public.link_preview_public` (test 253
   pins it), `public.plans_public` and `app.plan_key_defaults` were last redefined in 021237. In the eslint allow-list. The advisor's finding
   on `app.business_page_view_counts` is expected.
+  Since 021242 (owner (314) ב) owners/admins choose who gets the page's leads: `business_pages.owner_user_id` (an active non-viewer, taken
+  FOR SHARE when judged) or `team_id` (at most one; composite FKs set null; hints `business_page:routing|owner`), written onto the page's
+  own form (`assign_mode` owner / round_robin with team) by `app.business_pages_make_form` / `app.business_pages_sync_form`; a suspended
+  or viewer person is cleared (`app.memberships_business_page_owner_off`), so leads go back to the regular distribution; `intake_submit`
+  unchanged. Since 021243 (owner (316) ב) `public.business_page_link_create` (definer, owners/admins of a writable business) makes a new
+  token, the old one answers not found at once, audited `business_page_link` without the token; the page's audit trigger is split
+  (`business_pages_audit_update` runs only when the token is unchanged) so the token never enters `audit_log`. The advisor's finding on
+  `business_page_link_create` is expected. Tests 64 and 88 end with `_business_page_new_link.sql`; `rerunClosure` also closes over
+  triggers of the same name.
   In use (IMP-04, owner 9 November 2026, answers (155) א, (160) א, (161) א, (162) ב, (163) ב; migration `_background_jobs.sql`; two
    independent reviews): the OPS-04 worker (same route and secret) also claims `import.run` and `export.run` (payload `{request_id,
    user_id}` only) in its own pass (lease 900 s, one job, 40 s budget, then saved and handed back uncounted with
