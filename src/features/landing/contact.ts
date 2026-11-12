@@ -64,7 +64,7 @@ export function contactFormToken(address: string, hosts: readonly string[] = con
 
 /**
  * Owner (343) ב: the business type is its own select field on the "צור קשר באתר" form, whose key the server reads from
- * CONTACT_BUSINESS_TYPE_FIELD (a custom field key of leads: a-z, digits, "_", up to 40). The six options above are exactly the
+ * LANDING_BUSINESS_TYPE_FIELD_KEY (a custom field key of leads: a-z, digits, "_", up to 40). The six options above are exactly the
  * select's options. Unset or malformed = the type rides in the inquiry's message, as before.
  */
 export function contactBusinessTypeField(value: string | undefined): string | null {

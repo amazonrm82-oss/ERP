@@ -266,7 +266,7 @@ and build this CRM here instead. The old code is preserved on the branch
   `src/features/landing/provider-readiness.ts` (booleans only; InforU keys through `inforuAccountReady()` in inforu.ts; 339 ב; the
   roadmap section is gone, 341 א); the contact form `#contact` (`POST /api/forms/contact`, `contact-server.ts`) goes through the existing
   `handleIntake()` of the form at `SUPPORT.formUrl` (no new service-key use), Turnstile action `contact`, business type to the custom
-  field named by server env `CONTACT_BUSINESS_TYPE_FIELD` (343 ב; unset = into the message), consent wording `contact-draft-1` (DRAFT).
+  field named by server env `LANDING_BUSINESS_TYPE_FIELD_KEY` (343 ב; unset = into the message), consent wording `contact-draft-1` (DRAFT).
   In use (LND-13 notify-me, owner 13 October 2026, hard rule 5's conditions; built 12 November 2026 with LND-20 v3; migrations 021250 and
   021251 (021251 pasted by hand by the owner, md5 checked 12 November 2026); an independent review and a delta review): the landing page's "תודיעו לי כשנפתח"
   (`src/features/landing/waitlist-server.ts`, route `POST /api/forms/plan-notify`) calls only `public.landing_waitlist_submit()`

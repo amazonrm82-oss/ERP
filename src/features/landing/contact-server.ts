@@ -15,7 +15,7 @@ import { contactBusinessTypeField, CONTACT_BUSINESS_TYPES, CONTACT_CONSENT_VERSI
  * באתר" form (handleIntake, the same code and limits as POST /api/forms/<token>: FXS-11 per sender, the honeypot, the fill
  * time, intake_submit's own checks). Turnstile passes while Cloudflare cannot be asked (owner (340) ב, as the sign-in). The
  * consent (with its wording version) travels in the inquiry's message, which the form keeps; the business type goes into the
- * form's select field named by CONTACT_BUSINESS_TYPE_FIELD (owner (343) ב), else into the message too.
+ * form's select field named by LANDING_BUSINESS_TYPE_FIELD_KEY (owner (343) ב), else into the message too.
  */
 const MAX_BODY = 8 * 1024;
 
@@ -42,7 +42,7 @@ export async function handleContact(request: Request): Promise<Response> {
   if (!check.ok) return respond(400, { ok: false, message: check.message, field: TURNSTILE_FIELD });
 
   // owner (343) ב: into its own select field when the server names it, else into the message
-  const typeField = contactBusinessTypeField(process.env.CONTACT_BUSINESS_TYPE_FIELD);
+  const typeField = contactBusinessTypeField(process.env.LANDING_BUSINESS_TYPE_FIELD_KEY);
   const intakeBody: Record<string, string> = {
     full_name: str(body.full_name, 200),
     phone: str(body.phone, 40),
