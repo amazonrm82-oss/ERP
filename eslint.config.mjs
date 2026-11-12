@@ -49,6 +49,26 @@ const jwtSecretSelectors = [
   message: "SUPABASE_JWT_SECRET is read only by the background job worker's signer (src/features/background/user-token.ts), owner (160) א.",
 }));
 
+// FXS-12 (owner (281) א): SUPABASE_SECRET_KEY (the project's sb_secret_ key) is read in ONE file only, the sign-in
+// forwarding client, and only the auth actions import that file.
+const AUTH_FORWARDER = "src/lib/supabase/auth-forwarding-server.ts";
+const AUTH_ACTIONS = "src/features/auth/actions.ts";
+const secretKeySelectors = [
+  "MemberExpression[property.name='SUPABASE_SECRET_KEY']",
+  "MemberExpression[property.value='SUPABASE_SECRET_KEY']",
+  "Property[key.name='SUPABASE_SECRET_KEY']",
+  "Property[key.value='SUPABASE_SECRET_KEY']",
+  "Literal[value='SUPABASE_SECRET_KEY']",
+  "TemplateElement[value.raw=/SUPABASE_SECRET_KEY/]",
+].map((selector) => ({
+  selector,
+  message: "SUPABASE_SECRET_KEY is read only by the sign-in forwarding client (src/lib/supabase/auth-forwarding-server.ts), owner (281) א.",
+}));
+const authForwarderPattern = {
+  regex: "(^@/lib/supabase/auth-forwarding-server$|/auth-forwarding-server$)",
+  message: "Only the auth actions (src/features/auth/actions.ts) use the sign-in forwarding client (FXS-12, owner (281) א).",
+};
+
 // FXC-08: the service-role key has only the uses listed (CLAUDE.md, hard rule 5); a new one is the owner's decision
 const serviceKeyAllowList = {
   ignores: [
@@ -133,24 +153,38 @@ const eslintConfig = defineConfig([
   ...nextTs,
   {
     files: ["src/**/*.ts", "src/**/*.tsx"],
-    ignores: [JWT_SECRET_SIGNER],
-    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors] },
+    ignores: [JWT_SECRET_SIGNER, AUTH_FORWARDER],
+    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors, ...secretKeySelectors] },
   },
-  // the signer keeps every other rule of the block above
+  // the signer and the forwarder keep every other rule of the block above
   {
     files: [JWT_SECRET_SIGNER],
-    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors] },
+    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...secretKeySelectors] },
   },
-  // FXC-08 (the service key) and IMP-04 (the person's token): one rule, so the two allow-lists are judged together
+  {
+    files: [AUTH_FORWARDER],
+    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors] },
+  },
+  // FXC-08 (the service key), IMP-04 (the person's token) and FXS-12 (the sign-in forwarder): one rule, so the allow-lists
+  // are judged together
   {
     files: ["src/**/*.ts", "src/**/*.tsx"],
-    ignores: serviceKeyAllowList.ignores,
+    ignores: [...serviceKeyAllowList.ignores, AUTH_ACTIONS],
+    rules: { "no-restricted-imports": ["error", { patterns: [serviceKeyPattern, tokenSourcePattern, authForwarderPattern] }] },
+  },
+  // the auth actions may use the forwarder, nothing else of the lists
+  {
+    files: [AUTH_ACTIONS],
     rules: { "no-restricted-imports": ["error", { patterns: [serviceKeyPattern, tokenSourcePattern] }] },
   },
   // the service key's allowed files still may not make the person's token, but for the worker itself
   {
     files: serviceKeyAllowList.ignores.filter((file) => file !== BACKGROUND_WORKER),
-    rules: { "no-restricted-imports": ["error", { patterns: [tokenSourcePattern] }] },
+    rules: { "no-restricted-imports": ["error", { patterns: [tokenSourcePattern, authForwarderPattern] }] },
+  },
+  {
+    files: [BACKGROUND_WORKER],
+    rules: { "no-restricted-imports": ["error", { patterns: [authForwarderPattern] }] },
   },
   // OPS-06: server code logs only through the structured logger (src/lib/log.ts). A browser file that must write to the
   // browser's console says so with an eslint-disable comment and its reason.

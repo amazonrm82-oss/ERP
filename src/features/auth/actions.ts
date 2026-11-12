@@ -8,6 +8,7 @@ import { owesSecondStep, sessionCheck } from "@/lib/auth";
 import { authErrorMessage } from "@/lib/errors";
 import { paths, safeNextPath } from "@/lib/paths";
 import { siteOrigin } from "@/lib/site-origin";
+import { forwardedResetPassword, forwardedSignIn, forwardedSignUp } from "@/lib/supabase/auth-forwarding-server";
 import { createClient } from "@/lib/supabase/server";
 import { pick } from "@/lib/validation";
 import { validArg } from "@/lib/action-args";
@@ -21,8 +22,8 @@ export async function signInAction(_prev: FormState, formData: FormData): Promis
     return invalid(parsed.error, formData);
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
+  // FXS-12: the user's address goes to Auth's rate limit (else the user's own client, as before)
+  const { error } = await forwardedSignIn(parsed.data);
   if (error) {
     return fail(authErrorMessage(error, "לא הצלחנו לחבר אתכם. נסו שוב."), { values: formValues(formData) });
   }
@@ -41,8 +42,7 @@ export async function forgotPasswordAction(_prev: FormState, formData: FormData)
   if (!parsed.success) {
     return invalid(parsed.error, formData);
   }
-  const supabase = await createClient();
-  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+  const { error } = await forwardedResetPassword(parsed.data.email, {
     redirectTo: `${await siteOrigin()}/auth/callback?next=${encodeURIComponent(paths.resetPassword)}`,
   });
   // rate limits are worth telling; "no such user" is not (it would reveal who has an account)
@@ -76,8 +76,7 @@ export async function signUpAction(_prev: FormState, formData: FormData): Promis
   const next = safeNextPath(formData.get("next")?.toString());
   const callback = next === "/" ? "/auth/callback" : `/auth/callback?next=${encodeURIComponent(next)}`;
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({
+  const { data, error } = await forwardedSignUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {

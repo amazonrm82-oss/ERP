@@ -194,10 +194,20 @@ and build this CRM here instead. The old code is preserved on the branch
   audited `library_link` without the token) and `public.library_link_revoke` (maker or owner/admin). A link whose maker left keeps
   serving with no notice (interim, owner question 296). In the eslint allow-list. The advisor's findings on the two staff definers and
   the two app tables are expected.
-  Owner, 12 November 2026, answer (281) א (approved, not built yet; FXS-12): one server file only, in the eslint allow-list, may use the
-  project secret key `sb_secret_…` (set by the owner in Vercel) solely to forward the user's IP address to Supabase Auth's rate limit
-  (header `sb-forwarded-for`) on sign-in, sign-up and password reset; a test proves the key never reaches the browser; its own "In use"
-  line once built.
+  In use (FXS-12, owner 12 November 2026, answer (281) א; no migration; an independent review and a delta review): the sign-in
+  forwarding client (`src/lib/supabase/auth-forwarding-server.ts`, server-only, the ONLY reader of `SUPABASE_SECRET_KEY`, which the owner
+  sets in Vercel; only a key starting `sb_secret_`; lint refuses the name elsewhere, and only `src/features/auth/actions.ts` may import
+  the file) makes, per request, an Auth-only `@supabase/ssr` client with that key, the header `sb-forwarded-for` (the user's address from
+  `clientIp()`, a valid IPv4/IPv6 only) and the fixed User-Agent `mexuz-server` (Supabase refuses a secret key with a browser one). It
+  calls only `auth.signInWithPassword`, `auth.signUp` and `auth.resetPasswordForEmail` for the sign-in, sign-up and forgot-password
+  actions and answers only that call's result. Same session cookie methods and options as `src/lib/supabase/server.ts`; after a sign-in
+  the session goes to the request's own client with `setSession` (on failure that client signs out locally). No data call is made with
+  the key. Without the key or a valid address, or when the gateway refuses the key (401/403 without an Auth error code), the call runs
+  through the user's own client as before (never locked out; one redacted `auth.ip_forwarding_off` line per reason; `secret_key_refused`
+  in the logs means "fix the key"). With the key Auth treats these calls as admin and skips its own CAPTCHA, so any CAPTCHA on these
+  three forms (Turnstile, owner (275)) is verified by our server before the call, never by Supabase's setting.
+  `tests/unit/auth-forwarding.test.ts` proves no client component reaches the file, the name is never `NEXT_PUBLIC_`, and lint refuses it
+  elsewhere. Sessions started this way carry the User-Agent `mexuz-server` at Auth.
   In use (IMP-04, owner 9 November 2026, answers (155) א, (160) א, (161) א, (162) ב, (163) ב; migration `_background_jobs.sql`; two
    independent reviews): the OPS-04 worker (same route and secret) also claims `import.run` and `export.run` (payload `{request_id,
    user_id}` only) in its own pass (lease 900 s, one job, 40 s budget, then saved and handed back uncounted with

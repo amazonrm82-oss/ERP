@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieMethodsServer } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies, headers } from "next/headers";
 import { cache } from "react";
@@ -35,20 +35,30 @@ export const createClient = cache(async (): Promise<SupabaseClient<Database>> =>
   return createServerClient<Database>(env.url, env.anonKey, {
     global: { headers: forwarded },
     cookieOptions: SESSION_COOKIE,
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
-      },
-      setAll(cookiesToSet) {
-        try {
-          for (const { name, value, options } of cookiesToSet) {
-            cookieStore.set(name, value, options);
-          }
-        } catch {
-          // Server Components cannot write cookies. The proxy refreshes the
-          // session on every request, so it is safe to skip the write here.
-        }
-      },
-    },
+    cookies: sessionCookieMethods(cookieStore),
   });
 });
+
+type CookieStore = Awaited<ReturnType<typeof cookies>>;
+
+/**
+ * The session cookie methods every server client of the user's session uses: this file's client and the sign-in
+ * forwarding client (FXS-12, src/lib/supabase/auth-forwarding-server.ts), so both read and write the very same cookies.
+ */
+export function sessionCookieMethods(cookieStore: CookieStore): CookieMethodsServer {
+  return {
+    getAll() {
+      return cookieStore.getAll();
+    },
+    setAll(cookiesToSet) {
+      try {
+        for (const { name, value, options } of cookiesToSet) {
+          cookieStore.set(name, value, options);
+        }
+      } catch {
+        // Server Components cannot write cookies. The proxy refreshes the
+        // session on every request, so it is safe to skip the write here.
+      }
+    },
+  };
+}
