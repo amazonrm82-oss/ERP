@@ -16,7 +16,7 @@ type Props = {
   fingerprint: string;
   quote: { vatRateBp: number | null; pricesIncludeVat: boolean; discountBp: number | null; discountAgorot: number | null; };
   lines: QuoteLine[];
-  // SGN-07: in-person acceptance on the rep's device (see QuoteDecisionPanel)
+  // SGN-07: in-person acceptance or (owner (290) ב) decline on the rep's device (see QuoteDecisionPanel)
   inPerson?: { send: (body: DecisionBody) => Promise<DecisionReply>; evidence: string; done: (reply: DecisionReply) => ReactNode };
 };
 
@@ -33,7 +33,7 @@ export function QuoteAnswerArea({ token, fingerprint, quote, lines, inPerson }: 
 
   const panel = (choice?: { optionalKeys: number[]; acceptedTotalAgorot: number } | null) =>
     inPerson ? (
-      <QuoteDecisionPanel fingerprint={fingerprint} choice={choice} send={inPerson.send} acceptOnly evidence={inPerson.evidence} done={inPerson.done} />
+      <QuoteDecisionPanel fingerprint={fingerprint} choice={choice} send={inPerson.send} evidence={inPerson.evidence} done={inPerson.done} />
     ) : (
       <QuoteDecisionPanel token={token} fingerprint={fingerprint} choice={choice} />
     );

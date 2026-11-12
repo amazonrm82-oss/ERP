@@ -17,16 +17,19 @@ type Props = {
   back: { href: string; label: string };
 };
 
-type Reply = DecisionReply & { pdfLater?: boolean };
+type Reply = DecisionReply & { pdfLater?: boolean; declined?: boolean };
 
-/** SGN-07: the customer's acceptance of a quote, signed in person on the rep's device (optional lines as on its page). */
+/**
+ * SGN-07: the customer's acceptance of a quote, signed in person on the rep's device (optional lines as on its page), or,
+ * owner (290) ב, the customer's decline, as on its page.
+ */
 export function InPersonQuoteAccept({ orgId, quoteId, fingerprint, quote, lines, back }: Props) {
   async function send(body: unknown): Promise<Reply> {
     const result = await acceptQuoteInPersonAction(orgId, quoteId, body);
     if (!result.ok) return { ok: false, message: result.message };
     const data = result.data;
     if (!data) return { ok: false, message: "משהו השתבש. נסו שוב בעוד רגע." };
-    return { ok: data.signed, status: data.status, message: data.message, pdfLater: data.pdfLater };
+    return { ok: data.signed || data.declined === true, status: data.status, message: data.message, pdfLater: data.pdfLater, declined: data.declined === true };
   }
   return (
     <QuoteAnswerArea
@@ -36,7 +39,7 @@ export function InPersonQuoteAccept({ orgId, quoteId, fingerprint, quote, lines,
       inPerson={{
         send,
         evidence: IN_PERSON_EVIDENCE,
-        done: (reply) => <InPersonDone message={reply.message} pdfLater={(reply as Reply).pdfLater === true} back={back} />,
+        done: (reply) => <InPersonDone message={reply.message} pdfLater={(reply as Reply).pdfLater === true} declined={(reply as Reply).declined === true} back={back} />,
       }}
     />
   );

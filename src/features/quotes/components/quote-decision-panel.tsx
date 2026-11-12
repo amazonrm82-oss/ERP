@@ -23,9 +23,9 @@ type Props = {
   fingerprint: string;
   subject?: Subject;
   choice?: Choice | null;
-  // SGN-07: in-person signing: accept only, posted through the rep's own action, with its own evidence line and done view
+  // SGN-07: in-person signing: accept or (owner (290) ב) decline, posted through the rep's own action, with its own evidence
+  // line and done view
   send?: (body: DecisionBody) => Promise<DecisionReply>;
-  acceptOnly?: boolean;
   evidence?: string;
   done?: (reply: DecisionReply) => ReactNode;
 };
@@ -41,11 +41,11 @@ type Mode = "choose" | "accept" | "decline";
  * typed signature, the checkbox) or decline with an optional reason. The answer names the fingerprint of the version shown,
  * so it applies to exactly what the customer read.
  */
-export function QuoteDecisionPanel({ token, fingerprint, subject = "quote", choice, send, acceptOnly = false, evidence, done }: Props) {
+export function QuoteDecisionPanel({ token, fingerprint, subject = "quote", choice, send, evidence, done }: Props) {
   const texts = SUBJECT[subject];
   const router = useRouter();
   const ids = useId();
-  const [mode, setMode] = useState<Mode>(acceptOnly ? "accept" : "choose");
+  const [mode, setMode] = useState<Mode>("choose");
   const [name, setName] = useState("");
   const [idNumber, setIdNumber] = useState("");
   const [kind, setKind] = useState<"drawn" | "typed">("drawn");
@@ -158,11 +158,9 @@ export function QuoteDecisionPanel({ token, fingerprint, subject = "quote", choi
             <Button type="submit" loading={pending} disabled={!canAccept}>
               אישור וחתימה
             </Button>
-            {acceptOnly ? null : (
-              <Button type="button" variant="ghost" onClick={() => setMode("choose")} disabled={pending}>
-                חזרה
-              </Button>
-            )}
+            <Button type="button" variant="ghost" onClick={() => setMode("choose")} disabled={pending}>
+              חזרה
+            </Button>
           </div>
         </form>
       ) : (

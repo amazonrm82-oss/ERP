@@ -192,15 +192,16 @@ describe("in-person signing (SGN-07)", () => {
     const entry = await asAdmin((q) => one<{ body: string; created_by: string }>(q, "select body, created_by from public.activities where metadata ->> 'signature_document_id' = $1 and metadata ->> 'kind' = 'signature_signed'", [sent.id]));
     expect(entry.body).toBe("הלקוח חתם על המסמך במקום: הסכם שירות");
     expect(entry.created_by).toBe(member.id);
-    const told = await asAdmin(async (q) => (await q<{ user_id: string; body: string }>("select user_id, body from public.notifications where organization_id = $1 and title = 'מסמך נחתם בקישור'", [org])).rows);
-    expect(told).toEqual([]);
+    // (289) ב: the rep would have been the only one, so the active owners and admins are told instead (never the rep)
+    const told = await asAdmin(async (q) => (await q<{ user_id: string; body: string }>("select user_id, body from public.notifications where organization_id = $1 and title = 'מסמך נחתם בקישור' and entity_id = $2 order by user_id", [org, contact])).rows);
+    expect(told).toEqual([owner.id, admin.id].sort().map((user_id) => ({ user_id, body: "הסכם שירות" })));
     const audit = await asAdmin((q) => one<{ actor_id: string; changes: Record<string, unknown> }>(q, "select actor_id, changes from public.audit_log where entity_id = $1 and action = 'in_person_signature'", [sent.id]));
     expect(audit).toEqual({ actor_id: member.id, changes: { status: "signed", in_person: true, record_type: "contact" } });
 
     // an owner signing in person a member's document: the member (sender and owner of the record) is told, the title only
     const second = await sendDoc(member, await newContact(member, "יעל"));
     expect((await signInPerson(owner, second.id, { fingerprint: await fingerprintOf(second.id) })).status).toBe("signed");
-    const told2 = await asAdmin(async (q) => (await q<{ user_id: string; body: string }>("select user_id, body from public.notifications where organization_id = $1 and title = 'מסמך נחתם בקישור'", [org])).rows);
+    const told2 = await asAdmin(async (q) => (await q<{ user_id: string; body: string }>("select n.user_id, n.body from public.notifications n join public.signature_documents d on d.contact_id = n.entity_id where n.organization_id = $1 and n.title = 'מסמך נחתם בקישור' and d.id = $2", [org, second.id])).rows);
     expect(told2).toEqual([{ user_id: member.id, body: "הסכם שירות" }]);
     expect((await asAdmin((q) => one<{ b: string }>(q, "select in_person_by as b from public.signature_signatures where document_id = $1", [second.id]))).b).toBe(owner.id);
 
@@ -247,7 +248,10 @@ describe("in-person signing (SGN-07)", () => {
     const later = await newContact(member, "גל");
     const doc2 = await sendDoc(member, later);
     expect((await signInPerson(member, doc2.id, { fingerprint: await fingerprintOf(doc2.id) })).status).toBe("signed");
-    await asAdmin((q) => q("update public.signature_signatures set signed_at = now() - interval '61 minutes' where document_id = $1", [doc2.id]));
+    // (288) ב: 23 hours later the rep still may; past 24 hours not
+    await asAdmin((q) => q("update public.signature_signatures set signed_at = now() - interval '23 hours' where document_id = $1", [doc2.id]));
+    expect(await run(member, async (q) => (await one<{ r: unknown }>(q, "select public.signature_in_person_pdf_allowed($1, $2) as r", [org, doc2.id])).r)).not.toBeNull();
+    await asAdmin((q) => q("update public.signature_signatures set signed_at = now() - interval '24 hours 1 minute' where document_id = $1", [doc2.id]));
     expect((await pgError(run(member, (q) => q("select public.signature_in_person_pdf_allowed($1, $2)", [org, doc2.id])))).code).toBe("42501");
     expect((await pgError(asService((q) => q("select public.signature_pdf_store($1, $2, $3, 1234, $4)", [org, doc2.id, member.id, "c".repeat(64)])))).code).toBe("42501");
     const doc3Contact = await newContact(member, "שי");
@@ -303,7 +307,9 @@ describe("in-person signing (SGN-07)", () => {
     expect(audit).toEqual({ actor_id: member.id, changes: { status: "accepted", in_person: true } });
     // the rep is never told of their own in-person acceptance
     expect(await asAdmin((q) => count(q, "select 1 from public.notifications where entity_id = $1 and user_id = $2 and type = 'quote'", [quote, member.id]))).toBe(0);
-    expect(await asAdmin((q) => count(q, "select 1 from public.notifications where entity_id = $1 and title like 'הצעת מחיר אושרה במקום:%'", [quote]))).toBe(0);
+    // (289) ב: the rep (the quote's owner) would have been the only one: the owners and admins are told instead
+    const toldQuote = await asAdmin(async (q) => (await q<{ user_id: string }>("select user_id from public.notifications where entity_id = $1 and title like 'הצעת מחיר אושרה במקום:%' order by user_id", [quote])).rows.map((r) => r.user_id));
+    expect(toldQuote).toEqual([owner.id, admin.id].sort());
     expect((await quoteOpen(member, quote)).state).toBe("decided");
     expect((await acceptInPerson(member, quote, open.fingerprint!, [2], total)).status).toBe("already_decided");
   });

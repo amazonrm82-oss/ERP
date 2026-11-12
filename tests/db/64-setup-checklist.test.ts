@@ -839,6 +839,10 @@ describe("setup checklist and sample data (USR-04)", () => {
       // LIB-02's answers (292)-(296) redefine app.scheduled_no_activity() of _share_note_rules.sql and
       // app.automation_run_facts() / app.automation_event_still_holds() of _dormant_customers.sql last (library_viewed is not activity)
       "_library_link_answers.sql",
+      // the owner's answers of 12 November 2026 redefine app.send_contract_renewals() of _contract_renewals.sql and
+      // public.signature_in_person_sign / quote_in_person_accept, app.signature_in_person_rep / quote_in_person_rep of
+      // _in_person_signing.sql last ((283), (287)-(290))
+      "_signature_answers.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

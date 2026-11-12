@@ -144,6 +144,8 @@ const RERUN = [
   // LIB-02's answers (292)-(296) redefine app.scheduled_no_activity(), app.automation_run_facts() and
   // app.automation_event_still_holds() last (library_viewed is not activity)
   migrationFile("_library_link_answers.sql"),
+  // the owner's answers of 12 November 2026 redefine app.send_contract_renewals() and the in-person functions last
+  migrationFile("_signature_answers.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

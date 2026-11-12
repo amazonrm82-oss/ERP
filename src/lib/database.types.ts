@@ -2685,6 +2685,9 @@ export type SignatureDocumentRow = {
   // public.signature_document_set_validity only)
   valid_until: string | null;
   renewal_on: string | null;
+  // (283) ב (migration signature_answers): when the renewal job found the last day had passed and closed its renewal tasks
+  // (server only; cleared when the last day changes)
+  contract_expired_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -4835,6 +4838,11 @@ export type Database = {
         Returns: Json;
       };
       quote_in_person_pdf_allowed: { Args: { p_org: string; p_quote: string }; Returns: Json };
+      // (290) ב: the customer declines the quote on the rep's device (the device's IP comes in the x-crm-device-ip header)
+      quote_in_person_decline: {
+        Args: { p_org: string; p_quote: string; p_fingerprint: string; p_signer_name?: string | null; p_decline_reason?: string | null; p_user_agent?: string | null };
+        Returns: Json;
+      };
       // (223) ב: the customer's download of the signed PDF (service_role only)
       signature_public_pdf: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       signature_pdf_public_store: { Args: { p_token: string; p_size: number; p_sha256: string; p_path?: string | null; p_fingerprint?: string | null }; Returns: Json };

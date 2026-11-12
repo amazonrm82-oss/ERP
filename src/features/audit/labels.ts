@@ -199,6 +199,8 @@ export const ACTION_LABELS: Record<string, string> = {
   signature_validity: "תוקף מסמך חתום",
   // SGN-07: the customer signed a document or accepted a quote on the rep's device (ids and codes only)
   in_person_signature: "חתימה במקום",
+  // (290) ב: the customer declined a quote on the rep's device
+  in_person_decline: "דחייה במקום",
   // BAL-04: the customer's statement link on a contact or company (created / revoked; never the token)
   statement_link: "קישור לדף חשבון",
   // LIB-02: a library item sent to the record by a tracked link (created / revoked; never the token)
