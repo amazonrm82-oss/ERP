@@ -112,9 +112,9 @@ describe("siteverify judgement", () => {
     });
   });
 
-  it("the default timeout is 5 seconds; only sign-in passes while Cloudflare is unavailable", async () => {
+  it("the default timeout is 3 seconds; only sign-in passes while Cloudflare is unavailable", async () => {
     const mod = await import("@/features/auth/turnstile-server");
-    expect(mod.TURNSTILE_TIMEOUT_MS).toBe(5000);
+    expect(mod.TURNSTILE_TIMEOUT_MS).toBe(3000);
     expect(mod.passesWhenUnavailable("login")).toBe(true);
     expect(mod.passesWhenUnavailable("signup")).toBe(false);
     expect(mod.passesWhenUnavailable("forgot_password")).toBe(false);
@@ -203,7 +203,24 @@ describe("verifyTurnstile in a request", () => {
     expect(await mod.verifyTurnstile(form(TOKEN), "login", down)).toEqual({ ok: true });
     expect(await mod.verifyTurnstile(form(TOKEN), "signup", down)).toEqual({ ok: false, message: CAPTCHA_UNAVAILABLE });
     expect(await mod.verifyTurnstile(form(TOKEN), "forgot_password", down)).toEqual({ ok: false, message: CAPTCHA_UNAVAILABLE });
-    expect(logged.join("\n")).toContain("auth.turnstile_skipped");
+    const lines = logged.filter((l) => l.includes('"turnstile.unavailable"'));
+    // one line per form a minute; no token, secret or address
+    expect(lines).toHaveLength(3);
+    expect(lines.join("\n")).toContain("http_error");
+    for (const text of [TOKEN, SECRET, "203.0.113.7"]) expect(lines.join("\n")).not.toContain(text);
+    await mod.verifyTurnstile(form(TOKEN), "login", down);
+    expect(logged.filter((l) => l.includes('"turnstile.unavailable"'))).toHaveLength(3);
+    expect(logged.join("\n")).not.toContain("auth.turnstile_skipped");
+  });
+
+  it("our secret refused by Cloudflare is logged at error level, while the sign-in still passes", async () => {
+    const mod = await import("@/features/auth/turnstile-server");
+    const rejected = vi.fn(ok({ success: false, "error-codes": ["invalid-input-secret"] })) as unknown as typeof fetch;
+    expect(await mod.verifyTurnstile(form(TOKEN), "login", rejected)).toEqual({ ok: true });
+    const line = logged.find((l) => l.includes("secret_rejected"));
+    expect(line).toBeDefined();
+    expect(JSON.parse(line!)).toMatchObject({ level: "error", event: "turnstile.unavailable", reason: "secret_rejected", what: "login" });
+    expect(line).not.toContain(SECRET);
   });
 
   it("the same reason and form are logged at most once a minute", async () => {
@@ -219,7 +236,8 @@ describe("the auth actions check Turnstile before any Supabase call", () => {
     vi.stubEnv("TURNSTILE_SECRET_KEY", SECRET);
     const forwarded = { forwardedSignIn: vi.fn(), forwardedSignUp: vi.fn(), forwardedResetPassword: vi.fn() };
     vi.doMock("@/lib/supabase/auth-forwarding-server", () => forwarded);
-    vi.doMock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: {} }) }));
+    const resend = vi.fn();
+    vi.doMock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { resend } }) }));
     vi.stubGlobal("fetch", vi.fn(ok({ success: false, "error-codes": ["invalid-input-response"] })));
     const actions = await import("@/features/auth/actions");
     const f = new FormData();
@@ -236,6 +254,14 @@ describe("the auth actions check Turnstile before any Supabase call", () => {
     expect(forwarded.forwardedSignIn).not.toHaveBeenCalled();
     expect(forwarded.forwardedSignUp).not.toHaveBeenCalled();
     expect(forwarded.forwardedResetPassword).not.toHaveBeenCalled();
+    // sign-up's "send again": the token is an argument; refused without one or with a bad one, before Auth
+    const { CAPTCHA_FAILED, CAPTCHA_UNAVAILABLE } = await import("@/lib/errors");
+    expect(await actions.resendConfirmationAction("a@example.com", "/")).toEqual({ ok: false, message: CAPTCHA_FAILED });
+    expect(await actions.resendConfirmationAction("a@example.com", "/", TOKEN)).toEqual({ ok: false, message: CAPTCHA_FAILED });
+    // Cloudflare unavailable: refused like sign-up (owner (319) א)
+    vi.stubGlobal("fetch", vi.fn(ok({}, 503)));
+    expect(await actions.resendConfirmationAction("a@example.com", "/", TOKEN)).toEqual({ ok: false, message: CAPTCHA_UNAVAILABLE });
+    expect(resend).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
 
@@ -245,13 +271,28 @@ describe("the auth actions check Turnstile before any Supabase call", () => {
       ["signInAction", "forwardedSignIn("],
       ["signUpAction", "forwardedSignUp("],
       ["forgotPasswordAction", "forwardedResetPassword("],
+      ["resendConfirmationAction", ".auth.resend("],
     ]) {
       const body = source.slice(source.indexOf(`export async function ${fn}`));
       const end = body.indexOf("\nexport ", 10);
       const own = end === -1 ? body : body.slice(0, end);
-      expect(own.indexOf("verifyTurnstile("), fn).toBeGreaterThan(0);
-      expect(own.indexOf("verifyTurnstile("), fn).toBeLessThan(own.indexOf(call));
+      const check = own.search(/verifyTurnstile(Token)?\(/);
+      expect(check, fn).toBeGreaterThan(0);
+      expect(check, fn).toBeLessThan(own.indexOf(call));
+      // a field-validation failure (the only answer with fieldErrors) comes before the check, so it never uses the token
+      expect(own.slice(check), fn).not.toMatch(/fieldErrors|invalid\(/);
     }
+  });
+
+  it("the widget is reset only after an answer that used the token", async () => {
+    const { turnstileTokenUsed } = await import("@/features/auth/turnstile");
+    expect(turnstileTokenUsed(null)).toBe(false);
+    expect(turnstileTokenUsed({ ok: false, fieldErrors: { email: "x" } })).toBe(false);
+    expect(turnstileTokenUsed({ ok: false })).toBe(true);
+    expect(turnstileTokenUsed({ ok: false, fieldErrors: {} })).toBe(true);
+    expect(turnstileTokenUsed({ ok: true })).toBe(true);
+    const widget = readFileSync("src/features/auth/components/turnstile-widget.tsx", "utf8");
+    expect(widget).toContain("if (!turnstileTokenUsed(resetSignal)) return;");
   });
 });
 

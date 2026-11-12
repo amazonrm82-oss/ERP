@@ -13,17 +13,18 @@ import { TURNSTILE_FIELD, type TurnstileAction } from "./turnstile";
 // owner in Vercel; lint refuses the name anywhere else in src; never NEXT_PUBLIC_). With the project's secret key Supabase Auth
 // treats sign-in, sign-up and the reset email as admin calls and skips its own CAPTCHA, so the three auth actions call
 // verifyTurnstile() BEFORE any Supabase call; Supabase's own CAPTCHA protection stays off.
-// The check: POST to siteverify with the secret, the widget's token and the user's address, within 5 seconds; accepted only
+// The check: POST to siteverify with the secret, the widget's token and the user's address, within 3 seconds (owner (319)); accepted only
 // with success true, a hostname on the closed list (mexuzsystem.com, erp-3yft.vercel.app, the host of NEXT_PUBLIC_SITE_URL)
 // and the action of the same form. Never logged: the token, the secret, the address. One redacted line per refusal reason and
 // form per minute.
 // Off: without BOTH keys there is no widget and no check (the forms work exactly as before; one line per process says so).
 // Cloudflare unreachable (timeout, network error, 5xx, an answer that is not JSON, internal-error, or our secret refused):
 // the sign-in passes (never locked out, as FXS-12's fallback; an attacker cannot make our server's call fail), sign-up and the
-// reset email are refused with "try again" (lead's choice; an owner question).
+// reset email are refused with "try again in a minute" (owner (319) א). That case logs event `turnstile.unavailable`.
+// The address is only sent to Cloudflare (remoteip); it is never stored, logged or kept in memory past the request.
 
 export const TURNSTILE_VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
-export const TURNSTILE_TIMEOUT_MS = 5_000;
+export const TURNSTILE_TIMEOUT_MS = 3_000;
 export const TURNSTILE_FIXED_HOSTS = ["mexuzsystem.com", "erp-3yft.vercel.app"] as const;
 
 // a token is at most 2,048 characters (Cloudflare); printable ASCII, no spaces
@@ -131,7 +132,7 @@ export async function checkTurnstileToken({ secret, token, ip, action, hostnames
   return { result: "pass" };
 }
 
-/** The forms that pass while Cloudflare cannot be asked: only the sign-in (never locked out). */
+/** The forms that pass while Cloudflare cannot be asked: only the sign-in (never locked out); sign-up, its "send again" and the reset email do not (owner (319) א). */
 export function passesWhenUnavailable(action: TurnstileAction): boolean {
   return action === "login";
 }
@@ -140,13 +141,15 @@ export function passesWhenUnavailable(action: TurnstileAction): boolean {
 const lastLogged = new Map<string, number>();
 const LOG_EVERY_MS = 60_000;
 
-async function noteOutcome(outcome: Exclude<TurnstileOutcome, { result: "pass" }>, action: TurnstileAction, passed: boolean) {
+async function noteOutcome(outcome: Exclude<TurnstileOutcome, { result: "pass" }>, action: TurnstileAction) {
   const key = `${outcome.result}:${outcome.reason}:${action}`;
   const now = Date.now();
   const last = lastLogged.get(key);
   if (last !== undefined && now - last < LOG_EVERY_MS) return;
   lastLogged.set(key, now);
-  await serverLog(outcome.result === "unavailable" || outcome.reason === "wrong_hostname" ? "warn" : "info", passed ? "auth.turnstile_skipped" : "auth.turnstile_refused", {
+  // our secret refused by Cloudflare means a wrong key in Vercel: an error, even while the sign-in passes
+  const level = outcome.reason === "secret_rejected" ? "error" : outcome.result === "unavailable" || outcome.reason === "wrong_hostname" ? "warn" : "info";
+  await serverLog(level, outcome.result === "unavailable" ? "turnstile.unavailable" : "auth.turnstile_refused", {
     reason: outcome.reason,
     what: action,
     code: outcome.code,
@@ -158,12 +161,17 @@ async function noteOutcome(outcome: Exclude<TurnstileOutcome, { result: "pass" }
  * the token from the form's `cf-turnstile-response` field and the address from the request (clientIp()).
  */
 export async function verifyTurnstile(formData: FormData, action: TurnstileAction, fetchImpl?: typeof fetch): Promise<{ ok: true } | { ok: false; message: string }> {
+  return verifyTurnstileToken(formData.get(TURNSTILE_FIELD), action, fetchImpl);
+}
+
+/** verifyTurnstile for an action that takes the token as an argument (sign-up's "send again"). */
+export async function verifyTurnstileToken(token: unknown, action: TurnstileAction, fetchImpl?: typeof fetch): Promise<{ ok: true } | { ok: false; message: string }> {
   const keys = currentKeys();
   if ("off" in keys) return { ok: true };
   const ip = clientIp(await headers())?.trim() ?? null;
   const outcome = await checkTurnstileToken({
     secret: keys.secret,
-    token: formData.get(TURNSTILE_FIELD),
+    token,
     ip,
     action,
     hostnames: allowedHostnames(process.env.NEXT_PUBLIC_SITE_URL),
@@ -172,9 +180,9 @@ export async function verifyTurnstile(formData: FormData, action: TurnstileActio
   if (outcome.result === "pass") return { ok: true };
   if (outcome.result === "unavailable") {
     const passes = passesWhenUnavailable(action);
-    await noteOutcome(outcome, action, passes);
+    await noteOutcome(outcome, action);
     return passes ? { ok: true } : { ok: false, message: CAPTCHA_UNAVAILABLE };
   }
-  await noteOutcome(outcome, action, false);
+  await noteOutcome(outcome, action);
   return { ok: false, message: CAPTCHA_FAILED };
 }

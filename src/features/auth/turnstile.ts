@@ -13,11 +13,22 @@ export const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
 export const TURNSTILE_FIELD = "cf-turnstile-response";
 
 /** The action each form's widget carries; the server accepts a token only for the same form. */
-export const TURNSTILE_ACTIONS = { signIn: "login", signUp: "signup", forgotPassword: "forgot_password" } as const;
+// `resend`: sign-up's "send again" of the confirmation email (behaves like sign-up)
+export const TURNSTILE_ACTIONS = { signIn: "login", signUp: "signup", forgotPassword: "forgot_password", resend: "resend" } as const;
 
 export type TurnstileAction = (typeof TURNSTILE_ACTIONS)[keyof typeof TURNSTILE_ACTIONS];
 
 /** The widget's theme from the page's own (data-theme on <html>, kept by src/features/theme): dark or light, never by the device alone. */
 export function turnstileTheme(dataTheme: string | null | undefined): "dark" | "light" {
   return dataTheme === "dark" ? "dark" : "light";
+}
+
+/**
+ * Whether a form's answer used up the widget's token, so the widget must be reset. The actions check the token only after the
+ * form's fields pass (zod), and a field-validation failure is the only answer carrying `fieldErrors`; that answer leaves the
+ * token unused, so the user can fix the field and send again at once.
+ */
+export function turnstileTokenUsed(state: { ok: boolean; fieldErrors?: Record<string, string> } | null | undefined): boolean {
+  if (!state) return false;
+  return !(state.ok === false && state.fieldErrors && Object.keys(state.fieldErrors).length > 0);
 }

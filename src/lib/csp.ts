@@ -18,8 +18,9 @@ type Options = {
   isDev: boolean;
   // the public lead form: posts back here, then may redirect to the customer's site
   publicForm: boolean;
-  // owner (275) א: the sign-in, sign-up and forgot-password pages while the Turnstile site key is set: its script and its
-  // challenge frame come from TURNSTILE_ORIGIN, and only those pages allow it
+  // owner (275) א: while the Turnstile site key is set, every page but the customer pages under /f/ (turnstileAllowed in
+  // src/lib/supabase/proxy.ts): the widget's script and challenge frame come from TURNSTILE_ORIGIN, and a client-side move
+  // into the sign-in, sign-up or forgot-password page keeps the policy of the first page loaded
   turnstile?: boolean;
 };
 

@@ -24,7 +24,15 @@ export function SignupForm({ next, turnstileSiteKey }: { next: string; turnstile
   const [editing, setEditing] = useState(false);
 
   if (state?.ok && sentTo && !editing) {
-    return <WaitingForConfirmation email={sentTo.email} next={next} message={state.message ?? ""} onBack={() => setEditing(true)} />;
+    return (
+      <WaitingForConfirmation
+        email={sentTo.email}
+        next={next}
+        message={state.message ?? ""}
+        onBack={() => setEditing(true)}
+        turnstileSiteKey={turnstileSiteKey}
+      />
+    );
   }
 
   return (
@@ -92,9 +100,23 @@ export function SignupForm({ next, turnstileSiteKey }: { next: string; turnstile
 const RESEND_WAIT_SECONDS = 60;
 
 /** After sign-up: the email is on its way; send it again, or go back and fix the address (FXU-05). */
-function WaitingForConfirmation({ email, next, message, onBack }: { email: string; next: string; message: string; onBack: () => void }) {
+function WaitingForConfirmation({
+  email,
+  next,
+  message,
+  onBack,
+  turnstileSiteKey,
+}: {
+  email: string;
+  next: string;
+  message: string;
+  onBack: () => void;
+  turnstileSiteKey?: string | null;
+}) {
   const [wait, setWait] = useState(RESEND_WAIT_SECONDS);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+  // the "send again" is checked like sign-up (owner (275) א): its own widget, the token handed to the action
+  const [token, setToken] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -106,7 +128,7 @@ function WaitingForConfirmation({ email, next, message, onBack }: { email: strin
   function resend() {
     setResult(null);
     startTransition(async () => {
-      const reply = await resendConfirmationAction(email, next);
+      const reply = await resendConfirmationAction(email, next, token);
       setResult(reply.ok ? { ok: true, text: "שלחנו שוב. בדקו גם בתיקיית הספאם." } : { ok: false, text: reply.message });
       setWait(RESEND_WAIT_SECONDS);
     });
@@ -116,8 +138,11 @@ function WaitingForConfirmation({ email, next, message, onBack }: { email: strin
     <div className="space-y-4">
       <FormNotice message={message} />
       <p className="text-md text-ink-soft">ההודעה לא הגיעה? כדאי לבדוק בתיקיית הספאם, או לשלוח שוב.</p>
+      {turnstileSiteKey ? (
+        <TurnstileWidget siteKey={turnstileSiteKey} action={TURNSTILE_ACTIONS.resend} resetSignal={result} onToken={setToken} />
+      ) : null}
       <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" onClick={resend} loading={pending} disabled={wait > 0}>
+        <Button variant="secondary" onClick={resend} loading={pending} disabled={wait > 0 || (Boolean(turnstileSiteKey) && !token)}>
           {wait > 0 ? `שליחה חוזרת (בעוד ${wait})` : "שליחה חוזרת"}
         </Button>
         <Button variant="ghost" onClick={onBack}>

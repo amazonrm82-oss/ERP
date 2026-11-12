@@ -16,7 +16,7 @@ import { z } from "zod";
 
 import { forgotPasswordSchema, newPasswordSchema, signInSchema, signUpSchema } from "./schema";
 import { TURNSTILE_ACTIONS } from "./turnstile";
-import { verifyTurnstile } from "./turnstile-server";
+import { verifyTurnstile, verifyTurnstileToken } from "./turnstile-server";
 
 export async function signInAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const parsed = signInSchema.safeParse(pick(formData, ["email", "password"]));
@@ -121,8 +121,11 @@ export async function signUpAction(_prev: FormState, formData: FormData): Promis
 const resendArgs = z.object({ email: z.email().max(254), next: z.string().max(500) });
 
 /** Sends the confirmation email again, to the address just signed up with (FXU-05). */
-export async function resendConfirmationAction(email: string, next: string): Promise<{ ok: true } | { ok: false; message: string }> {
+export async function resendConfirmationAction(email: string, next: string, turnstileToken?: string | null): Promise<{ ok: true } | { ok: false; message: string }> {
   if (!validArg(resendArgs, { email, next })) return fail("כתובת האימייל אינה תקינה.");
+  // owner (275) א, (319) א: checked like sign-up, before the Auth call
+  const captcha = await verifyTurnstileToken(turnstileToken, TURNSTILE_ACTIONS.resend);
+  if (!captcha.ok) return fail(captcha.message);
   const target = safeNextPath(next);
   const callback = target === "/" ? "/auth/callback" : `/auth/callback?next=${encodeURIComponent(target)}`;
   const supabase = await createClient();
