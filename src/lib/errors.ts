@@ -4,7 +4,7 @@ import { SUPPORT_LINE } from "@/lib/support-phone";
 
 /** SPD-04, owner (282) ב: an instant reply that holds a price, a percent discount or a marketing word is not saved. */
 export const INSTANT_REPLY_OFFER =
-  "התבנית לא תישמר: במענה מיידי אין מחיר, אחוז הנחה או מילים שיווקיות (כמו מבצע, הנחה, חינם, הטבה). הורידו אותם מהנוסח ושמרו שוב.";
+  "התבנית לא תישמר: במענה מיידי אין מחיר, אחוז הנחה או מילים שיווקיות (כמו מחיר, במבצע, הנחה של, חינם, הטבה, רק היום). הורידו אותם מהנוסח ושמרו שוב.";
 /** SPD-04, owner (282) ב: an instant reply that holds an external link is not saved. */
 export const INSTANT_REPLY_LINK = "התבנית לא תישמר: במענה מיידי אין קישור חיצוני. אפשר לכתוב רק את האתר והאימייל של העסק.";
 /** SPD-04 review: the system's instant reply templates keep their channel and message type. */

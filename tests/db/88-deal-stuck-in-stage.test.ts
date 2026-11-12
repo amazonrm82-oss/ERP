@@ -155,6 +155,8 @@ const RERUN = [
   migrationFile("_review_requests.sql"),
   // BIZ-01 redefines app.plan_key_defaults() and app.guard_form() last
   migrationFile("_business_page.sql"),
+  // SPD-04 (305) ב redefines the offer rule of _instant_reply_editable.sql last
+  migrationFile("_instant_reply_offer_words.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

@@ -527,7 +527,7 @@ export function fieldsNotAllowed(template: TemplateText): string[] {
 /** The closed list of marketing words (= app.message_offer_words; mirrored between the markers, unit test). */
 export const OFFER_WORDS: readonly string[] = [
   // offer-words:start
-  "מבצע", "מבצעים", "הנחה", "הנחות", "חינם", "הטבה", "הטבות", "קופון", "קופונים", "בלעדי", "בלעדית", "בלעדיים",
+  "במבצע", "חינם", "מחיר", "מחירים", "הטבה", "הטבות", "קופון", "קופונים", "בלעדי", "בלעדית", "בלעדיים",
   "בלעדיות", "אחוז", "אחוזים", "שקל", "שקלים", "דולר", "דולרים", "יורו", "nis", "ils", "usd", "eur", "sale", "discount",
   "coupon", "promo",
   // offer-words:end
@@ -646,6 +646,13 @@ const OFFER_CURRENCY = /[\u20AA$\u20AC\u00A3]/;
 const OFFER_SHEKEL = /\u05E9["'\u05F4\u05F3\u201C\u201D\u201E\u2033\u2032\u2018\u2019]{1,2}\u05D7/;
 const OFFER_BARE_SHEKEL = /[0-9] *\u05E9\u05D7([^\u05D0-\u05EA]|$)|(^|[^\u05D0-\u05EA])\u05E9\u05D7 *[0-9]/;
 const OFFER_PERCENT = /[0-9] *[%\u066A]|[%\u066A] *[0-9]/;
+// owner (305) ב: "הנחה" counts only in a phrase: "הנחה של" or a percent sign before it; "רק היום" counts as a phrase. The first
+// word may carry up to three prefix letters (= the phrase scans of app.message_offer).
+const OFFER_PHRASES = [
+  /(^|[^\u05D0-\u05EA])[ובלהשכמ]{0,3}הנחה +של([^\u05D0-\u05EA]|$)/,
+  /[%\u066A] *[ובלהשכמ]{0,3}הנחה([^\u05D0-\u05EA]|$)/,
+  /(^|[^\u05D0-\u05EA])[ובלהשכמ]{0,3}רק +היום([^\u05D0-\u05EA]|$)/,
+];
 const OFFER_WORD = /[\u05D0-\u05EA]+|[a-z]+/g;
 
 /** The rule's plain text: NFKC, format characters and niqqud out, whitespace to spaces, look-alikes folded, ASCII lower case. */
@@ -669,6 +676,7 @@ export function messageOffer(text: string): boolean {
   if (!text) return false;
   const plain = offerPlainText(text);
   if (OFFER_CURRENCY.test(plain) || OFFER_SHEKEL.test(plain) || OFFER_BARE_SHEKEL.test(plain) || OFFER_PERCENT.test(plain)) return true;
+  if (OFFER_PHRASES.some((phrase) => phrase.test(plain))) return true;
   for (const match of plain.matchAll(OFFER_WORD)) {
     if (offerWord(match[0])) return true;
   }

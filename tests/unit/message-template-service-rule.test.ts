@@ -277,17 +277,17 @@ describe("service template rule (MSG-02, owner (90) ג)", () => {
   it("SPD-04 (282) ב: saving an instant reply is refused for an offer or an external link only", () => {
     const base = { channel: "sms" as const, messageType: "instant_reply" as const, subject: null };
     expect(instantReplyRefusal({ ...base, body: "שלום {שם פרטי}" })).toBeNull();
-    expect(instantReplyRefusal({ ...base, body: "{סכום} מבצע" })).toBe("offer");
+    expect(instantReplyRefusal({ ...base, body: "{סכום} במבצע" })).toBe("offer");
     expect(instantReplyRefusal({ ...base, body: "ראו www.example.com" })).toBe("external_link");
     expect(instantReplyRefusal({ ...base, body: "ראו www.biz.co.il", ownDomain: "biz.co.il" })).toBeNull();
     expect(instantReplyRefusal({ ...base, messageType: "collection", body: "מבצע www.example.com" })).toBeNull();
-    expect(templateProblemText({ ...base, body: "מבצע" })).toContain("לא תישמר");
+    expect(templateProblemText({ ...base, body: "במבצע" })).toContain("לא תישמר");
     expect(templateProblemText({ ...base, body: "ראו www.example.com" })).toContain("לא תישמר");
     expect(SEND_REFUSAL_LABELS.offer).toBe("מחיר או מילה שיווקית");
   });
 
   it("SPD-04 (282) ב: the offer rule is linear on long hostile text", () => {
-    for (const text of ["ש\"".repeat(100_000), "ו".repeat(200_000), "1 ".repeat(100_000) + "x", " %".repeat(100_000), "מבצ ".repeat(50_000)]) {
+    for (const text of ["ש\"".repeat(100_000), "ו".repeat(200_000), "1 ".repeat(100_000) + "x", " %".repeat(100_000), "מבצ ".repeat(50_000), "הנחה ".repeat(50_000), "רק ".repeat(50_000), "%".repeat(100_000) + "הנחהה", "ההה".repeat(70_000)]) {
       const started = performance.now();
       messageOffer(text);
       expect(performance.now() - started).toBeLessThan(500);

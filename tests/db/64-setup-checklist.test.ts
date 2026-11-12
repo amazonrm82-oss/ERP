@@ -855,6 +855,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_review_requests.sql",
       // BIZ-01 redefines app.plan_key_defaults() of _review_requests.sql and app.guard_form() of _meta_lead_ads.sql last
       "_business_page.sql",
+      // SPD-04 (305) ב redefines app.message_offer_words() / app.message_offer_not_words() / app.message_offer() of
+      // _instant_reply_editable.sql last
+      "_instant_reply_offer_words.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

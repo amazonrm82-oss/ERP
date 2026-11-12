@@ -260,7 +260,7 @@ describe("the instant reply to a web form inquiry (SPD-04)", () => {
     const tpl = await asAdmin(async (q) => (await q<{ id: string }>("select id from public.message_templates where organization_id = $1 and notice_kind = 'instant_reply_open' and channel = 'sms'", [org])).rows[0].id);
     const original = await asAdmin(async (q) => (await q<{ body: string; name: string }>("select body, name from public.message_templates where id = $1", [tpl])).rows[0]);
     const hint = async (sql: string, args: unknown[]) => (await pgError(asUser(owner.id, (q) => q(sql, args)))).hint;
-    for (const body of ["שלום, מבצע!", "רק היום 20% הנחה", "המחיר 100 ש\"ח", "המחיר ₪100", "שירות בחינם", "קופון מתנה", "50 NIS", "100NIS", "20 ٪", "מבְּצָע"]) {
+    for (const body of ["שלום, במבצע!", "רק היום 20% הנחה", "הנחה של עשרה", "% הנחה", "המחיר יישלח", "המחיר 100 ש\"ח", "המחיר ₪100", "שירות בחינם", "קופון מתנה", "50 NIS", "100NIS", "20 ٪", "במבְּצָע"]) {
       expect(await hint("update public.message_templates set body = $2 where id = $1", [tpl, body]), body).toBe("message_template:offer");
     }
     expect(await hint("update public.message_templates set body = 'ראו www.example.com' where id = $1", [tpl])).toBe("message_template:instant_reply_link");
@@ -273,20 +273,22 @@ describe("the instant reply to a web form inquiry (SPD-04)", () => {
     // review: an outsider learns nothing from the refusal helper
     const outsider = await createUser("outsider");
     const asked = await asUser(outsider.id, async (q) =>
-      (await q<{ r: string | null }>("select app.instant_reply_template_refusal($1, 'instant_reply', null, 'מבצע') as r", [org])).rows[0].r,
+      (await q<{ r: string | null }>("select app.instant_reply_template_refusal($1, 'instant_reply', null, 'במבצע') as r", [org])).rows[0].r,
     );
     expect(asked).toBeNull();
     expect(
       await asUser(owner.id, async (q) =>
-        (await q<{ r: string | null }>("select app.instant_reply_template_refusal($1, 'instant_reply', null, 'מבצע') as r", [org])).rows[0].r,
+        (await q<{ r: string | null }>("select app.instant_reply_template_refusal($1, 'instant_reply', null, 'במבצע') as r", [org])).rows[0].r,
       ),
     ).toBe("offer");
     // a person edits the wording and the name now
     expect((await asUser(owner.id, (q) => q("update public.message_templates set name = 'מענה שלנו', body = 'שלום {שם פרטי}, נחזור אליך עד {שעה}. {שם העסק}' where id = $1 returning id", [tpl]))).rowCount).toBe(1);
+    // owner (305) ב: a bare מבצע or הנחה is no offer
+    expect((await asUser(owner.id, (q) => q("update public.message_templates set body = 'אני מבצע את העבודה, הנחה סבירה היא שנחזור מחר' where id = $1 returning id", [tpl]))).rowCount).toBe(1);
     expect((await asUser(owner.id, (q) => q("update public.message_templates set is_active = false where id = $1 returning id", [tpl]))).rowCount).toBe(1);
     expect((await asUser(owner.id, (q) => q("update public.message_templates set is_active = true where id = $1 returning id", [tpl]))).rowCount).toBe(1);
     // a server write is refused too (every writer)
-    expect((await pgError(asAdmin((q) => q("update public.message_templates set body = 'מבצע' where id = $1", [tpl])))).hint).toBe("message_template:offer");
+    expect((await pgError(asAdmin((q) => q("update public.message_templates set body = 'במבצע' where id = $1", [tpl])))).hint).toBe("message_template:offer");
     await asUser(owner.id, (q) => q("update public.message_templates set name = $2, body = $3 where id = $1", [tpl, original.name, original.body]));
     // a person's own instant reply: the same rule on insert; deleting it is allowed
     expect(
@@ -317,7 +319,7 @@ describe("the instant reply to a web form inquiry (SPD-04)", () => {
       async (q) =>
         (
           await q<{ a: string | null; b: string | null; c: string }>(
-            `select app.message_template_problem('sms', 'instant_reply', null, 'מבצע!', null, null) as a,
+            `select app.message_template_problem('sms', 'instant_reply', null, 'במבצע!', null, null) as a,
                     app.message_template_problem('sms', 'collection', null, 'מבצע!', null, null) as b,
                     app.message_send_refusal_text('offer') as c`,
           )

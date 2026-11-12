@@ -2726,28 +2726,28 @@
     "problem": null
   },
   {
-    "note": "SPD-04 (282): the word מבצע",
+    "note": "SPD-04 (305) ב: a bare מבצע is no offer",
     "channel": "sms",
     "messageType": "instant_reply",
     "subject": null,
     "body": "יש לנו מבצע",
-    "problem": "offer"
+    "problem": null
   },
   {
-    "note": "SPD-04 (282): plural מבצעים",
+    "note": "SPD-04 (305) ב, lead's choice: a bare plural מבצעים is no offer",
     "channel": "sms",
     "messageType": "instant_reply",
     "subject": null,
     "body": "מבצעים חמים",
-    "problem": "offer"
+    "problem": null
   },
   {
-    "note": "SPD-04 (282): הנחה",
+    "note": "SPD-04 (305) ב: a bare הנחה is no offer",
     "channel": "sms",
     "messageType": "instant_reply",
     "subject": null,
     "body": "הנחה למצטרפים",
-    "problem": "offer"
+    "problem": null
   },
   {
     "note": "SPD-04 (282): with a prefix: בחינם",
@@ -2758,11 +2758,11 @@
     "problem": "offer"
   },
   {
-    "note": "SPD-04 (282): two prefixes: ובהנחה",
+    "note": "SPD-04 (282), (305) ב: two prefixes: ובהנחה של",
     "channel": "sms",
     "messageType": "instant_reply",
     "subject": null,
-    "body": "ובהנחה",
+    "body": "ובהנחה של 10",
     "problem": "offer"
   },
   {
@@ -2854,26 +2854,26 @@
     "problem": null
   },
   {
-    "note": "SPD-04 (282): niqqud inside the word",
+    "note": "SPD-04 (282): niqqud inside the word (במבצע, owner (305) ב)",
     "channel": "sms",
     "messageType": "instant_reply",
     "subject": null,
-    "body": "מִבְצָע",
+    "body": "במִבְצָע",
     "problem": "offer"
   },
   {
-    "note": "SPD-04 (282): a zero-width space inside the word",
+    "note": "SPD-04 (282): a zero-width space inside the word (במבצע, owner (305) ב)",
     "channel": "sms",
     "messageType": "instant_reply",
     "subject": null,
-    "body": "מב​צע",
+    "body": "במב​צע",
     "problem": "offer"
   },
   {
-    "note": "SPD-04 (282): in the email subject",
+    "note": "SPD-04 (282): in the email subject (305) ב",
     "channel": "email",
     "messageType": "instant_reply",
-    "subject": "מבצע לפונים",
+    "subject": "במבצע לפונים",
     "body": "שלום {שם פרטי}",
     "problem": "offer"
   },
@@ -2886,11 +2886,11 @@
     "problem": "field_not_allowed"
   },
   {
-    "note": "SPD-04 (282): an offer before a link",
+    "note": "SPD-04 (282): an offer before a link (305) ב",
     "channel": "sms",
     "messageType": "instant_reply",
     "subject": null,
-    "body": "מבצע www.example.com",
+    "body": "במבצע www.example.com",
     "problem": "offer"
   },
   {
@@ -2975,11 +2975,11 @@
     "problem": "offer"
   },
   {
-    "note": "SPD-04 (282) review: a Hebrew presentation form folds by NFKC",
+    "note": "SPD-04 (282) review: a Hebrew presentation form folds by NFKC (במבצע, owner (305) ב)",
     "channel": "sms",
     "messageType": "instant_reply",
     "subject": null,
-    "body": "מבּצע",
+    "body": "במבּצע",
     "problem": "offer"
   },
   {
@@ -2991,19 +2991,19 @@
     "problem": null
   },
   {
-    "note": "SPD-04 (282) review: a word joiner inside a word",
+    "note": "SPD-04 (282) review: a word joiner inside a word (במבצע, owner (305) ב)",
     "channel": "sms",
     "messageType": "instant_reply",
     "subject": null,
-    "body": "מב⁠צע",
+    "body": "במב⁠צע",
     "problem": "offer"
   },
   {
-    "note": "SPD-04 (282) review: a bidi mark inside a word",
+    "note": "SPD-04 (282) review: a bidi mark inside a word (הנחה של, owner (305) ב)",
     "channel": "sms",
     "messageType": "instant_reply",
     "subject": null,
-    "body": "הנ‏חה",
+    "body": "הנ‏חה של",
     "problem": "offer"
   },
   {
@@ -3023,19 +3023,19 @@
     "problem": "offer"
   },
   {
-    "note": "SPD-04 (282) review: a variation selector inside a word",
+    "note": "SPD-04 (282) review: a variation selector inside a word (במבצע, owner (305) ב)",
     "channel": "sms",
     "messageType": "instant_reply",
     "subject": null,
-    "body": "מבצ️ע",
+    "body": "במבצ️ע",
     "problem": "offer"
   },
   {
-    "note": "SPD-04 (282) review: a tag character inside a word",
+    "note": "SPD-04 (282) review: a tag character inside a word (במבצע, owner (305) ב)",
     "channel": "sms",
     "messageType": "instant_reply",
     "subject": null,
-    "body": "מבצ󠁁ע",
+    "body": "במבצ󠁁ע",
     "problem": "offer"
   },
   {
@@ -3199,12 +3199,12 @@
     "problem": "offer"
   },
   {
-    "note": "SPD-04 (282) review: the prefix מ before a list word: מהמבצע",
+    "note": "SPD-04 (305) ב: מהמבצע is no offer any more (מבצע alone)",
     "channel": "sms",
     "messageType": "instant_reply",
     "subject": null,
     "body": "מהמבצע הזה",
-    "problem": "offer"
+    "problem": null
   },
   {
     "note": "SPD-04 (282) review: three prefix letters: כשבמבצע",
@@ -3215,12 +3215,12 @@
     "problem": "offer"
   },
   {
-    "note": "SPD-04 (282) review: four prefix letters are too many",
+    "note": "SPD-04 (305) ב: three prefix letters before the list word במבצע: וכשבמבצע",
     "channel": "sms",
     "messageType": "instant_reply",
     "subject": null,
     "body": "וכשבמבצע",
-    "problem": null
+    "problem": "offer"
   },
   {
     "note": "SPD-04 (282) review: weight is not a shekel: משקל",
@@ -3263,11 +3263,11 @@
     "problem": "offer"
   },
   {
-    "note": "SPD-04 (282) review: from a discount: מהנחה",
+    "note": "SPD-04 (282), (305) ב: from a discount of: מהנחה של",
     "channel": "sms",
     "messageType": "instant_reply",
     "subject": null,
-    "body": "מהנחה",
+    "body": "מהנחה של",
     "problem": "offer"
   },
   {
@@ -3303,51 +3303,51 @@
     "problem": "offer"
   },
   {
-    "note": "SPD-04 (282) delta review: a combining acute inside a word",
+    "note": "SPD-04 (282) delta review: a combining acute inside a word (במבצע, owner (305) ב)",
     "channel": "sms",
     "messageType": "instant_reply",
     "subject": null,
-    "body": "מב́צע",
+    "body": "במב́צע",
     "problem": "offer"
   },
   {
-    "note": "SPD-04 (282) delta review: a sof pasuq inside a word",
+    "note": "SPD-04 (282) delta review: a sof pasuq inside a word (במבצע, owner (305) ב)",
     "channel": "sms",
     "messageType": "instant_reply",
     "subject": null,
-    "body": "מב׃צע",
+    "body": "במב׃צע",
     "problem": "offer"
   },
   {
-    "note": "SPD-04 (282) delta review: a Hangul filler inside a word",
+    "note": "SPD-04 (282) delta review: a Hangul filler inside a word (במבצע, owner (305) ב)",
     "channel": "sms",
     "messageType": "instant_reply",
     "subject": null,
-    "body": "מבㅤצע",
+    "body": "במבㅤצע",
     "problem": "offer"
   },
   {
-    "note": "SPD-04 (282) delta review: a halfwidth Hangul filler inside a word (NFKC to U+1160)",
+    "note": "SPD-04 (282) delta review: a halfwidth Hangul filler inside a word (NFKC to U+1160) (במבצע, owner (305) ב)",
     "channel": "sms",
     "messageType": "instant_reply",
     "subject": null,
-    "body": "מבﾠצע",
+    "body": "במבﾠצע",
     "problem": "offer"
   },
   {
-    "note": "SPD-04 (282) delta review: a Hangul choseong filler inside a word",
+    "note": "SPD-04 (282) delta review: a Hangul choseong filler inside a word (במבצע, owner (305) ב)",
     "channel": "sms",
     "messageType": "instant_reply",
     "subject": null,
-    "body": "מבᅟצע",
+    "body": "במבᅟצע",
     "problem": "offer"
   },
   {
-    "note": "SPD-04 (282) delta review: a braille blank inside a word",
+    "note": "SPD-04 (282) delta review: a braille blank inside a word (במבצע, owner (305) ב)",
     "channel": "sms",
     "messageType": "instant_reply",
     "subject": null,
-    "body": "מב⠀צע",
+    "body": "במב⠀צע",
     "problem": "offer"
   },
   {
@@ -3397,5 +3397,261 @@
     "subject": null,
     "body": "ששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששש",
     "problem": "too_long"
+  },
+  {
+    "note": "SPD-04 (305) ב: the verb מבצע is no offer",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "אני מבצע את העבודה",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (305) ב: המבצע is no offer",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "המבצע של הפרויקט יחזור אליכם",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (305) ב: ומבצע is no offer",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "אנחנו בודקים ומבצע יחזור אליכם",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (305) ב: a reasonable assumption is no offer",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "הנחה סבירה היא שנחזור מחר",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (305) ב: ההנחה alone is no offer",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "ההנחה שלנו היא שנחזור מחר",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (305) ב: הנחה של",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "הנחה של 10 למצטרפים",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (305) ב: בהנחה של",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "בהנחה של עשרה אחוז",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (305) ב: הנחה של across a line end",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "הנחה\nשל",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (305) ב: הנחה שלנו is not the phrase",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "הנחה שלנו",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (305) ב: a percent and הנחה",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "20% הנחה",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (305) ב: a percent sign before הנחה",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "% הנחה",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (305) ב: a percent sign glued to הנחה",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "%הנחה למצטרפים",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (305) ב: an Arabic percent sign before הנחה",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "٪ הנחה",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (305) ב: a percent sign before a longer word is not the phrase",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "% הנחהות",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (305) ב: במבצע",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "במבצע עד סוף החודש",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (305) ב: ובמבצע",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "ובמבצע הזה",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (305) ב: מחיר",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "המחיר יישלח בנפרד",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (305) ב: מחירים",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "מחירים מיוחדים",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (305) ב: בחינם",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "שירות בחינם",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (305) ב: רק היום",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "רק היום!",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (305) ב: ורק היום",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "ורק היום",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (305) ב: רק without היום is no offer",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "רק רצינו לומר תודה",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (305) ב: היום without רק is no offer",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "נחזור אליכם היום",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (305) ב: הטבה",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "הטבה למצטרפים",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (305) ב: והטבה",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "והטבה",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (305) ב: four prefix letters are too many",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "וכשהחינם",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (305) ב, lead's choice: the verb מבצעים is no offer",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "אנחנו מבצעים תיקונים",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (305) ב, lead's choice: ההנחות (assumptions) is no offer",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "לפי ההנחות שלנו נחזור מחר",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (305) ב, lead's choice: במבצעים is not a list word",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "במבצעים",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (305) ב, lead's choice: הנחות של is not the phrase (הנחה של only)",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "הנחות של 10",
+    "problem": null
+  },
+  {
+    "note": "SPD-04 (305) ב, lead's choice: plurals beside במבצע still match",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "הנחות ומבצעים: הכול במבצע",
+    "problem": "offer"
+  },
+  {
+    "note": "SPD-04 (305) ב, lead's choice: plurals beside a percent before הנחה still match",
+    "channel": "sms",
+    "messageType": "instant_reply",
+    "subject": null,
+    "body": "מבצעים: 20% הנחה",
+    "problem": "offer"
   }
 ]
