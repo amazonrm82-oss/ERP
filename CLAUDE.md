@@ -235,6 +235,18 @@ and build this CRM here instead. The old code is preserved on the branch
   three forms (Turnstile, owner (275)) is verified by our server before the call, never by Supabase's setting.
   `tests/unit/auth-forwarding.test.ts` proves no client component reaches the file, the name is never `NEXT_PUBLIC_`, and lint refuses it
   elsewhere. Sessions started this way carry the User-Agent `mexuz-server` at Auth.
+  In use (CAP-12 / FXS-12 Turnstile, owner (275) א and (319) א, 12 November 2026; no migration; an independent review): Cloudflare
+  Turnstile on sign-in, sign-up, sign-up's "send again" and forgot-password (actions `login`, `signup`, `resend`, `forgot_password`),
+  verified by OUR server (`src/features/auth/turnstile-server.ts`, server-only, the ONLY reader of `TURNSTILE_SECRET_KEY`; lint refuses
+  the name elsewhere) after the zod check and before any Supabase call: siteverify with secret, token and `remoteip` (never stored or
+  logged), 3 s timeout; ok only with success, a hostname on the closed list (mexuzsystem.com, erp-3yft.vercel.app, the host of
+  `NEXT_PUBLIC_SITE_URL`) and the form's own action; a missing or malformed token is always refused. When Cloudflare cannot be asked
+  (timeout, network, 5xx, not JSON, internal-error, our secret refused) sign-in passes and logs `turnstile.unavailable` (no user details;
+  `secret_rejected` at error level); the other three answer "נסו שוב בעוד דקה". Without both keys (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`,
+  `TURNSTILE_SECRET_KEY`, Production only) nothing is shown or checked. The widget (explicit render, Hebrew) resets only after an answer
+  that used the token (`turnstileTokenUsed`). CSP (`src/lib/csp.ts`, `proxy.ts`) adds `https://challenges.cloudflare.com` to script-src and
+  frame-src on every page but `/f/` while the site key is set (client navigation keeps the first page's policy). Supabase's own CAPTCHA
+  protection stays OFF.
   In use (LND-13 / WEB-01, owner 11 November 2026; migration 021232; an independent review and a delta review): the landing page's price
   list (`src/features/landing/price-list-server.ts`, page `/`) calls only `public.plans_public()` with a plain anon client (no session,
   cookie or service key). The function is sql, stable, definer, no argument, `search_path ''`, executable by anon and authenticated only
