@@ -260,7 +260,7 @@ try {
     await visitor.getByRole("link", { name: "כניסה", exact: true }).waitFor();
     // what the system does, from the catalog; only what works is listed as available (LND-03, LND-04)
     await visitor.getByRole("heading", { name: "כל מה שיש במערכת" }).waitFor();
-    await visitor.getByRole("heading", { name: "בקרוב" }).waitFor();
+    await visitor.getByRole("heading", { name: "בדרך למערכת" }).waitFor();
     // search engines: the landing page yes, the app and the sign-in screens no (LND-11)
     if ((await visitor.locator('meta[name="robots"]').getAttribute("content")) !== "index, follow") throw new Error("the landing page is not open to search engines");
     const robotsTxt = await (await visitor.context().request.get(`${APP}/robots.txt`)).text();
