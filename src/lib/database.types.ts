@@ -616,6 +616,8 @@ export type BusinessPageRow = {
   show_hours: boolean;
   show_form: boolean;
   booking_page_ids: string[];
+  owner_user_id: string | null;
+  team_id: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -629,6 +631,8 @@ export type BusinessPageWrite = {
   show_hours?: boolean;
   show_form?: boolean;
   booking_page_ids?: string[];
+  owner_user_id?: string | null;
+  team_id?: string | null;
 };
 
 // INT-02: a business's connection to a provider (owners/admins only). It holds no secret: secret_set_at /

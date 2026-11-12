@@ -15,6 +15,9 @@ export type BusinessPageSettings = {
   showHours: boolean;
   showForm: boolean;
   bookingPageIds: string[];
+  /** BIZ-01 (314) ב: who gets the form's leads (null and null = the business's regular distribution) */
+  ownerUserId: string | null;
+  teamId: string | null;
 };
 
 export async function getBusinessPage(orgId: string): Promise<BusinessPageSettings | null> {
@@ -22,7 +25,7 @@ export async function getBusinessPage(orgId: string): Promise<BusinessPageSettin
   const row = must(
     await supabase
       .from("business_pages")
-      .select("id, token, is_active, about, show_phone, show_whatsapp, show_website, show_hours, show_form, booking_page_ids")
+      .select("id, token, is_active, about, show_phone, show_whatsapp, show_website, show_hours, show_form, booking_page_ids, owner_user_id, team_id")
       .eq("organization_id", orgId)
       .maybeSingle(),
     "business page",
@@ -39,6 +42,8 @@ export async function getBusinessPage(orgId: string): Promise<BusinessPageSettin
     showHours: row.show_hours,
     showForm: row.show_form,
     bookingPageIds: row.booking_page_ids ?? [],
+    ownerUserId: row.owner_user_id,
+    teamId: row.team_id,
   };
 }
 

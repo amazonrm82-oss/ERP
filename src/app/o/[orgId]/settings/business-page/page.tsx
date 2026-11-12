@@ -9,7 +9,7 @@ import { publicBusinessPagePath } from "@/features/business-page/paths";
 import { getBusinessPage, getBusinessPageSource } from "@/features/business-page/queries";
 import { QrImage } from "@/features/intake/components/qr-image";
 import { isAdminRole } from "@/features/settings/permissions";
-import { orgHasFeature } from "@/features/settings/queries";
+import { listMembers, listTeams, orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { getOrgHours } from "@/features/work-hours/queries";
 import { paths } from "@/lib/paths";
@@ -37,14 +37,17 @@ export default async function BusinessPageSettings({ params }: Props) {
       </Card>
     );
   }
-  const [page, source, hours, bookingPages, inPlan, origin] = await Promise.all([
+  const [page, source, hours, bookingPages, inPlan, origin, members, teams] = await Promise.all([
     getBusinessPage(orgId),
     getBusinessPageSource(orgId),
     getOrgHours(orgId),
     listBookingPages(orgId),
     orgHasFeature(orgId, "public_page"),
     siteOrigin(),
+    listMembers(orgId),
+    listTeams(orgId),
   ]);
+  const people = members.filter((m) => m.status === "active" && m.role !== "viewer").map((m) => ({ id: m.userId, name: m.name }));
   const link = page ? `${origin}${publicBusinessPagePath(page.token)}` : null;
 
   return (
@@ -88,6 +91,8 @@ export default async function BusinessPageSettings({ params }: Props) {
             page={page}
             bookingPages={bookingPages.map((b) => ({ id: b.id, title: b.title, repName: b.repName, isActive: b.isActive }))}
             source={{ phone: source.phone, website: source.website, hasHours: hours !== null && Object.keys(hours).length > 0 }}
+            members={people}
+            teams={teams.map((t) => ({ id: t.id, name: t.name }))}
           />
         ) : (
           <p className="text-md text-ink-soft">העסק במצב קריאה בלבד, ולכן אי אפשר לשנות את הדף כרגע.</p>

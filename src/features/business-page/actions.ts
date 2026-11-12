@@ -9,7 +9,7 @@ import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { isUuid } from "@/lib/paths";
 import { optionalText } from "@/lib/validation";
 
-import { MAX_ABOUT, MAX_PAGE_BOOKINGS } from "./model";
+import { MAX_ABOUT, MAX_PAGE_BOOKINGS, routingColumns } from "./model";
 import { businessPageSettingsPath } from "./paths";
 
 const schema = z.object({
@@ -21,6 +21,12 @@ const schema = z.object({
   show_hours: z.boolean(),
   show_form: z.boolean(),
   booking_page_ids: z.array(z.string().refine(isUuid)).max(MAX_PAGE_BOOKINGS, { error: `אפשר לבחור עד ${MAX_PAGE_BOOKINGS} דפי קביעת תור.` }),
+  routing: z.enum(["default", "person", "team"]),
+  owner_user_id: z.string().refine(isUuid).nullable(),
+  team_id: z.string().refine(isUuid).nullable(),
+}).superRefine((v, ctx) => {
+  if (v.routing === "person" && !v.owner_user_id) ctx.addIssue({ code: "custom", path: ["owner_user_id"], message: "בחרו מי יקבל את הלידים." });
+  if (v.routing === "team" && !v.team_id) ctx.addIssue({ code: "custom", path: ["team_id"], message: "בחרו צוות." });
 });
 
 /**
@@ -41,9 +47,13 @@ export async function saveBusinessPageAction(orgId: string, _prev: FormState, fo
     show_hours: on("show_hours"),
     show_form: on("show_form"),
     booking_page_ids: [...new Set(formData.getAll("booking_page_ids").map(String))],
+    routing: formData.get("routing") ?? "default",
+    owner_user_id: String(formData.get("owner_user_id") ?? "") || null,
+    team_id: String(formData.get("team_id") ?? "") || null,
   });
   if (!parsed.success) return invalid(parsed.error, formData);
-  const values = parsed.data;
+  const { routing, owner_user_id, team_id, ...rest } = parsed.data;
+  const values = { ...rest, ...routingColumns(routing, owner_user_id, team_id) };
   const { supabase } = context;
 
   const update = () => supabase.from("business_pages").update(values).eq("organization_id", orgId).select("id");

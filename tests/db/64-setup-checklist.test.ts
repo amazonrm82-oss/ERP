@@ -865,6 +865,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_review_requests_leads.sql",
       // LIB-02 (299) ב redefines app.library_link_mark_viewed() of _library_link_answers.sql last (the record's owner is told)
       "_library_link_notice_owner.sql",
+      // BIZ-01 (314) ב redefines app.business_pages_check() / app.business_pages_make_form() of _business_page.sql last and
+      // grants the routing columns after its revoke all
+      "_business_page_routing.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

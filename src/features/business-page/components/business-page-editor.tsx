@@ -1,17 +1,18 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
-import { Checkbox, TextareaField } from "@/components/ui/field";
+import { Checkbox, SelectField, TextareaField } from "@/components/ui/field";
 import { FormError, FormNotice } from "@/components/ui/feedback";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
 
 import { saveBusinessPageAction } from "../actions";
-import { MAX_ABOUT, MAX_PAGE_BOOKINGS } from "../model";
+import { MAX_ABOUT, MAX_PAGE_BOOKINGS, type PageRouting } from "../model";
 import type { BusinessPageSettings } from "../queries";
 
 export type BookingChoice = { id: string; title: string; repName: string; isActive: boolean };
+export type RoutingOption = { id: string; name: string };
 
 /** BIZ-01: what the business page shows, and whether it is on. The details themselves come from the business's settings. */
 export function BusinessPageEditor({
@@ -19,17 +20,29 @@ export function BusinessPageEditor({
   page,
   bookingPages,
   source,
+  members,
+  teams,
 }: {
   orgId: string;
   page: BusinessPageSettings | null;
   bookingPages: BookingChoice[];
   source: { phone: string | null; website: string | null; hasHours: boolean };
+  members: RoutingOption[];
+  teams: RoutingOption[];
 }) {
   const [state, formAction] = useActionState<FormState, FormData>(saveBusinessPageAction.bind(null, orgId), null);
   const failure = state && !state.ok ? state : null;
   const values = failure?.values;
   const picked = new Set(page?.bookingPageIds ?? []);
   const missing = (value: string | null | boolean, text: string) => (value ? undefined : text);
+  const savedRouting: PageRouting = page?.ownerUserId ? "person" : page?.teamId ? "team" : "default";
+  const [routing, setRouting] = useState<PageRouting>((values?.routing as PageRouting | undefined) ?? savedRouting);
+  const routingChoice = (value: PageRouting, label: string) => (
+    <label className="flex items-start gap-2.5 text-md">
+      <input type="radio" name="routing" value={value} checked={routing === value} onChange={() => setRouting(value)} className="mt-1 size-4 accent-accent" />
+      <span>{label}</span>
+    </label>
+  );
 
   return (
     <form action={formAction} className="space-y-5" noValidate>
@@ -50,7 +63,41 @@ export function BusinessPageEditor({
         <Checkbox name="show_whatsapp" label="כפתור WhatsApp (לטלפון העסק)" hint={missing(source.phone, "אין טלפון בפרטי העסק.")} defaultChecked={page?.showWhatsapp ?? true} />
         <Checkbox name="show_website" label="אתר העסק" hint={missing(source.website, "אין אתר בפרטי העסק.")} defaultChecked={page?.showWebsite ?? true} />
         <Checkbox name="show_hours" label="שעות פעילות (שעות העבודה של העסק)" hint={missing(source.hasHours, "לא הוגדרו שעות עבודה לעסק.")} defaultChecked={page?.showHours ?? true} />
-        <Checkbox name="show_form" label='טופס "צרו קשר" (כל פנייה נכנסת כליד, לפי חלוקת הלידים של העסק)' defaultChecked={page?.showForm ?? true} />
+        <Checkbox name="show_form" label='טופס "צרו קשר" (כל פנייה נכנסת כליד)' defaultChecked={page?.showForm ?? true} />
+      </fieldset>
+      <fieldset className="space-y-3 rounded-md border border-line p-3">
+        <legend className="px-1 text-md font-medium">למי הולכים הלידים מהטופס</legend>
+        <div className="space-y-2">
+          {routingChoice("default", "לפי חלוקת הלידים של העסק")}
+          {routingChoice("person", "לאדם אחד")}
+          {routingChoice("team", "לצוות אחד")}
+        </div>
+        {routing === "person" ? (
+          <SelectField
+            label="מי מקבל את הלידים"
+            name="owner_user_id"
+            defaultValue={values?.owner_user_id ?? page?.ownerUserId ?? ""}
+            error={failure?.fieldErrors?.owner_user_id}
+            hint="בחופשה הליד עובר לממלא המקום. בלי ממלא מקום זמין הליד נשאר בלי אחראי, והבעלים ומנהלי המערכת מקבלים התראה. אם האדם יעזוב או יהפוך לצופה, הלידים יחזרו לחלוקה של העסק."
+          >
+            <option value="">בחרו</option>
+            {members.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </SelectField>
+        ) : null}
+        {routing === "team" ? (
+          <SelectField label="איזה צוות" name="team_id" defaultValue={values?.team_id ?? page?.teamId ?? ""} error={failure?.fieldErrors?.team_id} hint="הלידים מתחלקים בין חברי הצוות.">
+            <option value="">בחרו</option>
+            {teams.map((t) => (
+              <option key={t.id} value={t.id}>
+                צוות {t.name}
+              </option>
+            ))}
+          </SelectField>
+        ) : null}
       </fieldset>
       <fieldset className="space-y-2">
         <legend className="mb-1 text-md font-medium">קביעת תור</legend>

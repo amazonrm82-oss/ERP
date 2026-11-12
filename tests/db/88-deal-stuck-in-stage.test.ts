@@ -163,6 +163,8 @@ const RERUN = [
   migrationFile("_review_requests_leads.sql"),
   // LIB-02 (299) ב redefines app.library_link_mark_viewed() last
   migrationFile("_library_link_notice_owner.sql"),
+  // BIZ-01 (314) ב redefines app.business_pages_check() and app.business_pages_make_form() last
+  migrationFile("_business_page_routing.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its
