@@ -868,6 +868,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       // BIZ-01 (314) ב redefines app.business_pages_check() / app.business_pages_make_form() of _business_page.sql last and
       // grants the routing columns after its revoke all
       "_business_page_routing.sql",
+      // BIZ-01 (316) ב sets the business_pages_audit trigger of _business_page.sql last (the token never reaches the log)
+      "_business_page_new_link.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

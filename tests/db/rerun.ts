@@ -62,6 +62,16 @@ export function addedConstraints(sql: string): Set<string> {
   return new Set([...sql.matchAll(CONSTRAINT_ADD)].map((m) => m[1].toLowerCase()));
 }
 
+// create [or replace] trigger <name>: a trigger a migration (re)sets. A re-run of an older `create or replace trigger` puts
+// back its older events or WHEN clause (BIZ-01 (316): re-running 021237 put back business_pages_audit on update), so every
+// later migration that creates a trigger of the same name joins. Matched by name alone, which can only add files.
+const TRIGGER_CREATE = /\bcreate\s+(?:or\s+replace\s+)?(?:constraint\s+)?trigger\s+"?([a-z_][a-z0-9_]*)"?/gi;
+
+/** The triggers a migration creates, lower case. */
+export function createdTriggers(sql: string): Set<string> {
+  return new Set([...sql.matchAll(TRIGGER_CREATE)].map((m) => m[1].toLowerCase()));
+}
+
 /** The migration file whose name ends with this suffix (the number changes when the lead renumbers it). */
 export function migrationFile(suffix: string): string {
   const file = readdirSync(MIGRATIONS_DIR).find((f) => f.endsWith(suffix));
@@ -81,6 +91,8 @@ export function migrationFile(suffix: string): string {
  * migration that drops an index a file already in the list creates joins.
  * Constraints too: a re-run `drop constraint if exists … add constraint` puts back an older check, so every later
  * migration that adds a constraint of a name a file already in the list adds joins.
+ * Triggers too: a re-run `create or replace trigger` puts back older events or WHEN, so every later migration that creates
+ * a trigger of a name a file already in the list creates joins.
  */
 export function rerunClosure(
   files: string[],
@@ -94,6 +106,7 @@ export function rerunClosure(
   const policies = new Set<string>();
   const indexes = new Set<string>();
   const constraints = new Set<string>();
+  const triggers = new Set<string>();
   const picked: string[] = [];
   const texts: string[] = [];
   for (const file of readdirSync(dir).filter((f) => f.endsWith(".sql") && f >= first).sort()) {
@@ -103,6 +116,7 @@ export function rerunClosure(
     const sets = definedPolicies(sql);
     const drops = droppedIndexes(sql);
     const adds = addedConstraints(sql);
+    const made = createdTriggers(sql);
     if (
       start.has(file) ||
       [...defines].some((name) => names.has(name)) ||
@@ -110,6 +124,7 @@ export function rerunClosure(
       [...sets].some((p) => policies.has(p)) ||
       [...drops].some((i) => indexes.has(i)) ||
       [...adds].some((c) => constraints.has(c)) ||
+      [...made].some((t) => triggers.has(t)) ||
       also(sql)
     ) {
       picked.push(file);
@@ -119,6 +134,7 @@ export function rerunClosure(
       for (const p of sets) policies.add(p);
       for (const i of createdIndexes(sql)) indexes.add(i);
       for (const c of adds) constraints.add(c);
+      for (const t of made) triggers.add(t);
     }
   }
   const missing = files.filter((file) => !picked.includes(file));

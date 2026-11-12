@@ -42,6 +42,10 @@ export function auditEntryNote(action: string, changes: Json, terms: OrgTerms = 
     if (changes.link === "created") return "נוצר קישור חדש להעדפות הדיוור (הקישור הקודם מאפשר עוד רק הסרה)";
     return null;
   }
+  if (action === "business_page_link") {
+    if (changes.link === "created") return "נוצר קישור חדש לדף העסק (הקישור הקודם הפסיק לעבוד)";
+    return null;
+  }
   if (action === "privacy_request_link") {
     if (changes.link === "created") return "נוצר קישור חדש לבקשות פרטיות (קישור קודם, אם היה, הפסיק לעבוד)";
     if (changes.link === "revoked") return "הקישור לבקשות פרטיות בוטל";

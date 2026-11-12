@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
-import { definedFunctions, definedPolicies, rerunClosure, stalePolicies } from "../db/rerun";
+import { createdTriggers, definedFunctions, definedPolicies, rerunClosure, stalePolicies } from "../db/rerun";
 
 // tests/db/rerun.ts: which later migrations a test re-runs after an older one (the closure).
 describe("rerunClosure", () => {
@@ -66,5 +66,28 @@ describe("rerunClosure and stalePolicies over policies", () => {
     expect(stalePolicies(["0100_a.sql"], dir)).toEqual(["public.things things_select: list ends with 0100_a.sql, latest is 0200_c.sql"]);
     expect(stalePolicies(["0100_a.sql", "0200_c.sql"], dir)).toEqual(["storage.objects files_delete: list ends with 0200_c.sql, latest is 0300_d.sql"]);
     expect(stalePolicies(["0100_a.sql", "0200_c.sql", "0300_d.sql"], dir)).toEqual([]);
+  });
+});
+
+// Triggers close the same way: a re-run `create or replace trigger` puts back older events or WHEN (BIZ-01 (316)).
+describe("rerunClosure over triggers", () => {
+  const dir = mkdtempSync(join(tmpdir(), "rerun-triggers-"));
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+  const files: Record<string, string> = {
+    "0100_a.sql": "create or replace trigger things_audit after insert or update or delete on public.things for each row execute function app.audit_row();",
+    "0150_b.sql": "create trigger other_touch before update on public.other for each row execute function app.touch_row();",
+    "0200_c.sql": 'create or replace trigger "things_audit" after insert or delete on public.things for each row execute function app.audit_row();',
+    "0300_d.sql": "create constraint trigger other_touch after update on public.other deferrable initially deferred for each row execute function app.x();",
+  };
+  for (const [name, sql] of Object.entries(files)) writeFileSync(join(dir, name), sql);
+
+  it("reads the triggers a migration creates", () => {
+    expect([...createdTriggers(files["0200_c.sql"])]).toEqual(["things_audit"]);
+    expect([...createdTriggers(files["0300_d.sql"])]).toEqual(["other_touch"]);
+  });
+
+  it("brings in every later file that creates a trigger of the set", () => {
+    expect(rerunClosure(["0100_a.sql"], undefined, dir).files).toEqual(["0100_a.sql", "0200_c.sql"]);
+    expect(rerunClosure(["0150_b.sql"], undefined, dir).files).toEqual(["0150_b.sql", "0300_d.sql"]);
   });
 });

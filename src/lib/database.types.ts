@@ -4531,6 +4531,7 @@ export type Database = {
       platform_list_sms_sender_pending: { Args: Record<string, never>; Returns: Json };
       business_card_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       // BIZ-01: the public business page (service_role only)
+      business_page_link_create: { Args: { p_org: string }; Returns: string };
       business_page_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       business_page_submit: {
         Args: { p_token: string; p_payload: Json; p_ip_hash?: string | null; p_user_agent?: string | null; p_is_spam?: boolean };

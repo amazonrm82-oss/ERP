@@ -3,6 +3,8 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { ConfirmButton } from "@/components/ui/confirm-button";
+import { newBusinessPageLinkAction } from "@/features/business-page/actions";
 import { listBookingPages } from "@/features/booking/queries";
 import { BusinessPageEditor } from "@/features/business-page/components/business-page-editor";
 import { publicBusinessPagePath } from "@/features/business-page/paths";
@@ -82,6 +84,17 @@ export default async function BusinessPageSettings({ params }: Props) {
                 </Link>
               </p>
               <p className="text-sm text-ink-soft">אפשר להעתיק את הקישור, או לצלם את הקוד ולהדפיס אותו.</p>
+              {canWrite ? (
+                <ConfirmButton
+                  variant="secondary"
+                  title="ליצור קישור חדש לדף העסק?"
+                  description="הקישור הנוכחי וקודי ה-QR שהודפסו איתו יפסיקו לעבוד מיד. צריך להחליף אותם בכל מקום שבו פרסמתם אותם."
+                  confirmLabel="יצירת קישור חדש"
+                  action={newBusinessPageLinkAction.bind(null, orgId)}
+                >
+                  קישור חדש
+                </ConfirmButton>
+              ) : null}
             </div>
           </div>
         ) : null}

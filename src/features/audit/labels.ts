@@ -213,6 +213,7 @@ export const ACTION_LABELS: Record<string, string> = {
   consent_link: "קישור להעדפות דיוור",
   // PRK-02: the business's public privacy-request link (created / revoked; never the token)
   privacy_request_link: "קישור לבקשות פרטיות",
+  business_page_link: "קישור לדף העסק",
   // PRV-01: turning the retention policy on, off or changing its months; "keep" on one lead; the count the policy erased
   retention_policy: "מדיניות שמירה",
   retention_keep: "השארה ברשימת מדיניות השמירה",

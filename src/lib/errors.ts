@@ -604,7 +604,7 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // BIZ-01 (migration business_page)
   "business_page:booking_page": "אחד מדפי קביעת התור שנבחרו כבר לא קיים. רעננו את הדף ובחרו שוב.",
   // BIZ-01 (314) ב: who gets the page's leads
-  "business_page:owner": "הלידים מהדף יכולים ללכת רק לחבר צוות פעיל שאינו צופה.",
+  "business_page:owner": "הלידים מהדף יכולים ללכת רק לחבר צוות פעיל שאינו צופה. בחרו אדם אחר.",
   "business_page:routing": "בחרו אדם אחד או צוות אחד, לא את שניהם.",
   "form:page": "טופס הפנייה של דף העסק משתנה רק דרך הגדרות הדף. שנו אותו ב\"הגדרות > דף העסק\".",
   // BIZ-02 (migration business_cards)

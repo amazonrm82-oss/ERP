@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { actionContext } from "@/lib/action-context";
-import { fail, formValues, invalid, type FormState } from "@/lib/action-result";
+import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { isUuid } from "@/lib/paths";
 import { optionalText } from "@/lib/validation";
@@ -73,4 +73,22 @@ export async function saveBusinessPageAction(orgId: string, _prev: FormState, fo
   }
   revalidatePath(businessPageSettingsPath(orgId));
   return { ok: true, message: "הדף נשמר." };
+}
+
+/**
+ * BIZ-01 (316) ב: a new secret link for the page (owners and admins of a writable business; the database makes the token,
+ * the old link answers "not found" at once, and the audit entry holds no token).
+ */
+export async function newBusinessPageLinkAction(orgId: string): Promise<ActionResult> {
+  const context = await actionContext(orgId);
+  if (!context.ok) return context;
+  const { data, error } = await context.supabase.rpc("business_page_link_create", { p_org: orgId });
+  if (error) {
+    if (error.code === "42501") return fail("רק בעלים ומנהלי מערכת יוצרים קישור חדש לדף העסק.");
+    if (error.code === "P0002") return fail("עוד אין דף עסק. שמרו את הדף קודם.");
+    return fail(dbErrorMessage(error, "לא הצלחנו ליצור קישור חדש. נסו שוב."));
+  }
+  if (typeof data !== "string") return fail("לא הצלחנו ליצור קישור חדש. נסו שוב.");
+  revalidatePath(businessPageSettingsPath(orgId));
+  return ok();
 }
