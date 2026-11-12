@@ -25,6 +25,7 @@ export const MESSAGE_TYPE_LABELS: Record<MessageType, string> = {
   verification_code: "קוד אימות",
   punch_card_notice: "כרטיסייה",
   instant_reply: "מענה מיידי לפנייה",
+  review_request: "בקשת ביקורת",
   marketing: "שיווק",
 };
 
@@ -307,3 +308,39 @@ export const DEFAULT_COLLECTION_CUSTOMER_TEMPLATES: ReadonlyArray<{
     noticeKind: "collection_reminder",
   },
 ];
+
+// RET-02 (owner (273); the spec's note on Google's review policy): the request for a Google review after a won deal or a
+// held meeting, SMS and email (server-only mark notice_kind 'review_request'; a template of the type is always the system's),
+// seeded by app.seed_review_request_templates with the wording version below when requests are first switched on;
+// tests/unit/review-requests.test.ts keeps the two equal. DRAFT wording until the lawyer edits it. A MARKETING message (the
+// envelope adds "פרסומת", the sender and the unsubscribe line), held to its own closed field list; the same text for every
+// customer, never chosen by how satisfied they are.
+export const REVIEW_REQUEST_WORDING_VERSION = "review-draft-1";
+
+const REVIEW_REQUEST_SMS_BODY = "שלום {שם פרטי}, תודה שבחרתם ב-{שם העסק}. נשמח מאוד אם תקדישו דקה לכתוב לנו ביקורת: {קישור לביקורת}";
+const REVIEW_REQUEST_EMAIL_BODY =
+  "שלום {שם פרטי}, תודה שבחרתם ב-{שם העסק}. נשמח מאוד אם תקדישו דקה לכתוב לנו ביקורת: {קישור לביקורת}. לשאלות: {טלפון העסק}";
+
+export const DEFAULT_REVIEW_REQUEST_TEMPLATES: ReadonlyArray<{
+  name: string;
+  channel: MessageChannel;
+  messageType: MessageType;
+  subject: string | null;
+  body: string;
+  noticeKind: "review_request";
+}> = [
+  { name: "בקשת ביקורת (SMS)", channel: "sms", messageType: "review_request", subject: null, body: REVIEW_REQUEST_SMS_BODY, noticeKind: "review_request" },
+  {
+    name: "בקשת ביקורת (אימייל)",
+    channel: "email",
+    messageType: "review_request",
+    subject: "נשמח לשמוע מכם, {שם העסק}",
+    body: REVIEW_REQUEST_EMAIL_BODY,
+    noticeKind: "review_request",
+  },
+];
+
+/** RET-02: a type only the system's own templates carry (constraint message_templates_review_request_mark); never offered to pick. */
+export function isSystemOnlyType(type: MessageType): boolean {
+  return type === "review_request";
+}

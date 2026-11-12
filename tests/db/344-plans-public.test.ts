@@ -9,8 +9,10 @@ afterAll(closePool);
 // search_path '', the body by md5), whom it is granted to, what it reads (only public.plans) and what it answers (the public
 // fields of available and coming-soon plans only). A change here needs a fresh review.
 
-// md5(prosrc) of the reviewed body (migration 20261006021232_plans_public.sql)
-const REVIEWED_BODY_MD5 = "6c246066dbf154393d0f4a05288c67f4";
+// md5(prosrc) of the reviewed body (migration 20261006021232_plans_public.sql; 6c246066dbf154393d0f4a05288c67f4)
+// RET-02 (migration 20261006021235_review_requests.sql): 021232's body with 'review_requests' added to the closed landing list
+// after 'sms'; rechecked: nothing else changed (no new field, table, argument or grant). Needs the fresh review the header asks for.
+const REVIEWED_BODY_MD5 = "f6fe40e4956b37f2ca09bae33678504c";
 
 type PublicPlan = Record<string, unknown> & { key: string; availability: string; limits: Record<string, unknown>; features: string[] };
 

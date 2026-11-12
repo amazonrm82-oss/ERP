@@ -34,17 +34,31 @@ export const SERVICE_TYPE_FIELDS: Record<ServiceMessageType, readonly MergeField
 };
 
 /**
+ * RET-02: the types this rule judges. The service types, and the review request: a MARKETING type (a grant of the channel,
+ * the caps, the envelope) whose templates are still held to a closed list of fields, no link of their own and the service
+ * length cap (= app.message_notice_template_problem, migration review_requests).
+ */
+export type JudgedMessageType = ServiceMessageType | "review_request";
+
+/** The merge fields each judged type may hold (= app.message_type_fields). */
+export const JUDGED_TYPE_FIELDS: Record<JudgedMessageType, readonly MergeFieldKey[]> = {
+  ...SERVICE_TYPE_FIELDS,
+  // the business signs it; the review link comes only through its field
+  review_request: ["firstName", "businessName", "businessPhone", "reviewLink"],
+};
+
+/**
  * SGN-03 review M1: the fields a template may hold only with the system's own mark (message_templates.notice_kind), on
  * top of its type's (= app.message_notice_fields). A requested_document marked 'signature_reminder' carries the document's
  * title, last day and link; no template a person writes may.
  */
-export const NOTICE_KIND_FIELDS: Partial<Record<ServiceMessageType, Record<string, readonly MergeFieldKey[]>>> = {
+export const NOTICE_KIND_FIELDS: Partial<Record<JudgedMessageType, Record<string, readonly MergeFieldKey[]>>> = {
   requested_document: { signature_reminder: ["date", "manageLink", "documentName"] },
 };
 
-function allowedFields(template: { messageType: ServiceMessageType; noticeKind?: string | null }): readonly MergeFieldKey[] {
+function allowedFields(template: { messageType: JudgedMessageType; noticeKind?: string | null }): readonly MergeFieldKey[] {
   const extra = template.noticeKind ? (NOTICE_KIND_FIELDS[template.messageType]?.[template.noticeKind] ?? []) : [];
-  return [...SERVICE_TYPE_FIELDS[template.messageType], ...extra];
+  return [...JUDGED_TYPE_FIELDS[template.messageType], ...extra];
 }
 
 /** A service message's body cap by channel, in characters, counted on the template as written (= app.message_service_body_max). */
@@ -469,6 +483,11 @@ function isService(type: MessageType): type is ServiceMessageType {
   return (SERVICE_MESSAGE_TYPES as readonly string[]).includes(type);
 }
 
+/** A type this rule judges: a service type, or the review request (RET-02). */
+export function isJudgedType(type: MessageType): type is JudgedMessageType {
+  return isService(type) || type === "review_request";
+}
+
 function fieldName(key: MergeFieldKey): string {
   return MESSAGE_MERGE_FIELDS[key].token.slice(1, -1);
 }
@@ -491,7 +510,7 @@ export type OwnAddresses = { ownDomain: string | null; businessEmail: string | n
 
 /** Every {field} of the template that its service type may not hold, in order, each once; [] for marketing. */
 export function fieldsNotAllowed(template: TemplateText): string[] {
-  if (!isService(template.messageType)) return [];
+  if (!isJudgedType(template.messageType)) return [];
   const allowed = new Set(allowedFields({ messageType: template.messageType, noticeKind: template.noticeKind }).map(fieldName));
   const found = new Set<string>();
   for (const match of `${template.subject ?? ""}\n${template.body}`.matchAll(MERGE_FIELD_PATTERN)) {
@@ -672,7 +691,7 @@ export function instantReplyRefusal(template: TemplateText): "offer" | "external
 
 /** null when the template may be sent; else the first problem, in the database's order. Marketing is never judged here. */
 export function messageTemplateProblem(template: TemplateText): TemplateProblem | null {
-  if (!isService(template.messageType)) return null;
+  if (!isJudgedType(template.messageType)) return null;
   if (fieldsNotAllowed(template).length > 0) return "field_not_allowed";
   const text = `${template.subject ?? ""}\n${template.body}`;
   // SPD-04 (282) ב: judged for an instant reply only
@@ -701,7 +720,9 @@ export function editedTemplateProblemText(
 /** Why the template will not be sent, in Hebrew, for the settings page and the editor; null when it may be sent. */
 export function templateProblemText(template: TemplateText): string | null {
   const problem = messageTemplateProblem(template);
-  if (!problem || !isService(template.messageType)) return null;
+  if (!problem || !isJudgedType(template.messageType)) return null;
+  // RET-02: a review request is a marketing message held to the same rule
+  const inKind = isService(template.messageType) ? "בהודעת שירות" : "בבקשת ביקורת";
   // SPD-04 (282) ב: an instant reply with an offer or an external link is not saved at all
   if (problem === "offer") return INSTANT_REPLY_OFFER;
   if (problem === "external_link" && template.messageType === "instant_reply") return INSTANT_REPLY_LINK;
@@ -709,7 +730,7 @@ export function templateProblemText(template: TemplateText): string | null {
     const allowed = allowedFields({ messageType: template.messageType, noticeKind: template.noticeKind })
       .map((key) => MESSAGE_MERGE_FIELDS[key].token)
       .join(" ");
-    return `התבנית לא תישלח: בהודעת שירות מהסוג הזה אפשר להשתמש רק בשדות ${allowed}. צריך להוריד את ${fieldsNotAllowed(template).join(", ")}.`;
+    return `התבנית לא תישלח: ${inKind} מהסוג הזה אפשר להשתמש רק בשדות ${allowed}. צריך להוריד את ${fieldsNotAllowed(template).join(", ")}.`;
   }
   if (problem === "glued_address") {
     return "התבנית לא תישלח: הכתובת צמודה לטקסט. צריך להפריד אותה ברווח מהמילים שלפניה ואחריה.";
@@ -718,11 +739,11 @@ export function templateProblemText(template: TemplateText): string | null {
     // owner (111) ב: an email address is allowed only on the business's own domain, or the business's own email
     const email = template.businessEmail?.trim() ? `, ואימייל רק בדומיין הזה או האימייל של העסק (${template.businessEmail.trim()})` : ", ואימייל רק בדומיין הזה";
     return ownDomainOk(template.ownDomain)
-      ? `התבנית לא תישלח: בהודעת שירות אפשר לכתוב רק כתובות של האתר של העסק (${template.ownDomain})${email}. המערכת מוסיפה את הקישורים שלה דרך השדות, למשל {קישור להצעה}.`
-      : `התבנית לא תישלח: בהודעת שירות אי אפשר לכתוב קישור, כתובת אתר או אימייל${template.businessEmail?.trim() ? ` מלבד האימייל של העסק (${template.businessEmail.trim()})` : ""}. המערכת מוסיפה את הקישורים שלה דרך השדות, למשל {קישור להצעה}. כתובת האתר של העסק מותרת אחרי שממלאים אותה בפרטי העסק.`;
+      ? `התבנית לא תישלח: ${inKind} אפשר לכתוב רק כתובות של האתר של העסק (${template.ownDomain})${email}. המערכת מוסיפה את הקישורים שלה דרך השדות, למשל {קישור להצעה}.`
+      : `התבנית לא תישלח: ${inKind} אי אפשר לכתוב קישור, כתובת אתר או אימייל${template.businessEmail?.trim() ? ` מלבד האימייל של העסק (${template.businessEmail.trim()})` : ""}. המערכת מוסיפה את הקישורים שלה דרך השדות, למשל {קישור להצעה}. כתובת האתר של העסק מותרת אחרי שממלאים אותה בפרטי העסק.`;
   }
   const max = SERVICE_BODY_MAX[template.channel];
-  return `התבנית לא תישלח: הודעת שירות בערוץ הזה יכולה להיות עד ${max.toLocaleString("he-IL")} תווים, והנוסח ארוך יותר (${[...template.body].length.toLocaleString("he-IL")}).`;
+  return `התבנית לא תישלח: ${isService(template.messageType) ? "הודעת שירות" : "בקשת ביקורת"} בערוץ הזה יכולה להיות עד ${max.toLocaleString("he-IL")} תווים, והנוסח ארוך יותר (${[...template.body].length.toLocaleString("he-IL")}).`;
 }
 
 export class TemplateNotSendableError extends Error {

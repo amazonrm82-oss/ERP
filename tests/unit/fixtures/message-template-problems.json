@@ -3357,5 +3357,45 @@
     "subject": null,
     "body": "נחזור עד ١٤:٠٠",
     "problem": null
+  },
+  {
+    "note": "RET-02: the default review request (SMS)",
+    "channel": "sms",
+    "messageType": "review_request",
+    "subject": null,
+    "body": "שלום {שם פרטי}, תודה שבחרתם ב-{שם העסק}. נשמח מאוד אם תקדישו דקה לכתוב לנו ביקורת: {קישור לביקורת}",
+    "problem": null
+  },
+  {
+    "note": "RET-02: a review request holds only its own fields",
+    "channel": "sms",
+    "messageType": "review_request",
+    "subject": null,
+    "body": "שלום {שם פרטי}, קיבלתם {סכום} הנחה: {קישור לביקורת}",
+    "problem": "field_not_allowed"
+  },
+  {
+    "note": "RET-02: a review request holds no link of its own (only through its field)",
+    "channel": "email",
+    "messageType": "review_request",
+    "subject": "נשמח לשמוע מכם",
+    "body": "כתבו לנו ביקורת: https://g.page/r/abc/review",
+    "problem": "external_link"
+  },
+  {
+    "note": "RET-02: the review link field is not a service type's field",
+    "channel": "sms",
+    "messageType": "collection",
+    "subject": null,
+    "body": "שלום {שם פרטי}, {קישור לביקורת}",
+    "problem": "field_not_allowed"
+  },
+  {
+    "note": "RET-02: a review request is held to the service length cap",
+    "channel": "sms",
+    "messageType": "review_request",
+    "subject": null,
+    "body": "ששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששששש",
+    "problem": "too_long"
   }
 ]

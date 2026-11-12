@@ -1,0 +1,232 @@
+[
+  {
+    "url": "https://g.page/r/CbXyZ123abc/review",
+    "ok": true,
+    "note": "the short review link of a business profile"
+  },
+  {
+    "url": "https://g.page/r/CbXyZ123abc",
+    "ok": true,
+    "note": "the short profile link"
+  },
+  {
+    "url": "https://search.google.com/local/writereview?placeid=ChIJN1t_tDeuEmsRUsoyG83frY4",
+    "ok": true,
+    "note": "write a review by place id"
+  },
+  {
+    "url": "https://www.google.com/maps/place/Biz/@32.08,34.78,17z",
+    "ok": true,
+    "note": "maps on www.google.com"
+  },
+  {
+    "url": "https://google.co.il/maps/place/abc",
+    "ok": true,
+    "note": "maps on the Israeli Google domain"
+  },
+  {
+    "url": "https://maps.app.goo.gl/AbCdEf123",
+    "ok": true,
+    "note": "a shared maps link"
+  },
+  {
+    "url": "https://g.co/kgs/AbC123",
+    "ok": true,
+    "note": "a knowledge panel short link"
+  },
+  {
+    "url": "https://G.PAGE/r/abc/review",
+    "ok": true,
+    "note": "the host in capitals"
+  },
+  {
+    "url": "https://g.page:443/r/abc/review",
+    "ok": true,
+    "note": "the default port written out"
+  },
+  {
+    "url": "https://g.page:8443/r/abc/review",
+    "ok": false,
+    "note": "another port"
+  },
+  {
+    "url": "http://g.page/r/abc/review",
+    "ok": false,
+    "note": "not https"
+  },
+  {
+    "url": "https://g.page/abc",
+    "ok": false,
+    "note": "g.page without /r/"
+  },
+  {
+    "url": "https://search.google.com/local/writereview",
+    "ok": false,
+    "note": "write a review without a place"
+  },
+  {
+    "url": "https://search.google.com/search?x=1",
+    "ok": false,
+    "note": "another search.google.com page"
+  },
+  {
+    "url": "https://www.google.com/url?q=https://evil.example/",
+    "ok": false,
+    "note": "Google's redirect page"
+  },
+  {
+    "url": "https://www.google.com/maps/place/abc?url=https://evil.example/",
+    "ok": false,
+    "note": "a url= parameter"
+  },
+  {
+    "url": "https://www.google.com/maps/place/?q=place_id:ChIJN1t_tDeuEmsRUsoyG83frY4",
+    "ok": false,
+    "note": "a q= parameter"
+  },
+  {
+    "url": "https://www.google.com/maps/place/abc?hl=he&Q=x",
+    "ok": false,
+    "note": "a q= parameter in capitals, not first"
+  },
+  {
+    "url": "https://www.google.com/amp/s/evil.example/",
+    "ok": false,
+    "note": "an AMP page"
+  },
+  {
+    "url": "https://www.google.com/maps/amp/abc",
+    "ok": false,
+    "note": "an AMP path under maps"
+  },
+  {
+    "url": "https://www.google.com/search?q=biz",
+    "ok": false,
+    "note": "a search page"
+  },
+  {
+    "url": "https://maps.google.com/maps/place/abc",
+    "ok": false,
+    "note": "maps.google.com is not on the list"
+  },
+  {
+    "url": "https://maps.app.goo.gl/a/b",
+    "ok": false,
+    "note": "a deeper path on the shared maps host"
+  },
+  {
+    "url": "https://g.co/abc",
+    "ok": false,
+    "note": "g.co without /kgs/"
+  },
+  {
+    "url": "https://g.page.example.com/r/abc",
+    "ok": false,
+    "note": "a look-alike host"
+  },
+  {
+    "url": "https://example.com/?u=https://g.page/r/abc",
+    "ok": false,
+    "note": "another site"
+  },
+  {
+    "url": "https://facebook.com/biz/reviews",
+    "ok": false,
+    "note": "another review site"
+  },
+  {
+    "url": "https://user@g.page/r/abc",
+    "ok": false,
+    "note": "a user name"
+  },
+  {
+    "url": "https://g.page/r/abc review",
+    "ok": false,
+    "note": "a space"
+  },
+  {
+    "url": "https://goo.gl/abc",
+    "ok": false,
+    "note": "the old shortener is not on the list"
+  },
+  {
+    "url": "",
+    "ok": false,
+    "note": "empty"
+  },
+  {
+    "url": "https://www.google.com/maps/../travel/clk?pcurl=https://evil.example",
+    "ok": false,
+    "note": "delta review: a '..' segment and pcurl="
+  },
+  {
+    "url": "https://www.google.com/maps/../aclk?sa=l&adurl=https://evil.example",
+    "ok": false,
+    "note": "delta review: a '..' segment and adurl="
+  },
+  {
+    "url": "https://www.google.com/maps/../%61mp/s/evil.example",
+    "ok": false,
+    "note": "delta review: a percent escape after '..'"
+  },
+  {
+    "url": "https://www.google.com/maps/place/a?continue=https://evil.example",
+    "ok": false,
+    "note": "delta review: continue="
+  },
+  {
+    "url": "https://www.google.com/maps/./place/a",
+    "ok": false,
+    "note": "a '.' segment"
+  },
+  {
+    "url": "https://www.google.com/maps//place/a",
+    "ok": false,
+    "note": "an empty segment"
+  },
+  {
+    "url": "https://www.google.com/maps/place/%41bc",
+    "ok": false,
+    "note": "any percent escape"
+  },
+  {
+    "url": "https://www.google.com/maps/place/a?hl=he",
+    "ok": true,
+    "note": "an allowed maps key"
+  },
+  {
+    "url": "https://www.google.com/maps/place/a?hl=he&sa=x",
+    "ok": false,
+    "note": "a maps key not on the list"
+  },
+  {
+    "url": "https://www.google.com/maps/place/a#x",
+    "ok": false,
+    "note": "a fragment"
+  },
+  {
+    "url": "https://search.google.com/local/writereview?placeid=ChIJ1&next=https://evil.example",
+    "ok": false,
+    "note": "next= beside placeid"
+  },
+  {
+    "url": "https://search.google.com/local/writereview?hl=he",
+    "ok": false,
+    "note": "writereview without placeid"
+  },
+  {
+    "url": "https://g.page/r/abc/review?redirect=x",
+    "ok": false,
+    "note": "a query on g.page"
+  },
+  {
+    "url": "https://maps.app.goo.gl/AbC123?g_st=ic",
+    "ok": true,
+    "note": "the shared link's own key"
+  },
+  {
+    "url": "https://www.google.com/maps/place/a?dest=x",
+    "ok": false,
+    "note": "dest="
+  }
+]

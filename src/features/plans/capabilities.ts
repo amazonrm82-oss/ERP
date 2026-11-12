@@ -68,6 +68,8 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "signatures", label: "תבניות מסמך וחתימה דיגיטלית", built: true },
   // SMS (owner (210) ב): every SMS to a customer, with the plan's month quota
   { feature: "sms", label: "הודעות SMS ללקוחות, עם מכסה חודשית", built: true },
+  // RET-02 (owner, 11 November 2026, answer (273)): basic and up
+  { feature: "review_requests", label: "בקשת ביקורת ב-Google אחרי עסקה או פגישה", built: true },
   { feature: "orders", label: "מודול הזמנות", built: true },
   { feature: "api", label: "API ו-webhooks", built: false },
   { feature: "custom_reports", label: "דוחות מותאמים", built: false },

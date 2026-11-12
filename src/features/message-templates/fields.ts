@@ -37,6 +37,8 @@ export const MESSAGE_MERGE_FIELDS = {
   manageLink: { token: "{קישור}", label: "הקישור האישי של הלקוח: לאישור, ביטול או שינוי של הפגישה, או לחתימה על המסמך" },
   // SGN-03 (owner (249) א; migration signature_status_reminders): the title of a document sent for signature
   documentName: { token: "{שם המסמך}", label: "שם המסמך שנשלח לחתימה" },
+  // RET-02 (migration review_requests): the business's Google review link, in a review request only
+  reviewLink: { token: "{קישור לביקורת}", label: "הקישור לכתיבת ביקורת ב-Google, בבקשת ביקורת" },
 } as const;
 
 export type MergeFieldKey = keyof typeof MESSAGE_MERGE_FIELDS;

@@ -181,9 +181,10 @@ describe("message templates (MSG-02)", () => {
     ).toBe("23514");
     expect((await pgError(add(owner.id, { body: "x".repeat(2001) }))).code).toBe("23514");
     await add(owner.id, { body: "x".repeat(2000), type: "verification_code" });
-    // every type of app.message_types() is accepted
+    // every type of app.message_types() is accepted, but RET-02's review_request: only the system's own (marked) template
     const types = await asAdmin(async (q) => (await q<{ t: string[] }>("select app.message_types() as t")).rows[0].t);
-    for (const type of types) await add(admin.id, { type, channel: "whatsapp" });
+    for (const type of types.filter((t) => t !== "review_request")) await add(admin.id, { type, channel: "whatsapp" });
+    expect((await pgError(add(admin.id, { type: "review_request", channel: "sms" }))).code).toBe("23514");
   });
 
   it("names are unique per business, ignoring case", async () => {

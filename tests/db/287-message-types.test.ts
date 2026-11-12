@@ -81,7 +81,8 @@ describe("message types: marketing and service (CNS-07)", () => {
     const lists = await asAdmin(
       async (q) => (await q<{ all: string[]; service: string[] }>("select app.message_types() as all, app.service_message_types() as service")).rows[0],
     );
-    expect(lists).toEqual({ all: [...SERVICE, "marketing"], service: SERVICE });
+    // RET-02: review_request is a marketing type (not in the service list)
+    expect(lists).toEqual({ all: [...SERVICE, "review_request", "marketing"], service: SERVICE });
     for (const type of lists.all) await enqueue(org, { channel: "email", lead_id: lead, message_type: type });
   });
 

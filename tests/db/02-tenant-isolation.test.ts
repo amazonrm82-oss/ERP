@@ -121,6 +121,8 @@ describe("tenant isolation", () => {
       await q("insert into public.punch_card_alert_settings (organization_id, low_entries, expiry_days) values ($1, 3, 10)", [orgA]);
       // MNY-04
       await q("insert into public.anomaly_alert_settings (organization_id, idle_rep_days) values ($1, 5)", [orgA]);
+      // RET-02 (off: switching on needs the plan key)
+      await q("insert into public.review_request_settings (organization_id, review_url, delay_days) values ($1, 'https://g.page/r/abc/review', 2)", [orgA]);
       // HEB-09
       await q("insert into public.org_sending_pauses (organization_id, paused, reason) values ($1, true, 'יום אבל')", [orgA]);
       // MSG-06
@@ -466,6 +468,8 @@ describe("tenant isolation", () => {
     "punch_card_alert_settings",
     // MNY-04
     "anomaly_alert_settings",
+    // RET-02
+    "review_request_settings",
     // HEB-09
     "org_sending_pauses",
     // MSG-06
@@ -742,6 +746,7 @@ describe("tenant isolation", () => {
       punch_card_alert_settings: "low_entries = low_entries",
       // no delete grant at all: a permission error is the expected outcome for the delete
       anomaly_alert_settings: "idle_rep_days = idle_rep_days",
+      review_request_settings: "delay_days = delay_days",
       // no delete grant at all: a permission error is the expected outcome for the delete
       org_sending_pauses: "reason = reason",
       // no delete grant at all: a permission error is the expected outcome for the delete
@@ -941,6 +946,7 @@ describe("tenant isolation", () => {
       ["insert into public.customer_status_settings (organization_id, dormant_months) values ($1, 2)", [orgA]],
       ["insert into public.punch_card_alert_settings (organization_id, low_entries) values ($1, 4)", [orgA]],
       ["insert into public.anomaly_alert_settings (organization_id, idle_rep_days) values ($1, 4)", [orgA]],
+      ["insert into public.review_request_settings (organization_id, delay_days) values ($1, 3)", [orgA]],
       ["insert into public.org_sending_pauses (organization_id, paused, reason) values ($1, true, 'x')", [orgA]],
       ["insert into public.org_message_settings (organization_id) values ($1)", [orgA]],
       ["insert into public.org_privacy_settings (organization_id) values ($1)", [orgA]],
@@ -1099,6 +1105,7 @@ describe("tenant isolation", () => {
       ["customer_status_settings", "dormant_months = 9", "dormant_months = 9"],
       ["punch_card_alert_settings", "low_entries = 9", "low_entries = 9"],
       ["anomaly_alert_settings", "idle_rep_days = 9", "idle_rep_days = 9"],
+      ["review_request_settings", "delay_days = 9", "delay_days = 9"],
       ["org_sending_pauses", "reason = 'HACKED'", "reason = 'HACKED'"],
       ["org_message_settings", "skip_rest_days = false", "not skip_rest_days"],
       ["org_privacy_settings", "privacy_officer_id = null", "privacy_officer_id is null"],

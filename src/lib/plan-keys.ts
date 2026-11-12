@@ -2,7 +2,7 @@
 // temporary "everything open, high values" defaults). Mirrors migrations plan_pricing
 // (the seed), plan_trial_built_with (the changes of the owner's later decisions) and
 // plan_review_fixes, lead_distribution_plan, campaign_costs_plan, punch_cards_plan, meta_leads_plan, meeting_customer_reminders and document_templates (the latest app.plan_key_defaults()): PLAN_VALUES = the seed with
-// plan_review_fixes, lead_distribution_plan, campaign_costs_plan, punch_cards_plan, meta_leads_plan, meeting_customer_reminders, document_templates and sms_b_send (the latest app.plan_key_defaults()): PLAN_VALUES = the seed with
+// plan_review_fixes, lead_distribution_plan, campaign_costs_plan, punch_cards_plan, meta_leads_plan, meeting_customer_reminders, document_templates, sms_b_send and review_requests (the latest app.plan_key_defaults()): PLAN_VALUES = the seed with
 // those changes, PLAN_KEY_FALLBACK = the latest app.plan_key_defaults().
 // tests/unit/plan-keys.test.ts reads the migrations and compares; keep them in step.
 //
@@ -107,6 +107,8 @@ const FEATURES: Record<string, Record<SoldPlan, boolean>> = {
   signatures: BASIC_UP, // SGN-01 (owner, 3 November 2026, answer (67) ג: basic and up)
   // SMS (owner (210) ב, 10 November 2026): basic and up
   sms: BASIC_UP,
+  // RET-02 (owner, 11 November 2026, answer (273)): a new key, basic and up
+  review_requests: BASIC_UP,
   orders: BASIC_UP,
   api: BASIC_UP,
   custom_reports: BASIC_UP,
@@ -180,6 +182,8 @@ const WAVE2_FEATURE_LIST = [
   "signatures",
   // SMS-02 (migration sms_b_send)
   "sms",
+  // RET-02 (migration review_requests)
+  "review_requests",
 ] as const;
 const WAVE2_LIMIT_LIST = [
   "max_products", "max_price_lists", "max_quote_templates", "max_booking_pages", "max_booking_pages_per_user",

@@ -1012,6 +1012,24 @@ export type AnomalyAlertSettingsRow = {
   updated_at: string;
 };
 
+// RET-02: the business's review requests (migration review_requests); no row = off. No filter by satisfaction.
+export type ReviewRequestSettingsRow = {
+  id: string;
+  organization_id: string;
+  enabled: boolean;
+  // a Google review link (app.review_url_ok); required while enabled
+  review_url: string | null;
+  on_deal_won: boolean;
+  on_meeting_held: boolean;
+  // whole days after the event's day in the business's zone, 0..30
+  delay_days: number;
+  // server only: when the requests were last switched on
+  enabled_at: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 type AnomalyAlertSettingsValues = {
   lead_drop_on?: boolean;
   lead_drop_percent?: number;
@@ -3765,6 +3783,12 @@ export type Database = {
       >;
       // MNY-04 (285) ג: column grants (the switches and the numbers); no delete
       anomaly_alert_settings: Table<AnomalyAlertSettingsRow, { organization_id: string } & AnomalyAlertSettingsValues, AnomalyAlertSettingsValues>;
+      // RET-02: column grants (enabled_at is the server's); no delete
+      review_request_settings: Table<
+        ReviewRequestSettingsRow,
+        { organization_id: string; enabled?: boolean; review_url?: string | null; on_deal_won?: boolean; on_meeting_held?: boolean; delay_days?: number },
+        { enabled?: boolean; review_url?: string | null; on_deal_won?: boolean; on_meeting_held?: boolean; delay_days?: number }
+      >;
       // HEB-09: column grants (paused, reason); the stamps are the server's; no delete
       org_sending_pauses: Table<
         OrgSendingPausesRow,

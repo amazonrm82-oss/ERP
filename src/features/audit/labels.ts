@@ -135,6 +135,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   punch_card_alert_settings: "התראות כרטיסייה",
   // MNY-04
   anomaly_alert_settings: "התראות חריגה",
+  // RET-02
+  review_request_settings: "בקשת ביקורת",
   // HEB-09
   org_sending_pauses: "עצירת שליחה ללקוחות",
   org_message_settings: "שעות ותקרות שליחה",

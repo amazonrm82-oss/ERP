@@ -16,6 +16,7 @@ import { editedTemplateProblemText, templateProblemText, type OwnAddresses } fro
 import {
   isInstantReplyNoticeTemplate,
   isServiceType,
+  isSystemOnlyType,
   MESSAGE_TEMPLATE_BODY_MAX,
   MESSAGE_TEMPLATE_NAME_MAX,
   MESSAGE_TEMPLATE_SUBJECT_MAX,
@@ -154,7 +155,10 @@ function TemplateFields({
           error={errors?.message_type}
           hint={typeIsService ? "הודעת שירות" : 'הודעה שיווקית: נשלחת רק למי שהסכים לקבל. המערכת מוסיפה לבד "פרסומת", את פרטי העסק ושורת הסרה.'}
         >
-          {MESSAGE_TYPE_OPTIONS.map((option) => (
+          {/* RET-02: a system-only type (the review request) is shown only on its own template, and nothing else is offered there */}
+          {MESSAGE_TYPE_OPTIONS.filter((option) =>
+            isSystemOnlyType(initial.messageType) ? option.value === initial.messageType : !isSystemOnlyType(option.value),
+          ).map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>

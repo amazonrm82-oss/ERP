@@ -23,7 +23,9 @@ export function isMessageChannel(value: unknown): value is MessageChannel {
  * blocklist or blocked by a privacy erasure. The database's send check judges; an adapter adds what the law asks of an
  * advertisement ("פרסומת", sender, opt-out) to a marketing message only.
  */
-export const MESSAGE_TYPES = ["meeting_reminder", "requested_document", "collection", "verification_code", "punch_card_notice", "instant_reply", "marketing"] as const;
+export const MESSAGE_TYPES = ["meeting_reminder", "requested_document", "collection", "verification_code", "punch_card_notice", "instant_reply", "review_request", "marketing"] as const;
+// RET-02: review_request, a request for a Google review after a won deal or a held meeting: MARKETING (a grant of the
+// channel, the caps); its templates are judged by a closed field list like a service type (service-rule.ts)
 export type MessageType = (typeof MESSAGE_TYPES)[number];
 // PKG-03 (owner (127) ב): punch_card_notice, a punch card's few entries left or last day near (no price, link or offer)
 // SPD-04 (owner (80) א): instant_reply, the automatic reply to a web form inquiry (to the typed address only; no link or offer)
