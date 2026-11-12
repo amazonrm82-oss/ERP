@@ -72,8 +72,9 @@ describe("ADM-01: subprocessors from the platform panel", () => {
     expect(names.slice(0, 3)).toEqual(["Supabase", "Vercel", "שירותי הדחיפה של הדפדפנים"]);
     const result = await asService(async (q) => (await q<{ l: PublicList<Record<string, unknown>> }>("select public.subprocessors_public_page() as l")).rows[0].l);
     expect(Object.keys(result).sort()).toEqual(["entries", "updated_on"]);
-    // the seed keeps the legal version's day as the last change
-    expect(result.updated_on).toBe("2026-10-13");
+    // LEGAL-2 (agreement_legal_review) adds five entries and fills two locations when it runs: the last change is that day
+    const migrated = await asAdmin(async (q) => (await q<{ d: string }>("select to_char(max(greatest(created_at, updated_at) at time zone 'Asia/Jerusalem'), 'YYYY-MM-DD') as d from public.subprocessors where cancelled_at is null")).rows[0].d);
+    expect(result.updated_on).toBe(migrated);
     const list = result.entries;
     expect(list.length).toBeGreaterThanOrEqual(3);
     for (const entry of list) {
@@ -256,17 +257,32 @@ describe("ADM-01: subprocessors from the platform panel", () => {
       const err = await pgError(asAdmin((q) => q(sql, [seeded])));
       expect([err.code, err.hint], sql).toEqual(["P0001", "subprocessor:in_force"]);
     }
-    // a location or website that was empty may be filled once (rolled back: the seed stays as it is)
+    // LEGAL-2 (agreement_legal_review) filled the country of the two entries in force while it was empty; a set location
+    // is locked like any other fact
+    expect((await asAdmin((q) => q<{ l: string }>("select location as l from public.subprocessors where id = $1", [seeded]))).rows[0].l).toBe("אירלנד (על תשתית AWS)");
+    // a location or website that was empty may be filled once (rolled back: the seed stays as it is); the push services'
+    // entry has none
+    const push = (await asAdmin((q) => q<{ id: string; purpose: string; data_categories: string }>("select id, purpose, data_categories from public.subprocessors where name = 'שירותי הדחיפה של הדפדפנים'"))).rows[0];
     const filled = await pgError(
       asMfaUser(owner.id, async (q) => {
-        await q("select public.platform_update_subprocessor($1, 'Supabase', 'מסד הנתונים, ההתחברות, האימות הדו-שלבי ועדכונים בזמן אמת.', 'כל המידע בשירות.', 'האיחוד האירופי', null, '2026-10-13')", [seeded]);
-        expect((await q<{ l: string }>("select location as l from public.platform_list_subprocessors() where id = $1", [seeded])).rows[0].l).toBe("האיחוד האירופי");
         await expect(
           q("select public.platform_update_subprocessor($1, 'Supabase', 'מסד הנתונים, ההתחברות, האימות הדו-שלבי ועדכונים בזמן אמת.', 'כל המידע בשירות.', 'ישראל', null, '2026-10-13')", [seeded]),
         ).rejects.toMatchObject({ hint: "subprocessor:in_force" });
         throw Object.assign(new Error("rollback"), { code: "ok" });
       }),
     );
+    expect(filled.code).toBe("ok");
+    const pushFilled = await pgError(
+      asMfaUser(owner.id, async (q) => {
+        await q("select public.platform_update_subprocessor($1, 'שירותי הדחיפה של הדפדפנים', $2, $3, 'האיחוד האירופי', null, '2026-10-13')", [push.id, push.purpose, push.data_categories]);
+        expect((await q<{ l: string }>("select location as l from public.platform_list_subprocessors() where id = $1", [push.id])).rows[0].l).toBe("האיחוד האירופי");
+        await expect(
+          q("select public.platform_update_subprocessor($1, 'שירותי הדחיפה של הדפדפנים', $2, $3, 'ישראל', null, '2026-10-13')", [push.id, push.purpose, push.data_categories]),
+        ).rejects.toMatchObject({ hint: "subprocessor:in_force" });
+        throw Object.assign(new Error("rollback"), { code: "ok" });
+      }),
+    );
+    expect(pushFilled.code).toBe("ok");
     expect(filled.code).toBe("ok");
 
     // a future end day, moved, cleared, logged; listed until it comes

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import { AGREEMENT_SLUGS, AGREEMENT_VERSION, agreementSnapshot } from "@/features/legal/agreement";
-import { BLANK, DETAILS } from "@/features/legal/documents";
+import { BLANK, DETAILS, getLegalDocument } from "@/features/legal/documents";
 import { fingerprintParts, templateInput } from "@/features/legal/fingerprint";
 
 import templates from "./fixtures/legal-templates.json";
@@ -54,4 +54,41 @@ describe("legal texts and their versions (FXS-09)", () => {
     expect(fingerprint(shifted)).not.toBe(fingerprint(doc));
   });
 
+  // LEGAL-2 (owner, 12 November 2026): what the legal review asked the texts to say
+  it("the texts of 2026-11-12 carry the legal review's points", () => {
+    const text = (slug: string) => getLegalDocument(slug)!.sections.map((sec) => [sec.heading, ...sec.paragraphs].join("\n")).join("\n");
+    const [terms, privacy, dpa, subs] = ["terms", "privacy", "dpa", "subprocessors"].map(text);
+    expect(AGREEMENT_VERSION).toBe("2026-11-12");
+    for (const doc of [terms, privacy, dpa]) expect(doc).toContain("בעל השליטה במאגר");
+    expect(dpa).toContain('"המחזיק"');
+    // the officer is a highlighted placeholder until appointed
+    expect(BLANK.privacyOfficer).toMatch(/^\[.+\]$/);
+    expect(privacy).toContain(BLANK.privacyOfficer);
+    expect(dpa).toContain(BLANK.privacyOfficer);
+    // storage in Ireland and the consent to the transfer
+    expect(BLANK.region).toContain("אירלנד");
+    for (const doc of [terms, privacy, dpa]) expect(doc).toContain(BLANK.region);
+    expect(dpa).toContain("הלקוח מסכים להעברת מידע הלקוח");
+    // DPA: 24 hours, the authority, the subprocessors with country, 14 days, return/deletion, confidentiality, yearly audit
+    expect(dpa).toContain("לא יאוחר מ-24 שעות");
+    expect(dpa).not.toContain("72 שעות");
+    expect(dpa).toContain("יסייע ללקוח לדווח לרשות להגנת הפרטיות");
+    for (const [name, country] of [["Supabase", "אירלנד"], ["Vercel", "ארצות הברית"], ["Resend", "אירלנד"], ["InforU", "ישראל"], ["Cloudflare", "ארצות הברית"], ["Meta", "ארצות הברית"], ["Anthropic", "ארצות הברית"]]) {
+      expect(dpa, name).toMatch(new RegExp(`• ${name}[^\n]*, ${country}:`));
+      expect(subs, name).toContain(name);
+    }
+    expect(dpa).toContain("14 יום מראש");
+    // the five new ones apply 14 days after the notice, as the platform list says (review of 4a22abaa)
+    expect(dpa).toContain("Resend, InforU, Cloudflare, Meta ו-Anthropic נכנסים לרשימה 14 יום אחרי שנשלחה עליהם הודעה");
+    expect(dpa).toContain("התחייבות לשמור על סודיות");
+    expect(dpa).toContain("פעם בשנה");
+    // terms: the advertiser under 30א, indemnity, no medical information, a cap (not a full exemption), 30 days, Israel
+    expect(terms).toContain('"המפרסם" לפי סעיף 30א');
+    expect(terms).toContain("ישפה");
+    expect(terms).toContain("אסור לשמור בשירות מידע רפואי");
+    expect(terms).toContain("ב-12 החודשים");
+    expect(terms).not.toContain("AS IS");
+    expect(terms).toContain("30 יום לפני");
+    expect(terms).toContain("לבתי המשפט בישראל");
+  });
 });

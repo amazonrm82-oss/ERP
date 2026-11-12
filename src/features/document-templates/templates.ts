@@ -19,6 +19,18 @@ export const DOCUMENT_KIND_LABELS: Record<DocumentKind, string> = {
   other: "אחר",
 };
 
+/**
+ * LEGAL-2 (7), owner 12 November 2026: the health declaration is not released until PRV-05, so it is not offered for a new
+ * template or a change of kind (the database refuses it too, hint document_template:health_closed). A template that already
+ * has the kind keeps it and stays readable.
+ */
+export const CLOSED_DOCUMENT_KINDS: readonly DocumentKind[] = ["health_declaration"];
+
+/** The kinds the editor offers: every open kind, plus the template's own kind when it is a closed one it already has. */
+export function selectableDocumentKinds(current: DocumentKind | null = null): DocumentKind[] {
+  return DOCUMENT_KINDS.filter((kind) => !CLOSED_DOCUMENT_KINDS.includes(kind) || kind === current);
+}
+
 export function isDocumentKind(value: unknown): value is DocumentKind {
   return typeof value === "string" && (DOCUMENT_KINDS as readonly string[]).includes(value);
 }

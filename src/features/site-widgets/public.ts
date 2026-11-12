@@ -1,5 +1,7 @@
 // SPD-07: what the widget's script and form receive from public.site_widget_public(): display settings only.
 
+import { noticeContactFrom, type PublicNoticeContact } from "@/features/privacy-center/wordings";
+
 export type WidgetPosition = "left" | "right";
 
 export type PublicWidget = {
@@ -14,6 +16,8 @@ export type PublicWidget = {
   call: string | null;
   // the short form (a business that takes leads, and the widget shows it)
   form: boolean;
+  // LEGAL-2 (4): the business's name and contact for the privacy notice under the short form (null before the migration)
+  notice: PublicNoticeContact | null;
 };
 
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() !== "" ? v : null);
@@ -37,5 +41,6 @@ export function publicWidgetFrom(data: unknown): PublicWidget | null {
     whatsapp: whatsapp && /^[1-9][0-9]{7,14}$/.test(whatsapp) ? whatsapp : null,
     call: call && /^\+[1-9][0-9]{7,14}$/.test(call) ? call : null,
     form: d.form === true,
+    notice: noticeContactFrom(d.notice),
   };
 }

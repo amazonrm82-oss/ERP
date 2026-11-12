@@ -6,6 +6,7 @@ import { BrandScope } from "@/features/branding/components/brand-scope";
 import { PublicBrandHeader, PublicPageFooter } from "@/features/branding/components/public-page";
 import { logoPublicUrl } from "@/features/branding/logo";
 import { PublicLeadForm } from "@/features/intake/components/public-lead-form";
+import { PublicPrivacyNotice } from "@/features/privacy-center/components/public-privacy-notice";
 import { getPublicForm, INACTIVE_FORM_TEXT } from "@/features/intake/public-form";
 import { cn } from "@/lib/cn";
 import { BotPreviewPage } from "@/features/link-preview/components/bot-preview-page";
@@ -67,6 +68,8 @@ export default async function PublicFormPage({ params, searchParams }: Props) {
             <div className="mt-6">
               <PublicLeadForm token={token} fields={found.fields} submitLabel={found.submitLabel} whatsappUrl={found.thanks.whatsappUrl} callback={found.callback} channelChoice={found.channelChoice} localeChoice={found.localeChoice} products={found.products} marketingConsent={found.marketingConsent} />
             </div>
+            {/* LEGAL-2 (4): the privacy notice (section 11) */}
+            <PublicPrivacyNotice contact={found.notice ?? { business: null, email: null, phone: null }} />
           </>
         )}
         {/* FLD-04: the small "נבנה ב-Mexuz" line, unless the business's plan removes it */}

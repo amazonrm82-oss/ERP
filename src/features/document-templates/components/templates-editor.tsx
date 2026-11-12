@@ -13,7 +13,7 @@ import type { FormState } from "@/lib/action-result";
 import { addDocumentTemplateAction, deleteDocumentTemplateAction, switchOffDocumentTemplateAction, updateDocumentTemplateAction } from "../actions";
 import { DOCUMENT_BUSINESS_FIELDS, DOCUMENT_RECORD_FIELDS, DOCUMENT_RECORD_TYPES, isDocumentRecordType, type DocumentRecordType } from "../fields";
 import type { DocumentTemplate } from "../queries";
-import { DOCUMENT_KIND_LABELS, DOCUMENT_KINDS, DOCUMENT_TEMPLATE_BODY_MAX, DOCUMENT_TEMPLATE_NAME_MAX, type DocumentKind } from "../templates";
+import { DOCUMENT_KIND_LABELS, DOCUMENT_TEMPLATE_BODY_MAX, DOCUMENT_TEMPLATE_NAME_MAX, selectableDocumentKinds, type DocumentKind } from "../templates";
 import { DocumentSegments } from "./document-segments";
 
 /** The record type in the business's own words (FLD-10). */
@@ -81,7 +81,7 @@ function TemplateFields({
       />
       <div className="grid gap-3 sm:grid-cols-2">
         <SelectField label="סוג המסמך" name="kind" required value={kind} onChange={(event) => setKind(event.target.value)} error={errors?.kind}>
-          {DOCUMENT_KINDS.map((value) => (
+          {selectableDocumentKinds(initial.kind).map((value) => (
             <option key={value} value={value}>
               {DOCUMENT_KIND_LABELS[value]}
             </option>

@@ -14,6 +14,7 @@ import { ORDER_STATUS_LABELS } from "@/features/orders/schema";
 import { PrintButton } from "@/features/print/components/print-button";
 import { buttonClasses } from "@/components/ui/button";
 import { QuoteDecisionPanel } from "@/features/quotes/components/quote-decision-panel";
+import { PublicPrivacyNotice } from "@/features/privacy-center/components/public-privacy-notice";
 import { clientIp } from "@/lib/keyed-ip-hash";
 import { formatDate } from "@/lib/format";
 import { BotPreviewPage } from "@/features/link-preview/components/bot-preview-page";
@@ -148,7 +149,13 @@ export default async function PublicOrderPage({ params }: Props) {
           }}
         />
         {/* a new order waits for one answer, bound to what the page shows (its fingerprint) */}
-        {page.fingerprint ? <QuoteDecisionPanel token={token} fingerprint={page.fingerprint} subject="order" /> : null}
+        {page.fingerprint ? (
+          <>
+            <QuoteDecisionPanel token={token} fingerprint={page.fingerprint} subject="order" />
+            {/* LEGAL-2 (4): the privacy notice (section 11); the contact only as the design shows it */}
+            <PublicPrivacyNotice contact={{ business: page.business.name, email: page.design.showBusinessDetails ? page.business.email : null, phone: page.design.showBusinessDetails ? page.business.phone : null }} className="text-sm leading-relaxed text-ink-soft print:hidden" />
+          </>
+        ) : null}
         <PublicPageFooter builtWith={page.builtWith} className="print:hidden" />
       </main>
     </BrandScope>

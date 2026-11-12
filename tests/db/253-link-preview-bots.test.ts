@@ -507,7 +507,10 @@ describe("link previews for preview bots (WAB-05)", () => {
     // OPS-02 (public_form_view_limit) adds only the view limit after the not-found and closed-business answers; it counts only
     // with the x-crm-sender header, which the preview never sends, so every not-found branch is unchanged (rechecked; the limit
     // reads app.form_view_limit() since review M1)
-    "public.intake_form(text)": "d5f8f3d6ab40116e8109c489b208b7bc",
+    // LEGAL-2 (privacy_notice_public_pages, owner 12 November 2026) adds only `notice` (display name and document contact) to
+    // the full answer; the null, inactive and rate-limited branches are unchanged (rechecked 12 November 2026 against the
+    // not-found matrix above)
+    "public.intake_form(text)": "9d5dd4b45f1478cf4a1fe5d70d097f74",
     // OPS-02 (public_sender_limit, owner (41) ב) adds only a per-sender view limit after the link's window, answering
     // {rate_limited}; it counts only with the x-crm-sender header, which the preview never sends; every not-found branch is
     // unchanged (rechecked)
@@ -523,13 +526,38 @@ describe("link previews for preview bots (WAB-05)", () => {
     // PKG-06 (punch_recipient_names, owner (156) א) adds only `recipient` to each line of the full page; the status page and
     // every not-found branch are unchanged (changed: the line object; rechecked 9 November 2026)
     "public.order_public(text,text)": "ce43766a6a66c0f8e884df26735ce8ce",
-    "public.booking_page_public(text,date,text)": "7ce1280bdcd77f4b22212665c9ce9481",
+    // LEGAL-2 (privacy_notice_public_pages) adds only `notice` to the full answer; the not-found, unavailable and rate-limited
+    // branches are unchanged (rechecked 12 November 2026 against the matrix above)
+    "public.booking_page_public(text,date,text)": "6f165e5c46ac541ad83b25601367d368",
     "public.booking_manage_public(text,date,text)": "8b489cfee0bed9f5ea592d22df63a70a",
     "public.business_card_public(text,text)": "3ec340a7db5b5d5cf50f79bd49f8a1d4",
     // BIZ-01 (021237): kind 'page'; its not-found rule is app.business_page_open, shared with link_preview_public (test 348)
     // review fix (12 November 2026): the page-wide view cap removed; the not-found branch is unchanged (rechecked)
     "public.business_page_public(text,text)": "717977c68a40bc4b0640cc93069cd53d",
   };
+
+  // LEGAL-2 (4), owner 12 November 2026: the hosted form and the booking page also answer `notice`, the business's display
+  // name and the contact of its document details, for the privacy notice under the form; nothing of the not-found answers
+  it("the form and the booking page answer the privacy notice's business details only (LEGAL-2)", async () => {
+    const form = await asService(async (q) => (await one<{ r: Record<string, unknown> }>(q, "select public.intake_form($1) as r", [tokens.form])).r);
+    expect(form.notice).toEqual({ name: DISPLAY, email: null, phone: "03-5550000" });
+    const booking = await asService(async (q) => (await one<{ r: Record<string, unknown> }>(q, "select public.booking_page_public($1, null, null) as r", [tokens.booking])).r);
+    expect(booking.notice).toEqual({ name: DISPLAY, email: null, phone: "03-5550000" });
+    // the document email wins as the address; another business's details never show
+    await asUser(owner.id, (q) => q("update public.org_document_settings set email = 'office@example.co.il' where organization_id = $1", [org]));
+    try {
+      const again = await asService(async (q) => (await one<{ r: Record<string, unknown> }>(q, "select public.intake_form($1) as r", [tokens.form])).r);
+      expect(again.notice).toEqual({ name: DISPLAY, email: "office@example.co.il", phone: "03-5550000" });
+      expect(JSON.stringify(again.notice)).not.toContain("עסק אחר");
+    } finally {
+      await asUser(owner.id, (q) => q("update public.org_document_settings set email = null where organization_id = $1", [org]));
+    }
+    // the helper is the server's only: no role may call it
+    const grants = await asAdmin(async (q) =>
+      (await q<{ r: string }>("select r from unnest(array['anon', 'authenticated', 'service_role']) r where has_function_privilege(r, 'app.privacy_notice_contact(uuid)', 'execute')")).rows.map((x) => x.r),
+    );
+    expect(grants).toEqual([]);
+  });
 
   it("the page functions are the ones its rule was checked against (review M1)", async () => {
     const bodies = await asAdmin(async (q) => {

@@ -5,6 +5,7 @@ import { BrandScope } from "@/features/branding/components/brand-scope";
 import { PublicBrandHeader, PublicPageFooter } from "@/features/branding/components/public-page";
 import { logoPublicUrl } from "@/features/branding/logo";
 import { PublicPrivacyForm } from "@/features/privacy-requests/components/public-privacy-form";
+import { PublicPrivacyNotice } from "@/features/privacy-center/components/public-privacy-notice";
 import { PUBLIC_TEXTS } from "@/features/privacy-requests/model";
 import { getPrivacyPage } from "@/features/privacy-requests/public-server";
 import { clientIp } from "@/lib/keyed-ip-hash";
@@ -55,6 +56,8 @@ export default async function PublicPrivacyPage({ params }: Props) {
         <div className="mt-6">
           <PublicPrivacyForm token={token} />
         </div>
+        {/* LEGAL-2 (4): the privacy notice (section 11); this form is the way to reach the business */}
+        <PublicPrivacyNotice contact={{ business: page.business, email: null, phone: null }} />
         <p className="mt-6 text-sm text-ink-soft">{PUBLIC_TEXTS.draft}</p>
         <PublicPageFooter builtWith={page.builtWith} />
       </main>

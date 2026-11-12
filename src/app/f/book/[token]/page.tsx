@@ -6,6 +6,7 @@ import { cache } from "react";
 import { buttonClasses } from "@/components/ui/button";
 import { BackIcon, ForwardIcon } from "@/components/ui/icons";
 import { PublicBookingForm } from "@/features/booking/components/public-booking-form";
+import { PublicPrivacyNotice } from "@/features/privacy-center/components/public-privacy-notice";
 import { publicBookingPath } from "@/features/booking/paths";
 import { addDays, fromParam, slotsByDay } from "@/features/booking/public";
 import { getPublicBooking } from "@/features/booking/public-server";
@@ -106,6 +107,8 @@ export default async function PublicBookingPage({ params, searchParams }: Props)
               </Link>
             </div>
             <PublicBookingForm token={token} business={page.business} startsAt={picked} timeZone={page.timeZone} questions={page.questions} backHref={weekHref(page.from)} />
+            {/* LEGAL-2 (4): the privacy notice (section 11) */}
+            <PublicPrivacyNotice contact={page.notice ?? { business: page.business || null, email: null, phone: null }} className="text-sm leading-relaxed text-ink-soft" />
           </section>
         ) : (
           <section aria-labelledby="booking-times" className="mt-6 space-y-4">

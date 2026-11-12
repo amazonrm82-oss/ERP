@@ -4,6 +4,7 @@ import { isHexColor } from "@/features/branding/color";
 import { isLogoPath } from "@/features/branding/logo";
 import { builtWithVisible } from "@/features/built-with/visibility";
 import { buildIcs } from "@/features/calendar-feed/ics";
+import { noticeContactFrom, type PublicNoticeContact } from "@/features/privacy-center/wordings";
 import type { BookingQuestion } from "@/lib/database.types";
 
 import { readQuestions } from "./schema";
@@ -24,6 +25,8 @@ export type PublicBooking = {
   from: string;
   // the free starts of the week from `from`, as ISO instants
   slots: string[];
+  // LEGAL-2 (4): the business's name and contact for the privacy notice under the booking form (null before the migration)
+  notice: PublicNoticeContact | null;
 };
 
 export type BookingConfirmation = {
@@ -93,6 +96,7 @@ export function publicBookingFrom(data: unknown): PublicBooking | null {
     lastDay: data.last_day as string,
     from: data.from as string,
     slots: Array.isArray(data.slots) ? data.slots.filter((s): s is string => typeof s === "string" && !Number.isNaN(Date.parse(s))) : [],
+    notice: noticeContactFrom(data.notice),
   };
 }
 

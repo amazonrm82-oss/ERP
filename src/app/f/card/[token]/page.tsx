@@ -8,6 +8,7 @@ import { BrandScope } from "@/features/branding/components/brand-scope";
 import { PublicBrandHeader, PublicPageFooter } from "@/features/branding/components/public-page";
 import { logoPublicUrl } from "@/features/branding/logo";
 import { PublicCardForm } from "@/features/business-cards/components/public-card-form";
+import { PublicPrivacyNotice } from "@/features/privacy-center/components/public-privacy-notice";
 import { cardVCardPath } from "@/features/business-cards/paths";
 import { getPublicCard } from "@/features/business-cards/public-server";
 import { clientIp } from "@/lib/keyed-ip-hash";
@@ -116,6 +117,8 @@ export default async function PublicCardPage({ params }: Props) {
               השאירו פרטים
             </h2>
             <PublicCardForm token={token} rep={card.name} />
+            {/* LEGAL-2 (4): the privacy notice (section 11); the card's own contact details */}
+            <PublicPrivacyNotice contact={{ business: card.business, email: card.email, phone: card.phone }} className="text-sm leading-relaxed text-ink-soft" />
           </section>
         ) : null}
         <PublicPageFooter builtWith={card.builtWith} />

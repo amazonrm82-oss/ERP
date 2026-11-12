@@ -870,6 +870,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_business_page_routing.sql",
       // BIZ-01 (316) ב sets the business_pages_audit trigger of _business_page.sql last (the token never reaches the log)
       "_business_page_new_link.sql",
+      // LEGAL-2 (4) redefines public.intake_form() of _public_form_view_limit.sql last (the privacy notice's business details)
+      "_privacy_notice_public_pages.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

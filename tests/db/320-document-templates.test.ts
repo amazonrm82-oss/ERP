@@ -236,4 +236,33 @@ describe("document templates (SGN-01)", () => {
     expect((await pgError(add(admin.id))).hint).toBe("document_templates:max");
   });
 
+  // LEGAL-2 (7), owner 12 November 2026: no health declaration until PRV-05: a person can neither create one nor turn a
+  // template into one; one that already exists (made by the server) stays readable, editable and may move to another kind
+  it("a person cannot create a health declaration template or change one into it (LEGAL-2)", async () => {
+    // a business of its own: the one above is at its 50 templates
+    const hOwner = await createUser("doctpl-health-owner");
+    const hOrg = await createOrg(hOwner.id);
+    await asAdmin((q) => q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [hOrg, JSON.stringify({ signatures: true })]));
+    expect(await pgError(add(hOwner.id, { kind: "health_declaration", orgId: hOrg }))).toMatchObject({ code: "P0001", hint: "document_template:health_closed" });
+    const id = await add(hOwner.id, { orgId: hOrg });
+    expect(
+      await pgError(asUser(hOwner.id, (q) => q("update public.document_templates set kind = 'health_declaration' where id = $1", [id]))),
+    ).toMatchObject({ code: "P0001", hint: "document_template:health_closed" });
+    const old = (
+      await asAdmin((q) =>
+        q<{ id: string }>(
+          "insert into public.document_templates (organization_id, name, kind, record_type, body) values ($1, 'הצהרה ישנה', 'health_declaration', 'contact', 'שלום {שם מלא}') returning id",
+          [hOrg],
+        ),
+      )
+    ).rows[0].id;
+    try {
+      const seen = await asUser(hOwner.id, (q) => q<{ kind: string }>("select kind from public.document_templates where id = $1", [old]));
+      expect(seen.rows[0].kind).toBe("health_declaration");
+      await asUser(hOwner.id, (q) => q("update public.document_templates set body = 'שלום שוב {שם מלא}', name = 'הצהרה ישנה 2' where id = $1", [old]));
+      await asUser(hOwner.id, (q) => q("update public.document_templates set kind = 'other' where id = $1", [old]));
+    } finally {
+      await asAdmin((q) => q("delete from public.document_templates where id = $1", [old]));
+    }
+  });
 });

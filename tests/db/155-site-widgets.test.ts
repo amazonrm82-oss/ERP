@@ -131,6 +131,8 @@ describe("site widgets (SPD-07)", () => {
       whatsapp: "97235551234",
       call: "+97235551234",
       form: true,
+      // LEGAL-2 (4): the business's display name and contact for the privacy notice (no document email here, so none)
+      notice: { name: "עסק הכפתורים", phone: "03-5551234" },
     });
     const text = JSON.stringify(answer);
     for (const secret of [widget.id, widget.token, org, member.id, (await widgetForm(widget.id)).token]) expect(text).not.toContain(secret);

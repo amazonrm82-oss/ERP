@@ -116,8 +116,11 @@ describe("public booking page (CAL-10)", () => {
   it("the public page answers only its public fields", async () => {
     const r = await publicPage(token);
     expect(Object.keys(r).sort()).toEqual(
-      ["brand", "built_with", "business", "from", "intro", "last_day", "meeting", "questions", "rep", "slots", "time_zone", "title", "today"].sort(),
+      ["brand", "built_with", "business", "from", "intro", "last_day", "meeting", "notice", "questions", "rep", "slots", "time_zone", "title", "today"].sort(),
     );
+    // LEGAL-2 (4): the privacy notice's business details only (display name, document email and phone), never the rep's
+    expect(Object.keys(r.notice as object).sort()).toEqual(["email", "name", "phone"]);
+    expect((r.notice as { name: string }).name).toBe("עסק התורים");
     expect(r).toMatchObject({
       title: "קביעת פגישת ייעוץ",
       intro: "בחרו זמן שנוח לכם",

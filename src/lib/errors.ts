@@ -559,6 +559,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "record_email:rate": "שלחתם הרבה אימיילים בשעה האחרונה. אפשר לשלוח עד 30 בשעה. נסו שוב מאוחר יותר.",
   // SGN-01 (migration document_templates)
   "document_templates:max": "אפשר לשמור עד 50 תבניות מסמך. מחקו תבנית שלא בשימוש כדי להוסיף חדשה.",
+  // LEGAL-2 (7): the health declaration is not released until PRV-05
+  "document_template:health_closed": "אי אפשר עדיין ליצור תבנית של הצהרת בריאות, כי היא כוללת מידע רפואי רגיש. אפשר לבחור סוג מסמך אחר.",
   "document_template:field": "בנוסח יש שדה שהמערכת לא מכירה לסוג הרשומה הזה. אפשר להשתמש רק בשדות שברשימה, כתובים בדיוק כך, למשל {שם מלא}.",
   "document_template:variant": VARIANT_PROBLEM_MESSAGES.variant,
   "document_template:neutral": VARIANT_PROBLEM_MESSAGES.neutral,

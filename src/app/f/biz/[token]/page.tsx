@@ -12,6 +12,7 @@ import { businessPageSubmitPath } from "@/features/business-page/paths";
 import { websiteLabel } from "@/features/business-page/public";
 import { getPublicBusinessPage } from "@/features/business-page/public-server";
 import { PublicCardForm } from "@/features/business-cards/components/public-card-form";
+import { PublicPrivacyNotice } from "@/features/privacy-center/components/public-privacy-notice";
 import { BotPreviewPage } from "@/features/link-preview/components/bot-preview-page";
 import { botPreviewMetadata } from "@/features/link-preview/bot-preview";
 import { isPreviewBotRequest, loadBotPreview } from "@/features/link-preview/bot-request";
@@ -147,6 +148,8 @@ export default async function PublicBusinessPage({ params }: Props) {
               צרו קשר
             </h2>
             <PublicCardForm token={token} rep={page.business} submitPath={businessPageSubmitPath(token)} doneLine="נחזור אליכם בהקדם." />
+            {/* LEGAL-2 (4): the privacy notice (section 11); the phone only when the page shows it */}
+            <PublicPrivacyNotice contact={{ business: page.business, email: null, phone: page.phone }} className="text-sm leading-relaxed text-ink-soft" />
           </section>
         ) : null}
         <PublicPageFooter builtWith={page.builtWith} />

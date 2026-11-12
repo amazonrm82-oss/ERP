@@ -10,6 +10,7 @@ import { PublicBrandHeader, PublicPageFooter } from "@/features/branding/compone
 import { logoPublicUrl } from "@/features/branding/logo";
 import { PrintButton } from "@/features/print/components/print-button";
 import { QuoteAnswerArea } from "@/features/quotes/components/quote-answer-area";
+import { PublicPrivacyNotice } from "@/features/privacy-center/components/public-privacy-notice";
 import { QuoteQuestionForm } from "@/features/quotes/components/quote-question-form";
 import { QuoteDocument } from "@/features/quotes/components/quote-document";
 import { publicQuotePdfPath, STATUS_PAGE_TEXT } from "@/features/quotes/public";
@@ -246,6 +247,11 @@ export default async function PublicQuotePage({ params }: Props) {
         ) : null}
         {/* QUO-08: a question to the rep, while the quote is shown in full (open or accepted) */}
         {page.quote.status === "sent" || page.quote.status === "viewed" || page.quote.status === "accepted" ? <QuoteQuestionForm token={token} /> : null}
+        {/* LEGAL-2 (4): the privacy notice (section 11) under the answer and question forms (a name, an ID, a question); the
+            contact only as the quote's design shows it */}
+        {fingerprint || page.quote.status === "sent" || page.quote.status === "viewed" || page.quote.status === "accepted" ? (
+          <PublicPrivacyNotice contact={{ business: page.business.name, email: page.design.showBusinessDetails ? page.business.email : null, phone: page.design.showBusinessDetails ? page.business.phone : null }} className="text-sm leading-relaxed text-ink-soft print:hidden" />
+        ) : null}
         <PublicPageFooter builtWith={page.builtWith} className="print:hidden" />
       </main>
     </BrandScope>

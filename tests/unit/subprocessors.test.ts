@@ -147,19 +147,20 @@ describe("ADM-01 subprocessors", () => {
     expect(AGREEMENT_SLUGS).not.toContain("subprocessors");
   });
 
-  it("the migration seeds the same providers the legal page listed", () => {
+  it("the migrations seed the same providers the legal page lists", () => {
     const dir = join(process.cwd(), "supabase/migrations");
-    const file = readdirSync(dir).find((name) => name.endsWith("_platform_subprocessors.sql"));
-    expect(file).toBeTruthy();
-    const sql = readFileSync(join(dir, file!), "utf8");
+    // ADM-01 seeded the first three; LEGAL-2 (agreement_legal_review, owner 12 November 2026) adds five with 14 days' notice
+    const files = ["_platform_subprocessors.sql", "_agreement_legal_review.sql"].map((end) => readdirSync(dir).find((name) => name.endsWith(end)));
+    expect(files.every(Boolean)).toBe(true);
+    const sql = files.map((file) => readFileSync(join(dir, file!), "utf8")).join("\n");
     const doc = getLegalDocument("subprocessors")!;
     const providers = doc.sections.filter((s) => s.heading !== "עדכון אחרון");
-    expect(providers.map((s) => s.heading)).toEqual(["Supabase", "Vercel", "שירותי הדחיפה של הדפדפנים"]);
+    expect(providers.map((s) => s.heading)).toEqual(["Supabase", "Vercel", "Resend", "InforU", "Cloudflare", "Meta", "Anthropic", "שירותי הדחיפה של הדפדפנים"]);
     for (const section of providers) {
       expect(sql, section.heading).toContain(`'${section.heading}'`);
       for (const text of section.paragraphs) {
         const value = text.replace(/^(תפקיד|מידע): /, "").replace(/'/g, "''");
-        if (text.startsWith("מיקום:")) continue; // the location placeholder is not stored; the platform owner fills it once
+        if (text.startsWith("מיקום:")) continue; // the page's location line; the stored country is checked in tests/db/246
         expect(sql, text).toContain(value);
       }
     }

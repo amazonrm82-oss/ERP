@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { selectableDocumentKinds } from "@/features/document-templates/templates";
+
 import { parseNote } from "@/features/activities/markdown";
 import {
   DOCUMENT_BUSINESS_FIELDS,
@@ -56,6 +58,10 @@ describe("document templates (SGN-01)", () => {
     expect(DEFAULT_DOCUMENT_TEMPLATES.map((d) => d.kind)).toEqual(["service_agreement", "contract", "joining_form"]);
     // owner (202) ב: no health declaration is seeded until PRV-05
     expect(seed).not.toContain("health_declaration");
+    // LEGAL-2 (7): nor offered for a new template or a change of kind; a template that has it keeps it
+    expect(selectableDocumentKinds()).toEqual(["contract", "service_agreement", "joining_form", "other"]);
+    expect(selectableDocumentKinds("contract")).not.toContain("health_declaration");
+    expect(selectableDocumentKinds("health_declaration")).toContain("health_declaration");
     for (const d of DEFAULT_DOCUMENT_TEMPLATES) {
       expect(seed, d.name).toContain(`'${d.name}', '${d.kind}', '${d.recordType}',`);
       expect(seed, d.name).toContain(`'${d.body}'`);

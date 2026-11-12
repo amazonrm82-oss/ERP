@@ -7,6 +7,7 @@ import { PublicBrandHeader, PublicPageFooter } from "@/features/branding/compone
 import { logoPublicUrl } from "@/features/branding/logo";
 import { isPreviewBotRequest } from "@/features/link-preview/bot-request";
 import { SignPanel } from "@/features/signatures/components/sign-panel";
+import { PublicPrivacyNotice } from "@/features/privacy-center/components/public-privacy-notice";
 import { publicSignaturePdfPath, signatureDateText, signatureDayText } from "@/features/signatures/public";
 import { getPublicSignature } from "@/features/signatures/public-server";
 import { TEXT_ERASED_LINE } from "@/features/signatures/states";
@@ -110,7 +111,13 @@ export default async function PublicSignaturePage({ params }: Props) {
         <article className="rounded-lg border border-line bg-surface p-4 sm:p-6">
           <NoteText text={page.body} className="text-md text-ink" />
         </article>
-        {page.fingerprint ? <SignPanel token={token} fingerprint={page.fingerprint} /> : null}
+        {page.fingerprint ? (
+          <>
+            <SignPanel token={token} fingerprint={page.fingerprint} />
+            {/* LEGAL-2 (4): the privacy notice (section 11) */}
+            <PublicPrivacyNotice contact={{ business: page.business, email: null, phone: page.phone }} className="text-sm leading-relaxed text-ink-soft" />
+          </>
+        ) : null}
         <PublicPageFooter builtWith={page.builtWith} />
       </main>
     </BrandScope>

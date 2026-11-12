@@ -190,6 +190,7 @@ describe("SPD-07: the site widget's script", () => {
       whatsapp: "97235551234",
       call: "+97235551234",
       form: true,
+      notice: null,
     });
     const odd = publicWidgetFrom({ label: "x", business: "y", position: "top", brand: { color: "red" }, whatsapp: "javascript:alert(1)", call: "tel:1", form: "yes" })!;
     expect(odd).toMatchObject({ position: "left", brand: { color: null }, whatsapp: null, call: null, form: false });

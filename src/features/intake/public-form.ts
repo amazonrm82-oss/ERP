@@ -13,6 +13,7 @@ import { callbackOfferFrom, type CallbackOffer } from "./callback";
 import { marketingConsentFrom, type MarketingConsentOffer } from "./marketing-consent";
 import { FORM_EXCLUDED_TYPES, INTAKE_FIELD_LABELS, isIntakeField, parseFieldsConfig } from "./fields";
 import { formProductsFrom, type FormProduct } from "./product";
+import { noticeContactFrom, type PublicNoticeContact } from "@/features/privacy-center/wordings";
 import type { PublicField } from "./public-validate";
 import { whatsappChatUrl } from "./whatsapp";
 
@@ -37,6 +38,8 @@ export type PublicForm = {
   products: FormProduct[] | null;
   // CAP-07 / CNS-04: the unticked marketing-consent boxes (channel and the business's DRAFT wording), or null for none
   marketingConsent: MarketingConsentOffer | null;
+  // LEGAL-2 (4): the business's display name and contact for the privacy notice under the form (null before the migration)
+  notice: PublicNoticeContact | null;
 };
 
 type ServiceClient = NonNullable<ReturnType<typeof createServiceClient>>;
@@ -106,6 +109,7 @@ export function publicFormFrom(data: Json): PublicForm | null {
     localeChoice: data.locale_choice === true,
     products: formProductsFrom(data.products),
     marketingConsent: marketingConsentFrom(data.marketing_consent),
+    notice: noticeContactFrom(data.notice),
   };
 }
 

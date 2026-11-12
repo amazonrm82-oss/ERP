@@ -194,6 +194,7 @@ describe("hosted form: what the server reads (CAP-01)", () => {
       localeChoice: false,
       products: null,
       marketingConsent: null,
+      notice: null,
     });
     expect(publicFormFrom(null)).toBeNull();
   });
