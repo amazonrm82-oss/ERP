@@ -267,6 +267,21 @@ and build this CRM here instead. The old code is preserved on the branch
   automation made, reminder tasks (collection, signature, contract renewal), automatic customer messages queued/sent by type (a person's
   send or press left out), and debts paid within 14 days after a collection stage that really reminded. A failed read shows one line on
   the card, never breaks the page. The monthly email (`digest.send`) is not built: it waits for owner question 311.
+  In use (BIZ-01, owner 3 and 11 November 2026, answers (70) ב and (271) ב; migration 021237; an independent review and a delta review):
+  the public business page (`src/features/business-page/public-server.ts`, page `/f/biz/<token>`, route `POST /api/forms/biz/<token>`),
+  which calls only `public.business_page_public()` (display name `organizations.name`, logo, colour, built-with, the page's description
+  and, as switched on, the business phone, its WhatsApp digits, its website, its weekly working hours, and the title and token of the
+  listed booking pages that are open now; never an id, a person or a count) and `public.business_page_submit()` (through `intake_submit`
+  with the page's own form of kind `page`, the business's distribution; status only; a refusal of intake_submit answers the neutral "not
+  available"). One not-found rule `app.business_page_open` (page on, plan key `public_page`, `app.org_public_pages_open`). Limit after the
+  lookup: 60 per sender (keyed IP hash, scope `bizpage`, re-scoped per page, 1,024 buckets in `app.business_page_view_counts`, no hash
+  kept) in 10 minutes, no page-wide cap (like the card and the widget); the form keeps intake_submit's limits. Published like the business
+  card, so left out of OPS-02's shared not-found limit; embeddable like the card (owner question 317). Preview bots get only
+  `link_preview_public` (kind `page`). No cookies or visitor id. Owners and admins switch it on in `/settings/business-page`
+  (`public.business_pages`, one row per business, admins only; the token is made by the server); forms of kind `page` are made and locked
+  by the server (`app.guard_form`, `app.forms_page_lock`), outside `max_forms`. `app.guard_form`, `public.link_preview_public` (test 253
+  pins it), `public.plans_public` and `app.plan_key_defaults` were last redefined in 021237. In the eslint allow-list. The advisor's finding
+  on `app.business_page_view_counts` is expected.
   In use (IMP-04, owner 9 November 2026, answers (155) א, (160) א, (161) א, (162) ב, (163) ב; migration `_background_jobs.sql`; two
    independent reviews): the OPS-04 worker (same route and secret) also claims `import.run` and `export.run` (payload `{request_id,
    user_id}` only) in its own pass (lease 900 s, one job, 40 s budget, then saved and handed back uncounted with
