@@ -7,10 +7,15 @@ import {
   ChartIcon,
   ChatIcon,
   CheckSquareIcon,
+  CalendarIcon,
   FormIcon,
   InboxIcon,
   LockIcon,
+  OrderIcon,
+  PencilIcon,
+  QuoteIcon,
   SearchIcon,
+  TagIcon,
   UploadIcon,
   UsersIcon,
 } from "@/components/ui/icons";
@@ -45,10 +50,18 @@ export const FEATURES: Feature[] = [
   { key: "mobile", status: "live", icon: BellIcon, title: "אפליקציה לטלפון עם התראות", text: "מתקינים מהדפדפן למסך הבית, ומקבלים התראה על ליד חדש ועל תזכורת." },
   { key: "teams", status: "live", icon: UsersIcon, title: "צוותים והרשאות", text: "כל אחד רואה את מה שלו, מנהל צוות את הצוות שלו, ומנהלים את הכול." },
   { key: "security", status: "live", icon: LockIcon, title: "אבטחה ואימות דו-שלבי", text: "אימות דו-שלבי, יומן ביקורת של כל שינוי, והפרדה מלאה בין עסקים." },
-  // the three flags of chapter 18.2: shown only as "soon" until each one works
+  { key: "quotes", status: "live", icon: QuoteIcon, title: "הצעות מחיר", text: "הצעה מקטלוג המוצרים, PDF ממותג וקישור ללקוח שמאשר וחותם מהטלפון." },
+  { key: "orders", status: "live", icon: OrderIcon, title: "הזמנות", text: "הצעה שאושרה הופכת להזמנה, עם מעקב חיוב ותשלום." },
+  { key: "payments", status: "live", icon: ChartIcon, title: "תשלומים וגבייה", text: "רישום תשלומים, צ'קים והחזרים, כרטסת לקוח, גיל חובות ותזכורות גבייה לצוות." },
+  { key: "money", status: "live", icon: BoardIcon, title: "כמה כסף מחכה לכם", text: "מספר אחד בשקלים: עסקאות תקועות, הצעות פתוחות וחובות, ולכל שורה פעולה." },
+  { key: "booking", status: "live", icon: CalendarIcon, title: "דף קביעת תור", text: "קישור שבו לקוחות קובעים פגישה לפי שעות העבודה שלכם, ומבטלים או מזיזים לבד." },
+  { key: "signatures", status: "live", icon: PencilIcon, title: "מסמכים לחתימה", text: "חוזה או טופס הצטרפות מתבנית, נשלח בקישור ונחתם בטלפון, עם PDF חתום." },
+  { key: "punch_cards", status: "live", icon: TagIcon, title: "כרטיסיות", text: "כרטיסייה נפתחת עם התשלום, וכל פגישה שהתקיימה מורידה כניסה." },
+  { key: "presence", status: "live", icon: UsersIcon, title: "כרטיס ביקור, דף עסק וקוד QR", text: "כרטיס ביקור דיגיטלי לכל נציג, דף עסק ציבורי וקודי QR, וכל פנייה נכנסת כליד." },
+  { key: "goals", status: "live", icon: ChartIcon, title: "יעדים", text: "יעד לעסק, לצוות או לנציג, והתקדמות מול היעד בכל חודש." },
+  // the flags of chapter 18.2 not built yet: shown only as "soon" until each one works
   { key: "whatsapp", status: "soon", icon: ChatIcon, title: "אף ליד לא מתפספס, והכול ב-WhatsApp", text: "מענה לליד חדש בתוך דקות, ועדכון המערכת מתוך WhatsApp." },
   { key: "ads", status: "soon", icon: ChartIcon, title: "הפרסום לומד מהמכירות", text: "החזרה לפייסבוק ולגוגל של מי מהלידים נסגר, כדי שהפרסום יביא עוד כאלה." },
-  { key: "money", status: "soon", icon: BoardIcon, title: "כמה כסף מחכה לכם", text: "מספר אחד בשקלים כל בוקר, ולכל שורה בו פעולה אחת." },
 ];
 
 export const LIVE_FEATURES = FEATURES.filter((feature) => feature.status === "live");

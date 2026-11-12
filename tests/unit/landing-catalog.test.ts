@@ -6,13 +6,13 @@ describe("landing page catalog (LND-03, LND-04)", () => {
   it("lists every part of the system the spec names, each once", () => {
     const keys = FEATURES.map((feature) => feature.key);
     expect(new Set(keys).size).toBe(keys.length);
-    for (const key of ["leads", "contacts", "deals", "tasks", "forms", "automations", "reports", "import", "files", "search", "mobile", "teams", "security"]) {
+    for (const key of ["leads", "contacts", "deals", "tasks", "forms", "automations", "reports", "import", "files", "search", "mobile", "teams", "security", "quotes", "orders", "payments", "money", "booking", "signatures", "punch_cards", "presence", "goals"]) {
       expect(LIVE_FEATURES.map((feature) => feature.key)).toContain(key);
     }
   });
 
   it("keeps what is not built yet apart, never as available", () => {
-    expect(SOON_FEATURES.map((feature) => feature.key)).toEqual(["whatsapp", "ads", "money"]);
+    expect(SOON_FEATURES.map((feature) => feature.key)).toEqual(["whatsapp", "ads"]);
     expect(LIVE_FEATURES.length + SOON_FEATURES.length).toBe(FEATURES.length);
   });
 
