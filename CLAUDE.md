@@ -224,6 +224,17 @@ and build this CRM here instead. The old code is preserved on the branch
   three forms (Turnstile, owner (275)) is verified by our server before the call, never by Supabase's setting.
   `tests/unit/auth-forwarding.test.ts` proves no client component reaches the file, the name is never `NEXT_PUBLIC_`, and lint refuses it
   elsewhere. Sessions started this way carry the User-Agent `mexuz-server` at Auth.
+  In use (LND-13 / WEB-01, owner 11 November 2026; migration 021232; an independent review and a delta review): the landing page's price
+  list (`src/features/landing/price-list-server.ts`, page `/`) calls only `public.plans_public()` with a plain anon client (no session,
+  cookie or service key). The function is sql, stable, definer, no argument, `search_path ''`, executable by anon and authenticated only
+  (the second anon function beside `health_check`; test 01 names both). It answers, for available and coming-soon plans only: key, Hebrew
+  name, monthly and annual price, price unit, availability, position, the plan card's three limits (`max_users`, `max_records`,
+  `storage_gb`) and, from a CLOSED list (the built, non-core keys of `PLAN_CAPABILITIES`, compared by a unit test), the features that are
+  on. The function has no limit in the database (about 5 rows, no input); the page reads it through a one-hour `unstable_cache` (tag
+  `plans-public`, expired by `updatePlanAction` and `setPlanAvailabilityAction`), which protects only the page; a failed read is not cached,
+  backs off a minute, logs one redacted line, and the section shows without prices. `/` renders per request. Test 344 pins the body by
+  md5, the settings, the grants and the answer; flipping `built` in `capabilities.ts` needs a migration that redefines the function and a
+  fresh review. The advisor's anon/authenticated definer findings on it are expected.
   In use (IMP-04, owner 9 November 2026, answers (155) א, (160) א, (161) א, (162) ב, (163) ב; migration `_background_jobs.sql`; two
    independent reviews): the OPS-04 worker (same route and secret) also claims `import.run` and `export.run` (payload `{request_id,
    user_id}` only) in its own pass (lease 900 s, one job, 40 s budget, then saved and handed back uncounted with
