@@ -90,15 +90,17 @@ const positive = (data: unknown, key: string) => typeof field(data, key) === "nu
 // review (5), (6): InforU posts again after a 5xx, so a limit or a report that came too early answers 503, never 429
 const tryLater = () => Response.json({ ok: false }, { status: 503, headers: { ...noStore, "Retry-After": "60" } });
 
-export async function inforuStatusRoute(request: Request, secret: string, deps: { db: InforuWebhookDb | null; log: WebhookLog; env?: Record<string, string | undefined> }) {
-  if (!deps.db) return json(503, { error: "not configured" });
+export async function inforuStatusRoute(request: Request, secret: string, deps: { db: () => InforuWebhookDb | null; log: WebhookLog; env?: Record<string, string | undefined> }) {
   if (!inforuSecretMatches(secret, deps.env)) return json(404, { error: "not found" });
+  // RVW-101: the service-key client is made only after the secret in the path passed
+  const db = deps.db();
+  if (!db) return json(503, { error: "not configured" });
   const body = await readJson(request);
   if (!body.ok) return json(body.status, { error: "bad request" });
   const items = deliveryItems(body.value);
   if (items.length === 0) return json(200, { ok: true });
   try {
-    const answer = await deps.db.deliveryStatus(items);
+    const answer = await db.deliveryStatus(items);
     if (rateLimited(answer)) {
       deps.log("sms.inforu.status_limited", { count: items.length, reason: "rate_limited" });
       return tryLater();
@@ -113,16 +115,18 @@ export async function inforuStatusRoute(request: Request, secret: string, deps: 
   }
 }
 
-export async function inforuInboundRoute(request: Request, secret: string, deps: { db: InforuWebhookDb | null; log: WebhookLog; env?: Record<string, string | undefined> }) {
-  if (!deps.db) return json(503, { error: "not configured" });
+export async function inforuInboundRoute(request: Request, secret: string, deps: { db: () => InforuWebhookDb | null; log: WebhookLog; env?: Record<string, string | undefined> }) {
   if (!inforuSecretMatches(secret, deps.env)) return json(404, { error: "not found" });
+  // RVW-101: the service-key client is made only after the secret in the path passed
+  const db = deps.db();
+  if (!db) return json(503, { error: "not configured" });
   const body = await readJson(request);
   if (!body.ok) return json(body.status, { error: "bad request" });
   const items = inboundItems(body.value);
   let limited = 0;
   try {
     for (const item of items) {
-      const answer = await deps.db.inboundReply(item);
+      const answer = await db.inboundReply(item);
       if (rateLimited(answer) || positive(answer, "limited")) limited += 1;
     }
   } catch {

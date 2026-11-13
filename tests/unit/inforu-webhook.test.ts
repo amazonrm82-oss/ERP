@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { deliveryItems, inboundItems, inforuInboundRoute, inforuStatusRoute, type InforuWebhookDb } from "@/features/inforu-callbacks/webhook";
@@ -20,12 +23,26 @@ describe("SMS-05: InforU's callbacks", () => {
     const db = fakeDb();
     const log = vi.fn();
     const request = post([{ CustomerMessageId: JOB, Status: 2 }]);
-    expect((await inforuStatusRoute(request, "wrong", { db, log, env })).status).toBe(404);
+    expect((await inforuStatusRoute(request, "wrong", { db: () => db, log, env })).status).toBe(404);
     expect(request.bodyUsed).toBe(false);
-    expect((await inforuInboundRoute(post({}), SECRET, { db, log, env: {} })).status).toBe(404);
-    expect((await inforuStatusRoute(post([]), SECRET, { db: null, log, env })).status).toBe(503);
+    expect((await inforuInboundRoute(post({}), SECRET, { db: () => db, log, env: {} })).status).toBe(404);
+    expect((await inforuStatusRoute(post([]), SECRET, { db: () => null, log, env })).status).toBe(503);
     expect(db.deliveryStatus).not.toHaveBeenCalled();
     expect(log).not.toHaveBeenCalled();
+  });
+
+  it("RVW-101: the service-key client is made only after the secret passed", async () => {
+    const make = vi.fn(() => fakeDb());
+    expect((await inforuStatusRoute(post([]), "wrong", { db: make, log: vi.fn(), env })).status).toBe(404);
+    expect((await inforuInboundRoute(post({}), "wrong", { db: make, log: vi.fn(), env })).status).toBe(404);
+    expect((await inforuInboundRoute(post({}), SECRET, { db: make, log: vi.fn(), env: {} })).status).toBe(404);
+    expect(make).not.toHaveBeenCalled();
+    expect((await inforuStatusRoute(post([]), SECRET, { db: make, log: vi.fn(), env })).status).toBe(200);
+    expect(make).toHaveBeenCalledTimes(1);
+    // the server file hands the factory itself to the routes, never a client built up front
+    const server = readFileSync(path.join(process.cwd(), "src/features/inforu-callbacks/webhook-server.ts"), "utf8");
+    expect(server).toMatch(/\{ db: database, log \}/);
+    expect(server).not.toMatch(/db: database\(\)/);
   });
 
   it("a delivery report hands the database our job ids and states only, and logs a count", async () => {
@@ -38,7 +55,7 @@ describe("SMS-05: InforU's callbacks", () => {
         { Status: 6, CustomerMessageId: JOB },
       ]),
       SECRET,
-      { db, log, env },
+      { db: () => db, log, env },
     );
     expect(response.status).toBe(200);
     expect(db.deliveryStatus).toHaveBeenCalledWith([
@@ -47,17 +64,17 @@ describe("SMS-05: InforU's callbacks", () => {
     ]);
     expect(JSON.stringify(log.mock.calls)).not.toMatch(/0521234567|סוד/);
     // review (5), (6): a limit or a report before the message row answers 503, so InforU posts it again
-    expect((await inforuStatusRoute(post([{ CustomerMessageId: JOB, Status: 2 }]), SECRET, { db: fakeDb({ rate_limited: true }), log, env })).status).toBe(503);
-    expect((await inforuStatusRoute(post([{ CustomerMessageId: JOB, Status: 2 }]), SECRET, { db: fakeDb({ delivered: 0, failed: 0, pending: 1 }), log, env })).status).toBe(503);
-    expect((await inforuStatusRoute(post([{ CustomerMessageId: JOB, Status: 2 }]), SECRET, { db: fakeDb({ delivered: 0, failed: 0, pending: 0 }), log, env })).status).toBe(200);
+    expect((await inforuStatusRoute(post([{ CustomerMessageId: JOB, Status: 2 }]), SECRET, { db: () => fakeDb({ rate_limited: true }), log, env })).status).toBe(503);
+    expect((await inforuStatusRoute(post([{ CustomerMessageId: JOB, Status: 2 }]), SECRET, { db: () => fakeDb({ delivered: 0, failed: 0, pending: 1 }), log, env })).status).toBe(503);
+    expect((await inforuStatusRoute(post([{ CustomerMessageId: JOB, Status: 2 }]), SECRET, { db: () => fakeDb({ delivered: 0, failed: 0, pending: 0 }), log, env })).status).toBe(200);
   });
 
   it("refuses a body over 256 KB and a malformed one", async () => {
     const db = fakeDb();
     const big = new Request("https://x.test/", { method: "POST", body: "x".repeat(256 * 1024 + 1) });
-    expect((await inforuStatusRoute(big, SECRET, { db, log: vi.fn(), env })).status).toBe(413);
+    expect((await inforuStatusRoute(big, SECRET, { db: () => db, log: vi.fn(), env })).status).toBe(413);
     const bad = new Request("https://x.test/", { method: "POST", body: "{" });
-    expect((await inforuInboundRoute(bad, SECRET, { db, log: vi.fn(), env })).status).toBe(400);
+    expect((await inforuInboundRoute(bad, SECRET, { db: () => db, log: vi.fn(), env })).status).toBe(400);
   });
 
   it("replies go to the database one by one, SMS only", async () => {
@@ -65,17 +82,17 @@ describe("SMS-05: InforU's callbacks", () => {
     const response = await inforuInboundRoute(
       post({ CustomerId: 1, Data: [{ Channel: "SMS_MO", Value: "0521234567", Message: "הסר" }, { Channel: "WA", Value: "1", Message: "x" }] }),
       SECRET,
-      { db, log: vi.fn(), env },
+      { db: () => db, log: vi.fn(), env },
     );
     expect(response.status).toBe(200);
     expect(db.inboundReply).toHaveBeenCalledTimes(1);
     expect(db.inboundReply).toHaveBeenCalledWith({ phone: "0521234567", body: "הסר" });
     const limitedDb: InforuWebhookDb = { deliveryStatus: vi.fn(), inboundReply: vi.fn(async () => ({ rate_limited: true, scope: "number" })) };
     const log = vi.fn();
-    expect((await inforuInboundRoute(post({ Data: [{ Value: "0521234567", Message: "הסר" }] }), SECRET, { db: limitedDb, log, env })).status).toBe(503);
+    expect((await inforuInboundRoute(post({ Data: [{ Value: "0521234567", Message: "הסר" }] }), SECRET, { db: () => limitedDb, log, env })).status).toBe(503);
     expect(log).toHaveBeenCalledWith("sms.inforu.inbound_limited", { count: 1, reason: "rate_limited" });
     const businessLimited: InforuWebhookDb = { deliveryStatus: vi.fn(), inboundReply: vi.fn(async () => ({ status: "done", limited: 1 })) };
-    expect((await inforuInboundRoute(post({ Data: [{ Value: "0521234567", Message: "הסר" }] }), SECRET, { db: businessLimited, log, env })).status).toBe(503);
+    expect((await inforuInboundRoute(post({ Data: [{ Value: "0521234567", Message: "הסר" }] }), SECRET, { db: () => businessLimited, log, env })).status).toBe(503);
   });
 
   it("parsers keep only what is needed", () => {

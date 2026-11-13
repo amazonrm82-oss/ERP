@@ -6,8 +6,8 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { inforuInboundRoute, inforuStatusRoute, type InforuWebhookDb } from "./webhook";
 
 /**
- * SMS-05 (owner (318) א), wave 3 use (2): the service_role path of InforU's two callbacks. After the secret check
- * (webhook.ts) it calls only public.sms_delivery_status() and public.sms_inbound_reply(); no table is read or
+ * SMS-05 (owner (318) א), wave 3 use (2): the service_role path of InforU's two callbacks. The routes in webhook.ts
+ * call `database` only after the secret check passed (RVW-101), so no service-key client exists before it; it calls only public.sms_delivery_status() and public.sms_inbound_reply(); no table is read or
  * written with the service key. Log lines carry counts only, never the body, a number or a text.
  */
 function database(): InforuWebhookDb | null {
@@ -30,9 +30,9 @@ function database(): InforuWebhookDb | null {
 const log = (event: string, fields: { count?: number; status?: string; reason?: string }) => logEvent("info", event, fields);
 
 export function inforuStatus(request: Request, secret: string) {
-  return inforuStatusRoute(request, secret, { db: database(), log });
+  return inforuStatusRoute(request, secret, { db: database, log });
 }
 
 export function inforuInbound(request: Request, secret: string) {
-  return inforuInboundRoute(request, secret, { db: database(), log });
+  return inforuInboundRoute(request, secret, { db: database, log });
 }
