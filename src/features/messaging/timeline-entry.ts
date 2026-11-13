@@ -35,10 +35,10 @@ export const REFUSED: Record<string, string> = {
   link_invalid: "לא נשלחה: הקישור לביקורת לא תקין.",
   consent_missing: "לא נשלחה: אין הסכמה מתועדת לדיוור.",
   consent_suppressed: "לא נשלחה: הלקוח ביקש לא לקבל דיוור.",
-  consent_blocked: "לא נשלחה: המספר חסום לשליחה.",
+  consent_blocked: "לא נשלחה: הכתובת או המספר חסומים לשליחה.",
   consent_unknown: "לא נשלחה: לא ניתן היה לבדוק הסכמה.",
   no_phone: "לא נשלחה: אין מספר טלפון.",
-  address_changed: "לא נשלחה: מספר הטלפון השתנה.",
+  address_changed: "לא נשלחה: פרטי הקשר של הלקוח השתנו.",
   no_customer: "לא נשלחה: אין לקוח להודעה.",
   record_gone: "לא נשלחה: הרשומה נמחקה.",
   customer_changed: "לא נשלחה: הלקוח השתנה.",
@@ -67,6 +67,14 @@ export const REFUSED: Record<string, string> = {
   not_a_meeting_message: "לא נשלחה: התבנית השתנתה.",
   link: "לא נשלחה: לא ניתן היה ליצור קישור.",
   changed: "לא נשלחה: ההודעה השתנתה בזמן ההכנה.",
+  // EML-01: the email composer's own final codes (021275)
+  not_email: "לא נשלחה: ההודעה לא מתאימה לערוץ.",
+  no_address: "לא נשלחה: אין כתובת אימייל.",
+  bad_address: "לא נשלחה: כתובת האימייל לא תקינה.",
+  bad_subject: "לא נשלחה: שורת הנושא לא תקינה.",
+  subject_too_long: "לא נשלחה: שורת הנושא ארוכה מדי.",
+  attachment_changed: "לא נשלחה: קובץ מצורף כבר לא זמין לשליחה.",
+  attachments_too_large: "לא נשלחה: הקבצים המצורפים גדולים מדי.",
 };
 
 /** The entry's label: channel and direction ("SMS יוצא"); an unknown channel reads "הודעה". */

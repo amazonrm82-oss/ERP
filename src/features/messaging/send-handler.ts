@@ -64,6 +64,8 @@ export function parseComposedEmail(data: unknown): ComposeEmailAnswer | null {
   if (typeof r.from_name !== "string") return null;
   if (r.reply_to !== null && !isAddress(r.reply_to)) return null;
   if (r.list_unsubscribe !== null && (typeof r.list_unsubscribe !== "string" || !/^https?:\/\/[^\s<>]+$/.test(r.list_unsubscribe))) return null;
+  if (!Array.isArray(r.links) || r.links.length > 10) return null;
+  if (!r.links.every((url) => typeof url === "string" && url.length <= 2048 && /^https:\/\/[^\s<>"']+$/.test(url))) return null;
   if (!Array.isArray(r.attachments) || r.attachments.length > 5) return null;
   const attachments = r.attachments.map(parseAttachment);
   if (attachments.some((a) => a === null)) return null;
@@ -76,6 +78,7 @@ export function parseComposedEmail(data: unknown): ComposeEmailAnswer | null {
       text: r.text,
       replyTo: r.reply_to,
       listUnsubscribe: r.list_unsubscribe,
+      links: r.links as string[],
       attachments: attachments as EmailAttachmentRef[],
     },
   };

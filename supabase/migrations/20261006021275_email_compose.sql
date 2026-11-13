@@ -9,7 +9,7 @@
 --
 --   public.email_job_compose(p_job uuid, p_lease uuid, p_site_url text) returns jsonb
 --     {to, from_name, subject, text, reply_to: text | null, list_unsubscribe: text | null,
---      attachments: [{bucket, path, name, type}]}   or   {refused: <code>}
+--      links: [https URL], attachments: [{bucket, path, name, type}]}   or   {refused: <code>}
 --
 -- This is the function owner (195) א approved with EML-02 (the header of 021198, "Approved for later"), built on the SMS
 -- composer's shape (021247, app.sms_compose_core):
@@ -49,6 +49,9 @@
 --   body as it goes out; the filled subject must hold no control character ('bad_subject') and at most 255 characters
 --   ('subject_too_long').
 -- * Links are minted LAST, after every check passed with placeholders of the tokens' exact length (64 characters).
+--   `links` lists the exact https URLs the composer itself put in the text (the minted meeting, signature and unsubscribe
+--   links, the stored review link): the adapter makes only those clickable in the HTML part, so an address a customer typed
+--   into a name or a form field stays plain text (review of EML-01, finding 1).
 -- * reply_to: the email of the person who sent it from the card (`reply_to_user_id`) while they are an active member of
 --   the business and their address has a plain shape, else null. from_name: the business's display name
 --   (organizations.name); the address the email goes out from is the platform's (the adapter's RESEND_FROM).
@@ -154,6 +157,7 @@ declare
   v_links jsonb := '{}'::jsonb;
   v_link_token text;
   v_unsubscribe_url text;
+  v_link_urls jsonb := '[]'::jsonb;
   v_answer jsonb;
   v_placeholder constant text := repeat('x', 64);
   v_meeting public.meetings;
@@ -587,6 +591,7 @@ begin
       return jsonb_build_object('refused', 'link');
     end if;
     v_values := v_values || jsonb_build_object('קישור', v_site || (v_links ->> 'קישור') || v_link_token);
+    v_link_urls := v_link_urls || to_jsonb(v_site || (v_links ->> 'קישור') || v_link_token);
   end if;
   if v_links ? 'קישור הסרה' then
     v_answer := public.consent_preference_link_for_job(v_job.id, p_lease);
@@ -600,6 +605,12 @@ begin
     v_values := v_values || jsonb_build_object('קישור הסרה', v_site || (v_links ->> 'קישור הסרה') || v_link_token);
     -- RFC 8058: the one-click POST address for the List-Unsubscribe headers (the same token)
     v_unsubscribe_url := v_site || '/api/forms/unsub/' || v_link_token;
+    v_link_urls := v_link_urls || to_jsonb(v_site || (v_links ->> 'קישור הסרה') || v_link_token);
+  end if;
+  -- RET-02: the stored review link, when the text holds it
+  if v_type = 'review_request' and strpos(v_body || v_subject, '{קישור לביקורת}') > 0
+     and v_rsettings.review_url like 'https://%' then
+    v_link_urls := v_link_urls || to_jsonb(v_rsettings.review_url);
   end if;
   v_text := app.sms_fill(v_body, v_values, v_gender);
   v_subject_out := app.sms_fill(v_subject, v_values, v_gender);
@@ -610,7 +621,11 @@ begin
   end if;
 
   return jsonb_build_object('to', v_address, 'from_name', v_org.name, 'subject', v_subject_out, 'text', v_text,
-                            'reply_to', v_reply, 'list_unsubscribe', v_unsubscribe_url, 'attachments', v_attachments);
+                            'reply_to', v_reply, 'list_unsubscribe', v_unsubscribe_url,
+                            'links', (select coalesce(jsonb_agg(distinct u), '[]'::jsonb)
+                                        from jsonb_array_elements_text(v_link_urls) u
+                                       where u like 'https://%'),
+                            'attachments', v_attachments);
 end;
 $$;
 revoke all on function app.email_compose_core(uuid, uuid, text) from public, anon, authenticated, service_role;

@@ -5,7 +5,16 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ClaimedJob } from "@/features/jobs/registry";
 import { attachmentRefAllowed, downloadEmailAttachment, EMAIL_ATTACHMENT_BUCKET } from "@/features/messaging/email-attachments-server";
-import { createResendProvider, emailHtml, plainEmailAddress, RESEND_SEND_URL, resendAccountReady, senderDisplayName } from "@/features/messaging/providers/resend";
+import {
+  attachmentFilename,
+  createResendProvider,
+  emailHtml,
+  plainEmailAddress,
+  RESEND_SEND_URL,
+  resendAccountReady,
+  resendTimeoutMs,
+  senderDisplayName,
+} from "@/features/messaging/providers/resend";
 import { messagingProviderFor } from "@/features/messaging/providers/select";
 import type { LoadedEmail, OutgoingMessage } from "@/features/messaging/providers/types";
 import { createSendHandler, parseComposedEmail } from "@/features/messaging/send-handler";
@@ -24,9 +33,10 @@ const email = (extra: Partial<LoadedEmail> = {}): LoadedEmail => ({
   to: "dana@example.com",
   fromName: "עסק \"הרכבה\" <x>",
   subject: "שלום דנה",
-  text: "שלום דנה,\nהמסמך: https://mexuz.test/f/sign/abc.\n<b>",
+  text: "שלום https://phish.test/x דנה,\nהמסמך: https://mexuz.test/f/sign/abc.\n<b>",
   replyTo: "rep@example.com",
   listUnsubscribe: null,
+  links: ["https://mexuz.test/f/sign/abc"],
   attachments: [],
   ...extra,
 });
@@ -59,7 +69,7 @@ describe("EML-01: the Resend adapter", () => {
     const provider = createResendProvider(ENV, { fetch })!;
     expect(provider.composes).toBe(true);
     expect(provider.channel).toBe("email");
-    const result = await provider.send(message(email({ attachments: [{ name: "חוזה.pdf", type: "application/pdf", content: "JVBERi0=" }] })));
+    const result = await provider.send(message(email({ attachments: [{ name: "חוזה\u202e/../x\u0000.pdf", type: "application/pdf", content: "JVBERi0=" }] })));
     expect(result).toEqual({ ok: true, providerId: "4ef9a417-02e9-4d39-ad75-9611e0fcc33c" });
     expect(fetch).toHaveBeenCalledTimes(1);
     const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
@@ -74,8 +84,11 @@ describe("EML-01: the Resend adapter", () => {
     expect(body.subject).toBe("שלום דנה");
     expect(body.reply_to).toBe("rep@example.com");
     expect(body.headers).toBeUndefined();
-    expect(body.attachments).toEqual([{ filename: "חוזה.pdf", content: "JVBERi0=", content_type: "application/pdf" }]);
+    expect(body.attachments).toEqual([{ filename: "חוזה_.._x.pdf", content: "JVBERi0=", content_type: "application/pdf" }]);
     expect(body.html).toContain('<a href="https://mexuz.test/f/sign/abc">https://mexuz.test/f/sign/abc</a>.');
+    // review finding 1: an address the composer did not put there (a customer's typed name) stays plain text
+    expect(body.html).toContain("שלום https://phish.test/x דנה");
+    expect(body.html).not.toContain('href="https://phish.test');
     expect(body.html).toContain("&lt;b&gt;");
     expect(body.html).toContain('dir="rtl"');
   });
@@ -121,7 +134,36 @@ describe("EML-01: the Resend adapter", () => {
     }
     expect(senderDisplayName("א\r\nBcc: x")).toBe("א Bcc: x");
     expect(senderDisplayName("x".repeat(100))).toHaveLength(70);
-    expect(emailHtml("a & b\nhttps://x.test/a?b=1&c=2)")).toContain('<a href="https://x.test/a?b=1&amp;c=2">https://x.test/a?b=1&amp;c=2</a>)');
+    // C1 controls, separators, bidi / format characters and "@" never reach the From header
+    expect(senderDisplayName("עסק\u0085\u2028\u202e\u200b@x")).toBe("עסק x");
+    expect(emailHtml("a & b\nhttps://x.test/a?b=1&c=2)", ["https://x.test/a?b=1&c=2"])).toContain('<a href="https://x.test/a?b=1&amp;c=2">https://x.test/a?b=1&amp;c=2</a>)');
+    // only exact, standalone occurrences of the listed https links; never http, never a longer URL that starts with one
+    expect(emailHtml("http://x.test/a", ["http://x.test/a"])).not.toContain("<a ");
+    expect(emailHtml("https://x.test/abc", ["https://x.test/a"])).not.toContain("<a ");
+    expect(emailHtml("evil.https://x.test/a", ["https://x.test/a"])).not.toContain("<a ");
+    expect(emailHtml("(https://x.test/a)", ["https://x.test/a"])).toContain('(<a href="https://x.test/a">');
+    expect(emailHtml("https://x.test/a https://x.test/a", ["https://x.test/a"]).match(/<a /g)).toHaveLength(2);
+    expect(emailHtml("https://x.test/a")).not.toContain("<a ");
+  });
+
+  it("cleans attachment names and keeps their extension", () => {
+    expect(attachmentFilename("הצעה.pdf")).toBe("הצעה.pdf");
+    expect(attachmentFilename("a\u0001b\u202ec\u2029.PDF")).toBe("abc.PDF");
+    expect(attachmentFilename("dir/sub\\name.docx")).toBe("dir_sub_name.docx");
+    expect(attachmentFilename(`${"א".repeat(150)}.pdf`)).toBe(`${"א".repeat(100)}.pdf`);
+    expect(attachmentFilename("\u200b.pdf")).toBe("file.pdf");
+    expect(attachmentFilename("")).toBe("file");
+    expect(attachmentFilename("noext")).toBe("noext");
+  });
+
+  it("gives a large request more time, within 40 seconds", async () => {
+    expect(resendTimeoutMs(0)).toBe(10_000);
+    expect(resendTimeoutMs(1)).toBe(12_000);
+    expect(resendTimeoutMs(3 * 1_048_576)).toBe(16_000);
+    expect(resendTimeoutMs(14 * 1_048_576)).toBe(38_000);
+    expect(resendTimeoutMs(100 * 1_048_576)).toBe(40_000);
+    const route = readFileSync(join(root, "src", "app", "api", "jobs", "run", "route.ts"), "utf8");
+    expect(route).toMatch(/export const maxDuration = 120;/);
   });
 
   it("only the adapter reads the Resend settings", () => {
@@ -180,6 +222,7 @@ describe("EML-01: the send handler asks the email composer for a composing provi
     text: "גוף",
     reply_to: null,
     list_unsubscribe: null,
+    links: ["https://mexuz.test/f/sign/x"],
     attachments: [{ bucket: "record-files", path: `${ORG}/${FILE}`, name: "a.pdf", type: "application/pdf" }],
   };
 
@@ -201,6 +244,7 @@ describe("EML-01: the send handler asks the email composer for a composing provi
       text: "גוף",
       replyTo: null,
       listUnsubscribe: null,
+      links: ["https://mexuz.test/f/sign/x"],
       attachments: [{ name: "a.pdf", type: "application/pdf", content: "QUJD" }],
     });
   });
@@ -241,6 +285,9 @@ describe("EML-01: the send handler asks the email composer for a composing provi
     expect(parseComposedEmail({ ...composed, attachments: [{ ...composed.attachments[0], path: "../x" }] })).toBeNull();
     expect(parseComposedEmail({ ...composed, attachments: Array(6).fill(composed.attachments[0]) })).toBeNull();
     expect(parseComposedEmail({ ...composed, list_unsubscribe: "javascript:x" })).toBeNull();
+    expect(parseComposedEmail({ ...composed, links: ["http://mexuz.test/x"] })).toBeNull();
+    expect(parseComposedEmail({ ...composed, links: undefined })).toBeNull();
+    expect(parseComposedEmail({ ...composed, links: ["https://a.test/x y"] })).toBeNull();
     expect(parseComposedEmail(null)).toBeNull();
   });
 });

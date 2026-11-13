@@ -87,6 +87,9 @@ export type ComposedEmail = {
   text: string;
   replyTo: string | null;
   listUnsubscribe: string | null;
+  // the exact https URLs the composer put in the text itself (minted links, the stored review link): the only ones made
+  // clickable in the HTML part
+  links: string[];
   attachments: EmailAttachmentRef[];
 };
 

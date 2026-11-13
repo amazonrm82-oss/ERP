@@ -22,7 +22,7 @@ type Env = Record<string, string | undefined>;
  *   never a second send).
  * Everything sent is ONLY what public.email_job_compose answered (the database fills and judges it) and the files read at
  * the paths it named; the address, the text and the key are never logged, kept or returned. One call per message, within
- * 10 seconds.
+ * 10 seconds plus 2 per started megabyte of the request, at most 40 (resendTimeoutMs).
  */
 export const RESEND_SEND_URL = "https://api.resend.com/emails";
 export const RESEND_TIMEOUT_MS = 10_000;
@@ -58,33 +58,79 @@ export function resendAccountReady(env: Env = process.env): boolean {
   return (env.RESEND_API_KEY?.trim() ?? "") !== "" && fromAddress(env) !== null;
 }
 
-/** The display name in front of the platform address: no quote, angle bracket, backslash or control character, 70 at most. */
+// review of EML-01 (findings 3, 8): characters that never go into a header or a file name: C0 and C1 controls, the line and
+// paragraph separators, and every format character (Cf: bidi marks and overrides, zero-width characters)
+const UNSAFE = /[\u0000-\u001f\u007f-\u009f\u2028\u2029\p{Cf}]/gu;
+
+/**
+ * The display name in front of the platform address: no control, separator or format character, quote, angle bracket,
+ * backslash or "@", 70 characters at most.
+ */
 export function senderDisplayName(name: string | null | undefined): string {
-  const clean = (name ?? "").replace(/[\u0000-\u001f\u007f"<>\\]/g, " ").replace(/\s+/g, " ").trim();
+  const clean = (name ?? "").replace(UNSAFE, " ").replace(/["<>\\@]/g, " ").replace(/\s+/g, " ").trim();
   return [...clean].slice(0, 70).join("").trim();
+}
+
+/**
+ * An attachment's file name as it goes out: no control, separator or format character and no path separator, at most 100
+ * characters before the extension; the extension (letters and digits, up to 10) is kept. Never empty.
+ */
+export function attachmentFilename(name: string | null | undefined): string {
+  const clean = (name ?? "").replace(UNSAFE, "").replace(/[\/\\]/g, "_").replace(/\s+/g, " ").trim();
+  const dot = clean.lastIndexOf(".");
+  const ext = dot >= 0 && /^[A-Za-z0-9]{1,10}$/.test(clean.slice(dot + 1)) ? clean.slice(dot + 1) : "";
+  const base = [...(ext ? clean.slice(0, dot) : clean)].slice(0, 100).join("").replace(/^[.\s]+|[.\s]+$/g, "");
+  return `${base || "file"}${ext ? `.${ext}` : ""}`;
 }
 
 function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
+// a link stands alone: nothing that could continue a URL right before or after it
+const LINK_BEFORE = /[\s(<"'\u00a0]/;
+const LINK_AFTER = /[\s.,;:!?)\]>"'\u00a0]/;
+
 /**
- * The HTML part of an email from its text: every character escaped, a line break per line, http(s) links made clickable
- * (their trailing punctuation left out), right to left. Nothing else is added.
+ * The HTML part of an email from its text: every character escaped, a line break per line, right to left. Only the exact
+ * https URLs the composer put in the text itself (`links`: the minted links and the stored review link) are made clickable,
+ * where they stand alone; any other address in the text (a name or a field a customer typed) stays plain text. Never http.
  */
-export function emailHtml(text: string): string {
+export function emailHtml(text: string, links: readonly string[] = []): string {
+  const urls = [...new Set(links.filter((url) => /^https:\/\/[^\s<>"']+$/.test(url)))].sort((a, b) => b.length - a.length);
   const out: string[] = [];
   let last = 0;
-  for (const match of text.matchAll(/https?:\/\/[^\s<>"']+/g)) {
-    const start = match.index ?? 0;
-    const url = match[0].replace(/[.,;:!?)\]]+$/, "");
-    out.push(escapeHtml(text.slice(last, start)));
-    out.push(`<a href="${escapeHtml(url)}">${escapeHtml(url)}</a>`);
-    last = start + url.length;
+  let at = 0;
+  while (urls.length > 0 && at < text.length) {
+    let found: { index: number; url: string } | null = null;
+    for (const url of urls) {
+      let index = text.indexOf(url, at);
+      while (index !== -1) {
+        const before = index === 0 ? "" : text[index - 1];
+        const after = index + url.length >= text.length ? "" : text[index + url.length];
+        if ((before === "" || LINK_BEFORE.test(before)) && (after === "" || LINK_AFTER.test(after))) break;
+        index = text.indexOf(url, index + 1);
+      }
+      if (index !== -1 && (found === null || index < found.index)) found = { index, url };
+    }
+    if (!found) break;
+    out.push(escapeHtml(text.slice(last, found.index)));
+    out.push(`<a href="${escapeHtml(found.url)}">${escapeHtml(found.url)}</a>`);
+    last = found.index + found.url.length;
+    at = last;
   }
   out.push(escapeHtml(text.slice(last)));
   const body = out.join("").replace(/\r?\n/g, "<br>\n");
   return `<!doctype html><html lang="he" dir="rtl"><body><div dir="rtl" style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;text-align:right">${body}</div></body></html>`;
+}
+
+/**
+ * Review of EML-01 (finding 2): the request's time limit grows with its size (10 s, plus 2 s for every started megabyte),
+ * at most RESEND_MAX_TIMEOUT_MS, so a large attachment is not cut off while it uploads.
+ */
+export const RESEND_MAX_TIMEOUT_MS = 40_000;
+export function resendTimeoutMs(bodyBytes: number): number {
+  return Math.min(RESEND_TIMEOUT_MS + 2_000 * Math.ceil(Math.max(bodyBytes, 0) / 1_048_576), RESEND_MAX_TIMEOUT_MS);
 }
 
 const fail = (code: string, final: boolean): ProviderResult => ({ ok: false, error: `resend ${code}`, code, final });
@@ -110,7 +156,7 @@ export function createResendProvider(env: Env = process.env, deps: { fetch?: Fet
         to: [content.to],
         subject: content.subject,
         text: content.text,
-        html: emailHtml(content.text),
+        html: emailHtml(content.text, content.links),
       };
       if (content.replyTo && plainEmailAddress(content.replyTo)) body.reply_to = content.replyTo;
       if (content.listUnsubscribe && /^https:\/\/[^\s<>]+$/.test(content.listUnsubscribe)) {
@@ -118,15 +164,16 @@ export function createResendProvider(env: Env = process.env, deps: { fetch?: Fet
         body.headers = { "List-Unsubscribe": `<${content.listUnsubscribe}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" };
       }
       if (content.attachments.length > 0) {
-        body.attachments = content.attachments.map((file) => ({ filename: file.name, content: file.content, content_type: file.type }));
+        body.attachments = content.attachments.map((file) => ({ filename: attachmentFilename(file.name), content: file.content, content_type: file.type }));
       }
+      const payload = JSON.stringify(body);
       let response: Response;
       try {
         response = await doFetch(RESEND_SEND_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, "Idempotency-Key": message.jobId },
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(RESEND_TIMEOUT_MS),
+          body: payload,
+          signal: AbortSignal.timeout(resendTimeoutMs(Buffer.byteLength(payload, "utf8"))),
           cache: "no-store",
         });
       } catch (error) {

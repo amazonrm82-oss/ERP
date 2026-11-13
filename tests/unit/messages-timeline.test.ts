@@ -26,11 +26,15 @@ describe("MSG-03: messages on the timeline", () => {
   });
 
   // RVW-89: every final refusal of the SMS composer has its own Hebrew line on the timeline
-  it("has a line for every refusal code the SMS composer ends a job with", () => {
-    const file = readdirSync(join(root, "supabase", "migrations")).find((f) => f.endsWith("_sms_compose.sql"));
-    expect(file).toBeDefined();
-    const sql = readFileSync(join(root, "supabase", "migrations", file as string), "utf8");
+  // EML-01: and of the email composer (021275)
+  it("has a line for every refusal code the SMS and email composers end a job with", () => {
+    const files = readdirSync(join(root, "supabase", "migrations")).filter((f) => f.endsWith("_sms_compose.sql") || f.endsWith("_email_compose.sql"));
+    expect(files).toHaveLength(2);
+    const sql = files.map((file) => readFileSync(join(root, "supabase", "migrations", file), "utf8")).join("\n");
     const literal = [...sql.matchAll(/'refused', '([a-z_]+)'/g)].map((m) => m[1]);
+    for (const code of ["bad_address", "no_address", "bad_subject", "subject_too_long", "attachment_changed", "attachments_too_large", "not_email"]) {
+      expect(literal, code).toContain(code);
+    }
     // the codes it passes on: app.message_template_sendable / app.message_filled_problem, app.collection_customer_refusal,
     // public.meeting_reminder_link and public.consent_preference_link_for_job
     const passed = ["not_found", "inactive", "field_not_allowed", "external_link", "glued_address", "offer", "too_long",

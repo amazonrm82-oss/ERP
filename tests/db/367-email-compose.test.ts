@@ -13,9 +13,11 @@ type Answer = Record<string, unknown>;
 // md5 of the email composer as built for EML-01 (owner (195) א, (268) א): body, security definer, settings and arguments (test
 // 284's and 352's shape). A change of a body fails here until it gets a fresh independent review against CLAUDE.md's "THE
 // FUTURE SENDER" notes and 021198's header (the attachments); then update the md5.
+// Rechecked after the independent review of lane/n-eml05: the core also answers `links` (only the https URLs it put in the
+// text itself: the minted links and the stored review link); nothing else changed.
 const REVIEWED_MD5: Record<string, string> = {
   "email_job_compose(uuid,uuid,text)": "c5c2ae88f99865569bd24ddf80c2168f",
-  "app.email_compose_core(uuid,uuid,text)": "b59b36659b2f8fc64b33326069ceb525",
+  "app.email_compose_core(uuid,uuid,text)": "9530cdcc73961003f5dfb51a87d52baf",
   "app.email_usage_give_back(uuid)": "c952eaea4bb85cf196cf49280e8b7816",
   "email_quota_return(uuid,uuid)": "9a75bbbe4baa464daf175f376f2be501",
 };
@@ -203,6 +205,8 @@ describe("the email composer (EML-01, Resend)", () => {
       text: "שלום רון רון לוי, כאן משה החבר מעסק הרכבה 03-5550000, הרצל 1, תל אביב.",
       reply_to: memberEmail,
       list_unsubscribe: null,
+      // review finding 1: only what the composer put in itself is clickable; a card's service email puts none
+      links: [],
       attachments: [
         { bucket: "record-files", path: await pathOf(file), name: "הצעה.pdf", type: "application/pdf" },
         { bucket: "record-files", path: await pathOf(lib), name: "מצגת.pdf", type: "application/pdf" },
@@ -283,13 +287,22 @@ describe("the email composer (EML-01, Resend)", () => {
     job = await card({ file_ids: [file] });
     expect(await compose(job)).toEqual({ refused: "attachment_changed" });
 
-    // a library item switched off, or a newer file of it
+    // a library item switched off, expired, or replaced by a newer file
     const item = await libraryItem(owner.id, org);
     const lib = await libraryFile(org, item);
     job = await card({ library_file_ids: [lib] });
     await asAdmin((q) => q("update public.library_items set is_active = false where id = $1", [item]));
     expect(await compose(job)).toEqual({ refused: "attachment_changed" });
     await asAdmin((q) => q("update public.library_items set is_active = true where id = $1", [item]));
+    job = await card({ library_file_ids: [lib] });
+    await asAdmin((q) => q("update public.library_items set valid_until = current_date - 2 where id = $1", [item]));
+    expect(await compose(job)).toEqual({ refused: "attachment_changed" });
+    await asAdmin((q) => q("update public.library_items set valid_until = null, valid_from = current_date + 5 where id = $1", [item]));
+    job = await card({ library_file_ids: [lib] });
+    expect(await compose(job)).toEqual({ refused: "attachment_changed" });
+    await asAdmin((q) => q("update public.library_items set valid_from = null where id = $1", [item]));
+    job = await card({ library_file_ids: [lib] });
+    expect(((await compose(job)).attachments as unknown[]).length).toBe(1);
     job = await card({ library_file_ids: [lib] });
     await libraryFile(org, item);
     expect(await compose(job)).toEqual({ refused: "attachment_changed" });
@@ -320,6 +333,7 @@ describe("the email composer (EML-01, Resend)", () => {
     expect(text).toMatch(/^שלום דנה, יש חדש\.\n\nעסק הרכבה · 03-5550000 · הרצל 1, תל אביב\nלהסרה מרשימת התפוצה: https:\/\/mexuz\.test\/f\/unsub\/[A-Za-z0-9_-]{64}$/);
     const token = text.slice(-64);
     expect(answer.list_unsubscribe).toBe(`${SITE}/api/forms/unsub/${token}`);
+    expect(answer.links).toEqual([`${SITE}/f/unsub/${token}`]);
     const kept = await asAdmin(
       async (q) =>
         (await q<{ n: number }>("select count(*)::int as n from app.consent_preference_tokens where token_hash = encode(sha256(convert_to($1, 'UTF8')), 'hex') and organization_id = $2", [token, org]))
@@ -416,6 +430,7 @@ describe("the email composer (EML-01, Resend)", () => {
     const answer = await compose(job);
     expect(String(answer.text)).toMatch(/^תזכורת: יום .+, \d+ ב.+ ב-\d\d:\d\d, ב-המשרד\. לשינוי: https:\/\/mexuz\.test\/f\/book\/manage\/[0-9a-f]{64}$/);
     expect(answer.list_unsubscribe).toBeNull();
+    expect(answer.links).toEqual([String(answer.text).slice(String(answer.text).indexOf("https://"))]);
     await asAdmin((q) => q("delete from app.meeting_customer_messages where meeting_id = $1", [meeting]));
     job = await queue();
     await asAdmin((q) => q("update public.meetings set starts_at = starts_at + interval '1 hour', ends_at = ends_at + interval '1 hour' where id = $1", [meeting]));
@@ -473,10 +488,107 @@ describe("the email composer (EML-01, Resend)", () => {
     expect(answer.subject).toBe("פרסומת: נשמח לביקורת");
     expect(String(answer.text).startsWith("דנה, נשמח לביקורת: https://g.page/r/abc/review")).toBe(true);
     expect(String(answer.list_unsubscribe)).toMatch(/\/api\/forms\/unsub\/[A-Za-z0-9_-]{64}$/);
+    expect((answer.links as string[]).sort()).toEqual(["https://g.page/r/abc/review", String(answer.text).slice(-(SITE.length + "/f/unsub/".length + 64))].sort());
     const job = await queue();
     await asAdmin((q) => q("insert into app.qr_external_blocks (organization_id, blocked, reason) values ($1, true, 'בדיקה') on conflict (organization_id) do update set blocked = true", [org]));
     expect(await compose(job)).toEqual({ refused: "link_blocked" });
     await asAdmin((q) => q("update app.qr_external_blocks set blocked = false where organization_id = $1", [org]));
+  });
+
+  it("a signature reminder (SGN-03): the document as sent, its link minted last", async () => {
+    const c = await contact(owner.id, org, "sign@example.test");
+    const doc = await asAdmin(
+      async (q) =>
+        (
+          await q<{ id: string }>(
+            `insert into public.signature_documents (organization_id, contact_id, title, body, content_sha256, status, sent_at, expires_at)
+             values ($1, $2, 'הסכם שירות', 'טקסט', repeat('0', 64), 'sent', now(), now() + interval '3 days') returning id`,
+            [org, c],
+          )
+        ).rows[0].id,
+    );
+    const t = await template(org, { type: "requested_document", notice: "signature_reminder", subject: "תזכורת: {שם המסמך}", body: "{שם פרטי}, המסמך {שם המסמך} מחכה עד {תאריך}: {קישור}" });
+    const queue = async () => {
+      const job = await prepared(org, { channel: "email", message_type: "requested_document", template_id: t, contact_id: c, signature_document_id: doc });
+      await asAdmin((q) =>
+        q(
+          `insert into app.signature_customer_reminders (organization_id, document_id, outcome, job_id) values ($1, $2, 'queued', $3)
+           on conflict (document_id) do update set job_id = excluded.job_id, outcome = 'queued'`,
+          [org, doc, job.id],
+        ),
+      );
+      return job;
+    };
+    const answer = await compose(await queue());
+    expect(answer.subject).toBe("תזכורת: הסכם שירות");
+    expect(String(answer.text)).toMatch(/^דנה, המסמך הסכם שירות מחכה עד \d+ ב.+ \d{4}: https:\/\/mexuz\.test\/f\/sign\/[A-Za-z0-9_-]{64}$/);
+    expect(answer.links).toEqual([String(answer.text).slice(String(answer.text).indexOf("https://"))]);
+    // cancelled after queuing: nothing is minted
+    const job = await queue();
+    await asAdmin((q) => q("update public.signature_documents set status = 'cancelled', cancelled_at = now() where id = $1", [doc]));
+    expect(await compose(job)).toEqual({ refused: "document_changed" });
+  });
+
+  it("a collection reminder (COL-07): the stage's refusal rule, and the balance at send time", async () => {
+    const c = await contact(owner.id, org, "pay@example.test");
+    await asAdmin((q) =>
+      q(`update public.org_document_settings set collection_customer_reminder = true, collection_customer_stages = '{0,7,14}' where organization_id = $1`, [org]),
+    );
+    const doc = await asAdmin(
+      async (q) =>
+        (
+          await q<{ id: string }>(
+            "insert into public.accounting_documents (organization_id, contact_id, doc_type, number, doc_date, amount_agorot, due_date) values ($1, $2, 'tax_invoice', '2001', current_date - 10, 123450, current_date) returning id",
+            [org, c],
+          )
+        ).rows[0].id,
+    );
+    const t = await template(org, { type: "collection", notice: "collection_reminder", subject: "תזכורת לתשלום", body: "{שם פרטי}, {מסמך} על {סכום}, עד {מועד תשלום}." });
+    const queue = async (offset: number) => {
+      const job = await prepared(org, { channel: "email", message_type: "collection", template_id: t, contact_id: c, collection_document_id: doc });
+      await asAdmin((q) =>
+        q(
+          `insert into app.collection_reminders_sent (organization_id, document_id, due_date, offset_days, customer_job_id) values ($1, $2, current_date, $3, $4)
+           on conflict do nothing`,
+          [org, doc, offset, job.id],
+        ),
+      );
+      return job;
+    };
+    const answer = await compose(await queue(0));
+    expect(String(answer.text)).toMatch(/^דנה, חשבונית מס 2001 על 1,234\.50 ₪, עד \d+ ב.+ \d{4}\.$/);
+    expect(answer.links).toEqual([]);
+    expect(await compose(await queue(-3))).toEqual({ refused: "stage_off" });
+  });
+
+  it("a punch card notice (PKG-03): the card still active and the contact's, the business's switch on", async () => {
+    const c = await contact(owner.id, org, "card-notice@example.test");
+    const product = await asAdmin(async (q) => (await q<{ id: string }>("insert into public.products (organization_id, name) values ($1, 'כרטיסייה') returning id", [org])).rows[0].id);
+    const card = await asAdmin(
+      async (q) =>
+        (
+          await q<{ id: string }>(
+            "insert into public.punch_cards (organization_id, contact_id, product_id, name, entries_total, status, activated_at, expires_on) values ($1, $2, $3, 'עשר כניסות', 10, 'active', now(), '2027-03-01') returning id",
+            [org, c, product],
+          )
+        ).rows[0].id,
+    );
+    const t = await template(org, { type: "punch_card_notice", notice: "punch_card_low", subject: "הכרטיסייה שלך", body: "{שם פרטי}, ב{שם הכרטיסייה} {כניסות}, עד {תאריך}." });
+    await asAdmin((q) => q("update public.punch_card_alert_settings set customer_messages = false where organization_id = $1", [org]));
+    let job = await prepared(org, { channel: "email", message_type: "punch_card_notice", template_id: t, contact_id: c, punch_card_id: card });
+    expect(await compose(job)).toEqual({ refused: "messages_off" });
+    await asAdmin((q) =>
+      q(
+        `insert into public.punch_card_alert_settings (organization_id, customer_messages) values ($1, true)
+         on conflict (organization_id) do update set customer_messages = true`,
+        [org],
+      ),
+    );
+    job = await prepared(org, { channel: "email", message_type: "punch_card_notice", template_id: t, contact_id: c, punch_card_id: card });
+    expect((await compose(job)).text).toBe("דנה, בעשר כניסות נשארו 10 כניסות, עד 1 במרץ 2027.");
+    job = await prepared(org, { channel: "email", message_type: "punch_card_notice", template_id: t, contact_id: c, punch_card_id: card });
+    await asAdmin((q) => q("update public.punch_cards set status = 'cancelled', cancelled_at = now(), cancel_reason = 'בדיקה' where id = $1", [card]));
+    expect(await compose(job)).toEqual({ refused: "card_changed" });
   });
 
   it("never reaches across businesses", async () => {
