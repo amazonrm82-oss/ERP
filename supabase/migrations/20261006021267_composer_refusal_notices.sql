@@ -31,7 +31,7 @@ as $$
     when 'offer' then 'יש בתבנית מחיר, הנחה או מילה שיווקית'
     when 'inactive' then 'התבנית כבויה'
     -- RVW-89: the business's own setup
-    when 'unfilled_field' then 'שדה בהודעה לא התמלא (בהודעת שיווק ב-SMS: כתובת העסק או הטלפון חסרים בהגדרות המסמכים)'
+    when 'unfilled_field' then 'שדה בהודעה לא התמלא (למשל כתובת העסק או הטלפון חסרים בהגדרות המסמכים, או פרט חסר אצל הלקוח)'
     when 'feature_off' then 'סוג ההודעה כבוי בהגדרות או לא כלול בחבילה'
     when 'link_blocked' then 'הקישורים החיצוניים של העסק כובו על ידי צוות המערכת'
     when 'link_invalid' then 'הקישור לביקורת לא תקין'
@@ -72,7 +72,7 @@ begin
   end if;
   -- RVW-89: where the business fixes it
   v_fix := case p_reason
-             when 'unfilled_field' then 'אפשר להשלים את כתובת העסק והטלפון בהגדרות, במע"מ ופרטים למסמכים, ולבדוק את השדות בתבנית.'
+             when 'unfilled_field' then 'אפשר להשלים את כתובת העסק והטלפון בהגדרות, במע"מ ופרטים למסמכים, ולבדוק את השדות בתבנית ואצל הלקוח.'
              when 'feature_off' then 'אפשר לבדוק את ההגדרות של סוג ההודעה ואת החבילה.'
              when 'link_blocked' then 'לפרטים פנו לתמיכה.'
              when 'link_invalid' then 'אפשר לתקן את הקישור בהגדרות, בבקשת ביקורת.'

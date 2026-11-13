@@ -29,7 +29,7 @@ export type MessageEntryInput = {
 // A code not listed here keeps the plain "השליחה נכשלה.".
 export const REFUSED: Record<string, string> = {
   too_long: "לא נשלחה: ארוכה מדי.",
-  unfilled_field: "לא נשלחה: שדה בהודעה לא התמלא (בהודעת שיווק: כתובת או טלפון העסק בהגדרות המסמכים).",
+  unfilled_field: "לא נשלחה: שדה בהודעה לא התמלא (למשל כתובת או טלפון העסק בהגדרות המסמכים, או פרט חסר אצל הלקוח).",
   feature_off: "לא נשלחה: האפשרות כבויה או לא כלולה בחבילה.",
   link_blocked: "לא נשלחה: הקישורים החיצוניים של העסק כבויים.",
   link_invalid: "לא נשלחה: הקישור לביקורת לא תקין.",
