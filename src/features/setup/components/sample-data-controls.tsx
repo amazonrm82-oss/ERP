@@ -8,15 +8,17 @@ import { FormError, FormNotice } from "@/components/ui/feedback";
 
 import { addSampleDataAction, removeSampleDataAction } from "../checklist-actions";
 import { keptSampleMessage } from "../checklist";
+import { sampleDataBlurb, type SampleKitKey } from "../sample-kits";
 
 // removable: untouched sample records; kept: sample records someone changed, which stay
-type Props = { orgId: string; removable: number; kept: number };
+// kit: the industry whose sample set is added (VRT-03); null = the generic set
+type Props = { orgId: string; removable: number; kept: number; kit?: SampleKitKey | null };
 
 /**
  * Sample data (USR-04): add a small set of records to see how the system looks,
  * and remove all of them in one click. Real records are never removed.
  */
-export function SampleDataControls({ orgId, removable, kept }: Props) {
+export function SampleDataControls({ orgId, removable, kept, kit = null }: Props) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -61,7 +63,7 @@ export function SampleDataControls({ orgId, removable, kept }: Props) {
         </>
       ) : (
         <>
-          <p className="text-sm text-ink-soft">רוצים לראות איך זה נראה? אפשר להוסיף כמה לידים, אנשי קשר ועסקה לדוגמה, ולמחוק אותם בלחיצה.</p>
+          <p className="text-sm text-ink-soft">{sampleDataBlurb(kit)}</p>
           <Button variant="secondary" size="sm" onClick={add} loading={pending}>
             הוספת נתוני דוגמה
           </Button>

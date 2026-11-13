@@ -54,7 +54,7 @@ export default async function SetupChecklistPage({ params }: Props) {
         <CardHeader id="sample-title" title="נתוני דוגמה" />
         <CardBody>
           {canWrite ? (
-            <SampleDataControls orgId={orgId} {...sampleCounts(checklist.sample)} />
+            <SampleDataControls orgId={orgId} {...sampleCounts(checklist.sample)} kit={checklist.kit} />
           ) : (
             <p className="text-md text-ink-soft">העסק במצב קריאה בלבד, ואי אפשר להוסיף או למחוק נתוני דוגמה.</p>
           )}

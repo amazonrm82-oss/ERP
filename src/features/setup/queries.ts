@@ -4,6 +4,7 @@ import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
 import { buildChecklist, type ChecklistFacts, type ChecklistItem } from "./checklist";
+import { sampleDataKit, type SampleKitKey } from "./sample-kits";
 import { isSetupStep, type SetupStep } from "./steps";
 
 /** The next step of the organization's setup wizard, or null when it is finished (or the row is not visible). */
@@ -30,7 +31,8 @@ function notIn(ids: string[]): string {
   return `(${ids.join(",")})`;
 }
 
-export type SetupChecklist = { items: ChecklistItem[]; hidden: boolean; sample: SampleRecord[] };
+// kit: the industry whose sample set "add sample data" makes (VRT-03), null = the generic set
+export type SetupChecklist = { items: ChecklistItem[]; hidden: boolean; sample: SampleRecord[]; kit: SampleKitKey | null };
 
 /**
  * The setup checklist of an owner or admin (USR-04), worked out from the
@@ -39,7 +41,7 @@ export type SetupChecklist = { items: ChecklistItem[]; hidden: boolean; sample: 
 export async function getSetupChecklist(orgId: string, userId: string): Promise<SetupChecklist | null> {
   const supabase = await createClient();
   const [org, sample] = await Promise.all([
-    supabase.from("organizations").select("phone, industry, setup_checklist_hidden_at").eq("id", orgId).maybeSingle(),
+    supabase.from("organizations").select("phone, industry, industry_templates, setup_checklist_hidden_at").eq("id", orgId).maybeSingle(),
     getSampleRecords(orgId),
   ]);
   const row = must(org, "organizations.checklist");
@@ -76,5 +78,10 @@ export async function getSetupChecklist(orgId: string, userId: string): Promise<
     importDone: must(importJob, "import_jobs.checklist").length > 0,
     pushOn: must(push, "push_subscriptions.checklist").length > 0,
   };
-  return { items: buildChecklist(orgId, facts), hidden: row.setup_checklist_hidden_at !== null, sample };
+  return {
+    items: buildChecklist(orgId, facts),
+    hidden: row.setup_checklist_hidden_at !== null,
+    sample,
+    kit: sampleDataKit({ industry: row.industry, industry_templates: row.industry_templates ?? [] }),
+  };
 }

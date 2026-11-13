@@ -885,6 +885,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_recurring_billing_report.sql",
       "_recurring_billing_erase.sql",
       "_recurring_billing_links.sql",
+      // VRT-03 redefines app.sample_untouched() last (the sample punch card) and public.sample_data_add() of _setup_checklist.sql
+      "_sample_data_kits.sql",
+      "_sample_data_kits_add.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

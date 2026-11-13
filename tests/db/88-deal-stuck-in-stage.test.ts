@@ -179,6 +179,9 @@ const RERUN = [
   migrationFile("_recurring_billing_report.sql"),
   migrationFile("_recurring_billing_erase.sql"),
   migrationFile("_recurring_billing_links.sql"),
+  // VRT-03 redefines app.sample_untouched() last (the sample punch card) and public.sample_data_add() of _setup_checklist.sql
+  migrationFile("_sample_data_kits.sql"),
+  migrationFile("_sample_data_kits_add.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

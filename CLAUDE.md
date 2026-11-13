@@ -1326,6 +1326,17 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   it is null (a person who fills it makes the record kept); a new NOT NULL column with a default needs its own exception there. Test 64 re-runs the sample migrations and must end with the latest
   migration that redefines `app.sample_row()`. Sample leads
   never count for activation (GAP-06).
+- Sample data by industry (VRT-03, migrations 021261, 021262; owner questions 358-360 built as (א); an independent review):
+  `public.sample_data_add` (last redefined in 021262) gives a business with a kit (`app.sample_kit`: the last kit key in
+  `industry_templates`, else health = clinic, education = studio; = `sampleDataKit()`) the set of `app.sample_kit_content(kit)`
+  (= `SAMPLE_KIT_CONTENT` in `src/features/setup/sample-kits.ts`, test 358; DRAFT; no medical words, tests 356/358 and unit sample-kits)
+  through `app.sample_kit_add` (no grants; its one caller checks is_admin, writable and the lock first: a new caller must too). The
+  kit's statuses, sources, pipeline and stage are matched by name with the generic choices as fallback; custom values go through
+  `app.sample_kit_fields`; with `punch_cards` one card is opened by hand through `punch_card_open` (its own seller checks) and noted in
+  `app.sample_punch_cards` (cascades with the card, so `sample_data_remove` is unchanged). `app.sample_untouched` (last redefined in
+  021261) lets the sample's own unchanged, unused card (`app.sample_punch_card_pristine`) not keep its contact. The generic set is
+  unchanged. Tests 64 and 88 end with `_sample_data_kits.sql`, `_sample_data_kits_add.sql`. The advisor's finding on
+  `app.sample_punch_cards` is expected.
 - Industry templates (FLD-05, migration 0107): `app.industry_template(key)` holds 12 templates as jsonb and mirrors
   `src/features/industry-templates/templates.ts` (test 65 keeps them equal). `public.apply_industry_template(org, industry)`
   (security definer, owner/admin, writable org) only adds what is missing (names compared with btrim), puts open stages

@@ -295,4 +295,26 @@ describe("apply_industry_template with a kit (VRT-01)", () => {
       for (const word of MEDICAL_WORDS) expect(flat, row).not.toContain(word.toLowerCase());
     }
   });
+
+  // VRT-03: the clinic's sample data (public.sample_data_add after the kit) holds no health or medical content either
+  it("the clinic's sample data holds no health or medical word", async () => {
+    const u = await createUser("kit-medical-sample");
+    const o = await createOrg(u.id);
+    await setPlan(o, { products: true, punch_cards: true });
+    await apply(u.id, o, "clinic");
+    const added = await asUser(u.id, async (q) => (await q<{ r: { kit: string } }>("select public.sample_data_add($1) as r", [o])).rows[0].r);
+    expect(added.kit).toBe("clinic");
+    const rows = await asAdmin(async (q) => {
+      const read = async (sql: string) => (await q<{ r: unknown }>(sql, [o])).rows.map((r) => JSON.stringify(r).toLowerCase());
+      return [
+        ...(await read("select to_jsonb(l) - 'id' as r from public.leads l join app.sample_records s on s.lead_id = l.id where s.organization_id = $1")),
+        ...(await read("select to_jsonb(c) - 'id' as r from public.contacts c join app.sample_records s on s.contact_id = c.id where s.organization_id = $1")),
+        ...(await read("select to_jsonb(d) - 'id' as r from public.deals d join app.sample_records s on s.deal_id = d.id where s.organization_id = $1")),
+        ...(await read("select to_jsonb(t) - 'id' as r from public.tasks t join app.sample_records s on s.task_id = t.id where s.organization_id = $1")),
+        ...(await read("select c.name as r from public.punch_cards c join app.sample_punch_cards s on s.punch_card_id = c.id where s.organization_id = $1")),
+      ];
+    });
+    expect(rows.length).toBe(9);
+    for (const row of rows) for (const word of MEDICAL_WORDS) expect(row, row).not.toContain(word.toLowerCase());
+  });
 });
