@@ -11,7 +11,8 @@ For the lead session that has the Supabase and Vercel connectors. Written 13 Nov
   - USR-11 (quiet hours), when merged: migration `20261006021276_notification_quiet_hours.sql`.
 - Independent reviews: EML-01 one full review and two delta reviews, no open finding above low (two lows accepted:
   the lease is measured from the app's clock after the claim; findings 5 and 6 of the first review, consistent with SMS).
-  USR-11 one full review, its six lows being fixed (check the branch log for "USR-11: review fixes").
+  USR-11 one full review and one delta review; its six lows fixed in "USR-11: review fixes"; two lows accepted (autumn night
+  releases an hour early; the zone lookup costs about 9 ms once per zone per transaction).
 - Local checks on EML-01's first two commits: lint, typecheck, unit 4,159, db 4,433, build, e2e all passed. Run them
   again on the final branch before applying (the lead check script with both migrations).
 - Vercel (owner, 13 November 2026): `RESEND_API_KEY` and `RESEND_FROM=noreply@mexuzsystem.com` set in Production;
@@ -55,6 +56,8 @@ For the lead session that has the Supabase and Vercel connectors. Written 13 Nov
 - Quiet hours (USR-11): time zone (business / personal), days (every day / chosen days / separate rest-day window),
   a push held over 12 hours (send / drop / urgent only), changing the window while pushes are held (keep / release),
   which kinds are held (all but system / let urgent kinds through).
+  On the autumn clock change night a window like 22:00-07:00 releases at 06:00 (the hold is never longer than the window;
+  accepted by the lead, delta review of 45f0543c): keep / never release before the wall-clock end.
 - EML-01: retry after Resend refuses the key (retry up to 5 times / end at once); an automation's email has no reply-to
   (keep / use the record owner's address); library files allowed on any card send (as (198) ב) – confirm.
 - Function region `iad1` while the database is in Ireland: every database call crosses the Atlantic; moving functions
