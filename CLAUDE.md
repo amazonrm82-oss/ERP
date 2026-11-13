@@ -875,6 +875,16 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   read own row; written only by `set_notification_settings()`). Trigger `notifications_apply_settings`
   drops a muted kind and sets `pushed_at` for a bell-only kind. `system` is never mutable; a new kind
   must be added to the table's check constraint and to `src/features/notifications/settings.ts`.
+  Quiet hours (USR-11 first part, migration 021276; an independent review and a delta review): `notification_settings.quiet_from|
+  quiet_until` (time, both or neither, ends differ, < 24:00; constraint `notification_settings_quiet`), written only through
+  `set_notification_settings(p_muted, p_no_push, p_quiet_set default false, p_quiet_from, p_quiet_until)` (the two-argument one
+  retired as `app.set_notification_settings_021276_retired`, no grants; without `p_quiet_set` stored hours are kept; hint
+  `notification_settings:quiet`). During the window, read in the notification's business zone (checked in `pg_timezone_names`, an
+  unknown zone holds nothing; remembered per transaction in `app.quiet_zone_ok`), `app.apply_notification_settings` stamps server-only
+  `notifications.push_after` = `app.quiet_hours_end(...)` (never longer than the window's length, so the autumn night releases an hour
+  early, accepted); `system` is never held; the bell is unchanged. `public.claim_push_notifications` and `app.dispatch_push` (both last
+  redefined in 021276, bodies of 020615 / 0010 but the freshness line) take a held row only after `push_after`, fresh for an hour from it
+  (index `notifications_held_push_idx`). The daily email summary waits for `digest.send`.
 - List sorting (migration 0032): computed fields `sort_status(leads)`, `sort_source(leads)`,
   `sort_owner(leads|contacts|companies)`, `sort_company(contacts)` (security invoker) are ordered by as
   PostgREST columns (`order=sort_owner`); each list's `*_SORT_COLUMNS` maps URL keys to columns.
