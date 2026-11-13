@@ -1384,6 +1384,12 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   in `src/features/landing/industries.ts`); the pictures are drawn panels filled from `SAMPLE_KIT_CONTENT`, never images. DRAFT wording,
   no prices, a link to `/#pricing`. A new kit needs its key in `INDUSTRY_PAGE_KEYS`, its copy, a thin `src/app/industries/<key>/page.tsx`
   and its exact path in the proxy. `tests/unit/industry-pages` checks the texts, metadata and component against the closed medical list.
+- Weekly review of 13 November 2026 (migration 021268; an independent review and a delta review): a converted lead's library links move to
+  its contact (trigger `leads_library_links_convert`, `app.convert_library_links`; a lead merge sends them to the kept lead's contact,
+  `app.merge_library_links`); `app.import_record_worked` counts library links, messages and prefill links; a documented recurring cycle
+  never returns to `due` while it holds a document (hint `recurring_cycle:due_document`); `app.recurring_billing_rep` takes the first usable
+  of deal, contact and company owner; `app.lead_retention_candidates` keeps a lead with a `library_viewed` or `prefill_submitted` entry or a
+  queued review request since the cutoff. All five were last redefined in 021268; tests 64 and 88 end with `_review_1113_database.sql`.
 - Recurring billing (SUB-01..05, migrations 021253-021260, one design split in eight parts so each fits one apply call; owner (269) ג, (352)-(357); an independent review and two delta reviews;
   plan key `recurring_billing` pro and business; rights `app.can_record_payments`): tables `recurring_billings`, `_lines`, `_cycles`,
   `_events`; pg_cron `crm-recurring-billings` makes a cycle, a task for the rep and a draft order (owner (352) ב; the order's owner only
@@ -2957,6 +2963,11 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   http(s) or a bare host, never a public suffix, shared host, URL shortener or big platform), allowed with its registered domain
   and every host under it, or under a shared site host only exactly (and its www). Closed lists `app.message_shared_site_host` /
   `message_url_shortener` / `message_platform_domain` / `message_file_extension` are mirrored in `service-rule.ts` between markers.
+  Since 021267 (RVW-89; an independent review) `app.jobs_record_message` (test 284's pin rechecked) also tells the owners, through
+  `app.message_send_refused`, about a job that ended failed with no provider and code `unfilled_field`, `feature_off`, `link_blocked` or
+  `link_invalid` (consent codes tell no one); `app.message_send_refusal_text` and `app.message_send_refused` (a fix sentence per reason)
+  were last redefined there; the timeline has a Hebrew line for every final composer code (`REFUSED` in `timeline-entry.ts`), and the
+  message-sending and review-request settings warn while the document settings lack the address or phone the SMS envelope needs.
   `app.message_template_problem` takes `p_own_domain` (last redefined in 021160; the 4-argument version retired, idempotently);
   re-running 021159 needs 021160 re-run after it.
   Endings and business email (migration 021161; owner (110) ב, (111) ב; two reviews): a bare domain is a link only when its last
