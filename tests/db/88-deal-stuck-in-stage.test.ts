@@ -187,6 +187,8 @@ const RERUN = [
   migrationFile("_prefill_entry_rules.sql"),
   // RVW-89 redefines app.jobs_record_message(), app.message_send_refusal_text() and app.message_send_refused() last
   migrationFile("_composer_refusal_notices.sql"),
+  // review 2026-11-13 (RVW-91..95) redefines app.import_record_worked() and app.lead_retention_candidates() last
+  migrationFile("_review_1113_database.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

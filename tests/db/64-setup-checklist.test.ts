@@ -894,6 +894,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // RVW-89 redefines app.jobs_record_message() of _review_1111_messaging.sql, app.message_send_refusal_text() of
       // _instant_reply_editable.sql and app.message_send_refused() of _service_message_send_rules.sql last
       "_composer_refusal_notices.sql",
+      // review 2026-11-13 (RVW-91..95) redefines app.import_record_worked(), app.recurring_billing_cycles_check(),
+      // app.recurring_billing_rep() and app.lead_retention_candidates() last
+      "_review_1113_database.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
