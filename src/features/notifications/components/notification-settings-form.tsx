@@ -9,7 +9,7 @@ import type { FormState } from "@/lib/action-result";
 import { submitWith } from "@/lib/use-submit";
 
 import { saveNotificationSettingsAction } from "../actions";
-import { QUIET_HOURS_DEFAULT, QUIET_HOURS_HELP, quietHoursFromRow, quietHoursSummary, type QuietHours } from "../quiet-hours";
+import { QUIET_HOURS_DEFAULT, QUIET_HOURS_HELP, quietHoursFormLine, type QuietHours } from "../quiet-hours";
 import { shownNotificationGroups, type DeliveryChoice, type NotificationSettings } from "../settings";
 
 const GROUPS = shownNotificationGroups();
@@ -88,7 +88,7 @@ export function NotificationSettingsForm({ orgId, settings, quiet }: { orgId: st
                 error={errors.quiet_until}
               />
             </div>
-            <p className="text-sm text-ink-soft">{quietHoursSummary(quietHoursFromRow(quietFrom, quietUntil))}</p>
+            <p className="text-sm text-ink-soft">{quietHoursFormLine(quietFrom, quietUntil)}</p>
           </>
         ) : null}
       </fieldset>

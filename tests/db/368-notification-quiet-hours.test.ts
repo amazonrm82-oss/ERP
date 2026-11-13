@@ -39,6 +39,21 @@ describe("the quiet window (app.quiet_hours_end)", () => {
     expect(await endOf("22:00", "07:00", "America/New_York", "2026-11-14T03:30:00Z")).toBe("2026-11-14T12:00");
   });
 
+  it("Israel's spring change: the window is an hour shorter and ends at its wall-clock end", async () => {
+    // 27 March 2026: 02:00 IST jumps to 03:00 IDT (00:00 UTC). 04:00 IDT, a 22:00-07:00 window: ends 07:00 IDT = 04:00 UTC
+    expect(await endOf("22:00", "07:00", "Asia/Jerusalem", "2026-03-27T01:00:00Z")).toBe("2026-03-27T04:00");
+    // 01:30 IST in a 01:00-03:30 window: held until 03:30 IDT (00:30 UTC), one hour, never more than the 2.5 hours
+    expect(await endOf("01:00", "03:30", "Asia/Jerusalem", "2026-03-26T23:30:00Z")).toBe("2026-03-27T00:30");
+  });
+
+  it("Israel's autumn change: never held longer than the window's own length", async () => {
+    // 25 October 2026: 02:00 IDT falls back to 01:00 IST (23:00 UTC). A 22:00-07:00 window began at 19:00 UTC: 9 hours = 04:00 UTC
+    // (its wall-clock end, 07:00 IST, would be 05:00 UTC)
+    expect(await endOf("22:00", "07:00", "Asia/Jerusalem", "2026-10-25T01:00:00Z")).toBe("2026-10-25T04:00");
+    // 01:10 IDT in a 01:00-01:30 window (the hour that repeats): 30 minutes from the arrival at most, not until 01:30 IST
+    expect(await endOf("01:00", "01:30", "Asia/Jerusalem", "2026-10-24T22:10:00Z")).toBe("2026-10-24T22:40");
+  });
+
   it("off or equal ends never hold", async () => {
     expect(await asAdmin(async (q) => (await q("select app.quiet_hours_end(null, '07:00', 'Asia/Jerusalem', now()) as e")).rows[0].e)).toBeNull();
     expect(await endOf("07:00", "07:00", "Asia/Jerusalem", "2026-11-14T05:00:00Z")).toBeNull();
@@ -47,8 +62,10 @@ describe("the quiet window (app.quiet_hours_end)", () => {
 
 describe("quiet hours on notifications and the push claim", () => {
   let owner: string, rep: string, other: string, org: string;
-  // the local wall-clock hour now in the business's zone, so the window can be put around now or away from it
-  let hour: number;
+  // the local wall-clock hour now in the business's zone, read in each test, so the window can be put around now or away
+  // from it; every window below still holds (or still misses) if the hour rolls over during the test
+  const localHour = () =>
+    asAdmin(async (q) => Number((await q<{ h: string }>("select extract(hour from now() at time zone 'Asia/Tokyo')::int as h")).rows[0].h));
 
   const pad = (h: number) => `${String(((h % 24) + 24) % 24).padStart(2, "0")}:00`;
   const setQuiet = (user: string, from: string | null, until: string | null) =>
@@ -74,13 +91,15 @@ describe("quiet hours on notifications and the push claim", () => {
       for (const user of [rep, other]) {
         await q("insert into public.push_subscriptions (user_id, endpoint, p256dh, auth) values ($1, $2, 'k', 'a')", [user, `https://push.example.test/quiet/${user}`]);
       }
-      hour = Number((await q<{ h: string }>("select extract(hour from now() at time zone 'Asia/Tokyo')::int as h")).rows[0].h);
     });
   });
 
   it("stores quiet hours only through the function; a half pair or equal ends is refused", async () => {
     expect((await pgError(setQuiet(rep, "22:00", null))).hint).toBe("notification_settings:quiet");
     expect((await pgError(setQuiet(rep, "08:00", "08:00"))).hint).toBe("notification_settings:quiet");
+    expect((await pgError(setQuiet(rep, "24:00", "07:00"))).hint).toBe("notification_settings:quiet");
+    expect((await pgError(setQuiet(rep, "22:00", "24:00"))).hint).toBe("notification_settings:quiet");
+    expect((await pgError(asAdmin((q) => q("insert into public.notification_settings (user_id, quiet_from, quiet_until) values ($1, '22:00', '24:00')", [owner]))))).toMatchObject({ code: "23514" });
     expect((await pgError(asUser(rep, (q) => q("update public.notification_settings set quiet_from = '01:00'")))).code).toBe("42501");
     expect((await pgError(asAnon((q) => q("select public.set_notification_settings('{}', '{}', true, '22:00', '07:00')")))).code).toBe("42501");
     expect((await pgError(asAdmin((q) => q("insert into public.notification_settings (user_id, quiet_from) values ($1, '01:00')", [owner]))))).toMatchObject({ code: "23514" });
@@ -98,12 +117,13 @@ describe("quiet hours on notifications and the push claim", () => {
 
   it("inside the window the bell row is made at once with the push held to the window's end; others are not held", async () => {
     // a window across midnight that holds now: from an hour ago until two hours before now (the next day)
+    const hour = await localHour();
     await setQuiet(rep, pad(hour - 1), pad(hour - 2));
     const held = await notify(rep, "task_reminder", "מוחזק");
     expect(held.pushed).toBe(false);
     expect(held.push_after).not.toBeNull();
     const span = await asAdmin(async (q) => Number((await q<{ s: string }>("select extract(epoch from (push_after - now())) / 3600 as s from public.notifications where id = $1", [held.id])).rows[0].s));
-    expect(span).toBeGreaterThan(21);
+    expect(span).toBeGreaterThan(20);
     expect(span).toBeLessThanOrEqual(23);
     // the rep's bell sees it now
     const bell = await asUser(rep, async (q) => (await q("select id from public.notifications where id = $1", [held.id])).rows);
@@ -121,6 +141,7 @@ describe("quiet hours on notifications and the push claim", () => {
   });
 
   it("outside the window nothing is held; muted and bell-only kinds keep their rules", async () => {
+    const hour = await localHour();
     await setQuiet(rep, pad(hour + 2), pad(hour + 3));
     expect((await notify(rep, "task_reminder", "מחוץ לחלון")).push_after).toBeNull();
     await asUser(rep, (q) => q("select public.set_notification_settings($1, $2, true, $3::time, $4::time)", [["automation"], ["assigned"], pad(hour - 1), pad(hour + 2)]));
@@ -133,6 +154,7 @@ describe("quiet hours on notifications and the push claim", () => {
   });
 
   it("a held push read in the bell is never pushed; one released more than an hour ago is stale", async () => {
+    const hour = await localHour();
     await setQuiet(rep, pad(hour - 1), pad(hour + 2));
     const read = await notify(rep, "task_reminder", "נקרא");
     const stale = await notify(rep, "task_reminder", "ישן");
@@ -142,6 +164,25 @@ describe("quiet hours on notifications and the push claim", () => {
       await q("update public.notifications set push_after = now() - interval '2 hours' where id = $1", [stale.id]);
     });
     expect(await claimMine([read.id, stale.id])).toEqual([]);
+  });
+
+  it("a business zone the server does not know holds nothing, and the notification is still made", async () => {
+    const hour = await localHour();
+    const odd = await createOrg(owner, "עסק אזור זמן לא מוכר");
+    const member = (await addMember(odd, owner, "member", "quiet-odd")).id;
+    await setQuiet(member, pad(hour - 1), pad(hour - 2));
+    // a stored zone from before the time zone check (the check refuses it today, so it is written past the triggers), all in one
+    // transaction that puts the zone back, so no other test ever sees it
+    const row = await asAdmin(async (q) => {
+      await q("set local session_replication_role = replica");
+      await q("update public.organizations set timezone = 'Mars/Olympus' where id = $1", [odd]);
+      await q("set local session_replication_role = origin");
+      const made = (await q<{ push_after: string | null }>("insert into public.notifications (organization_id, user_id, type, title) values ($1, $2, 'task_reminder', 'x') returning push_after", [odd, member])).rows;
+      await q("set local session_replication_role = replica");
+      await q("update public.organizations set timezone = 'Asia/Jerusalem' where id = $1", [odd]);
+      return made;
+    });
+    expect(row).toEqual([{ push_after: null }]);
   });
 
   it("the old two-argument function is out of the API; the new one is not for anon", async () => {

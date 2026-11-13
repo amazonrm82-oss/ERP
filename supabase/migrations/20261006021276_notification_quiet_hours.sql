@@ -16,8 +16,13 @@
 --   still marked pushed at once, so there is nothing to hold.
 -- * The end is fixed when the notification is created: changing or switching off quiet hours later moves nothing
 --   already held (accepted; at most one window, under 24 hours).
--- * A failure while working out the window (it should not happen: the zone is checked by organizations_timezone_check)
---   never fails the write that made the notification: the notification is then pushed as before.
+-- * The business's zone is looked up in pg_timezone_names before use (once per zone and transaction, remembered in the
+--   transaction-local setting app.quiet_zone_ok); a zone that is not there holds nothing, so the notification is pushed
+--   as before. Nothing else in the trigger can raise, so the notification's insert never fails because of quiet hours.
+-- * Clock changes: the end is the window's wall-clock end, capped so that a push is never held longer than the window's
+--   own length, counted from the window's start and from the moment the notification arrived. In the autumn change a
+--   window across it ends after its length (an hour before its wall-clock end); in the spring change it is an hour
+--   shorter and ends at its wall-clock end. Times are 00:00..23:59 ('24:00' is refused).
 -- * public.set_notification_settings gains p_quiet_set, p_quiet_from, p_quiet_until (defaults: false, null, null).
 --   Without p_quiet_set the stored quiet hours are kept, so the two-argument call of the live code keeps working and
 --   changes nothing it did not send. Adding arguments is a new signature: the two-argument function is first moved out
@@ -37,17 +42,17 @@ begin
     alter table public.notification_settings
       add constraint notification_settings_quiet check (
         (quiet_from is null) = (quiet_until is null)
-        and (quiet_from is null or quiet_from <> quiet_until));
+        and (quiet_from is null or (quiet_from <> quiet_until and quiet_from < '24:00' and quiet_until < '24:00')));
   end if;
 end;
 $$;
 
 alter table public.notifications add column if not exists push_after timestamptz;
 create index if not exists notifications_held_push_idx on public.notifications (push_after)
-  where pushed_at is null and push_after is not null;
+  where pushed_at is null and read_at is null and push_after is not null;
 
 -- The end of the quiet window that holds the instant p_at, or null when p_at is outside it (or the window is off).
--- Local wall-clock time in p_zone; [from, until), crossing midnight when from > until.
+-- Local wall-clock time in p_zone; [from, until), crossing midnight when from > until. Capped at the window's length.
 create or replace function app.quiet_hours_end(p_from time, p_until time, p_zone text, p_at timestamptz)
 returns timestamptz
 language plpgsql stable
@@ -59,22 +64,37 @@ declare
   v_day date;
   v_time time;
   v_end timestamptz;
+  v_start timestamptz;
+  v_length interval;
 begin
-  if p_from is null or p_until is null or p_from = p_until or p_at is null then
+  if p_from is null or p_until is null or p_from = p_until or p_at is null
+     or p_from >= '24:00'::time or p_until >= '24:00'::time then
     return null;
+  end if;
+  v_length := p_until - p_from;
+  if v_length < interval '0' then
+    v_length := v_length + interval '24 hours';
   end if;
   v_local := p_at at time zone v_zone;
   v_day := v_local::date;
   v_time := v_local::time;
   if p_from < p_until then
     if v_time >= p_from and v_time < p_until then
+      v_start := (v_day + p_from) at time zone v_zone;
       v_end := (v_day + p_until) at time zone v_zone;
     end if;
   elsif v_time >= p_from then
+    v_start := (v_day + p_from) at time zone v_zone;
     v_end := ((v_day + 1) + p_until) at time zone v_zone;
   elsif v_time < p_until then
+    v_start := ((v_day - 1) + p_from) at time zone v_zone;
     v_end := (v_day + p_until) at time zone v_zone;
   end if;
+  if v_end is null then
+    return null;
+  end if;
+  -- clock changes: never held longer than the window's own length, from its start or from p_at
+  v_end := least(v_end, v_start + v_length, p_at + v_length);
   -- a clock change can put the wall-clock end at or before the instant: nothing to hold then
   if v_end is null or v_end <= p_at then
     return null;
@@ -105,12 +125,18 @@ begin
   end if;
   -- USR-11: during the user's quiet hours the push waits for the window's end; the bell is not touched
   if new.pushed_at is null and new.type <> 'system' and v_from is not null and v_until is not null then
-    begin
-      select o.timezone into v_zone from public.organizations o where o.id = new.organization_id;
+    select o.timezone into v_zone from public.organizations o where o.id = new.organization_id;
+    -- a zone unknown to the server holds nothing (at time zone would raise); checked once per zone and transaction
+    if v_zone is not null and current_setting('app.quiet_zone_ok', true) is distinct from v_zone then
+      if exists (select 1 from pg_catalog.pg_timezone_names z where z.name = v_zone) then
+        perform set_config('app.quiet_zone_ok', v_zone, true);
+      else
+        v_zone := null;
+      end if;
+    end if;
+    if v_zone is not null then
       new.push_after := app.quiet_hours_end(v_from, v_until, v_zone, now());
-    exception when others then
-      new.push_after := null;
-    end;
+    end if;
   end if;
   return new;
 end;
@@ -145,7 +171,8 @@ begin
     raise exception 'two-step verification required' using errcode = '42501', hint = 'mfa:aal2_required';
   end if;
   if coalesce(p_quiet_set, false)
-     and ((p_quiet_from is null) <> (p_quiet_until is null) or p_quiet_from = p_quiet_until) then
+     and ((p_quiet_from is null) <> (p_quiet_until is null) or p_quiet_from = p_quiet_until
+          or p_quiet_from >= '24:00'::time or p_quiet_until >= '24:00'::time) then
     raise exception 'quiet hours need a start and an end that differ'
       using errcode = 'P0001', hint = 'notification_settings:quiet';
   end if;

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { parseQuietHours, quietHoursFromRow, quietHoursSummary, quietTime } from "@/features/notifications/quiet-hours";
+import { parseQuietHours, quietHoursFormLine, quietHoursFromRow, quietHoursSummary, quietTime } from "@/features/notifications/quiet-hours";
 
-// USR-11: the form's reading of quiet hours. The window itself is applied by the database (test 367).
+// USR-11: the form's reading of quiet hours. The window itself is applied by the database (test 368).
 describe("quiet hours on the notification settings form", () => {
   it("reads stored and typed times as HH:MM", () => {
     expect(quietTime("22:00:00")).toBe("22:00");
@@ -31,5 +31,12 @@ describe("quiet hours on the notification settings form", () => {
     expect(quietHoursSummary({ from: "22:00", until: "07:00" })).toContain("למחרת");
     expect(quietHoursSummary({ from: "13:00", until: "16:00" })).not.toContain("למחרת");
     expect(quietHoursSummary(null)).toBe("שעות השקט כבויות.");
+    expect(quietHoursSummary({ from: "22:00", until: "07:00" })).toContain("לפי השעון של כל עסק");
+  });
+
+  it("with the box on, equal or missing times say what is wrong instead of 'off'", () => {
+    expect(quietHoursFormLine("09:00", "09:00")).toBe("שעת הסיום צריכה להיות שונה משעת ההתחלה.");
+    expect(quietHoursFormLine("", "07:00")).toBe("בחרו שעת התחלה לשעות השקט.");
+    expect(quietHoursFormLine("22:00", "07:00")).toContain("למחרת");
   });
 });

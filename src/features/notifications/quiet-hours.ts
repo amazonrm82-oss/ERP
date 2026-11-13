@@ -47,5 +47,11 @@ export function parseQuietHours(enabled: unknown, from: unknown, until: unknown)
 export function quietHoursSummary(quiet: QuietHours): string {
   if (!quiet) return "שעות השקט כבויות.";
   const nextDay = quiet.from > quiet.until ? " למחרת" : "";
-  return `כל יום מ-${quiet.from} עד ${quiet.until}${nextDay}, לפי שעון העסק.`;
+  return `כל יום מ-${quiet.from} עד ${quiet.until}${nextDay}, לפי השעון של כל עסק.`;
+}
+
+/** The line the form shows while the box is on: the summary, or what is still missing in the two times. */
+export function quietHoursFormLine(from: unknown, until: unknown): string {
+  const parsed = parseQuietHours("on", from, until);
+  return parsed.ok ? quietHoursSummary(parsed.quiet) : parsed.message;
 }
