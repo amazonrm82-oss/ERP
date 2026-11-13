@@ -78,7 +78,7 @@ import { getSupabaseEnv } from "@/lib/env";
  *     (src/features/business-page/public-server.ts): public.business_page_public() and
  *     business_page_submit() only;
  *   - a library item sent by a tracked link (LIB-02, owner 11 November 2026)
- *     (src/features/library-links/public-server.ts): public.library_link_public() and
+ *     (src/features/library-links/public-server.ts): public.library_link_public(), library_link_public_link() and
  *     library_link_public_file() only, and a 60-second signed link to the path the latter answers;
  *   - the form that fills an existing record by a personal link (BIZ-05, owner 11 November 2026, answer (271) ב)
  *     (src/features/prefill-links/public-server.ts): public.prefill_public() and prefill_public_submit() only;

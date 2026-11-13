@@ -453,7 +453,7 @@ and build this CRM here instead. The old code is preserved on the branch
    after the lookup: 120 per link, then 60 per sender (keyed IP hash, scope `preferences`, scoped per link) in 10 minutes, shared by views
    and writes; OPS-02 shared guard first. Never framed, no-referrer, always light, generic previews. Lock order: record FOR KEY SHARE,
    link counter, blocklist lock. Staff: `public.consent_preference_link_create` (owners/admins, audited `consent_link` without the
-   token). Since 021221 (owner (250) ב, (252) ב, (253) א; lead's choice for question 254; three reviews) a link whose active token a staff member minted (`consent_preference_links.created_by`; audited `consent_link` with the actor) also re-subscribes, for 7 days from the token's creation (`app.consent_preference_staff_closed`), but only back to a consent that existed: `can_turn_on` only on an 'out' channel where `app.consent_preference_staff_relist_ok` holds (relist_ok and the run of own opt-outs began from a counting 'in', `o_had_in` of `app.consent_register_walk_full`); never on 'unknown'. Every consent written through it has source `preferences_staff_link`, and at read time such a grant ends an 'out' only while that holds (an undone import reverts it). Past 7 days, or an older token, the page answers `unsubscribe_only` (full page) with the (232) א wording. Since 021222 (owner (254) ב; one review) a staff link within its 7 days may also turn on a channel never consented ('unknown') on the record's own address when nothing locks or suppresses it (re-judged under the blocklist lock, fail closed), and a staff-link grant reads like a 'preferences' grant in the walk (the o_had_in condition and `app.consent_preference_staff_relist_ok` have no caller now); a message link turns on only from 'out' under relist_ok, never on 'unknown'. `public.consent_preference_link_for_job(job, lease)` (service_role, lease-bound, refuses service types) has NO CALLER YET;
+   token). Since 021221 (owner (250) ב, (252) ב, (253) א; lead's choice for question 254; three reviews) a link whose active token a staff member minted (`consent_preference_links.created_by`; audited `consent_link` with the actor) also re-subscribes, for 7 days from the token's creation (`app.consent_preference_staff_closed`), but only back to a consent that existed: `can_turn_on` only on an 'out' channel where `app.consent_preference_staff_relist_ok` holds (relist_ok and the run of own opt-outs began from a counting 'in', `o_had_in` of `app.consent_register_walk_full`); never on 'unknown'. Every consent written through it has source `preferences_staff_link`, and at read time such a grant ends an 'out' only while that holds (an undone import reverts it). Past 7 days, or an older token, the page answers `unsubscribe_only` (full page) with the (232) א wording. Since 021222 (owner (254) ב; one review) a staff link within its 7 days may also turn on a channel never consented ('unknown') on the record's own address when nothing locks or suppresses it (re-judged under the blocklist lock, fail closed), and a staff-link grant reads like a 'preferences' grant in the walk (the o_had_in condition and `app.consent_preference_staff_relist_ok` have no caller now); a message link turns on only from 'out' under relist_ok, never on 'unknown'. `public.consent_preference_link_for_job(job, lease)` (service_role, lease-bound, refuses service types) has its first caller in the SMS composer (021247, In use (SMS-05 sender));
    the future sender needs its own "In use" line. In the eslint allow-list. The advisor's findings on
    `consent_preference_link_create` and the three `app.consent_preference_*` tables are expected.
    In use (SGN-02, owner 9 and 10 November 2026, answers (191) א, (219) ב, (223) ב, (224) ב; migrations 021212 and 021213 (only 021213 pasted by
@@ -933,7 +933,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   customer (made by a person, imported, or contacted by a person). Caps: 200 a business day, one confirmation and (session-less) 3
   messages per address a day, by HMAC bucket (`app.meeting_confirm_buckets`, no key = nothing). Lock order: day row, then bucket. A move,
   cancel or delete cancels waiting jobs (`refused:meeting_changed`). `public.meeting_reminder_link(job, lease)` (service_role, lease-bound,
-  only for a template holding `{קישור}`) mints a new CAL-10b link per reminder: NO CALLER YET; the future sender re-reads the meeting by
+  only for a template holding `{קישור}`) mints a new CAL-10b link per reminder (first caller: the SMS composer, 021247); the future sender re-reads the meeting by
   `meeting_id` and sends nothing unless it is still planned, not a block, at the job's start with the job's customer, and needs its own
   "In use" line in hard rule 5. `app.seed_punch_card_message_templates` (reads its two marks only) was last redefined there.
 - Blocked time (GAP-07, migration 020115): `meetings.is_block` (insert-only column grant); constraint `meetings_block_shape` (no record
@@ -3076,11 +3076,11 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `sms_sender_rejected_at` + one `system` notice); effective sender `app.sms_effective_sender` (approved name, else verified number,
   else platform default). Since 021205 clients read `org_message_settings` through column select grants (not `sms_sender_approved_by`):
   a new column needs its own select grant and its place in `EXPORT_COLUMNS`. Opt-out (208, 209 ב): `public.sms_inbound_optout`
-  (service_role, NO CALLER YET; the inbound webhook needs its own "In use" line) adds the number to the business blocklist
+  (service_role; first caller `public.sms_inbound_reply`, 021248, In use (SMS-05 callbacks)) adds the number to the business blocklist
   (server-only reason `sms_reply`, hash only, outside the 100,000 cap; `consent_blocklist_add_noted` last redefined in 021203) and a
   withdrawn consent on records holding it as primary phone; whole-message match against `src/features/messaging/sms-optout-words.json`
   (mirrored by `app.sms_optout_words`, unit test); 600 opt-outs a minute per business. Since 021220 `sms_sender_verify_start` needs the `sms` key (RVW-81) and `app.jobs_record_message` (pin rechecked) skips sender-verification jobs (RVW-80). `public.sms_sender_code_issue` (service_role,
-  lease-bound) has NO CALLER YET either: the future SMS sender needs its own "In use" line in hard rule 5 for both. The advisor's
+  lease-bound) has its first caller in the SMS composer (021247, In use (SMS-05 sender)). The advisor's
   findings on `record_sms_queue`, `sms_sender_verify(_start)`, the two `platform_*sms_sender*` functions and the four new app tables
   (`sms_optout_counts`, `sms_quota_months`, `sms_quota_notices`, `sms_sender_checks`) are expected.
 - Document templates (SGN-01, migration 021200; owner (67) ג, (200) א, (201) ב, (202) ב; independent review): plan key
@@ -3258,6 +3258,8 @@ that back.
   RVW-78). A CI run on `main` that ends red with no red job is re-run before the next push, so `production` never stays behind
   quietly (RVW-87). The courier's first use (SGN-02, 021212) dropped one blank line inside `app.audit_erase_core`; the md5 check
   caught it and 021214 defined the function again unchanged (RVW-79).
+- Re-adding a `check` constraint on a growing table (a new notification kind, consent source, template field; RVW-102): add it
+  `not valid` and `validate constraint` it in a second statement, so the table is not scanned under ACCESS EXCLUSIVE.
 - A file the owner pastes in the SQL Editor may arrive with Windows line endings: compare its functions with
   `md5(replace(pg_get_functiondef(oid), chr(13), ''))` against the local build (seen 19 October 2026: FXD-06, QUO-13).
 - Courier for a large migration (owner, 4 November 2026, answer (א) with conditions): an exception to "only the lead uses the
