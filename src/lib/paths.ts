@@ -5,6 +5,10 @@ export const paths = {
   landing: "/",
   // LND-20 v2: every capability, from the landing catalog (public)
   features: "/features",
+  // VRT-02: a marketing page per industry kit (public)
+  industry: (kit: string) => `/industries/${kit}`,
+  // the landing page's price list (LND-13)
+  pricing: "/#pricing",
   home: "/app",
   login: "/login",
   loginMfa: "/login/mfa",

@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 
 import { ContactSection } from "@/features/landing/components/contact-section";
 import { FlowSection } from "@/features/landing/components/flow";
+import { IndustryLinks } from "@/features/landing/components/industry-page";
 import styles from "@/features/landing/components/landing.module.css";
 import { LANDING_ROOT_ID } from "@/features/landing/components/motion";
 import { PricingSection } from "@/features/landing/components/pricing-section";
 import { Cta, Faq, Hero, LandingFooter, LandingNav, Marquee, ProductBlocks, Quote, Steps } from "@/features/landing/components/sections";
 import { StandaloneRedirect } from "@/features/landing/components/standalone-redirect";
+import { INDUSTRY_PAGE_LINKS } from "@/features/landing/industries";
 import { readPublicPlans } from "@/features/landing/price-list-server";
 import { providerReadiness, waitingForProvider } from "@/features/landing/provider-readiness";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/app";
@@ -39,6 +41,8 @@ export default async function LandingPage() {
         <FlowSection />
         <Steps />
         <ProductBlocks />
+        {/* VRT-02: the industry pages */}
+        <IndustryLinks pages={INDUSTRY_PAGE_LINKS} />
         <PricingSection plans={plans} waiting={waiting} />
         <Quote />
         <Faq />

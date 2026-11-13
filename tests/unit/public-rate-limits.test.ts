@@ -74,6 +74,9 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
   // TRU-01: the public roadmap is a static list in the code; votes are cast inside the system
   // LND-20 v2: the list of every capability, from the landing catalog in the code
   "/features": { guard: "static", limit: "capability list from code (src/features/landing/catalog.ts)", refusal: "none" },
+  // VRT-02: the industry pages, from the kits in the code
+  "/industries/clinic": { guard: "static", limit: "industry page from code (src/features/landing/industries.ts)", refusal: "none" },
+  "/industries/studio": { guard: "static", limit: "industry page from code (src/features/landing/industries.ts)", refusal: "none" },
   "/help/roadmap": { guard: "static", limit: "roadmap from code (src/features/roadmap/public-items.ts)", refusal: "none" },
   "/legal/[doc]": { guard: "static", limit: "legal texts from code", refusal: "none" },
   "/legal/subprocessors": {

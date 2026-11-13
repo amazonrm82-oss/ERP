@@ -8,6 +8,7 @@ import { SUPPORT } from "@/lib/support";
 import { SUPPORT_PHONE } from "@/lib/support-phone";
 import logoDark from "@/assets/mexuz-logo-dark.png";
 
+import { INDUSTRY_PAGE_LINKS } from "../industries";
 import { HeroCanvas } from "./hero-canvas";
 import styles from "./landing.module.css";
 import { PauseButton } from "./pause-button";
@@ -400,6 +401,11 @@ export function LandingFooter() {
             <li>
               <Link href={paths.roadmap}>מפת דרכים</Link>
             </li>
+            {INDUSTRY_PAGE_LINKS.map((page) => (
+              <li key={page.key}>
+                <Link href={paths.industry(page.key)}>{page.label}</Link>
+              </li>
+            ))}
             {(legal.length ? legal : LEGAL_DOCUMENTS).map((doc) => (
               <li key={doc.slug}>
                 <Link href={paths.legal(doc.slug)}>{doc.title}</Link>

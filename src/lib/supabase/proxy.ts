@@ -21,7 +21,8 @@ export const SESSION_COOKIE = { secure: process.env.NODE_ENV === "production", s
 // Reached without a session at exactly these paths (no prefix match: /api/healthz or /api/health/x stay private).
 // OPS-05: the uptime check (external monitor, no session); answers only ok or not ok.
 // LND-20 v2: the public list of everything the system does (the landing page links to it).
-const PUBLIC_EXACT = ["/api/health", "/features"];
+// VRT-02: the marketing page of each industry kit.
+const PUBLIC_EXACT = ["/api/health", "/features", "/industries/clinic", "/industries/studio"];
 
 const PUBLIC_PREFIXES = [
   "/auth/",

@@ -1355,6 +1355,11 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   holds no health or medical content (test 356, closed medical word list). A template field may carry `privacy_class`, written only when a
   new field is inserted; the FLD-05 "health" template marks "קופת חולים" sensitive (350 ג); `app.industry_template` was last redefined in
   021252. The setup wizard's "ערכה או תבנית" defaults to the kit for health/education (349 א), the old template stays in the same select.
+- Industry pages (VRT-02, no migration): `/industries/clinic` and `/industries/studio` (exact public paths in `src/lib/supabase/proxy.ts`,
+  in the sitemap, OPS-02 entries "static") in the landing page's dark look. What the kit sets up comes from `INDUSTRY_KITS` (`kitSetup()`
+  in `src/features/landing/industries.ts`); the pictures are drawn panels filled from `SAMPLE_KIT_CONTENT`, never images. DRAFT wording,
+  no prices, a link to `/#pricing`. A new kit needs its key in `INDUSTRY_PAGE_KEYS`, its copy, a thin `src/app/industries/<key>/page.tsx`
+  and its exact path in the proxy. `tests/unit/industry-pages` checks the texts, metadata and component against the closed medical list.
 - Recurring billing (SUB-01..05, migrations 021253-021260, one design split in eight parts so each fits one apply call; owner (269) ג, (352)-(357); an independent review and two delta reviews;
   plan key `recurring_billing` pro and business; rights `app.can_record_payments`): tables `recurring_billings`, `_lines`, `_cycles`,
   `_events`; pg_cron `crm-recurring-billings` makes a cycle, a task for the rep and a draft order (owner (352) ב; the order's owner only
