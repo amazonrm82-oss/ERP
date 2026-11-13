@@ -526,6 +526,24 @@ and build this CRM here instead. The old code is preserved on the branch
    1,200 a minute in total; every business that texted the number through InforU in 90 days (owner (320) א), in pages of 100, through
    `public.sms_inbound_optout` (its first caller, idempotent); any limit → 503. Pinned by md5 in test 353. The advisor's findings on
    `app.sms_callback_counts` and `app.sms_inbound_number_counts` are expected.
+   In use (EML-01 sender, owner (268) א, (195) א, wave 3 use (1); migration 021275, applied and md5 checked 13 November 2026; an
+   independent review and two delta reviews): the OPS-04 worker (same route and secret) sends email through Resend
+   (`src/features/messaging/providers/resend.ts`, the ONLY reader of `RESEND_API_KEY|RESEND_FROM`; lint refuses the names elsewhere;
+   `MESSAGING_PROVIDER_EMAIL=resend`, set by the owner; without it email jobs wait unclaimed). After `job_message_may_send` it calls only
+   `public.email_job_compose()` and `public.email_quota_return()` (both service_role). The composer is a wrapper over
+   `app.email_compose_core` (no grants), the SMS composer's shape: only on the live lease the send check passed, a counted job, once per
+   lease (`app.jobs.composed_lease`), job row FOR UPDATE; stamps `app.jobs.email_counted_on`; re-reads the record FOR KEY SHARE and its
+   current email (plain shape, `app.email_address_ok`), judges consent again on it, re-reads the business (writable, HEB-09), the template
+   (`app.message_template_sendable`; a card's or rule's email never from a `notice_kind` template) and every type's FUTURE SENDER condition
+   (CAL-12, SGN-03, COL-07, PKG-03/06, SPD-04, RET-02); attachments judged again on the send day (record files of the record, private-note
+   rule for the sender; library files only on a person's card send, current file of an active valid item; `app.record_email_max_bytes()`);
+   marketing types get `app.email_marketing_subject` / `_body` (= `marketingEnvelope()`), `{קישור הסרה}` and `list_unsubscribe` (RFC 8058,
+   `/api/forms/unsub/<token>`); fill `app.sms_fill`, unfilled field refuses, `app.message_filled_problem`, subject ≤255 without control
+   characters; links minted last (second caller of `meeting_reminder_link`, `app.signature_link_issue`, `consent_preference_link_for_job`)
+   and listed in `links` so only they become clickable. Answers `{to, from_name, subject, text, reply_to, list_unsubscribe, links,
+   attachments}` or `{refused}`; `stale`, `paused`, `site_url` wait. A refusal (not stale) and `email_quota_return` give the count back once
+   (`app.email_usage_give_back`). From = `"<business name>" <RESEND_FROM>`, reply-to = the sending person's address while an active member.
+   Addresses, text and keys never logged. Pinned by md5 in test 367 (email-compose).
    In use (OPS-04, owner 26 October 2026, answer (א) and wave 3 use (1); conditions of 2 November 2026, answers (52)-(55); migration
    `_jobs_queue.sql`): the background job worker (`src/features/jobs/run-server.ts`, route `POST /api/jobs/run`, public prefix in
    `src/lib/supabase/proxy.ts`), woken by `app.wake_job_worker()` (pg_cron `crm-jobs-wake`, pg_net; `app.settings` `jobs_run_url`,
