@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
+
 // MNY-04, owner (285) ג (11 November 2026): a switch and a threshold per anomaly alert, every alert on by default with the
 // numbers of migration anomaly_alerts. Stored in public.anomaly_alert_settings (no row = these defaults; the table's column
 // defaults and app.anomaly_settings_of hold the same numbers, a unit test reads the migration). Owner (286) ב: the idle
@@ -106,11 +108,12 @@ export function quietFormWeeksText(minInquiries: number): string {
   return weeks === 1 ? "לפחות בשבוע אחד מתוך ה-4" : `לפחות ב-${weeks} מתוך 4 השבועות`;
 }
 
-/** What each alert looks for, in plain Hebrew, with the business's numbers (the settings page; the notices say the same). */
-export function anomalyRuleText(kind: AnomalyKind, settings: AnomalyAlertSettings): string {
+/** What each alert looks for, in plain Hebrew, with the business's numbers (the settings page; the notices say the same).
+ * RVW-94 (FLD-10): the leads are named in the business's own word. */
+export function anomalyRuleText(kind: AnomalyKind, settings: AnomalyAlertSettings, terms: OrgTerms = DEFAULT_TERMS): string {
   switch (kind) {
     case "lead_drop":
-      return `מקור לידים קבוע שב-7 הימים האחרונים הביא פחות מ-${100 - settings.leadDropPercent}% מהממוצע השבועי של 4 השבועות שלפניהם (ירידה של יותר מ-${settings.leadDropPercent}%).`;
+      return `מקור ${terms.lead.plural} קבוע שב-7 הימים האחרונים הביא פחות מ-${100 - settings.leadDropPercent}% מהממוצע השבועי של 4 השבועות שלפניהם (ירידה של יותר מ-${settings.leadDropPercent}%).`;
     case "idle_rep":
       return settings.idleRepDays === 1
         ? "מישהו בצוות, כולל בעלים ומנהלי מערכת, שלא עדכן אף רשומה ביום העבודה האחרון שלו. ההתראה על בעלים או מנהל מערכת נשלחת לשאר הבעלים והמנהלים."

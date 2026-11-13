@@ -15,11 +15,12 @@ import {
 } from "@/features/recurring-billing/components/billing-forms";
 import { recurringBillingsPath } from "@/features/recurring-billing/paths";
 import { getBilling, getRecurringAccess, listOfferableProducts } from "@/features/recurring-billing/queries";
-import { BILLING_STATUS_LABELS, BILLING_STATUS_TONE, CYCLE_STATUS_LABELS, EVENT_LABELS } from "@/features/recurring-billing/schema";
+import { BILLING_STATUS_LABELS, BILLING_STATUS_TONE, CYCLE_STATUS_LABELS } from "@/features/recurring-billing/schema";
 import { commitmentEnd, CYCLE_LABELS } from "@/features/recurring-billing/schedule";
-import { billingAmountText, billingDayText, nextCycleText } from "@/features/recurring-billing/texts";
+import { billingAmountText, billingDayText, billingDealRow, billingEventLabel, nextCycleText } from "@/features/recurring-billing/texts";
 import { orderPath } from "@/features/orders/paths";
 import { getOrgContext, getUserNames } from "@/features/shell/queries";
+import { getOrgTerms } from "@/features/terminology/queries";
 import { formatDate, formatDateTime, formatMoney, zoneDate } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
 
@@ -35,7 +36,7 @@ type Props = { params: Promise<{ orgId: string; billingId: string }> };
 export default async function RecurringBillingPage({ params }: Props) {
   const { orgId, billingId } = await params;
   if (!isUuid(billingId)) notFound();
-  const [detail, access, context] = await Promise.all([getBilling(orgId, billingId), getRecurringAccess(orgId), getOrgContext(orgId)]);
+  const [detail, access, context, terms] = await Promise.all([getBilling(orgId, billingId), getRecurringAccess(orgId), getOrgContext(orgId), getOrgTerms(orgId)]);
   if (!detail) notFound();
   const { billing, lines, cycles, events, documents } = detail;
   const editable = access.canManage && billing.status !== "cancelled";
@@ -86,9 +87,9 @@ export default async function RecurringBillingPage({ params }: Props) {
               <dd>{commitment ? `${billing.commitmentMonths} חודשים, עד ${formatDate(commitment)}` : "בלי התחייבות"}</dd>
               {billing.dealId ? (
                 <>
-                  <dt className="text-ink-soft">עסקה</dt>
+                  <dt className="text-ink-soft">{billingDealRow(terms).label}</dt>
                   <dd>
-                    <TextLink href={paths.deal(orgId, billing.dealId)}>העסקה שממנה נוצר</TextLink>
+                    <TextLink href={paths.deal(orgId, billing.dealId)}>{billingDealRow(terms).link}</TextLink>
                   </dd>
                 </>
               ) : null}
@@ -197,7 +198,7 @@ export default async function RecurringBillingPage({ params }: Props) {
           <ul className="space-y-2 text-sm">
             {events.map((event) => (
               <li key={event.id} className="break-words">
-                <span className="text-ink-soft">{formatDateTime(event.createdAt)}</span> · {EVENT_LABELS[event.kind] ?? event.kind}
+                <span className="text-ink-soft">{formatDateTime(event.createdAt)}</span> · {billingEventLabel(event.kind, terms)}
                 {event.kind === "price_changed" && event.oldAmount !== null && event.newAmount !== null
                   ? `: ${formatMoney(event.oldAmount)} ← ${formatMoney(event.newAmount)}`
                   : ""}

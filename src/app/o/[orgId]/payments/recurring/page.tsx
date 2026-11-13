@@ -10,7 +10,8 @@ import { recurringBillingPath } from "@/features/recurring-billing/paths";
 import { getRecurringAccess, listBillings } from "@/features/recurring-billing/queries";
 import { BILLING_STATUS_LABELS, BILLING_STATUS_TONE } from "@/features/recurring-billing/schema";
 import { monthlyAmount } from "@/features/recurring-billing/schedule";
-import { billingAmountText, nextCycleText } from "@/features/recurring-billing/texts";
+import { billingAmountText, billingsEmptyText, nextCycleText } from "@/features/recurring-billing/texts";
+import { getOrgTerms } from "@/features/terminology/queries";
 import { formatMoney } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
@@ -26,7 +27,7 @@ export default async function RecurringBillingsPage({ params }: Props) {
   const { orgId } = await params;
   const access = await getRecurringAccess(orgId);
   const back = { href: paymentsPath(orgId), label: "לכל התשלומים" };
-  const billings = await listBillings(orgId);
+  const [billings, terms] = await Promise.all([listBillings(orgId), getOrgTerms(orgId)]);
   if (!access.inPlan && billings.length === 0) {
     return (
       <>
@@ -57,7 +58,7 @@ export default async function RecurringBillingsPage({ params }: Props) {
         </CardBody>
       </Card>
       {billings.length === 0 ? (
-        <EmptyState title="אין עדיין חיובים חוזרים" description='פותחים כרטיס של איש קשר או חברה ולוחצים על "חיוב חוזר חדש".' />
+        <EmptyState title="אין עדיין חיובים חוזרים" description={billingsEmptyText(terms)} />
       ) : (
         <Card>
           <CardBody className="p-0">

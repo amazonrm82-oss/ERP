@@ -1,11 +1,12 @@
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { libraryPath } from "@/features/library/paths";
 import { getOrgContext } from "@/features/shell/queries";
+import { getOrgTerms } from "@/features/terminology/queries";
 import { formatDateTime } from "@/lib/format";
 
 import { getLibraryLinksCard } from "../queries";
 import type { LibraryRecord } from "../record";
-import { LIBRARY_CARD_TEXTS as T, viewsText } from "../texts";
+import { libraryRecipientTexts, LIBRARY_CARD_TEXTS as T, viewsText } from "../texts";
 import { LibraryLinksPanel } from "./library-links-panel";
 
 type Props = {
@@ -22,7 +23,7 @@ type Props = {
  * the business sends; the database decides the rest.
  */
 export async function LibraryLinksCard({ orgId, record, recipient, canEditRecord = false }: Props) {
-  const [data, context] = await Promise.all([getLibraryLinksCard(orgId, record, canEditRecord), getOrgContext(orgId)]);
+  const [data, context, terms] = await Promise.all([getLibraryLinksCard(orgId, record, canEditRecord), getOrgContext(orgId), getOrgTerms(orgId)]);
   const titleId = `library-links-${record.id}`;
   return (
     <Card aria-labelledby={titleId} className="print:hidden">
@@ -44,6 +45,7 @@ export async function LibraryLinksCard({ orgId, record, recipient, canEditRecord
           libraryHref={libraryPath(orgId)}
           businessName={context.org.name}
           recipient={recipient}
+          texts={libraryRecipientTexts(record.kind, terms)}
         />
       </CardBody>
     </Card>

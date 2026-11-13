@@ -1,11 +1,12 @@
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { getOrgContext } from "@/features/shell/queries";
+import { getOrgTerms } from "@/features/terminology/queries";
 import { formatDateTime } from "@/lib/format";
 
 import type { PrefillRecordType } from "../fields";
 import { prefillFormsSettingsPath } from "../paths";
 import { getRecordPrefillLinks, listPrefillForms, prefillInPlan } from "../queries";
-import { PREFILL_CARD_TEXTS as T, PREFILL_STATE_LABELS } from "../texts";
+import { PREFILL_CARD_TEXTS as T, PREFILL_STATE_LABELS, prefillRecipientTexts } from "../texts";
 import { PrefillLinksPanel } from "./prefill-links-panel";
 
 type Props = {
@@ -21,11 +22,12 @@ type Props = {
  * business already holds (an intake questionnaire, details before a meeting); the answers go into the record and its timeline.
  */
 export async function PrefillLinksCard({ orgId, record, recipient, canEditRecord = false }: Props) {
-  const [context, forms, links, inPlan] = await Promise.all([
+  const [context, forms, links, inPlan, terms] = await Promise.all([
     getOrgContext(orgId),
     listPrefillForms(orgId),
     getRecordPrefillLinks(orgId, record.kind, record.id),
     prefillInPlan(orgId),
+    getOrgTerms(orgId),
   ]);
   const titleId = `prefill-links-${record.id}`;
   return (
@@ -48,6 +50,7 @@ export async function PrefillLinksCard({ orgId, record, recipient, canEditRecord
           settingsHref={prefillFormsSettingsPath(orgId)}
           businessName={context.org.name}
           recipient={recipient}
+          texts={prefillRecipientTexts(record.kind, terms)}
         />
       </CardBody>
     </Card>

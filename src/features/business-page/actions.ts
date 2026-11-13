@@ -7,12 +7,15 @@ import { actionContext } from "@/lib/action-context";
 import { fail, formValues, invalid, ok, type ActionResult, type FormState } from "@/lib/action-result";
 import { dbErrorMessage, NOT_FOUND_OR_FORBIDDEN } from "@/lib/errors";
 import { isUuid } from "@/lib/paths";
+import { getOrgTerms } from "@/features/terminology/queries";
 import { optionalText } from "@/lib/validation";
 
 import { MAX_ABOUT, MAX_PAGE_BOOKINGS, routingColumns } from "./model";
 import { businessPageSettingsPath } from "./paths";
+import { businessPageTexts } from "./texts";
 
-const schema = z.object({
+// RVW-94: the "pick a person" message names the leads in the business's words
+const schemaFor = (ownerMissing: string) => z.object({
   about: optionalText(MAX_ABOUT, "התיאור ארוך מדי (עד 1,000 תווים)."),
   is_active: z.boolean(),
   show_phone: z.boolean(),
@@ -25,7 +28,7 @@ const schema = z.object({
   owner_user_id: z.string().refine(isUuid).nullable(),
   team_id: z.string().refine(isUuid).nullable(),
 }).superRefine((v, ctx) => {
-  if (v.routing === "person" && !v.owner_user_id) ctx.addIssue({ code: "custom", path: ["owner_user_id"], message: "בחרו מי יקבל את הלידים." });
+  if (v.routing === "person" && !v.owner_user_id) ctx.addIssue({ code: "custom", path: ["owner_user_id"], message: ownerMissing });
   if (v.routing === "team" && !v.team_id) ctx.addIssue({ code: "custom", path: ["team_id"], message: "בחרו צוות." });
 });
 
@@ -38,6 +41,7 @@ export async function saveBusinessPageAction(orgId: string, _prev: FormState, fo
   const context = await actionContext(orgId);
   if (!context.ok) return context;
   const on = (name: string) => formData.get(name) === "on";
+  const schema = schemaFor(businessPageTexts(await getOrgTerms(orgId)).ownerMissing);
   const parsed = schema.safeParse({
     about: formData.get("about"),
     is_active: on("is_active"),

@@ -17,12 +17,12 @@ type Props = {
   orgId: string;
   forms: PrefillFormItem[];
   choices: Record<PrefillRecordType, PrefillChoice[]>;
+  // the record types' names in the business's words (prefillRecordLabels, read on the server; RVW-94)
+  recordLabels: Record<PrefillRecordType, string>;
 };
 
-const RECORD_LABELS: Record<PrefillRecordType, string> = { lead: "ליד", contact: "איש קשר" };
-
 /** BIZ-05: the business's prefill form templates: each one's name, what the customer sees, and the fields it asks. */
-export function PrefillFormsEditor({ orgId, forms, choices }: Props) {
+export function PrefillFormsEditor({ orgId, forms, choices, recordLabels }: Props) {
   const [adding, setAdding] = useState(false);
   return (
     <div className="space-y-4">
@@ -30,13 +30,13 @@ export function PrefillFormsEditor({ orgId, forms, choices }: Props) {
       <ul className="space-y-3">
         {forms.map((form) => (
           <li key={form.id}>
-            <TemplateItem orgId={orgId} form={form} choices={choices[form.recordType]} />
+            <TemplateItem orgId={orgId} form={form} choices={choices[form.recordType]} recordLabels={recordLabels} />
           </li>
         ))}
       </ul>
       {adding ? (
         <div className="rounded-md border border-line bg-canvas p-3">
-          <TemplateForm orgId={orgId} choices={choices} onDone={() => setAdding(false)} />
+          <TemplateForm orgId={orgId} choices={choices} recordLabels={recordLabels} onDone={() => setAdding(false)} />
         </div>
       ) : (
         <Button variant="secondary" onClick={() => setAdding(true)}>
@@ -47,7 +47,7 @@ export function PrefillFormsEditor({ orgId, forms, choices }: Props) {
   );
 }
 
-function TemplateItem({ orgId, form, choices }: { orgId: string; form: PrefillFormItem; choices: PrefillChoice[] }) {
+function TemplateItem({ orgId, form, choices, recordLabels }: { orgId: string; form: PrefillFormItem; choices: PrefillChoice[]; recordLabels: Record<PrefillRecordType, string> }) {
   const [editing, setEditing] = useState(false);
   const router = useRouter();
   const labels = new Map(choices.map((c) => [c.key, c.label]));
@@ -56,7 +56,7 @@ function TemplateItem({ orgId, form, choices }: { orgId: string; form: PrefillFo
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-md font-medium break-words">
           {form.name}
-          <span className="ms-2 text-sm text-ink-soft">({RECORD_LABELS[form.recordType]})</span>
+          <span className="ms-2 text-sm text-ink-soft">({recordLabels[form.recordType]})</span>
         </p>
         <div className="flex flex-wrap items-center gap-2">
           {form.draftWording ? <Badge tone="warning">נוסח טיוטה</Badge> : null}
@@ -64,7 +64,7 @@ function TemplateItem({ orgId, form, choices }: { orgId: string; form: PrefillFo
         </div>
       </div>
       {editing ? (
-        <TemplateForm orgId={orgId} form={form} choices={{ [form.recordType]: choices } as Record<PrefillRecordType, PrefillChoice[]>} onDone={() => setEditing(false)} />
+        <TemplateForm orgId={orgId} form={form} choices={{ [form.recordType]: choices } as Record<PrefillRecordType, PrefillChoice[]>} recordLabels={recordLabels} onDone={() => setEditing(false)} />
       ) : (
         <>
           <p className="text-sm text-ink-soft break-words">השדות: {form.fields.map((key) => labels.get(key) ?? "שדה שאינו זמין").join(", ")}</p>
@@ -93,11 +93,13 @@ function TemplateForm({
   orgId,
   form,
   choices,
+  recordLabels,
   onDone,
 }: {
   orgId: string;
   form?: PrefillFormItem;
   choices: Record<PrefillRecordType, PrefillChoice[]>;
+  recordLabels: Record<PrefillRecordType, string>;
   onDone: () => void;
 }) {
   const router = useRouter();
@@ -142,8 +144,8 @@ function TemplateForm({
             setPicked([]);
           }}
         >
-          <option value="contact">איש קשר</option>
-          <option value="lead">ליד</option>
+          <option value="contact">{recordLabels.contact}</option>
+          <option value="lead">{recordLabels.lead}</option>
         </SelectField>
       )}
       <TextField label="כותרת שהלקוח רואה" name="title" required maxLength={120} defaultValue={form?.title ?? ""} />

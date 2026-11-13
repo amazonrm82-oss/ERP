@@ -11,10 +11,11 @@ import type { FormState } from "@/lib/action-result";
 import { saveReviewRequestSettingsAction } from "../actions";
 import { REVIEW_DELAY_MAX, type ReviewRequestSettings } from "../review-url";
 
-type Props = { orgId: string; settings: ReviewRequestSettings; inPlan: boolean };
+// dealWonLabel: the "won deal" choice in the business's words (reviewDealWonLabel, read on the server; RVW-94)
+type Props = { orgId: string; settings: ReviewRequestSettings; inPlan: boolean; dealWonLabel: string };
 
 /** RET-02: the business's review requests. Owners and admins of a writable business. */
-export function ReviewRequestSettingsForm({ orgId, settings, inPlan }: Props) {
+export function ReviewRequestSettingsForm({ orgId, settings, inPlan, dealWonLabel }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(saveReviewRequestSettingsAction.bind(null, orgId), null);
   const failure = state && !state.ok ? state : null;
   const errors = failure?.fieldErrors ?? {};
@@ -47,7 +48,7 @@ export function ReviewRequestSettingsForm({ orgId, settings, inPlan }: Props) {
           />
           <fieldset className="space-y-3">
             <legend className="text-sm font-medium text-ink">מתי לשלוח</legend>
-            <Checkbox name="on_deal_won" label="אחרי שעסקה נסגרה בהצלחה" defaultChecked={checked("on_deal_won", settings.onDealWon)} />
+            <Checkbox name="on_deal_won" label={dealWonLabel} defaultChecked={checked("on_deal_won", settings.onDealWon)} />
             <Checkbox name="on_meeting_held" label="אחרי פגישה שהתקיימה" defaultChecked={checked("on_meeting_held", settings.onMeetingHeld)} />
             {errors.on_deal_won ? <p className="text-sm text-danger">{errors.on_deal_won}</p> : null}
           </fieldset>

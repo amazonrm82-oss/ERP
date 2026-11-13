@@ -46,7 +46,7 @@ export const EVENT_LABELS: Record<string, string> = {
   cycles_skipped: "מחזורים שלא נוצרו בזמן שהחיוב לא יכול היה לרוץ",
   no_lines: "לא נוצר מחזור: אין שורות בחיוב",
   order_not_made: "לא נוצרה טיוטת הזמנה למחזור (המשימה נוצרה)",
-  deal_unlinked: "הקישור לעסקה הוסר: העסקה מוזגה לעסקה של לקוח אחר",
+  // deal_unlinked: billingEventLabel() in ./texts.ts, which names the deal in the business's words (RVW-94)
 };
 
 const text = z.preprocess((value) => (typeof value === "string" ? value.trim() : ""), z.string());

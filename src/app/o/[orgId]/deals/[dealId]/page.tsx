@@ -65,6 +65,7 @@ import { editFocusParam } from "@/features/data-quality/completeness";
 import { CompletenessCard } from "@/features/data-quality/components/completeness-card";
 import { DealLinesCard } from "@/features/deal-lines/components/deal-lines-card";
 import { BillingFromDealButton } from "@/features/recurring-billing/components/billing-forms";
+import { billingFromDealTexts } from "@/features/recurring-billing/texts";
 import { recurringBillingPath } from "@/features/recurring-billing/paths";
 import { getDealBillingId, getRecurringAccess } from "@/features/recurring-billing/queries";
 import { RecordQuotesCard } from "@/features/quotes/components/record-quotes-card";
@@ -209,7 +210,7 @@ export default async function DealPage({ params, searchParams }: Props) {
                 החיוב החוזר
               </TextLink>
             ) : recurringAccess.canManage && deal.status === "won" && hasRecurringLines ? (
-              <BillingFromDealButton orgId={orgId} dealId={deal.id} />
+              <BillingFromDealButton orgId={orgId} dealId={deal.id} texts={billingFromDealTexts(terms)} />
             ) : null}
             {context.canWrite ? <ManualAutomationsButton orgId={orgId} entity="deal" recordId={deal.id} /> : null}
             {/* EML-02: an email to the customer from a template, with the record's and the library's files; its reads wait in

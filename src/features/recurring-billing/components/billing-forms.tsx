@@ -348,17 +348,17 @@ export function SkipCycleButton({ orgId, billingId, cycleId, skipped }: { orgId:
   );
 }
 
-/** SUB-03: one click from a won deal with recurring lines. */
-export function BillingFromDealButton({ orgId, dealId }: { orgId: string; dealId: string }) {
+/** SUB-03: one click from a won deal with recurring lines. `texts` = billingFromDealTexts(terms), read on the server (RVW-94). */
+export function BillingFromDealButton({ orgId, dealId, texts }: { orgId: string; dealId: string; texts: { title: string; description: string; button: string } }) {
   return (
     <ConfirmButton
       variant="secondary"
-      title="ליצור חיוב חוזר מהעסקה?"
-      description="השורות החוזרות של העסקה מועתקות לחיוב חוזר חדש של הלקוח, עם המחירים שלהן. בכל מחזור תיווצר משימה להפקת מסמך."
+      title={texts.title}
+      description={texts.description}
       confirmLabel="יצירה"
       action={() => createBillingFromDealAction(orgId, dealId)}
     >
-      חיוב חוזר מהעסקה
+      {texts.button}
     </ConfirmButton>
   );
 }

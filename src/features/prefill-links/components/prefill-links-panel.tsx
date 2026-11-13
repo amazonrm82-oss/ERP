@@ -10,7 +10,7 @@ import { Input, Label, Select } from "@/components/ui/field";
 
 import { createPrefillLinkAction, revokePrefillLinkAction } from "../actions";
 import type { PrefillRecordType } from "../fields";
-import { PREFILL_CARD_TEXTS as T, prefillWhatsappHref } from "../texts";
+import { PREFILL_CARD_TEXTS as T, prefillWhatsappHref, type PrefillRecipientTexts } from "../texts";
 
 export type PanelPrefillLink = { id: string; formName: string; meta: string; state: string; canRevoke: boolean };
 
@@ -24,13 +24,15 @@ type Props = {
   settingsHref: string;
   businessName: string;
   recipient: { name: string | null; phoneE164: string | null };
+  // who gets the link, in the business's words (prefillRecipientTexts, read on the server; RVW-94)
+  texts: PrefillRecipientTexts;
 };
 
 /**
  * BIZ-05: make a personal link to a prefill form. The link is shown once, right after it is made (only its hash is kept):
  * copy it or send it then. The list shows every link of the record and its state.
  */
-export function PrefillLinksPanel({ orgId, record, canSend, notInPlan, forms, links, settingsHref, businessName, recipient }: Props) {
+export function PrefillLinksPanel({ orgId, record, canSend, notInPlan, forms, links, settingsHref, businessName, recipient, texts }: Props) {
   const router = useRouter();
   const selectId = useId();
   const inputId = useId();
@@ -108,7 +110,7 @@ export function PrefillLinksPanel({ orgId, record, canSend, notInPlan, forms, li
           </p>
         ) : (
           <div className="space-y-3">
-            <p className="text-sm text-ink-soft">{T.intro}</p>
+            <p className="text-sm text-ink-soft">{texts.intro}</p>
             <div className="flex flex-wrap items-end gap-2">
               <div className="min-w-0 flex-1 basis-48">
                 <Label htmlFor={selectId}>{T.pick}</Label>
@@ -149,7 +151,7 @@ export function PrefillLinksPanel({ orgId, record, canSend, notInPlan, forms, li
                   <ConfirmButton
                     size="sm"
                     title={T.revokeTitle}
-                    description={T.revokeText}
+                    description={texts.revokeText}
                     confirmLabel={T.revoke}
                     action={revokePrefillLinkAction.bind(null, orgId, record.kind, record.id, link.id)}
                     onDone={() => router.refresh()}

@@ -10,6 +10,7 @@ import type { FormState } from "@/lib/action-result";
 import { saveBusinessPageAction } from "../actions";
 import { MAX_ABOUT, MAX_PAGE_BOOKINGS, type PageRouting } from "../model";
 import type { BusinessPageSettings } from "../queries";
+import type { BusinessPageTexts } from "../texts";
 
 export type BookingChoice = { id: string; title: string; repName: string; isActive: boolean };
 export type RoutingOption = { id: string; name: string };
@@ -22,6 +23,7 @@ export function BusinessPageEditor({
   source,
   members,
   teams,
+  texts,
 }: {
   orgId: string;
   page: BusinessPageSettings | null;
@@ -29,6 +31,8 @@ export function BusinessPageEditor({
   source: { phone: string | null; website: string | null; hasHours: boolean };
   members: RoutingOption[];
   teams: RoutingOption[];
+  // the lead words in the business's terms (businessPageTexts, read on the server; RVW-94)
+  texts: BusinessPageTexts;
 }) {
   const [state, formAction] = useActionState<FormState, FormData>(saveBusinessPageAction.bind(null, orgId), null);
   const failure = state && !state.ok ? state : null;
@@ -63,22 +67,22 @@ export function BusinessPageEditor({
         <Checkbox name="show_whatsapp" label="כפתור WhatsApp (לטלפון העסק)" hint={missing(source.phone, "אין טלפון בפרטי העסק.")} defaultChecked={page?.showWhatsapp ?? true} />
         <Checkbox name="show_website" label="אתר העסק" hint={missing(source.website, "אין אתר בפרטי העסק.")} defaultChecked={page?.showWebsite ?? true} />
         <Checkbox name="show_hours" label="שעות פעילות (שעות העבודה של העסק)" hint={missing(source.hasHours, "לא הוגדרו שעות עבודה לעסק.")} defaultChecked={page?.showHours ?? true} />
-        <Checkbox name="show_form" label='טופס "צרו קשר" (כל פנייה נכנסת כליד)' defaultChecked={page?.showForm ?? true} />
+        <Checkbox name="show_form" label={texts.showForm} defaultChecked={page?.showForm ?? true} />
       </fieldset>
       <fieldset className="space-y-3 rounded-md border border-line p-3">
-        <legend className="px-1 text-md font-medium">למי הולכים הלידים מהטופס</legend>
+        <legend className="px-1 text-md font-medium">{texts.routingLegend}</legend>
         <div className="space-y-2">
-          {routingChoice("default", "לפי חלוקת הלידים של העסק")}
+          {routingChoice("default", texts.routingDefault)}
           {routingChoice("person", "לאדם אחד")}
           {routingChoice("team", "לצוות אחד")}
         </div>
         {routing === "person" ? (
           <SelectField
-            label="מי מקבל את הלידים"
+            label={texts.ownerLabel}
             name="owner_user_id"
             defaultValue={values?.owner_user_id ?? page?.ownerUserId ?? ""}
             error={failure?.fieldErrors?.owner_user_id}
-            hint="בחופשה הליד עובר לממלא המקום. בלי ממלא מקום זמין הליד נשאר בלי אחראי, והבעלים ומנהלי המערכת מקבלים התראה. אם האדם יעזוב או יהפוך לצופה, הלידים יחזרו לחלוקה של העסק."
+            hint={texts.ownerHint}
           >
             <option value="">בחרו</option>
             {members.map((m) => (
@@ -89,7 +93,7 @@ export function BusinessPageEditor({
           </SelectField>
         ) : null}
         {routing === "team" ? (
-          <SelectField label="איזה צוות" name="team_id" defaultValue={values?.team_id ?? page?.teamId ?? ""} error={failure?.fieldErrors?.team_id} hint="הלידים מתחלקים בין חברי הצוות.">
+          <SelectField label="איזה צוות" name="team_id" defaultValue={values?.team_id ?? page?.teamId ?? ""} error={failure?.fieldErrors?.team_id} hint={texts.teamHint}>
             <option value="">בחרו</option>
             {teams.map((t) => (
               <option key={t.id} value={t.id}>

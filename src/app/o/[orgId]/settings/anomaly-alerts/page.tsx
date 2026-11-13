@@ -7,6 +7,7 @@ import { getAnomalyAlertSettings } from "@/features/anomaly-alerts/queries";
 import { anomalyRuleText, type AnomalyKind } from "@/features/anomaly-alerts/settings";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
+import { getOrgTerms } from "@/features/terminology/queries";
 
 export const metadata: Metadata = { title: "התראות חריגה" };
 
@@ -23,7 +24,7 @@ const KINDS: ReadonlyArray<{ kind: AnomalyKind; label: string; on: "leadDropOn" 
 export default async function AnomalyAlertSettingsPage({ params }: Props) {
   const { orgId } = await params;
   const { role, canWrite } = await getOrgContext(orgId);
-  const settings = await getAnomalyAlertSettings(orgId);
+  const [settings, terms] = await Promise.all([getAnomalyAlertSettings(orgId), getOrgTerms(orgId)]);
   const editable = isAdminRole(role) && canWrite;
 
   const rules = (
@@ -32,7 +33,7 @@ export default async function AnomalyAlertSettingsPage({ params }: Props) {
       <CardBody>
         <DetailList>
           {KINDS.map(({ kind, label, on }) => (
-            <Detail key={kind} label={label} value={settings[on] ? anomalyRuleText(kind, settings) : "כבויה"} />
+            <Detail key={kind} label={label} value={settings[on] ? anomalyRuleText(kind, settings, terms) : "כבויה"} />
           ))}
         </DetailList>
         <p className="mt-4 text-sm text-ink-soft">

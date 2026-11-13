@@ -11,7 +11,7 @@ import { Input, Label, Select } from "@/components/ui/field";
 import { createLibraryLinkAction, revokeLibraryLinkAction } from "../actions";
 import type { LibraryRecord } from "../record";
 import { libraryMailtoHref, libraryWhatsappHref } from "../share";
-import { LIBRARY_CARD_TEXTS as T } from "../texts";
+import { LIBRARY_CARD_TEXTS as T, type LibraryRecipientTexts } from "../texts";
 
 export type PanelLink = {
   id: string;
@@ -32,13 +32,15 @@ type Props = {
   libraryHref: string;
   businessName: string;
   recipient: { name: string | null; phoneE164: string | null; email: string | null };
+  // who gets the link, in the business's words (libraryRecipientTexts, read on the server; RVW-94)
+  texts: LibraryRecipientTexts;
 };
 
 /**
  * LIB-02: send a library item by a personal tracked link. The link is shown once, right after it is made (only its hash is
  * kept): copy it or send it then. The list below shows every link sent to the record and when the customer opened it.
  */
-export function LibraryLinksPanel({ orgId, record, canWrite, offerable, links, libraryHref, businessName, recipient }: Props) {
+export function LibraryLinksPanel({ orgId, record, canWrite, offerable, links, libraryHref, businessName, recipient, texts }: Props) {
   const router = useRouter();
   const selectId = useId();
   const inputId = useId();
@@ -83,7 +85,7 @@ export function LibraryLinksPanel({ orgId, record, canWrite, offerable, links, l
               {T.linkLabel}: <bdi>{made.title}</bdi>
             </Label>
             <Input id={inputId} dir="ltr" readOnly value={made.url} onFocus={(event) => event.currentTarget.select()} className="font-mono text-sm" />
-            <p className="text-sm text-ink-soft">{T.shownOnce}</p>
+            <p className="text-sm text-ink-soft">{texts.shownOnce}</p>
             <div className="flex flex-wrap gap-2">
               <a
                 className={buttonClasses("secondary", "sm")}
@@ -121,7 +123,7 @@ export function LibraryLinksPanel({ orgId, record, canWrite, offerable, links, l
           </p>
         ) : (
           <div className="space-y-3">
-            <p className="text-sm text-ink-soft">{T.intro}</p>
+            <p className="text-sm text-ink-soft">{texts.intro}</p>
             <div className="flex flex-wrap items-end gap-2">
               <div className="min-w-0 flex-1 basis-48">
                 <Label htmlFor={selectId}>{T.pick}</Label>
@@ -163,7 +165,7 @@ export function LibraryLinksPanel({ orgId, record, canWrite, offerable, links, l
                   <ConfirmButton
                     size="sm"
                     title={T.revokeTitle}
-                    description={T.revokeText}
+                    description={texts.revokeText}
                     confirmLabel={T.revoke}
                     action={revokeLibraryLinkAction.bind(null, orgId, record, link.id)}
                     onDone={() => router.refresh()}

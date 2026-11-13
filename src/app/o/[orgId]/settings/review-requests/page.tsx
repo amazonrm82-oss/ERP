@@ -9,11 +9,13 @@ import { messageTemplatesPath } from "@/features/message-templates/paths";
 import { ReviewRequestSettingsForm } from "@/features/review-requests/components/review-request-settings-form";
 import { getReviewRequestSettings, hasActiveReviewTemplate } from "@/features/review-requests/queries";
 import { REVIEW_REQUEST_GAP_DAYS } from "@/features/review-requests/review-url";
+import { reviewDealWonLabel, reviewHowItWorks, reviewOnlySince } from "@/features/review-requests/texts";
 import { qrExternalBlocked } from "@/features/qr-codes/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { orgHasFeature } from "@/features/settings/queries";
 import { sendingPauseSettingsPath } from "@/features/sending-pause/paths";
 import { getOrgContext } from "@/features/shell/queries";
+import { getOrgTerms } from "@/features/terminology/queries";
 import { SUPPORT } from "@/lib/support";
 
 export const metadata: Metadata = { title: "בקשת ביקורת" };
@@ -23,7 +25,7 @@ type Props = { params: Promise<{ orgId: string }> };
 // RET-02: a request for a review (Google, Facebook, easy, Zap or any https link; owner (307) ב) after a won deal or a held meeting. Everyone reads; owners and admins change.
 export default async function ReviewRequestSettingsPage({ params }: Props) {
   const { orgId } = await params;
-  const [{ role, canWrite }, settings, inPlan, hasTemplate, externalOff, smsInPlan, smsMissing] = await Promise.all([
+  const [{ role, canWrite }, settings, inPlan, hasTemplate, externalOff, smsInPlan, smsMissing, terms] = await Promise.all([
     getOrgContext(orgId),
     getReviewRequestSettings(orgId),
     orgHasFeature(orgId, "review_requests"),
@@ -31,6 +33,7 @@ export default async function ReviewRequestSettingsPage({ params }: Props) {
     qrExternalBlocked(orgId),
     orgHasFeature(orgId, "sms"),
     getMarketingSmsMissing(orgId),
+    getOrgTerms(orgId),
   ]);
   // RVW-89: a review request by SMS carries the marketing sender line, which needs the business's address and phone
   const smsDetails = inPlan && smsInPlan ? <MarketingSmsDetailsNotice orgId={orgId} missing={smsMissing} /> : null;
@@ -55,10 +58,7 @@ export default async function ReviewRequestSettingsPage({ params }: Props) {
     <Card aria-labelledby="review-requests-rules-title">
       <CardHeader id="review-requests-rules-title" title="איך זה עובד" />
       <CardBody className="space-y-3 text-sm">
-        <p>
-          כמה ימים אחרי שעסקה נסגרה בהצלחה, או אחרי פגישה שהתקיימה, הלקוח מקבל הודעה עם הקישור לדף הביקורות של העסק (ב-Google, בפייסבוק, ב-easy, בזאפ או בכל אתר אחר). ההודעה יוצאת לאיש הקשר של
-          העסקה או של הפגישה, ואם לפגישה יש רק ליד, לליד: בערוץ המועדף שלו, ואם אין, ב-SMS או באימייל. כל לקוח מקבל בקשה אחת לכל היותר ב-{REVIEW_REQUEST_GAP_DAYS} יום.
-        </p>
+        <p>{reviewHowItWorks(terms, REVIEW_REQUEST_GAP_DAYS)}</p>
         <p>
           כל לקוח מקבל את אותה הבקשה. המערכת לא שואלת קודם אם הלקוח מרוצה ולא בוחרת למי לשלוח לפי זה, כי הכללים של Google אוסרים לבקש ביקורות רק
           מלקוחות מרוצים.
@@ -68,7 +68,7 @@ export default async function ReviewRequestSettingsPage({ params }: Props) {
           הודעות השיווק, יוצאת רק בשעות השליחה, ולא יוצאת בזמן ש<TextLink href={sendingPauseSettingsPath(orgId)}>השליחה ללקוחות עצורה</TextLink>.
         </p>
         <p>
-          הבקשה נשלחת רק על עסקאות ופגישות מהרגע שהפעלתם, לא על מה שהיה לפני. את הנוסח משנים ב<TextLink href={messageTemplatesPath(orgId)}>תבניות ההודעה</TextLink>{" "}
+          {reviewOnlySince(terms)} את הנוסח משנים ב<TextLink href={messageTemplatesPath(orgId)}>תבניות ההודעה</TextLink>{" "}
           (&quot;בקשת ביקורת&quot;); תבנית שכובתה לא נשלחת.
         </p>
         {inPlan ? null : <p className="text-ink-soft">בקשת ביקורת לא כלולה בחבילה של העסק, ולכן לא נשלחות בקשות.</p>}
@@ -82,7 +82,7 @@ export default async function ReviewRequestSettingsPage({ params }: Props) {
         {externalNotice}
         {noTemplate}
         {smsDetails}
-        <ReviewRequestSettingsForm orgId={orgId} settings={settings} inPlan={inPlan} />
+        <ReviewRequestSettingsForm orgId={orgId} settings={settings} inPlan={inPlan} dealWonLabel={reviewDealWonLabel(terms)} />
         {rules}
       </div>
     );

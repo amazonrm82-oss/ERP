@@ -5,8 +5,10 @@ import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import { PrefillFormsEditor } from "@/features/prefill-links/components/prefill-forms-editor";
 import { prefillChoices } from "@/features/prefill-links/fields";
 import { listPrefillForms, prefillInPlan } from "@/features/prefill-links/queries";
+import { prefillRecordLabels } from "@/features/prefill-links/texts";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
+import { getOrgTerms } from "@/features/terminology/queries";
 
 export const metadata: Metadata = { title: "טפסי השלמת פרטים" };
 
@@ -30,11 +32,12 @@ export default async function PrefillFormsSettings({ params }: Props) {
       </Card>
     );
   }
-  const [forms, leadFields, contactFields, inPlan] = await Promise.all([
+  const [forms, leadFields, contactFields, inPlan, terms] = await Promise.all([
     listPrefillForms(orgId),
     listFieldDefinitions(orgId, "lead"),
     listFieldDefinitions(orgId, "contact"),
     prefillInPlan(orgId),
+    getOrgTerms(orgId),
   ]);
   return (
     <Card aria-labelledby="prefill-title">
@@ -54,6 +57,7 @@ export default async function PrefillFormsSettings({ params }: Props) {
             orgId={orgId}
             forms={forms}
             choices={{ lead: prefillChoices("lead", leadFields), contact: prefillChoices("contact", contactFields) }}
+            recordLabels={prefillRecordLabels(terms)}
           />
         ) : (
           <p className="text-md text-ink-soft">העסק במצב קריאה בלבד, ולכן אי אפשר לשנות את הטפסים כרגע.</p>
