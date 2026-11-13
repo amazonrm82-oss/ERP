@@ -15,8 +15,8 @@
 -- * RVW-93 (SUB): app.recurring_billing_rep takes the first USABLE of the deal's owner, the contact's owner and the
 --   company's owner (active, full seat, not a viewer), then the business's owner, else its oldest admin.
 -- * RVW-95 (PRV-01): app.lead_retention_candidates (021212's body) also keeps a lead that opened a library link or sent
---   back a prefill form since the cutoff (system entries library_viewed / prefill_submitted), or that was queued a review
---   request since the cutoff (app.review_requests, outcome 'queued').
+--   back a prefill form since the cutoff (system entries library_viewed / prefill_submitted). A review request sent to the
+--   lead keeps nothing: only the lead's own action does (owner (371) ב, 13 November 2026).
 --
 -- Safe to run twice. No drop statement, no delete.
 
@@ -378,11 +378,7 @@ AS $function$
      and not exists (select 1 from public.activities a
                       where a.organization_id = p_org and a.lead_id = l.id and a.type = 'system'
                         and coalesce(a.metadata ->> 'kind', '') in ('library_viewed', 'prefill_submitted')
-                        and a.created_at >= p_cutoff)
-     -- RVW-95: a review request queued to the lead since the cutoff (RET-02)
-     and not exists (select 1 from app.review_requests rr
-                      where rr.organization_id = p_org and rr.lead_id = l.id
-                        and rr.outcome = 'queued' and rr.created_at >= p_cutoff);
+                        and a.created_at >= p_cutoff);
 $function$;
 revoke all on function app.lead_retention_candidates(uuid, timestamptz, uuid) from public, anon, authenticated, service_role;
 

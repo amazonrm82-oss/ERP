@@ -1,3 +1,6 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { addMember, asAdmin, asUser, closePool, createOrg, createUser, defaultPipeline, insertLead, pgError, type Query } from "./helpers";
@@ -10,7 +13,7 @@ type U = { id: string; email: string };
  * The low database findings of the weekly review of 13 November 2026 (migration _review_1113_database.sql):
  * RVW-90 a converted lead's library links follow it to its contact; RVW-91 a library link, a message or a prefill link is
  * work for import undo; RVW-92 a cycle with a document does not go back to 'due' by its status alone; RVW-93 the rep of a
- * recurring billing is the first usable owner; RVW-95 the retention policy keeps a lead the customer engaged with.
+ * recurring billing is the first usable owner; RVW-95 the retention policy keeps a lead that acted (opened a link, sent back a form).
  */
 describe("review 2026-11-13 database fixes", () => {
   let owner: U, member: U, away: U;
@@ -64,6 +67,28 @@ describe("review 2026-11-13 database fixes", () => {
     expect(rows.find((r) => r.id === l2)).toMatchObject({ lead_id: other, contact_id: null });
     // the contact's card reads it now (the activities rule)
     expect(await asUser(owner.id, async (q) => (await q("select 1 from public.library_links where contact_id = $1", [contact])).rowCount)).toBe(1);
+  });
+
+  it("RVW-90 backfill (owner (372) ב): links already sitting on a converted lead move to its contact; a second run changes nothing", async () => {
+    const dir = join(process.cwd(), "supabase", "migrations");
+    const file = readdirSync(dir).find((f) => f.endsWith("_library_links_converted_backfill.sql"));
+    expect(file).toBeDefined();
+    const sql = readFileSync(join(dir, file!), "utf8");
+    const lead = await insertLead(owner.id, org, { full_name: "הומר לפני התיקון", phone: "050-7311031" });
+    const open = await insertLead(owner.id, org, { full_name: "לא הומר", phone: "050-7311032" });
+    const contact = await newContact();
+    // converted the old way: the trigger did not exist yet (triggers off)
+    await raw((q) => q("update public.leads set converted_at = now(), converted_contact_id = $2 where id = $1", [lead, contact]));
+    const moved = await link("lead_id", lead);
+    const kept = await link("lead_id", open);
+    const where = (id: string) =>
+      asAdmin(async (q) => one<{ lead_id: string | null; contact_id: string | null }>(q, "select lead_id, contact_id from public.library_links where id = $1", [id]));
+    expect(await where(moved)).toMatchObject({ lead_id: lead, contact_id: null });
+    await asAdmin((q) => q(sql));
+    expect(await where(moved)).toMatchObject({ lead_id: null, contact_id: contact });
+    expect(await where(kept)).toMatchObject({ lead_id: open, contact_id: null });
+    await asAdmin((q) => q(sql));
+    expect(await where(moved)).toMatchObject({ lead_id: null, contact_id: contact });
   });
 
   it("RVW-90: a lead merge sends the duplicate's links to the kept lead's contact when either side is converted", async () => {
@@ -167,7 +192,7 @@ describe("review 2026-11-13 database fixes", () => {
     await raw((q) => q("update public.memberships set status = 'active' where organization_id = $1 and user_id = any($2)", [org, [member.id, away.id]]));
   });
 
-  it("RVW-95: the retention policy keeps a lead that opened a link, sent back a form or was asked for a review", async () => {
+  it("RVW-95: the retention policy keeps a lead that opened a link or sent back a form, not one that was only asked for a review (owner (371) ב)", async () => {
     const old = async (name: string, phone: string) => {
       const id = await insertLead(owner.id, org, { full_name: name, phone });
       await raw((q) => q("update public.leads set created_at = now() - interval '13 months' where id = $1", [id]));
@@ -191,8 +216,8 @@ describe("review 2026-11-13 database fixes", () => {
     });
     expect(await candidate(viewed)).toBe(0);
     expect(await candidate(filled)).toBe(0);
-    expect(await candidate(asked)).toBe(0);
-    // a request that was never queued, and an opening before the cutoff, keep nothing
+    // owner (371) ב: a review request sent to the lead keeps nothing; neither does an opening before the cutoff
+    expect(await candidate(asked)).toBe(1);
     expect(await candidate(refused)).toBe(1);
     expect(await candidate(stale)).toBe(1);
   });
