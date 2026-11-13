@@ -9,6 +9,7 @@ import { fail, ok, type ActionResult, type FormState } from "@/lib/action-result
 import { dbErrorMessage } from "@/lib/errors";
 import { paths } from "@/lib/paths";
 
+import { parseQuietHours } from "./quiet-hours";
 import { NOTIFICATION_KINDS } from "./settings";
 import { parseTestSendResult, TEST_SENT_MESSAGE, testRateMessage } from "./test-send";
 
@@ -97,7 +98,18 @@ export async function saveNotificationSettingsAction(orgId: string, _prev: FormS
     if (choice === "off") muted.push(kind.key);
     else if (choice === "bell") noPush.push(kind.key);
   }
-  const { error } = await context.supabase.rpc("set_notification_settings", { p_muted: muted, p_no_push: noPush });
+  // USR-11: quiet hours travel in the same call (both null = off)
+  const quiet = parseQuietHours(formData.get("quiet_enabled"), formData.get("quiet_from"), formData.get("quiet_until"));
+  if (!quiet.ok) {
+    return fail(quiet.message, { fieldErrors: { [quiet.field]: quiet.message } });
+  }
+  const { error } = await context.supabase.rpc("set_notification_settings", {
+    p_muted: muted,
+    p_no_push: noPush,
+    p_quiet_set: true,
+    p_quiet_from: quiet.quiet?.from ?? null,
+    p_quiet_until: quiet.quiet?.until ?? null,
+  });
   if (error) {
     return fail(dbErrorMessage(error, "לא הצלחנו לשמור. נסו שוב."));
   }

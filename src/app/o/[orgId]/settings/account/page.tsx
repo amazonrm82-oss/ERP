@@ -14,7 +14,7 @@ import { getSignedVersion } from "@/features/legal/queries";
 import { DeviceOffLine } from "@/features/notifications/components/device-warning";
 import { NotificationSettingsForm } from "@/features/notifications/components/notification-settings-form";
 import { TestNotificationButton } from "@/features/notifications/components/test-notification-button";
-import { getNotificationSettings } from "@/features/notifications/queries";
+import { getNotificationPreferences } from "@/features/notifications/queries";
 import { AvatarPicker } from "@/features/profile/components/avatar-picker";
 import { ProfileForm } from "@/features/profile/components/profile-form";
 import { ThemePicker } from "@/features/theme/components/theme-picker";
@@ -41,7 +41,7 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
     supabase.from("organizations").select("require_mfa").eq("id", orgId).maybeSingle(),
     getRecoveryCodesLeft(),
     getSignedVersion(),
-    getNotificationSettings(),
+    getNotificationPreferences(),
     // a support session is not a member: it has no personal calendar link
     supportUntil ? null : getCalendarFeedStatus(orgId),
     showHours
@@ -123,7 +123,7 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
         <CardBody className="space-y-5">
           {/* GAP-01: this device does not get notifications (not a bar; cannot be closed) */}
           <DeviceOffLine orgId={orgId} />
-          <NotificationSettingsForm orgId={orgId} settings={notificationSettings} />
+          <NotificationSettingsForm orgId={orgId} settings={notificationSettings.settings} quiet={notificationSettings.quiet} />
           {/* a support session is not a member: nothing to send to */}
           {supportUntil ? null : (
             <div className="space-y-2 border-t border-line pt-4">

@@ -827,6 +827,9 @@ export type NotificationSettingsRow = {
   user_id: string;
   muted: string[];
   no_push: string[];
+  // USR-11: quiet hours ("HH:MM:SS"), both null = off; the window may cross midnight
+  quiet_from: string | null;
+  quiet_until: string | null;
   updated_at: string;
 };
 
@@ -1525,6 +1528,8 @@ export type NotificationRow = {
   read_at: string | null;
   // set by the push dispatcher
   pushed_at: string | null;
+  // USR-11: server only; the phone push waits until then (the user's quiet hours)
+  push_after: string | null;
   created_at: string;
 };
 
@@ -4522,7 +4527,11 @@ export type Database = {
       // signed agreement (migration 0016)
       sign_agreement: { Args: { p_version: string; p_documents: Json; p_full_name: string; p_method: string; p_signature: string | null }; Returns: string };
       agreement_status: { Args: Record<string, never>; Returns: string | null };
-      set_notification_settings: { Args: { p_muted: string[]; p_no_push: string[] }; Returns: undefined };
+      // USR-11: without p_quiet_set the stored quiet hours are kept
+      set_notification_settings: {
+        Args: { p_muted: string[]; p_no_push: string[]; p_quiet_set?: boolean; p_quiet_from?: string | null; p_quiet_until?: string | null };
+        Returns: undefined;
+      };
       // computed fields for sorting lists (migration 0032): used as `order=sort_owner`, not called as RPCs
       sort_status: { Args: Record<string, never>; Returns: number | null };
       sort_source: { Args: Record<string, never>; Returns: string | null };

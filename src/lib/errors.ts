@@ -336,6 +336,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "roadmap:vote_admin": "רק בעלים ומנהלי מערכת מצביעים בשם העסק. בקשו מאחד מהם להצביע.",
   "roadmap:closed": "העסק סגור כרגע, ולכן אי אפשר להצביע. בעלי העסק רואים את הפרטים ב\"הגדרות > חבילה ושימוש\".",
   "roadmap:done": "הפריט הזה כבר נבנה, וההצבעה עליו הסתיימה.",
+  // USR-11 (migration notification_quiet_hours): quiet hours need a start and an end that differ
+  "notification_settings:quiet": "שעות השקט צריכות שעת התחלה ושעת סיום שונות. בחרו את שתיהן ונסו שוב.",
   // USR-12 (migration support_requests): 5 requests per person per hour
   "support:rate": `שלחתם כבר 5 פניות בשעה האחרונה. נסו שוב מאוחר יותר, או פנו אלינו ישירות: ${SUPPORT_LINE}.`,
   // IMP-04 (migration background_jobs): three open background jobs per person; mirrors src/features/background/rules.ts

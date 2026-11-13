@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import { notificationHref } from "./links";
 import { notificationText } from "./notification-text";
+import { quietHoursFromRow, type QuietHours } from "./quiet-hours";
 import { NOTIFICATION_KINDS, type NotificationSettings } from "./settings";
 import { must } from "@/lib/db-read";
 
@@ -72,14 +73,17 @@ export async function countUnread(orgId: string, userId: string): Promise<number
   return count ?? 0;
 }
 
-/** The signed-in user's choices; a kind with no choice gets everything. */
-export async function getNotificationSettings(): Promise<NotificationSettings> {
+/** The signed-in user's choices per kind (a kind with no choice gets everything) and their quiet hours (USR-11). */
+export async function getNotificationPreferences(): Promise<{ settings: NotificationSettings; quiet: QuietHours }> {
   const supabase = await createClient();
-  const data = must(await supabase.from("notification_settings").select("muted, no_push").maybeSingle(), "notification_settings");
+  const data = must(
+    await supabase.from("notification_settings").select("muted, no_push, quiet_from, quiet_until").maybeSingle(),
+    "notification_settings",
+  );
   const settings = Object.fromEntries(NOTIFICATION_KINDS.map((k) => [k.key, "all"])) as NotificationSettings;
   for (const kind of NOTIFICATION_KINDS) {
     if (data?.no_push.includes(kind.key)) settings[kind.key] = "bell";
     if (data?.muted.includes(kind.key)) settings[kind.key] = "off";
   }
-  return settings;
+  return { settings, quiet: quietHoursFromRow(data?.quiet_from, data?.quiet_until) };
 }
