@@ -221,6 +221,30 @@ and build this CRM here instead. The old code is preserved on the branch
   Since 021241 (owner (299) ב) the first-opening notice goes to the maker while they read the record, else to the record's current
   owner while an active non-viewer who reads it (`app.user_can_read_record`), else to the active owners and admins;
   `app.library_link_mark_viewed` was last redefined in 021241.
+  In use (BIZ-05, owner 3 and 11 November 2026, answers (70) ב and (271) ב; migrations 021263-021266; an independent review and a
+  delta review): the prefill form, a personal link that fills an EXISTING lead or contact (`src/features/prefill-links/public-server.ts`,
+  page `/f/fill/<token>`, route `POST /api/forms/fill/<token>`), which calls only `public.prefill_public()` (business display name, logo,
+  colour, built-with, the privacy notice contact, the template's title and intro, and per field key, label, type, options, help,
+  required, read_only and the record's CURRENT value; never an id) and `public.prefill_public_submit()` (writes only the link's fields
+  as the server under a row lock: custom values through `app.custom_value_ok`, read-only filled values and unique clashes kept and
+  reported as skipped, a stored email or phone never replaced, built-in text with control, direction or zero-width characters
+  refused, an empty answer never clears; one submission per link; a `system` timeline entry kind `prefill_submitted` with labels only,
+  no author, no person writes, changes or removes it (`app.activities_prefill_entry_guard`, hint `activity:prefill_entry`), not contact
+  and not activity; a `system` notice with the template name to the maker while they read the record, else the record's owner, else
+  owners/admins). Templates `public.prefill_forms` (managed list, owners/admins of a writable business, 50, audited; plan key
+  `prefill_links`, the plans of `public_page`; built-in keys from a closed list = `PREFILL_BUILT_IN`, custom fields active, not of a
+  `FORM_EXCLUDED_TYPES` type and not `privacy_class = 'sensitive'`, judged again on every read and write; one DRAFT default seeded).
+  Links `app.prefill_links` (no grants; SHA-256 only; 14 days; the template's field list copied when made, so editing a template
+  narrows an open link and never widens it) through `public.prefill_link_create` (`app.can_write`, writable, `app.can_edit_record`,
+  100 per person an hour, audited without the token), `public.prefill_link_revoke` and `public.prefill_links_for_record`. One
+  not-found rule `app.prefill_link_usable` (unknown or revoked token, expired, business not writable (`app.org_writable`), public pages
+  closed, no key, template off, record binned, gone or a converted lead); a submitted link answers `{status:'done'}` until it expires.
+  Limits after the lookup: 120 per link and 60 per sender (keyed IP hash scope `prefill`, re-scoped per link, 1,024 buckets) in 10
+  minutes, 10 submissions per link in 10 minutes; OPS-02 shared guard first. Never framed, no-referrer, always light, preview bots read
+  nothing, no cookies. A merge moves the duplicate's links (accepted, as LIB-02). `app.scheduled_no_activity`, `app.automation_run_facts`,
+  `app.automation_event_still_holds`, `app.sample_untouched` (a sample record with a link is kept), `app.plan_key_defaults` and
+  `public.plans_public` (test 344's pin rechecked) were last redefined in 021263/021266; tests 64 and 88 end with `_prefill_entry_rules.sql`.
+  In the eslint allow-list. The advisor's findings on the three staff definers and the two app tables are expected.
   In use (FXS-12, owner 12 November 2026, answer (281) א; no migration; an independent review and a delta review): the sign-in
   forwarding client (`src/lib/supabase/auth-forwarding-server.ts`, server-only, the ONLY reader of `SUPABASE_SECRET_KEY`, which the owner
   sets in Vercel; only a key starting `sb_secret_`; lint refuses the name elsewhere, and only `src/features/auth/actions.ts` may import
