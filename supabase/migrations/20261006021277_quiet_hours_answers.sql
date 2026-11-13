@@ -19,6 +19,10 @@
 --   exempt list or a zone the server does not know = push_after set to now(), so the claim takes it at once and it is
 --   fresh for an hour from now (setting null instead would judge it by created_at, which may be long past).
 --   Only the caller's own rows change; nothing else is touched. The two-argument call (p_quiet_set false) moves nothing.
+--   A held row whose kind the same save makes bell-only (p_no_push) or muted (p_muted) is marked pushed (pushed_at now())
+--   and never pushed; the bell row stays.
+--   Accepted: a notification inserted at the same moment as a save may read the old quiet hours in its trigger and stay held
+--   by the old window (worst case: one push at the old end time).
 -- * Notifications of the urgent kinds held before this migration keep their stored push_after until the window ends or
 --   their user saves quiet hours again; this migration rewrites no stored row.
 -- Same signatures as 021276; one function per name. Every statement is safe to run twice.
@@ -199,8 +203,12 @@ begin
          and exists (select 1 from pg_catalog.pg_timezone_names z where z.name = v_org.timezone) then
         v_end := app.quiet_hours_end(p_quiet_from, p_quiet_until, v_org.timezone, now());
       end if;
+      -- a kind the same save made bell-only or muted is never pushed (marked pushed, as the trigger does for bell-only)
       update public.notifications n
-         set push_after = case when n.type = any (app.quiet_hours_exempt_kinds()) then now()
+         set pushed_at = case when n.type = any (coalesce(p_no_push, '{}') || coalesce(p_muted, '{}')) then now()
+                              else n.pushed_at end,
+             push_after = case when n.type = any (coalesce(p_no_push, '{}') || coalesce(p_muted, '{}')) then n.push_after
+                               when n.type = any (app.quiet_hours_exempt_kinds()) then now()
                                else coalesce(v_end, now()) end
        where n.user_id = auth.uid() and n.organization_id = v_org.organization_id
          and n.pushed_at is null and n.read_at is null and n.push_after > now();

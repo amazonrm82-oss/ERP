@@ -256,6 +256,25 @@ describe("quiet hours on notifications and the push claim", () => {
     expect((await pushAfter(theirs.id)).due).toBe(true);
   });
 
+  it("a held push of a kind the same save makes bell-only or muted is never pushed", async () => {
+    const hour = await localHour();
+    await setQuiet(rep, pad(hour - 1), pad(hour + 2));
+    const bellOnly = await notify(rep, "task_reminder", "יהפוך לפעמון בלבד");
+    const muted = await notify(rep, "follow", "יושתק");
+    const plain = await notify(rep, "mention", "ישוחרר");
+    for (const n of [bellOnly, muted, plain]) expect(n.push_after).not.toBeNull();
+    await asUser(rep, (q) => q("select public.set_notification_settings($1, $2, true, null, null)", [["follow"], ["task_reminder"]]));
+    const rows = await asAdmin(async (q) =>
+      (await q<{ id: string; pushed: boolean; due: boolean }>("select id, pushed_at is not null as pushed, push_after <= now() as due from public.notifications where id = any($1)", [[bellOnly.id, muted.id, plain.id]])).rows,
+    );
+    const by = Object.fromEntries(rows.map((r) => [r.id, r]));
+    expect(by[bellOnly.id].pushed).toBe(true);
+    expect(by[muted.id].pushed).toBe(true);
+    expect(by[plain.id]).toMatchObject({ pushed: false, due: true });
+    expect((await claimMine([bellOnly.id, muted.id, plain.id])).map((n) => n.id)).toEqual([plain.id]);
+    await asUser(rep, (q) => q("select public.set_notification_settings('{}'::text[], '{}'::text[])"));
+  });
+
   it("the old two-argument function is out of the API; the new one is not for anon", async () => {
     const grants = await asAdmin(async (q) =>
       (await q<{ sig: string; anon: boolean; auth: boolean; svc: boolean }>(`
