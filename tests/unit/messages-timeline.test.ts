@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { mergeTimeline, messageEntryLabel, messageEntryText } from "@/features/messaging/timeline-entry";
+import { mergeTimeline, messageEntryLabel, messageEntryText, REFUSED } from "@/features/messaging/timeline-entry";
 
 const root = join(__dirname, "..", "..");
 
@@ -23,6 +23,29 @@ describe("MSG-03: messages on the timeline", () => {
     expect(messageEntryText({ channel: "sms", direction: "outbound", status: "failed", provider: "fake", provider_error_code: "too_long" })).toBe(
       "השליחה נכשלה.",
     );
+  });
+
+  // RVW-89: every final refusal of the SMS composer has its own Hebrew line on the timeline
+  it("has a line for every refusal code the SMS composer ends a job with", () => {
+    const file = readdirSync(join(root, "supabase", "migrations")).find((f) => f.endsWith("_sms_compose.sql"));
+    expect(file).toBeDefined();
+    const sql = readFileSync(join(root, "supabase", "migrations", file as string), "utf8");
+    const literal = [...sql.matchAll(/'refused', '([a-z_]+)'/g)].map((m) => m[1]);
+    // the codes it passes on: app.message_template_sendable / app.message_filled_problem, app.collection_customer_refusal,
+    // public.meeting_reminder_link and public.consent_preference_link_for_job
+    const passed = ["not_found", "inactive", "field_not_allowed", "external_link", "glued_address", "offer", "too_long",
+      "reminder_off", "stage_off", "business_off", "debt_settled", "customer_changed",
+      "business", "meeting_changed", "no_link_field", "not_a_meeting_message", "no_customer", "service_type"];
+    // never final: the worker tries the job again (send-handler.ts), so no message row carries them
+    const retried = new Set(["stale", "paused", "site_url"]);
+    const codes = [...new Set([...literal, ...passed])].filter((c) => !retried.has(c));
+    expect(codes.length).toBeGreaterThan(30);
+    for (const code of codes) {
+      expect(REFUSED[code], code).toMatch(/^לא נשלחה: .+\.$/);
+      expect(messageEntryText({ channel: "sms", direction: "outbound", status: "failed", provider_error_code: code })).toBe(REFUSED[code]);
+    }
+    expect(messageEntryText({ channel: "sms", direction: "outbound", status: "failed", provider_error_code: "unfilled_field" })).toContain("כתובת או טלפון העסק");
+    expect(messageEntryText({ channel: "sms", direction: "outbound", status: "failed", provider_error_code: "constructor" })).toBe("השליחה נכשלה.");
   });
 
   it("keeps pinned entries on top and puts messages among the rest by time", () => {

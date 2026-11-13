@@ -6,6 +6,7 @@ import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
 import { DEFAULT_WINDOW_FROM, DEFAULT_WINDOW_UNTIL, shortTime, type SendingHours } from "./hours";
+import { marketingSmsMissing, type MarketingDetailMissing } from "./marketing-details";
 import { parseMessageUsage, type MessageUsage } from "./usage";
 import { smsSenderState, type SmsSender } from "@/features/messaging/sms-sender";
 
@@ -80,5 +81,22 @@ export const getSmsSender = cache(async (orgId: string): Promise<SmsSender> => {
     approved: Boolean(settings?.sms_sender_approved_at),
     rejected: Boolean(settings?.sms_sender_rejected_at),
     businessPhone: business?.phone ?? null,
+  });
+});
+
+/** RVW-89: what a marketing SMS still needs from the business's details (the composer's rule), read with the member's session. */
+export const getMarketingSmsMissing = cache(async (orgId: string): Promise<MarketingDetailMissing[]> => {
+  const supabase = await createClient();
+  const [settings, org] = await Promise.all([
+    supabase.from("org_document_settings").select("address_line, city, phone").eq("organization_id", orgId).maybeSingle(),
+    supabase.from("organizations").select("phone").eq("id", orgId).maybeSingle(),
+  ]);
+  const row = must(settings, "document details for marketing sms");
+  const orgRow = must(org, "business phone for marketing sms");
+  return marketingSmsMissing({
+    addressLine: row?.address_line ?? null,
+    city: row?.city ?? null,
+    documentPhone: row?.phone ?? null,
+    businessPhone: orgRow?.phone ?? null,
   });
 });

@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { Detail, DetailList } from "@/components/detail-list";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { TextLink } from "@/components/ui/text-link";
+import { MarketingSmsDetailsNotice } from "@/features/message-sending/components/marketing-sms-details-notice";
+import { getMarketingSmsMissing } from "@/features/message-sending/queries";
 import { messageTemplatesPath } from "@/features/message-templates/paths";
 import { ReviewRequestSettingsForm } from "@/features/review-requests/components/review-request-settings-form";
 import { getReviewRequestSettings, hasActiveReviewTemplate } from "@/features/review-requests/queries";
@@ -21,13 +23,17 @@ type Props = { params: Promise<{ orgId: string }> };
 // RET-02: a request for a review (Google, Facebook, easy, Zap or any https link; owner (307) ב) after a won deal or a held meeting. Everyone reads; owners and admins change.
 export default async function ReviewRequestSettingsPage({ params }: Props) {
   const { orgId } = await params;
-  const [{ role, canWrite }, settings, inPlan, hasTemplate, externalOff] = await Promise.all([
+  const [{ role, canWrite }, settings, inPlan, hasTemplate, externalOff, smsInPlan, smsMissing] = await Promise.all([
     getOrgContext(orgId),
     getReviewRequestSettings(orgId),
     orgHasFeature(orgId, "review_requests"),
     hasActiveReviewTemplate(orgId),
     qrExternalBlocked(orgId),
+    orgHasFeature(orgId, "sms"),
+    getMarketingSmsMissing(orgId),
   ]);
+  // RVW-89: a review request by SMS carries the marketing sender line, which needs the business's address and phone
+  const smsDetails = inPlan && smsInPlan ? <MarketingSmsDetailsNotice orgId={orgId} missing={smsMissing} /> : null;
   const editable = isAdminRole(role) && canWrite;
   // review (8): on, but nothing to send from (the templates were switched off or deleted)
   const noTemplate =
@@ -75,6 +81,7 @@ export default async function ReviewRequestSettingsPage({ params }: Props) {
       <div className="space-y-5">
         {externalNotice}
         {noTemplate}
+        {smsDetails}
         <ReviewRequestSettingsForm orgId={orgId} settings={settings} inPlan={inPlan} />
         {rules}
       </div>
@@ -84,6 +91,7 @@ export default async function ReviewRequestSettingsPage({ params }: Props) {
     <div className="space-y-5">
       {externalNotice}
       {noTemplate}
+      {smsDetails}
       <Card aria-labelledby="review-requests-title">
         <CardHeader id="review-requests-title" title="בקשת ביקורת מלקוחות" />
         <CardBody>

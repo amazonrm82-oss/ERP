@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { Detail, DetailList } from "@/components/detail-list";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { MarketingSmsDetailsNotice } from "@/features/message-sending/components/marketing-sms-details-notice";
 import { MeetingMessagesForm } from "@/features/message-sending/components/meeting-messages-form";
 import { MessageCapsForm } from "@/features/message-sending/components/message-caps-form";
 import { MessageUsageCard } from "@/features/message-sending/components/message-usage-card";
@@ -9,7 +10,7 @@ import { SendingHoursForm } from "@/features/message-sending/components/sending-
 import { SmsSenderForm } from "@/features/message-sending/components/sms-sender-form";
 import { RATE_PER_MINUTE, SHORT_DAY_UNTIL, windowText } from "@/features/message-sending/hours";
 import { MEETING_MESSAGE_TEXTS, MEETING_REMINDERS_FEATURE } from "@/features/message-sending/meeting-messages";
-import { getMeetingMessages, getMessageCaps, getMessageUsage, getSendingHours, getSmsSender } from "@/features/message-sending/queries";
+import { getMarketingSmsMissing, getMeetingMessages, getMessageCaps, getMessageUsage, getSendingHours, getSmsSender } from "@/features/message-sending/queries";
 import { CHANNEL_LABELS, MESSAGE_CHANNELS } from "@/features/message-sending/usage";
 import { isAdminRole } from "@/features/settings/permissions";
 import { orgHasFeature } from "@/features/settings/queries";
@@ -28,7 +29,7 @@ export default async function MessageSendingSettingsPage({ params }: Props) {
   const { role, canWrite } = await getOrgContext(orgId);
   const admin = isAdminRole(role);
   const editable = admin && canWrite;
-  const [hours, caps, meetingMessages, meetingRemindersInPlan, usage, smsSender, smsInPlan] = await Promise.all([
+  const [hours, caps, meetingMessages, meetingRemindersInPlan, usage, smsSender, smsInPlan, smsMissing] = await Promise.all([
     getSendingHours(orgId),
     getMessageCaps(orgId),
     getMeetingMessages(orgId),
@@ -36,7 +37,10 @@ export default async function MessageSendingSettingsPage({ params }: Props) {
     admin ? getMessageUsage(orgId) : Promise.resolve({ allowed: false } as const),
     getSmsSender(orgId),
     orgHasFeature(orgId, "sms"),
+    getMarketingSmsMissing(orgId),
   ]);
+  // RVW-89: a marketing SMS without the business's address or phone is refused by the composer; say so first
+  const smsDetails = smsInPlan ? <MarketingSmsDetailsNotice orgId={orgId} missing={smsMissing} /> : null;
 
   const rules = (
     <Card aria-labelledby="sending-rules-title">
@@ -71,6 +75,7 @@ export default async function MessageSendingSettingsPage({ params }: Props) {
   if (editable) {
     return (
       <div className="space-y-5">
+        {smsDetails}
         <SendingHoursForm orgId={orgId} hours={hours} />
         {usageCard}
         <MessageCapsForm orgId={orgId} caps={caps} />
@@ -82,6 +87,7 @@ export default async function MessageSendingSettingsPage({ params }: Props) {
   }
   return (
     <div className="space-y-5">
+      {smsDetails}
       <Card aria-labelledby="sending-hours-view-title">
         <CardHeader id="sending-hours-view-title" title="שעות שליחה" />
         <CardBody>

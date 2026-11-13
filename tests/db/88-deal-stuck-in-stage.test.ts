@@ -185,6 +185,8 @@ const RERUN = [
   // BIZ-05 redefines app.plan_key_defaults() and public.plans_public() (the key), then the three not-activity rules
   migrationFile("_prefill_forms.sql"),
   migrationFile("_prefill_entry_rules.sql"),
+  // RVW-89 redefines app.jobs_record_message(), app.message_send_refusal_text() and app.message_send_refused() last
+  migrationFile("_composer_refusal_notices.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

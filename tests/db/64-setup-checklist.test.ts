@@ -891,6 +891,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // BIZ-05 redefines app.plan_key_defaults() and public.plans_public() (the key), then the three not-activity rules
       "_prefill_forms.sql",
       "_prefill_entry_rules.sql",
+      // RVW-89 redefines app.jobs_record_message() of _review_1111_messaging.sql, app.message_send_refusal_text() of
+      // _instant_reply_editable.sql and app.message_send_refused() of _service_message_send_rules.sql last
+      "_composer_refusal_notices.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
