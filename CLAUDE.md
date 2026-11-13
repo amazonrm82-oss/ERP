@@ -526,8 +526,8 @@ and build this CRM here instead. The old code is preserved on the branch
    1,200 a minute in total; every business that texted the number through InforU in 90 days (owner (320) א), in pages of 100, through
    `public.sms_inbound_optout` (its first caller, idempotent); any limit → 503. Pinned by md5 in test 353. The advisor's findings on
    `app.sms_callback_counts` and `app.sms_inbound_number_counts` are expected.
-   In use (EML-01 sender, owner (268) א, (195) א, wave 3 use (1); migration 021275, applied and md5 checked 13 November 2026; an
-   independent review and two delta reviews): the OPS-04 worker (same route and secret) sends email through Resend
+   In use (EML-01 sender, owner (268) א, (195) א, wave 3 use (1); migration 021275, applied and md5 checked 13 November 2026, and 021278; an
+   independent review and two delta reviews, and one review of 021278): the OPS-04 worker (same route and secret) sends email through Resend
    (`src/features/messaging/providers/resend.ts`, the ONLY reader of `RESEND_API_KEY|RESEND_FROM`; lint refuses the names elsewhere;
    `MESSAGING_PROVIDER_EMAIL=resend`, set by the owner; without it email jobs wait unclaimed). After `job_message_may_send` it calls only
    `public.email_job_compose()` and `public.email_quota_return()` (both service_role). The composer is a wrapper over
