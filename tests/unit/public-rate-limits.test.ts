@@ -643,6 +643,8 @@ describe("OPS-02: every public path has a named limit", () => {
       "src/app/o/[orgId]/reports/[report]/export/route.ts",
       // SMS-05: the InforU adapter reads InforU's own throttle answers (HTTP 429, StatusId -429); it answers nobody
       "src/features/messaging/providers/inforu.ts",
+      // EML-01: the Resend adapter reads Resend's own throttle answer (HTTP 429); it answers nobody
+      "src/features/messaging/providers/resend.ts",
     ]);
     const offenders = sourceFiles(join(ROOT, "src"))
       .map((file) => relative(ROOT, file))

@@ -65,9 +65,33 @@ export type OutgoingMessage = {
   // SMS-05: what a composing provider (InforU) sends, as public.sms_job_compose answered it for this job's live lease: the
   // record's current number, the sender (null = the platform's default) and the filled text. Never logged or kept.
   content?: ComposedSms;
+  // EML-01: what a composing email provider (Resend) sends, as public.email_job_compose answered it for this job's live
+  // lease, with the attachments read from Storage at the paths it answered. Never logged or kept.
+  emailContent?: LoadedEmail;
 };
 
 export type ComposedSms = { to: string; sender: string | null; text: string };
+
+/** EML-01: a file to attach, as public.email_job_compose names it: a Storage object of the record-files bucket. */
+export type EmailAttachmentRef = { bucket: string; path: string; name: string; type: string };
+
+/**
+ * EML-01: the email public.email_job_compose answered: the record's current address, the business's display name (the
+ * address it goes out from is the platform's), the filled subject and text, the sending person's address for "reply to"
+ * (null = none), the one-click unsubscribe address of a marketing email (RFC 8058) and the files to attach.
+ */
+export type ComposedEmail = {
+  to: string;
+  fromName: string;
+  subject: string;
+  text: string;
+  replyTo: string | null;
+  listUnsubscribe: string | null;
+  attachments: EmailAttachmentRef[];
+};
+
+/** A composed email with its files read (base64), as the adapter gets it. */
+export type LoadedEmail = Omit<ComposedEmail, "attachments"> & { attachments: { name: string; type: string; content: string }[] };
 
 export type SmsParts = {
   templateId: string | null;
@@ -94,7 +118,8 @@ export type RecordEmailParts = {
 export type ProviderResult =
   | { ok: true; providerId: string }
   // notSent (SMS-05, owner (326) ב): the message never reached the provider (no connection, nothing it could send), so the
-  // business's SMS count is given back (public.sms_quota_return); never set when it may have been sent
+  // business's count is given back (public.sms_quota_return, EML-01 public.email_quota_return); never set when it may have
+  // been sent
   | { ok: false; error: string; final?: boolean; code?: string; notSent?: boolean };
 
 /** An adapter for one provider on one channel. `name` is the provider's code, kept on every message it sent. */
@@ -102,6 +127,7 @@ export type MessagingProvider = {
   name: string;
   channel: MessageChannel;
   // SMS-05: a provider that sends real text: the send handler asks the database's composer first and hands it `content`
+  // (SMS) or `emailContent` (EML-01, email)
   composes?: boolean;
   send(message: OutgoingMessage): Promise<ProviderResult>;
 };

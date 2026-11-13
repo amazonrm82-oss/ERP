@@ -4,7 +4,10 @@ import {
   isMessageChannel,
   isMessageType,
   messagePurpose,
+  type ComposedEmail,
   type ComposedSms,
+  type EmailAttachmentRef,
+  type LoadedEmail,
   type MessageChannel,
   type MessagingProvider,
   type RecordEmailParts,
@@ -34,6 +37,48 @@ export function parseComposed(data: unknown): ComposeAnswer | null {
   if (typeof r.text !== "string" || r.text.trim() === "") return null;
   if (r.sender !== null && typeof r.sender !== "string") return null;
   return { ok: true, content: { to: r.to, sender: r.sender, text: r.text } };
+}
+
+export type ComposeEmailAnswer = { ok: true; content: ComposedEmail } | { ok: false; code: string };
+
+const EMAIL_ADDRESS = /^[^@\s,;<>"'\\()]+@[^@\s,;<>"'\\()]+\.[^@\s,;<>"'\\().]+$/;
+const ATTACHMENT_PATH = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const isAddress = (value: unknown): value is string => typeof value === "string" && value.length <= 254 && EMAIL_ADDRESS.test(value);
+
+function parseAttachment(value: unknown): EmailAttachmentRef | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const r = value as Record<string, unknown>;
+  if (r.bucket !== "record-files" || typeof r.path !== "string" || !ATTACHMENT_PATH.test(r.path)) return null;
+  if (typeof r.name !== "string" || r.name.trim() === "" || typeof r.type !== "string" || r.type.trim() === "") return null;
+  return { bucket: r.bucket, path: r.path, name: r.name, type: r.type };
+}
+
+/** EML-01: parses public.email_job_compose's answer strictly; anything malformed is null (a failed try, never a send). */
+export function parseComposedEmail(data: unknown): ComposeEmailAnswer | null {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const r = data as Record<string, unknown>;
+  if (typeof r.refused === "string") return CODE.test(r.refused) ? { ok: false, code: r.refused } : null;
+  if (!isAddress(r.to)) return null;
+  if (typeof r.subject !== "string" || r.subject.trim() === "" || /[\r\n]/.test(r.subject)) return null;
+  if (typeof r.text !== "string" || r.text.trim() === "") return null;
+  if (typeof r.from_name !== "string") return null;
+  if (r.reply_to !== null && !isAddress(r.reply_to)) return null;
+  if (r.list_unsubscribe !== null && (typeof r.list_unsubscribe !== "string" || !/^https?:\/\/[^\s<>]+$/.test(r.list_unsubscribe))) return null;
+  if (!Array.isArray(r.attachments) || r.attachments.length > 5) return null;
+  const attachments = r.attachments.map(parseAttachment);
+  if (attachments.some((a) => a === null)) return null;
+  return {
+    ok: true,
+    content: {
+      to: r.to,
+      fromName: r.from_name,
+      subject: r.subject,
+      text: r.text,
+      replyTo: r.reply_to,
+      listUnsubscribe: r.list_unsubscribe,
+      attachments: attachments as EmailAttachmentRef[],
+    },
+  };
 }
 
 function parseAnswer(data: unknown): MaySendAnswer | null {
@@ -122,6 +167,11 @@ export function createSendHandler(deps: {
   compose?: ComposeCall;
   // owner (326) ב: public.sms_quota_return, for an SMS the provider says never reached it
   returnQuota?: ComposeCall;
+  // EML-01: public.email_job_compose and public.email_quota_return (service_role, the live lease only)
+  composeEmail?: ComposeCall;
+  returnEmailQuota?: ComposeCall;
+  // EML-01: a file of the email, read at the path the composer answered (base64), null when it cannot be read now
+  loadAttachment?: (ref: EmailAttachmentRef, job: ClaimedJob) => Promise<string | null>;
 }): JobHandler {
   return async (job) => {
     const to = target(job);
@@ -132,7 +182,27 @@ export function createSendHandler(deps: {
     if (!answer) return { status: "failed", error: "send check answered nothing" };
     if (!answer.may_send) return { status: "ended", reason: answer.reason };
     let content: ComposedSms | undefined;
-    if (provider.composes) {
+    let emailContent: LoadedEmail | undefined;
+    if (provider.composes && to.channel === "email") {
+      // EML-01: the address, the subject, the text, the reply-to and the files come from the database, for this lease only;
+      // a refusal ends the job as the SMS composer's does
+      if (!deps.composeEmail || !deps.loadAttachment) return { status: "failed", error: "no composer for channel" };
+      const composed = parseComposedEmail(await deps.composeEmail(job));
+      if (!composed) return { status: "failed", error: "composer answered nothing" };
+      if (!composed.ok) {
+        if (composed.code === "stale") return { status: "failed", error: "stale lease" };
+        if (RETRY_REFUSALS.has(composed.code)) return { status: "failed", error: `waiting ${composed.code}` };
+        return { status: "failed", error: `refused ${composed.code}`, final: true, receipt: { provider: null, errorCode: composed.code } };
+      }
+      const files: LoadedEmail["attachments"] = [];
+      for (const ref of composed.content.attachments) {
+        const bytes = await deps.loadAttachment(ref, job);
+        // a file that cannot be read now: nothing is sent, the job is tried again (the count stays: it was not refused)
+        if (bytes === null) return { status: "failed", error: "attachment unavailable" };
+        files.push({ name: ref.name, type: ref.type, content: bytes });
+      }
+      emailContent = { ...composed.content, attachments: files };
+    } else if (provider.composes) {
       // SMS-05: the number, the sender and the text come from the database, for this lease only; a refusal ends the job
       // (no provider was asked: provider null, the composer's code kept on the message)
       if (to.channel !== "sms" || !deps.compose) return { status: "failed", error: "no composer for channel" };
@@ -146,13 +216,20 @@ export function createSendHandler(deps: {
       }
       content = composed.content;
     }
-    const result = await provider.send({ jobId: job.id, organizationId: job.organization_id, ...to, ...(content ? { content } : {}) });
+    const result = await provider.send({
+      jobId: job.id,
+      organizationId: job.organization_id,
+      ...to,
+      ...(content ? { content } : {}),
+      ...(emailContent ? { emailContent } : {}),
+    });
     // MSG-03: the provider's code with its message id (sent) or its error code (failed) go back to the queue, which
     // records the message; the database drops a value of the wrong shape
     if (result.ok) return { status: "done", receipt: { provider: provider.name, providerMessageId: result.providerId } };
     // owner (326) ב: a message that never reached the provider gives its SMS count back (a later try is counted again);
     // a failure to give it back never changes the job's outcome
     if (result.notSent && to.channel === "sms" && deps.returnQuota) await deps.returnQuota(job).catch(() => undefined);
+    if (result.notSent && to.channel === "email" && provider.composes && deps.returnEmailQuota) await deps.returnEmailQuota(job).catch(() => undefined);
     return {
       status: "failed",
       error: result.error,

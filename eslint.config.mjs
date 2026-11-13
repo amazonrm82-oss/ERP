@@ -78,6 +78,20 @@ const inforuKeySelectors = [
   selector,
   message: "The InforU keys are read only by the adapter (src/features/messaging/providers/inforu.ts), owner (318) א.",
 }));
+// EML-01 (owner (268) א): the Resend platform account's settings (RESEND_API_KEY, RESEND_FROM) are read in ONE file only,
+// the adapter.
+const RESEND_ADAPTER = "src/features/messaging/providers/resend.ts";
+const resendKeySelectors = [
+  "MemberExpression[property.name=/^RESEND_/]",
+  "MemberExpression[property.value=/^RESEND_/]",
+  "Property[key.name=/^RESEND_/]",
+  "Property[key.value=/^RESEND_/]",
+  "Literal[value=/^RESEND_/]",
+  "TemplateElement[value.raw=/RESEND_[A-Z]/]",
+].map((selector) => ({
+  selector,
+  message: "The Resend keys are read only by the adapter (src/features/messaging/providers/resend.ts), owner (268) א.",
+}));
 const authForwarderPattern = {
   regex: "(^@/lib/supabase/auth-forwarding-server$|/auth-forwarding-server$)",
   message: "Only the auth actions (src/features/auth/actions.ts) use the sign-in forwarding client (FXS-12, owner (281) א).",
@@ -195,27 +209,31 @@ const eslintConfig = defineConfig([
   ...nextTs,
   {
     files: ["src/**/*.ts", "src/**/*.tsx"],
-    ignores: [JWT_SECRET_SIGNER, AUTH_FORWARDER, TURNSTILE_VERIFIER, INFORU_ADAPTER],
+    ignores: [JWT_SECRET_SIGNER, AUTH_FORWARDER, TURNSTILE_VERIFIER, INFORU_ADAPTER, RESEND_ADAPTER],
     rules: {
-      "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors, ...secretKeySelectors, ...turnstileSecretSelectors, ...inforuKeySelectors],
+      "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors, ...secretKeySelectors, ...turnstileSecretSelectors, ...inforuKeySelectors, ...resendKeySelectors],
     },
   },
   {
     files: [INFORU_ADAPTER],
-    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors, ...secretKeySelectors, ...turnstileSecretSelectors] },
+    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors, ...secretKeySelectors, ...turnstileSecretSelectors, ...resendKeySelectors] },
+  },
+  {
+    files: [RESEND_ADAPTER],
+    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors, ...secretKeySelectors, ...turnstileSecretSelectors, ...inforuKeySelectors] },
   },
   // the signer, the forwarder and the Turnstile check keep every other rule of the block above
   {
     files: [JWT_SECRET_SIGNER],
-    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...secretKeySelectors, ...turnstileSecretSelectors, ...inforuKeySelectors] },
+    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...secretKeySelectors, ...turnstileSecretSelectors, ...inforuKeySelectors, ...resendKeySelectors] },
   },
   {
     files: [AUTH_FORWARDER],
-    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors, ...turnstileSecretSelectors, ...inforuKeySelectors] },
+    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors, ...turnstileSecretSelectors, ...inforuKeySelectors, ...resendKeySelectors] },
   },
   {
     files: [TURNSTILE_VERIFIER],
-    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors, ...secretKeySelectors, ...inforuKeySelectors] },
+    rules: { "no-restricted-syntax": ["error", ...readAndDesignSelectors, ...jwtSecretSelectors, ...secretKeySelectors, ...inforuKeySelectors, ...resendKeySelectors] },
   },
   // FXC-08 (the service key), IMP-04 (the person's token) and FXS-12 (the sign-in forwarder): one rule, so the allow-lists
   // are judged together

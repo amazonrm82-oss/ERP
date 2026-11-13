@@ -3,9 +3,11 @@
  * on the server from the provider configuration only (never a hand list of features); the page passes on booleans, never an
  * env value. Pure (env in, booleans out), and kept equal to the real selectors by tests/unit/landing-provider-readiness.test.ts,
  * which compares it with messagingProviderFor() and metaGraphProvider() (the selectors are not imported here, so the page does
- * not load every adapter). The InforU account keys are read only by the adapter (owner (318) א): it answers a boolean.
+ * not load every adapter). The InforU and Resend account keys are read only by their adapters (owner (318) א, EML-01): each
+ * answers a boolean.
  */
 import { inforuAccountReady } from "@/features/messaging/providers/inforu";
+import { resendAccountReady } from "@/features/messaging/providers/resend";
 
 type Env = Record<string, string | undefined>;
 
@@ -16,8 +18,8 @@ const providerName = (env: Env, channel: "email" | "sms") =>
 type Ready = (env: Env) => boolean;
 /** The real (built, not fake) SMS adapters and their own "configured" check: InforU only (SMS-05). */
 export const REAL_SMS_PROVIDERS: Readonly<Record<string, Ready>> = { inforu: (env) => inforuAccountReady(env) };
-/** The real email adapters: none is built yet (MSG-01 has only the fake). */
-export const REAL_EMAIL_PROVIDERS: Readonly<Record<string, Ready>> = {};
+/** The real email adapters and their own "configured" check: Resend only (EML-01, owner (268) א). */
+export const REAL_EMAIL_PROVIDERS: Readonly<Record<string, Ready>> = { resend: (env) => resendAccountReady(env) };
 /** The real Meta Graph adapters: none is built yet (CAP-11 has only the fake). */
 export const REAL_META_PROVIDERS: Readonly<Record<string, Ready>> = {};
 /** What the Meta webhook itself needs beside the Graph adapter (route /api/meta/leads, INT-02's key for the page token). */

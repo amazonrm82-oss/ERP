@@ -4995,6 +4995,8 @@ export type Database = {
       // SMS-05: the InforU sender's composer (service_role only, migration sms_compose)
       sms_job_compose: { Args: { p_job: string; p_lease: string; p_site_url: string }; Returns: Json };
       sms_quota_return: { Args: { p_job: string; p_lease: string }; Returns: Json };
+      email_job_compose: { Args: { p_job: string; p_lease: string; p_site_url: string }; Returns: Json };
+      email_quota_return: { Args: { p_job: string; p_lease: string }; Returns: Json };
       // SMS-05: InforU's callbacks (service_role only, migration sms_inforu_callbacks)
       sms_delivery_status: { Args: { p_provider: string; p_items: Json }; Returns: Json };
       sms_inbound_reply: { Args: { p_provider: string; p_phone: string; p_body: string }; Returns: Json };

@@ -1,5 +1,6 @@
 import { createFakeProvider } from "./fake";
 import { createInforuProvider } from "./inforu";
+import { createResendProvider } from "./resend";
 import { createSms4FreeProvider } from "./sms4free";
 import { MESSAGE_CHANNELS, type MessageChannel, type MessagingProvider } from "./types";
 
@@ -18,6 +19,8 @@ const ADAPTERS: Record<string, Adapter> = {
   // SMS-05 (owner (318) א): InforU is built; without its keys it is still no provider (createInforuProvider answers null)
   inforu: { channels: ["sms"], built: true, create: (_channel, env) => createInforuProvider(env) },
   sms4free: { channels: ["sms"], built: false, create: (_channel, env) => createSms4FreeProvider(env) },
+  // EML-01 (owner (268) א): Resend is built; without its key and sender address it is no provider (null), and email jobs wait
+  resend: { channels: ["email"], built: true, create: (_channel, env) => createResendProvider(env) },
 };
 
 /** Adapters that may run only off Vercel or on a Vercel development environment. */

@@ -45,7 +45,10 @@ import { getSupabaseEnv } from "@/lib/env";
  *   owner (318) א, wave 3 use (2)): the client is made only after the secret in the path
  *   passed (timing-safe), and calls only public.sms_delivery_status() and
  *   public.sms_inbound_reply(); the OPS-04 worker also calls public.sms_job_compose() and
- *   public.sms_quota_return() (owner (326) ב) for the InforU sender;
+ *   public.sms_quota_return() (owner (326) ב) for the InforU sender, and public.email_job_compose()
+ *   and public.email_quota_return() for the Resend sender (EML-01, owner (195) א, (268) א), reading
+ *   Storage objects of record-files only at the paths the composer answered
+ *   (src/features/messaging/email-attachments-server.ts);
  * - the Meta Lead Ads webhook and its sweep (src/features/meta-leads/webhook-server.ts,
  *   routes /api/meta/leads and /api/meta/leads/sweep; CAP-11, owner 4 November 2026,
  *   answer (126) א): the client is made only after the X-Hub-Signature-256 check (or the

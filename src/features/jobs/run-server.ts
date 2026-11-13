@@ -4,6 +4,7 @@ import { createExportHandler, createImportHandler, type BackgroundCalls } from "
 import { BACKGROUND_RUN_BUDGET_MS } from "@/features/background/rules";
 import { backgroundJobsReady, createBackgroundTokenSource, createUserClient } from "@/features/background/user-token";
 import { AGREEMENT_VERSION } from "@/features/legal/agreement";
+import { downloadEmailAttachment } from "@/features/messaging/email-attachments-server";
 import { createSendHandler } from "@/features/messaging/send-handler";
 import { messagingProviders } from "@/features/messaging/providers/select";
 import { logEvent } from "@/lib/log";
@@ -27,7 +28,7 @@ const BACKGROUND_LEASE_SECONDS = 900;
  * The background job worker (OPS-04), route POST /api/jobs/run. Called by the database (app.wake_job_worker, through
  * pg_net, every minute while work is due), never by a user: it carries the push dispatcher's shared secret, checked
  * timing-safe before anything else. With the service role it calls only public.claim_jobs(), public.finish_job() and,
- * for message.send, public.job_message_may_send() and, for a composing SMS provider (InforU, SMS-05), public.sms_job_compose() and public.sms_quota_return() (owner (326) ב); for import.run and export.run (IMP-04, owner (155) א, (160) א) only
+ * for message.send, public.job_message_may_send() and, for a composing SMS provider (InforU, SMS-05), public.sms_job_compose() and public.sms_quota_return() (owner (326) ב), and for the composing email provider (Resend, EML-01, owner (195) א) public.email_job_compose() and public.email_quota_return(), reading Storage only at the paths the composer answered (email-attachments-server.ts); for import.run and export.run (IMP-04, owner (155) א, (160) א) only
  * public.background_job_begin(), background_job_progress() and background_job_end(), and, through the token source it hands
  * this client to (src/features/background/user-token.ts), background_job_token() before every signing of the person's token. No table is read or written with
  * the service role (CLAUDE.md hard rule 5, wave 3 use (1)): a background job's own work is done with a short-lived token
@@ -65,6 +66,19 @@ export async function runJobsRoute(request: Request): Promise<Response> {
             if (error) throw new Error("quota return failed");
             return data;
           },
+          // EML-01: the Resend sender's address, subject, text, reply-to and file paths (service_role, the live lease only)
+          composeEmail: async (job) => {
+            const { data, error } = await supabase.rpc("email_job_compose", { p_job: job.id, p_lease: job.lease, p_site_url: siteOrigin() });
+            if (error) throw new Error("compose failed");
+            return data;
+          },
+          returnEmailQuota: async (job) => {
+            const { data, error } = await supabase.rpc("email_quota_return", { p_job: job.id, p_lease: job.lease });
+            if (error) throw new Error("quota return failed");
+            return data;
+          },
+          // owner (195) א: the files only at the paths the composer answered, of the job's own business, bucket record-files
+          loadAttachment: (ref, job) => downloadEmailAttachment(supabase, ref, job.organization_id),
         })
       : null,
   });

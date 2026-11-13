@@ -13,7 +13,7 @@ import { PLAN_CAPABILITIES } from "@/features/plans/capabilities";
 // provider configuration exactly as the senders judge it.
 const NAMES = ["", "fake", "inforu", "sms4free", "resend", "sendgrid", "twilio", "graph", "meta", "INFORU"];
 // the adapter's own key names (tests may write them; the lint rule covers src/)
-const KEYS = { INFORU_USERNAME: "u", INFORU_API_TOKEN: "t", INFORU_SENDER: "Mexuz" };
+const KEYS = { INFORU_USERNAME: "u", INFORU_API_TOKEN: "t", INFORU_SENDER: "Mexuz", RESEND_API_KEY: "re_x", RESEND_FROM: "noreply@mexuz.test" };
 
 describe("landing: capabilities waiting for a provider (owner (339) ב)", () => {
   it("SMS and email readiness equal the real selector (a real adapter with its keys, never the fake)", () => {
@@ -36,6 +36,9 @@ describe("landing: capabilities waiting for a provider (owner (339) ב)", () => 
     }
     expect(providerReadiness({ MESSAGING_PROVIDER_SMS: "inforu", ...KEYS }).sms).toBe(true);
     expect(providerReadiness({ MESSAGING_PROVIDER_SMS: "inforu", INFORU_USERNAME: "u" }).sms).toBe(false);
+    // EML-01: Resend with its key and a plain sender address
+    expect(providerReadiness({ MESSAGING_PROVIDER_EMAIL: "resend", ...KEYS }).email).toBe(true);
+    expect(providerReadiness({ MESSAGING_PROVIDER_EMAIL: "resend", RESEND_API_KEY: "re_x", RESEND_FROM: "not an address" }).email).toBe(false);
   });
 
   it("Meta is ready only with a real Graph adapter and the webhook's keys (only the fake exists today)", () => {
