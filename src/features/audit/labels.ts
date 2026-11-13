@@ -236,6 +236,8 @@ export const ACTION_LABELS: Record<string, string> = {
   pdf_remake: "יצירה מחדש של קובץ PDF של הצעה",
   // EML-02 (198) ב: the files an email from the record card carried (ids and names; the details are in the entry's note)
   email_attachments: "קבצים שצורפו לאימייל",
+  // ADM-03: a request to delete the business, its confirmation by the emailed link, or its cancellation
+  org_deletion: "מחיקת העסק",
 };
 
 export const LOGIN_ACTION_LABELS: Record<string, string> = {

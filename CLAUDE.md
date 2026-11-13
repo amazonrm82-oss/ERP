@@ -2542,6 +2542,20 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   nothing is ever deleted) and new-lead notices to the owner (count only, first at once, then daily, `app.leads_waiting_text`
   mirrored by `leadsWaitingText()`; `crm-suspended-lead-notices`). A new redefinition of `intake_submit` must keep
   `app.org_takes_leads` and the `v_rotation_closed` lines.
+- Business deletion (ADM-03, migrations 021272-021274, 021273 pasted by hand; owner (361) ב, (362) ב, (363) ב, (373) ג; privacy,
+  every plan; an independent review and two delta reviews): `public.org_deletion_request(org, typed_name)` (definer; the owner, aal2,
+  the name after btrim, 3 a day) then the server asks Supabase Auth to email a reauthentication code (`auth.reauthenticate()`, the
+  user's session; SMTP is Resend) and `public.org_deletion_confirm(org, code)` checks it in the database against
+  `auth.users.reauthentication_token` = hex(SHA-224(email || code)), sent after the request and within 3,600 s; 5 wrong codes end the
+  request and 5 per person and sent code end the code across businesses (`app.org_deletion_code_tries`, row made first then locked);
+  refused while the account's email is changing (keep Supabase's "Secure email change" ON). Then 30 days: `app.org_deletion_pending`
+  makes `app.org_writable`, `app.org_takes_leads` and `app.org_public_pages_open` false (status untouched; the privacy-request page stays
+  open through `app.org_public_pages_open_base`), the policies that refuse writes while closed use `app.org_write_blocked` (021274),
+  `transfer_ownership` refuses (hint `org_deletion:read_only`); `public.org_deletion_cancel` (owner) undoes it at once;
+  `org_deletion_status` feeds the banner and `/settings/delete-business`. pg_cron `crm-org-deletions` (02:13 UTC,
+  `app.run_org_deletions`) runs the pasted `app.org_deletion_purge(org)` for a due request (021193's removal as a function: files
+  queued for the cleanup, then the cascade; accounts and profiles stay) and `app.purge_old_org_deletion_code_tries`. Kept as history:
+  `app.org_deletions` (ids and times only). The advisor's findings on the four definer RPCs and the two app tables are expected.
 - Individual permissions (PRM-01, migrations 020000-020020; owner 15 October 2026, plan capability `granular_permissions`):
   `public.member_permissions` (one row per org and user, keys from the closed list `app.member_permission_keys()` mirrored by
   `MEMBER_PERMISSIONS`; clients read their own row, owners/admins all; written only by `set_member_permissions()`, which refuses a

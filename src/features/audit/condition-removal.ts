@@ -56,6 +56,13 @@ export function auditEntryNote(action: string, changes: Json, terms: OrgTerms = 
     if (changes.link === "revoked") return "הקישור ללקוח בוטל";
     return null;
   }
+  // ADM-03: the steps of a business deletion
+  if (action === "org_deletion") {
+    if (changes.step === "requested") return "בעל העסק ביקש למחוק את העסק (ממתין לאישור בקישור באימייל)";
+    if (changes.step === "confirmed") return "בעל העסק אישר את מחיקת העסק בקישור באימייל; העסק במצב קריאה בלבד עד המחיקה";
+    if (changes.step === "cancelled") return "בעל העסק ביטל את מחיקת העסק";
+    return null;
+  }
   if (action === "email_attachments") return emailAttachmentsNote(changes);
   if (action === "retention_policy") return retentionPolicyNote(changes);
   if (action === "retention_purge" && typeof changes.count === "number") {

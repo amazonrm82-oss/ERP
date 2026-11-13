@@ -7,6 +7,7 @@ import { buttonClasses } from "@/components/ui/button";
 import { Wordmark } from "@/components/wordmark";
 import { OrgLogo } from "@/features/branding/components/org-logo";
 import { getOrgBranding } from "@/features/branding/queries";
+import { OrgDeletionBanner } from "@/features/org-deletion/components/org-deletion-banner";
 import { SendingPauseBanner } from "@/features/sending-pause/components/sending-pause-banner";
 import { RememberOrg } from "@/features/shortcuts/components/remember-org";
 import { withOrdersPlan } from "@/features/modules/modules";
@@ -227,6 +228,9 @@ export default async function OrgLayout({ children, params }: Props) {
 
       {/* HEB-09: automatic sending to customers is paused */}
       <SendingPauseBanner orgId={org.id} admin={isAdminRole(context.role)} timeZone={org.timeZone} />
+
+      {/* ADM-03: the business waits to be deleted (read-only until then) */}
+      <OrgDeletionBanner orgId={org.id} owner={context.role === "owner" && !context.supportUntil} timeZone={org.timeZone} />
 
       {/* bottom padding leaves room for the phone navigation bar */}
       <main id="main" className="mx-auto w-full max-w-6xl px-4 pt-5 pb-24 sm:px-6 sm:pt-7 md:pb-12">

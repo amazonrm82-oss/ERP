@@ -4714,6 +4714,11 @@ export type Database = {
       business_card_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       // BIZ-01: the public business page (service_role only)
       business_page_link_create: { Args: { p_org: string }; Returns: string };
+      // ADM-03: deleting the business (owner, aal2, typed name, Supabase Auth's emailed reauthentication code; 30 days read-only, then removed)
+      org_deletion_request: { Args: { p_org: string; p_typed_name: string }; Returns: Json };
+      org_deletion_confirm: { Args: { p_org: string; p_code: string }; Returns: Json };
+      org_deletion_cancel: { Args: { p_org: string }; Returns: Json };
+      org_deletion_status: { Args: { p_org: string }; Returns: Json };
       // BIZ-05: the personal prefill link (staff) and the customer's page (service_role only)
       prefill_link_create: { Args: { p_org: string; p_form: string; p_record_type: string; p_record_id: string }; Returns: string };
       prefill_link_revoke: { Args: { p_org: string; p_link: string }; Returns: boolean };

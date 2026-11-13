@@ -6,6 +6,7 @@ import { orderPath } from "@/features/orders/paths";
 import { privacyRequestPath, privacyRequestsPath } from "@/features/privacy-requests/paths";
 import { quotePath } from "@/features/quotes/paths";
 import { documentSettingsPath } from "@/features/tax/paths";
+import { orgDeletionPath } from "@/features/org-deletion/paths";
 import { paths } from "@/lib/paths";
 
 /** Where a notification leads: the record it is about, or nowhere. */
@@ -53,6 +54,9 @@ export function notificationHref(orgId: string, entityType: string | null, entit
     case "lead_retention_binned":
       return paths.settingsTrash(orgId);
     // USR-12 / ADM-05: support changed the status of a request; the support page lists it
+    // ADM-03: the business is to be deleted, or the deletion was cancelled (the id is the business)
+    case "org_deletion":
+      return orgDeletionPath(orgId);
     case "support_request":
       return paths.support(orgId);
     // DQL-03: the weekly cleanup suggestions (the id is the business)

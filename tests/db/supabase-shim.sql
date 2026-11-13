@@ -27,7 +27,13 @@ create table auth.users (
   email              text unique,
   raw_user_meta_data jsonb not null default '{}'::jsonb,
   last_sign_in_at    timestamptz,
-  created_at         timestamptz not null default now()
+  created_at         timestamptz not null default now(),
+  -- Supabase Auth's reauthentication code (ADM-03 reads it): hex SHA-224 of email || code, and when it was sent
+  reauthentication_token    varchar(255) default '',
+  reauthentication_sent_at  timestamptz,
+  -- an email change Supabase Auth has not finished (ADM-03 refuses to confirm while one is open)
+  email_change              varchar(255),
+  email_change_sent_at      timestamptz
 );
 
 -- the parts of Supabase Auth's own tables that the app reads

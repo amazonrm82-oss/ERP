@@ -28,6 +28,7 @@ import { consentBlocklistPath } from "@/features/consent-blocklist/paths";
 import { conversionMapSettingsPath } from "@/features/conversion-map/paths";
 import { leadScoreSettingsPath } from "@/features/lead-score/paths";
 import { retentionSettingsPath } from "@/features/lead-retention/paths";
+import { orgDeletionPath } from "@/features/org-deletion/paths";
 import { privacyCenterPath } from "@/features/privacy-center/paths";
 import { privacyRequestsPath } from "@/features/privacy-requests/paths";
 import { meetingTypesPath } from "@/features/meeting-types/paths";
@@ -88,6 +89,8 @@ export type SettingsAccess = {
   keptQuotes?: boolean;
   // PKG-03: the plan holds the 'punch_cards' capability; without it the punch card alerts section is hidden
   punchCards?: boolean;
+  // ADM-03: only the business's owner asks to delete it
+  owner?: boolean;
 };
 
 /**
@@ -115,6 +118,7 @@ export function settingsAccessFor(input: {
     catalog: canEditCatalog(role, granted),
     automations: canManageAutomations(role, granted),
     keptQuotes: admin || role === "manager",
+    owner: role === "owner",
   };
 }
 
@@ -287,6 +291,10 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         // PRV-01: owners and admins only (privacy, every plan)
         ...(access.admin
           ? [{ href: retentionSettingsPath(orgId), label: "מדיניות שמירה", description: "רשומות בלי קשר חודשים ארוכים עוברות לסל המחזור, עם רשימה מראש", icon: TrashIcon }]
+          : []),
+        // ADM-03: the owner only (privacy, every plan)
+        ...(access.owner
+          ? [{ href: orgDeletionPath(orgId), label: "מחיקת העסק", description: "מחיקת כל נתוני העסק וקבציו, אחרי אישור באימייל ו-30 יום שאפשר לבטל בהם", icon: TrashIcon }]
           : []),
       ],
     },
