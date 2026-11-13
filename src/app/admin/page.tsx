@@ -5,7 +5,8 @@ import { BarList } from "@/components/ui/chart";
 import { PageHeader } from "@/components/ui/page-header";
 import { ORG_STATUS_LABELS } from "@/features/platform/labels";
 import { consentHealthWarnings, getConsentHealth, getPlatformMetrics, platformReady } from "@/features/platform/queries";
-import { getSupportRequestCounts } from "@/features/platform/support-queries";
+import { emailKeyRefusedText } from "@/features/platform/email-health";
+import { getEmailHealth, getSupportRequestCounts } from "@/features/platform/support-queries";
 import { paths } from "@/lib/paths";
 import { formatMoney, formatNumber } from "@/lib/format";
 
@@ -20,6 +21,8 @@ export default async function AdminHomePage() {
   const warnings = me.role === "owner" || me.role === "support" ? consentHealthWarnings(await getConsentHealth()) : [];
   // ADM-05 (owner (48) ג): open support requests, for the platform owner and support only
   const support = me.role === "owner" || me.role === "support" ? await getSupportRequestCounts() : null;
+  // EML-01 owner (7) ב: emails stopped because Resend refused our key (counts only)
+  const emailWarning = me.role === "owner" || me.role === "support" ? emailKeyRefusedText(await getEmailHealth()) : null;
   const conversion = (m.trial_conversion ?? {}) as Obj;
   const health = (m.health ?? {}) as Obj;
   const ended = n(conversion.ended);
@@ -55,6 +58,14 @@ export default async function AdminHomePage() {
               <li key={line}>{line}</li>
             ))}
           </ul>
+        </section>
+      ) : null}
+      {emailWarning ? (
+        <section role="alert" aria-labelledby="email-health" className="mb-5 rounded-lg border border-warning bg-warning-soft px-4 py-3 text-warning sm:px-5">
+          <h2 id="email-health" className="font-semibold">
+            שליחת מיילים נעצרה
+          </h2>
+          <p className="mt-1 text-md">{emailWarning}</p>
         </section>
       ) : null}
       {support ? (

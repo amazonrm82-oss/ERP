@@ -1,3 +1,5 @@
+import { logEvent, type LogFields } from "@/lib/log";
+
 import type { MessagingProvider, ProviderResult } from "./types";
 
 type Env = Record<string, string | undefined>;
@@ -17,7 +19,9 @@ type Env = Record<string, string | undefined>;
  *   {from: "<business> <RESEND_FROM>", to: [address], subject, text, html, reply_to?, headers?: List-Unsubscribe,
  *    attachments?: [{filename, content (base64), content_type}]}
  *   answer 200 {id}; 429 = throttled; 4xx = refused (nothing sent); 5xx = unknown.
- *   Retried only for a 429 (and 401/403, our key refused: nothing was sent) and a failure before any connection; a timeout,
+ *   Retried only for a 429 and a failure before any connection; a 401/403 (our key refused: nothing was sent) ends the job
+ *   at once, final, code 'key_refused' (owner's answer (7) ב, 13 November 2026), with one error line `email.key_refused`
+ *   (ids only) and the warning on the platform panel's dashboard (public.platform_email_health); a timeout,
  *   a 5xx, a 409 (the idempotency key already used) or an unreadable answer ends the job "unknown" (it may have been sent:
  *   never a second send).
  * Everything sent is ONLY what public.email_job_compose answered (the database fills and judges it) and the files read at
@@ -138,11 +142,14 @@ const fail = (code: string, final: boolean): ProviderResult => ({ ok: false, err
 // not sent (checked before the request, no connection made, or refused by Resend), so the count goes back
 const notSent = (code: string, final: boolean): ProviderResult => ({ ok: false, error: `resend ${code}`, code, final, notSent: true });
 
-export function createResendProvider(env: Env = process.env, deps: { fetch?: Fetch } = {}): MessagingProvider | null {
+type Log = (level: "error", event: string, fields: LogFields) => void;
+
+export function createResendProvider(env: Env = process.env, deps: { fetch?: Fetch; log?: Log } = {}): MessagingProvider | null {
   if (!resendAccountReady(env)) return null;
   const key = `${env.RESEND_API_KEY?.trim()}`;
   const from = fromAddress(env) as string;
   const doFetch: Fetch = deps.fetch ?? ((input, init) => fetch(input, init));
+  const log: Log = deps.log ?? logEvent;
   return {
     name: "resend",
     channel: "email",
@@ -198,8 +205,12 @@ export function createResendProvider(env: Env = process.env, deps: { fetch?: Fet
       }
       // throttled: tried again, still counted
       if (response.status === 429) return fail("http_429", false);
-      // our key refused (a setting to fix): nothing was sent, tried again
-      if (response.status === 401 || response.status === 403) return notSent(`http_${response.status}`, false);
+      // owner (7) ב: our key refused (a setting to fix): nothing was sent; the job ends at once, never tried again, and the
+      // count goes back. One error line with ids only (never the address, the text or the key).
+      if (response.status === 401 || response.status === 403) {
+        log("error", "email.key_refused", { job_id: message.jobId, org_id: message.organizationId, status: `http_${response.status}` });
+        return notSent("key_refused", true);
+      }
       // the idempotency key was used already (or is in flight): it may have been sent
       if (response.status === 409 || response.status >= 500) return fail(`unknown_http_${response.status}`, true);
       // any other 4xx: Resend refused the request, nothing was sent

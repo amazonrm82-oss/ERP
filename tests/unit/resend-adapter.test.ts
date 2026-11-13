@@ -103,10 +103,11 @@ describe("EML-01: the Resend adapter", () => {
     expect(body).not.toHaveProperty("attachments");
   });
 
-  it("retries only a throttle, a refused key and a failure before any connection; anything that may have gone out is unknown and final", async () => {
-    const send = (response: Response | Error) => createResendProvider(ENV, { fetch: async () => { if (response instanceof Error) throw response; return response; } })!.send(message(email()));
+  it("retries only a throttle and a failure before any connection; anything that may have gone out is unknown and final", async () => {
+    const send = (response: Response | Error) =>
+      createResendProvider(ENV, { fetch: async () => { if (response instanceof Error) throw response; return response; }, log: () => undefined })!.send(message(email()));
     await expect(send(answer({ message: "slow down" }, 429))).resolves.toEqual({ ok: false, error: "resend http_429", code: "http_429", final: false });
-    await expect(send(answer({}, 401))).resolves.toMatchObject({ code: "http_401", final: false, notSent: true });
+    await expect(send(answer({}, 401))).resolves.toMatchObject({ code: "key_refused", final: true, notSent: true });
     await expect(send(answer({ name: "validation_error" }, 422))).resolves.toMatchObject({ code: "http_422", final: true, notSent: true });
     await expect(send(answer({}, 409))).resolves.toEqual({ ok: false, error: "resend unknown_http_409", code: "unknown_http_409", final: true });
     await expect(send(answer({}, 500))).resolves.toMatchObject({ code: "unknown_http_500", final: true });
@@ -329,6 +330,37 @@ describe("EML-01: the send handler asks the email composer for a composing provi
       },
     });
     expect(await slow(job)).toEqual({ status: "failed", error: "attachment unavailable" });
+  });
+
+  it("owner (7) ב: a refused key (401/403) ends the job at once, not sent, with one error line of ids only", async () => {
+    for (const status of [401, 403]) {
+      const log = vi.fn();
+      const result = await createResendProvider(ENV, { fetch: async () => answer({ message: "API key is invalid" }, status), log })!.send(message(email()));
+      expect(result).toEqual({ ok: false, error: "resend key_refused", code: "key_refused", final: true, notSent: true });
+      expect(log).toHaveBeenCalledTimes(1);
+      expect(log).toHaveBeenCalledWith("error", "email.key_refused", { job_id: JOB, org_id: ORG, status: `http_${status}` });
+      const line = JSON.stringify(log.mock.calls);
+      for (const secret of ["re_test_123", "dana@example.com", "noreply@mexuz.test", "שלום"]) expect(line).not.toContain(secret);
+    }
+    // a temporary failure is unchanged: a throttle is tried again, a 5xx ends unknown (it may have been sent), no key line
+    const log = vi.fn();
+    await expect(createResendProvider(ENV, { fetch: async () => answer({}, 429), log })!.send(message(email()))).resolves.toMatchObject({ code: "http_429", final: false });
+    await expect(createResendProvider(ENV, { fetch: async () => answer({}, 503), log })!.send(message(email()))).resolves.toMatchObject({ code: "unknown_http_503", final: true });
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it("gives the email count back for a refused key, once, and the job ends final with the code", async () => {
+    const returnEmailQuota = vi.fn(async () => ({ returned: true }));
+    const refused = { ok: false as const, error: "resend key_refused", code: "key_refused", final: true, notSent: true };
+    const outcome = await createSendHandler({
+      maySend: async () => ({ may_send: true }),
+      composeEmail: async () => ({ ...composed, attachments: [] }),
+      loadAttachment: async () => "x",
+      returnEmailQuota,
+      providerFor: () => ({ name: "resend", channel: "email", composes: true, send: async () => refused }),
+    })(job);
+    expect(returnEmailQuota).toHaveBeenCalledTimes(1);
+    expect(outcome).toMatchObject({ status: "failed", final: true, receipt: { provider: "resend", errorCode: "key_refused" } });
   });
 
   it("gives the email count back only for a message that never reached Resend", async () => {

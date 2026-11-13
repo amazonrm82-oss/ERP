@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { addMember, asAdmin, asService, asUser, closePool, createOrg, createUser, defaultPipeline, insertLead } from "./helpers";
+import { addMember, asAdmin, asMfaUser, asService, asUser, closePool, createOrg, createUser, defaultPipeline, insertLead, pgError } from "./helpers";
 
 // the owner fills app.settings 'consent_hash_key' per environment; the tests use their own
 const KEY = "test-consent-key";
@@ -16,9 +16,11 @@ type Answer = Record<string, unknown>;
 // Rechecked after the independent review of lane/n-eml05: the core also answers `links` (only the https URLs it put in the
 // text itself: the minted links and the stored review link); nothing else changed.
 // Then the delta review of 6b981972 (2): only a plain https URL (no space, quote or angle bracket) is listed in `links`.
+// Then 021278 (owner's answer (8) ב, 13 November 2026): an automation's email (automation_id, no reply_to_user_id) answers to
+// the record's owner (a deal's email: the deal's owner) while an active member with a plain address; only those lines added.
 const REVIEWED_MD5: Record<string, string> = {
   "email_job_compose(uuid,uuid,text)": "c5c2ae88f99865569bd24ddf80c2168f",
-  "app.email_compose_core(uuid,uuid,text)": "8431ab58312d5fa19a12fb0f37079d9e",
+  "app.email_compose_core(uuid,uuid,text)": "e57db159309a421faa1ca3eede225198",
   "app.email_usage_give_back(uuid)": "c952eaea4bb85cf196cf49280e8b7816",
   "email_quota_return(uuid,uuid)": "9a75bbbe4baa464daf175f376f2be501",
 };
@@ -363,6 +365,55 @@ describe("the email composer (EML-01, Resend)", () => {
     }
   });
 
+  it("owner (8) ב: an automation's email answers to the record's owner (a deal's email: the deal's owner), else none", async () => {
+    const RULE = "77777777-7777-4777-8777-777777777777";
+    const t = await template(org, { type: "requested_document", body: "שלום {שם פרטי}" });
+    const emailOf = (user: string) => asAdmin(async (q) => (await q<{ e: string }>("select email as e from auth.users where id = $1", [user])).rows[0].e);
+    const memberEmail = await emailOf(member.id);
+    const ownerEmail = await emailOf(owner.id);
+
+    // a lead's owner
+    const lead = await insertLead(member.id, org, { full_name: "שיר", email: "shir@example.test", owner_id: member.id });
+    let job = await prepared(org, { channel: "email", message_type: "requested_document", template_id: t, lead_id: lead, automation_id: RULE });
+    expect(await compose(job)).toMatchObject({ to: "shir@example.test", reply_to: memberEmail });
+    // a button run (pressed_by_user_id) is still the rule's email: the record's owner, not the presser
+    job = await prepared(org, { channel: "email", message_type: "requested_document", template_id: t, lead_id: lead, automation_id: RULE, pressed_by_user_id: owner.id });
+    expect(await compose(job)).toMatchObject({ reply_to: memberEmail });
+
+    // a contact's owner
+    const c = await contact(member.id, org, "rule-contact@example.test");
+    job = await prepared(org, { channel: "email", message_type: "requested_document", template_id: t, contact_id: c, automation_id: RULE });
+    expect(await compose(job)).toMatchObject({ reply_to: memberEmail });
+
+    // a deal's email: the deal's owner, not the contact's
+    const { pipelineId, stages } = await defaultPipeline(org);
+    const deal = await asAdmin(
+      async (q) =>
+        (await q<{ id: string }>("insert into public.deals (organization_id, name, pipeline_id, stage_id, contact_id, owner_id) values ($1, 'ע', $2, $3, $4, $5) returning id", [org, pipelineId, stages[0].id, c, owner.id]))
+          .rows[0].id,
+    );
+    job = await prepared(org, { channel: "email", message_type: "requested_document", template_id: t, contact_id: c, deal_id: deal, automation_id: RULE });
+    expect(await compose(job)).toMatchObject({ to: "rule-contact@example.test", reply_to: ownerEmail });
+
+    // no owner, or an owner who is no longer an active member: no reply-to
+    const unowned = await insertLead(owner.id, org, { full_name: "אין", email: "none@example.test" });
+    await asAdmin((q) => q("update public.leads set owner_id = null where id = $1", [unowned]));
+    job = await prepared(org, { channel: "email", message_type: "requested_document", template_id: t, lead_id: unowned, automation_id: RULE });
+    expect(await compose(job)).toMatchObject({ to: "none@example.test", reply_to: null });
+    const leaver = await addMember(org, owner.id, "member", "ecompose-rule-leaver");
+    const left = await insertLead(owner.id, org, { full_name: "עזב", email: "left@example.test", owner_id: leaver.id });
+    job = await prepared(org, { channel: "email", message_type: "requested_document", template_id: t, lead_id: left, automation_id: RULE });
+    await asAdmin((q) => q("update public.memberships set status = 'suspended' where organization_id = $1 and user_id = $2", [org, leaver.id]));
+    expect(await compose(job)).toMatchObject({ to: "left@example.test", reply_to: null });
+
+    // a card send keeps the sending person's address, whoever owns the record
+    job = await prepared(org, { channel: "email", message_type: "requested_document", template_id: t, lead_id: lead, reply_to_user_id: owner.id });
+    expect(await compose(job)).toMatchObject({ reply_to: ownerEmail });
+    // a job with neither (a system message) has none
+    job = await prepared(org, { channel: "email", message_type: "requested_document", template_id: t, lead_id: lead });
+    expect(await compose(job)).toMatchObject({ reply_to: null });
+  });
+
   it("refuses a card's email from a system template, a collection email without the keys, and a deal whose contact changed", async () => {
     const c = await contact(owner.id, org, "card@example.test");
     const notice = await template(org, { type: "requested_document", notice: "signature_reminder", body: "שלום {שם פרטי}" });
@@ -660,6 +711,43 @@ describe("the email composer (EML-01, Resend)", () => {
     const sms = await template(org, { type: "requested_document", channel: "sms", body: "שלום" });
     const smsJob = await prepared(org, { channel: "sms", message_type: "requested_document", template_id: sms, lead_id: lead });
     expect(await back(smsJob)).toEqual({ refused: "stale" });
+  });
+
+  it("owner (7) ב: the platform's dashboard counts the emails a refused key stopped, for platform owner and support only", async () => {
+    const support = await createUser("ecompose-platform-support");
+    const finance = await createUser("ecompose-platform-finance");
+    const staff = (id: string, role: string) =>
+      asAdmin((q) => q("insert into app.platform_staff (user_id, role) values ($1, $2) on conflict (user_id) do update set role = excluded.role", [id, role]));
+    await staff(support.id, "support");
+    await staff(finance.id, "finance");
+    try {
+      const health = (user: string) => asMfaUser(user, async (q) => (await q<{ h: Answer }>("select public.platform_email_health() as h")).rows[0].h);
+      const before = Number((await health(support.id)).key_refused_24h);
+      const lead = await insertLead(owner.id, org, { full_name: "מפתח", email: "key@example.test", owner_id: owner.id });
+      const t = await template(org, { type: "requested_document", body: "שלום {שם פרטי}" });
+      const finish = (job: Claimed, code: string) =>
+        asService((q) => q("select public.finish_job($1, $2, false, 'resend ' || $3, true, true, 'resend', null, $3)", [job.id, job.lease, code]));
+      await finish(await prepared(org, { channel: "email", message_type: "requested_document", template_id: t, lead_id: lead }), "key_refused");
+      await finish(await prepared(org, { channel: "email", message_type: "requested_document", template_id: t, lead_id: lead }), "key_refused");
+      // another failure, and a stop older than 24 hours, are not counted
+      await finish(await prepared(org, { channel: "email", message_type: "requested_document", template_id: t, lead_id: lead }), "http_422");
+      const old = await prepared(org, { channel: "email", message_type: "requested_document", template_id: t, lead_id: lead });
+      await finish(old, "key_refused");
+      await asAdmin((q) => q("update app.jobs set finished_at = now() - interval '25 hours' where id = $1", [old.id]));
+      const answer = await health(support.id);
+      expect(Object.keys(answer).sort()).toEqual(["key_refused_24h", "last_key_refused_at"]);
+      expect(Number(answer.key_refused_24h)).toBe(before + 2);
+      expect(answer.last_key_refused_at).not.toBeNull();
+      // other platform roles, a session without the second factor and a business member are refused
+      expect((await pgError(asMfaUser(finance.id, (q) => q("select public.platform_email_health()")))).code).toBe("42501");
+      expect((await pgError(asUser(support.id, (q) => q("select public.platform_email_health()")))).code).toBe("42501");
+      expect((await pgError(asMfaUser(owner.id, (q) => q("select public.platform_email_health()")))).code).toBe("42501");
+      const acl = await asAdmin(async (q) => (await q<{ a: string }>("select array_to_string(proacl, ',') as a from pg_proc where oid = 'public.platform_email_health()'::regprocedure")).rows[0].a);
+      expect(acl).not.toMatch(/(^|,)anon=/);
+      expect(acl).not.toMatch(/(^|,)=X/);
+    } finally {
+      await asAdmin((q) => q("delete from app.platform_staff where user_id = any($1)", [[support.id, finance.id]]));
+    }
   });
 
   it("is pinned as reviewed, service_role only", async () => {
