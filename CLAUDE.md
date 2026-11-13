@@ -2542,7 +2542,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   nothing is ever deleted) and new-lead notices to the owner (count only, first at once, then daily, `app.leads_waiting_text`
   mirrored by `leadsWaitingText()`; `crm-suspended-lead-notices`). A new redefinition of `intake_submit` must keep
   `app.org_takes_leads` and the `v_rotation_closed` lines.
-- Business deletion (ADM-03, migrations 021272-021274, 021273 pasted by hand; owner (361) ב, (362) ב, (363) ב, (373) ג; privacy,
+- Business deletion (ADM-03, migrations 021272-021274, 021273 pasted by hand, md5 checked 13 November 2026; owner (361) ב, (362) ב, (363) ב, (373) ג; privacy,
   every plan; an independent review and two delta reviews): `public.org_deletion_request(org, typed_name)` (definer; the owner, aal2,
   the name after btrim, 3 a day) then the server asks Supabase Auth to email a reauthentication code (`auth.reauthenticate()`, the
   user's session; SMTP is Resend) and `public.org_deletion_confirm(org, code)` checks it in the database against
