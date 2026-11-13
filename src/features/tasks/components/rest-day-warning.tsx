@@ -67,7 +67,8 @@ export function RestDayWarning({
   }
 
   return (
-    <div ref={ref} aria-live="polite">
+    // data-rest-day-warning: the screenshot run (tests/visual/stabilize.mjs) finds the field this warning watches by it
+    <div ref={ref} aria-live="polite" data-rest-day-warning="">
       {note ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-warning/40 bg-warning-soft px-3 py-2 text-sm text-warning">
           <p className="min-w-0 flex-[1_1_12rem]">{note.text}</p>

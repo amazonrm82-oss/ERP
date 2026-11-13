@@ -258,10 +258,21 @@ describe("anomaly alerts (MNY-04)", () => {
       const found = [...def.matchAll(/exists \((select 1 from app\.jobs j[\s\S]*?and j\.created_at < p_to)\)/g)].map((m) => m[1]).filter((t) => t.includes(`'${key}'`));
       expect(found, key).toHaveLength(1);
       const sql = found[0].replace(/p_org/g, "$1::uuid").replace(/p_user/g, "$2::uuid").replace(/p_from/g, "$3::timestamptz").replace(/p_to/g, "$4::timestamptz");
-      const plan = await asAdmin(async (q) => {
-        await q("set local enable_seqscan = off");
-        return (await q<{ "QUERY PLAN": string }>(`explain ${sql}`, [org, owner.id, ago(30), NOW])).rows.map((r) => r["QUERY PLAN"]).join("\n");
-      });
+      // on a small table PostgreSQL 17 may cost the generic jobs_org_idx the same as the partial index and pick it; what this
+      // test proves is that the query CAN be served by its partial sender index, so the generic one is hidden for the plan only,
+      // inside a transaction that is always rolled back (as the refusal test below does)
+      const client = new Client({ connectionString: TEST_DB_URL });
+      await client.connect();
+      let plan: string;
+      try {
+        await client.query("begin");
+        await client.query("set local enable_seqscan = off");
+        await client.query("drop index app.jobs_org_idx");
+        plan = (await client.query<{ "QUERY PLAN": string }>(`explain ${sql}`, [org, owner.id, ago(30), NOW])).rows.map((r) => r["QUERY PLAN"]).join("\n");
+      } finally {
+        await client.query("rollback").catch(() => undefined);
+        await client.end();
+      }
       expect(plan, key).toMatch(/(Index Scan|Index Only Scan|Bitmap Index Scan) (Backward )?(using|on) jobs_record_\w+/);
       expect(plan, key).not.toMatch(/Seq Scan/);
     }

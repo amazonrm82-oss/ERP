@@ -79,6 +79,15 @@ export function stabilizePage({ css, patterns, mask, hide }) {
     else if (input.value && re.test(input.value)) input.value = input.value.replace(re, mask);
     re.lastIndex = 0;
   }
+  // a rest-day warning was worked out from the real date the page opened with: tell it the fixed date (2026-01-01, a
+  // Thursday), so the shot does not change when the run falls on a rest day in Israel. Only the date fields of a form that
+  // holds such a warning get the events, so no other screen reacts.
+  for (const warning of document.querySelectorAll("[data-rest-day-warning]")) {
+    for (const input of warning.closest("form")?.querySelectorAll('input[type="date"]') ?? []) {
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  }
   for (const media of document.querySelectorAll("video, audio")) {
     media.pause();
     media.currentTime = 0;
