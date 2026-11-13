@@ -3,11 +3,13 @@
 // applied by the database (app.apply_notification_settings, migration
 // notification_quiet_hours): during the window the bell gets the notification at
 // once and the phone push waits for the window's end, in the business's time zone.
+// New leads, meeting reminders and system notices are never held, and saving
+// quiet hours judges the waiting pushes again at once (migration quiet_hours_answers).
 // This file only reads and checks the form; the window itself is never worked out here.
 
 export type QuietHours = { from: string; until: string } | null;
 
-export const QUIET_HOURS_HELP = "בשעות השקט ההתראות מופיעות בפעמון, וההתראה לטלפון נשלחת בסוף השעות";
+export const QUIET_HOURS_HELP = "בשעות השקט ההתראות מופיעות בפעמון, וההתראה לטלפון נשלחת בסוף השעות. ליד חדש, תזכורת לפגישה והודעות מערכת נשלחים לטלפון מיד";
 
 /** Defaults offered when the switch is turned on for the first time. */
 export const QUIET_HOURS_DEFAULT = { from: "22:00", until: "07:00" } as const;

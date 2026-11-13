@@ -5,7 +5,9 @@ import { addMember, asAdmin, asAnon, asService, asUser, closePool, createOrg, cr
 afterAll(closePool);
 
 // USR-11 (first part): quiet hours. During the user's window (in the business's time zone) the bell gets the notification at
-// once and only the phone push waits until the window ends; 'system' is never held; muted and bell-only kinds keep their rules.
+// once and only the phone push waits until the window ends; 'system', 'lead_new' and 'meeting_reminder' are never held (answer
+// (5) ב); muted and bell-only kinds keep their rules; saving quiet hours judges held pushes again (answer (4) ב); the end is the
+// wall-clock end, never earlier (answer (6) ב).
 
 type Claimed = { id: string; user_id: string };
 
@@ -39,19 +41,23 @@ describe("the quiet window (app.quiet_hours_end)", () => {
     expect(await endOf("22:00", "07:00", "America/New_York", "2026-11-14T03:30:00Z")).toBe("2026-11-14T12:00");
   });
 
-  it("Israel's spring change: the window is an hour shorter and ends at its wall-clock end", async () => {
+  it("Israel's spring change: the window ends at its wall-clock end; an end the clock jumps over ends at the jump", async () => {
     // 27 March 2026: 02:00 IST jumps to 03:00 IDT (00:00 UTC). 04:00 IDT, a 22:00-07:00 window: ends 07:00 IDT = 04:00 UTC
     expect(await endOf("22:00", "07:00", "Asia/Jerusalem", "2026-03-27T01:00:00Z")).toBe("2026-03-27T04:00");
-    // 01:30 IST in a 01:00-03:30 window: held until 03:30 IDT (00:30 UTC), one hour, never more than the 2.5 hours
+    // 01:30 IST in a 01:00-03:30 window: held until 03:30 IDT (00:30 UTC)
     expect(await endOf("01:00", "03:30", "Asia/Jerusalem", "2026-03-26T23:30:00Z")).toBe("2026-03-27T00:30");
+    // 01:30 IST in a 01:00-02:30 window: 02:30 never happens that night; the first instant after it is 03:00 IDT (00:00 UTC)
+    expect(await endOf("01:00", "02:30", "Asia/Jerusalem", "2026-03-26T23:30:00Z")).toBe("2026-03-27T00:00");
   });
 
-  it("Israel's autumn change: never held longer than the window's own length", async () => {
-    // 25 October 2026: 02:00 IDT falls back to 01:00 IST (23:00 UTC). A 22:00-07:00 window began at 19:00 UTC: 9 hours = 04:00 UTC
-    // (its wall-clock end, 07:00 IST, would be 05:00 UTC)
-    expect(await endOf("22:00", "07:00", "Asia/Jerusalem", "2026-10-25T01:00:00Z")).toBe("2026-10-25T04:00");
-    // 01:10 IDT in a 01:00-01:30 window (the hour that repeats): 30 minutes from the arrival at most, not until 01:30 IST
-    expect(await endOf("01:00", "01:30", "Asia/Jerusalem", "2026-10-24T22:10:00Z")).toBe("2026-10-24T22:40");
+  it("Israel's autumn change: the wall-clock end, never earlier, the first time the clock shows it", async () => {
+    // 25 October 2026: 02:00 IDT falls back to 01:00 IST (23:00 UTC). 03:00 IST in a 22:00-07:00 window: 07:00 IST = 05:00 UTC
+    // (10 hours after the window began; 021276 capped it at 9, answer (6) ב removed the cap)
+    expect(await endOf("22:00", "07:00", "Asia/Jerusalem", "2026-10-25T01:00:00Z")).toBe("2026-10-25T05:00");
+    // 01:10 IDT in a 01:00-01:30 window (the hour that repeats): the clock first shows 01:30 at 22:30 UTC (IDT)
+    expect(await endOf("01:00", "01:30", "Asia/Jerusalem", "2026-10-24T22:10:00Z")).toBe("2026-10-24T22:30");
+    // 01:10 IST, the second time round: ends at 01:30 IST = 23:30 UTC
+    expect(await endOf("01:00", "01:30", "Asia/Jerusalem", "2026-10-24T23:10:00Z")).toBe("2026-10-24T23:30");
   });
 
   it("off or equal ends never hold", async () => {
@@ -183,6 +189,71 @@ describe("quiet hours on notifications and the push claim", () => {
       return made;
     });
     expect(row).toEqual([{ push_after: null }]);
+  });
+
+  it("urgent kinds (new lead, meeting reminder) and system are never held, in the window too", async () => {
+    const hour = await localHour();
+    await setQuiet(rep, pad(hour - 1), pad(hour - 2));
+    expect(await asAdmin(async (q) => (await q<{ k: string[] }>("select app.quiet_hours_exempt_kinds() as k")).rows[0].k)).toEqual(["system", "lead_new", "meeting_reminder"]);
+    for (const kind of ["lead_new", "meeting_reminder", "system"]) {
+      const made = await notify(rep, kind, `דחוף ${kind}`);
+      expect(made).toMatchObject({ pushed: false, push_after: null });
+    }
+    expect((await notify(rep, "task_reminder", "לא דחוף")).push_after).not.toBeNull();
+  });
+
+  it("saving quiet hours judges the caller's held pushes again at once; other users and the two-argument call move nothing", async () => {
+    const pushAfter = (id: string) =>
+      asAdmin(async (q) => (await q<{ p: string | null; due: boolean }>("select push_after::text as p, push_after <= now() as due from public.notifications where id = $1", [id])).rows[0]);
+    const expectedEnd = (from: string, until: string) =>
+      asAdmin(async (q) => (await q<{ e: string | null }>("select app.quiet_hours_end($1::time, $2::time, 'Asia/Tokyo', now())::text as e", [from, until])).rows[0].e);
+
+    let hour = await localHour();
+    await setQuiet(rep, pad(hour - 1), pad(hour + 2));
+    await setQuiet(other, pad(hour - 1), pad(hour + 2));
+    const mine = await notify(rep, "task_reminder", "שלי מוחזק");
+    const theirs = await notify(other, "task_reminder", "של אחר מוחזק");
+    expect(mine.push_after).not.toBeNull();
+    expect(theirs.push_after).not.toBeNull();
+    const theirsBefore = (await pushAfter(theirs.id)).p;
+
+    // the two-argument call keeps the held push as it was
+    const before = (await pushAfter(mine.id)).p;
+    await asUser(rep, (q) => q("select public.set_notification_settings('{}'::text[], '{}'::text[])"));
+    expect((await pushAfter(mine.id)).p).toBe(before);
+
+    // a new window that still holds now: held until the new window's end
+    hour = await localHour();
+    await setQuiet(rep, pad(hour - 2), pad(hour + 3));
+    expect((await pushAfter(mine.id)).p).toBe(await expectedEnd(pad(hour - 2), pad(hour + 3)));
+
+    // an urgent kind held before answer (5) is released by the same save
+    const urgent = await notify(rep, "lead_new", "ליד ישן");
+    await asAdmin((q) => q("update public.notifications set push_after = now() + interval '2 hours' where id = $1", [urgent.id]));
+    hour = await localHour();
+    await setQuiet(rep, pad(hour - 2), pad(hour + 3));
+    expect((await pushAfter(urgent.id)).due).toBe(true);
+    expect((await pushAfter(mine.id)).due).toBe(false);
+
+    // a window that no longer holds now: released at once, and fresh for the claim even though it was made long ago
+    await asAdmin((q) => q("update public.notifications set created_at = now() - interval '5 hours' where id = $1", [mine.id]));
+    hour = await localHour();
+    await setQuiet(rep, pad(hour + 4), pad(hour + 6));
+    expect((await pushAfter(mine.id)).due).toBe(true);
+    expect((await claimMine([mine.id, theirs.id, urgent.id])).map((n) => n.id).sort()).toEqual([mine.id, urgent.id].sort());
+
+    // switching off releases what is still held
+    hour = await localHour();
+    await setQuiet(rep, pad(hour - 1), pad(hour + 2));
+    const again = await notify(rep, "task_reminder", "מוחזק שוב");
+    expect((await pushAfter(again.id)).due).toBe(false);
+    await setQuiet(rep, null, null);
+    expect((await pushAfter(again.id)).due).toBe(true);
+
+    // the other user's held push did not move
+    expect((await pushAfter(theirs.id)).p).toBe(theirsBefore);
+    await setQuiet(other, null, null);
+    expect((await pushAfter(theirs.id)).due).toBe(true);
   });
 
   it("the old two-argument function is out of the API; the new one is not for anon", async () => {
