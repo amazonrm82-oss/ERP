@@ -18,9 +18,10 @@ type Answer = Record<string, unknown>;
 // Then the delta review of 6b981972 (2): only a plain https URL (no space, quote or angle bracket) is listed in `links`.
 // Then 021278 (owner's answer (8) ב, 13 November 2026): an automation's email (automation_id, no reply_to_user_id) answers to
 // the record's owner (a deal's email: the deal's owner) while an active member with a plain address; only those lines added.
+// Then the review of 72b39957 (low): that owner must also not be a viewer (role <> 'viewer'); one condition added.
 const REVIEWED_MD5: Record<string, string> = {
   "email_job_compose(uuid,uuid,text)": "c5c2ae88f99865569bd24ddf80c2168f",
-  "app.email_compose_core(uuid,uuid,text)": "e57db159309a421faa1ca3eede225198",
+  "app.email_compose_core(uuid,uuid,text)": "b38096b63dc3490c6a735463685566c4",
   "app.email_usage_give_back(uuid)": "c952eaea4bb85cf196cf49280e8b7816",
   "email_quota_return(uuid,uuid)": "9a75bbbe4baa464daf175f376f2be501",
 };
@@ -405,6 +406,12 @@ describe("the email composer (EML-01, Resend)", () => {
     job = await prepared(org, { channel: "email", message_type: "requested_document", template_id: t, lead_id: left, automation_id: RULE });
     await asAdmin((q) => q("update public.memberships set status = 'suspended' where organization_id = $1 and user_id = $2", [org, leaver.id]));
     expect(await compose(job)).toMatchObject({ to: "left@example.test", reply_to: null });
+    // an owner demoted to viewer is not answered to (the rule of quote_notice_recipients / create_quote's owner)
+    const viewer = await addMember(org, owner.id, "member", "ecompose-rule-viewer");
+    const viewed = await insertLead(owner.id, org, { full_name: "צופה", email: "viewer@example.test", owner_id: viewer.id });
+    job = await prepared(org, { channel: "email", message_type: "requested_document", template_id: t, lead_id: viewed, automation_id: RULE });
+    await asAdmin((q) => q("update public.memberships set role = 'viewer', seat_type = 'view' where organization_id = $1 and user_id = $2", [org, viewer.id]));
+    expect(await compose(job)).toMatchObject({ to: "viewer@example.test", reply_to: null });
 
     // a card send keeps the sending person's address, whoever owns the record
     job = await prepared(org, { channel: "email", message_type: "requested_document", template_id: t, lead_id: lead, reply_to_user_id: owner.id });

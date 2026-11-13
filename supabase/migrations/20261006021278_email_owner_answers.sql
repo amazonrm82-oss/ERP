@@ -6,7 +6,7 @@
 --   app.require_platform), counts only: email jobs that ended with 'key_refused' in the last 24 hours and the time of the
 --   last one. No address, text, business or job id goes out. Index jobs_key_refused_idx keeps the read small.
 -- (8) ב An automation's email (payload automation_id, no reply_to_user_id) gets as reply-to the email of the record's owner
---   (a lead's or contact's owner; for a deal's email the deal's owner) while that person is an active member of the business
+--   (a lead's or contact's owner; for a deal's email the deal's owner) while that person is an active member (not a viewer)
 --   and the address has a plain shape (app.email_address_ok), else none. A card send keeps the sending person's address.
 --   app.email_compose_core is defined again with the same signature; every other line of its 021275 body is unchanged.
 -- Every statement is safe to run twice; no row is removed here.
@@ -208,7 +208,8 @@ begin
     v_sender_admin := coalesce(v_sender_admin, false);
   end if;
   -- owner (8) ב (13 November 2026): an automation's email answers to the record's owner (a deal's email: the deal's owner)
-  -- while that person is an active member with a plain address, else no reply-to; a card send keeps the sender's address
+  -- while that person is an active member who is not a viewer, with a plain address, else no reply-to; a card send keeps
+  -- the sender's address
   if v_sender is null and v_job.payload ? 'automation_id' then
     if v_deal is not null then
       select dl.owner_id into v_reply_owner from public.deals dl where dl.organization_id = v_org.id and dl.id = v_deal;
@@ -217,7 +218,7 @@ begin
     end if;
     if v_reply_owner is not null and exists (select 1 from public.memberships ms
                                               where ms.organization_id = v_org.id and ms.user_id = v_reply_owner
-                                                and ms.status = 'active') then
+                                                and ms.status = 'active' and ms.role <> 'viewer') then
       select nullif(btrim(coalesce(u.email, '')), '') into v_reply from auth.users u where u.id = v_reply_owner;
       if not coalesce(app.email_address_ok(v_reply), false) then
         v_reply := null;
