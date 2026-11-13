@@ -3555,7 +3555,8 @@ order of names, the order of merges and the order of applying to the hosted proj
 5. Keep each requirement as one commit. Apply the batch's migrations to the hosted project in name
    order and verify each one (hard rule 3, Migrations); run the advisors once after the last. Then push
    once: the requirement commits together with one commit that marks the backlog and the decisions for
-   the whole batch. The next batch waits until CI is green on `main`.
+   the whole batch. The next batch waits until CI is green on `main`. Red because of a flaky test is no exception (RVW-88):
+   push the test's fix alone, wait for green, then apply and push the batch.
 6. Merged alone, never in a batch: a shared-ground branch (lane ד), and a branch that changes anything
    on the shared-ground list. It lands before any lane builds on it.
 7. A branch whose migration the owner must run by hand (the connector stop, see Migrations) steps out
