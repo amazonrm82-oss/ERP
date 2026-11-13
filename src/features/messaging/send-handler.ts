@@ -64,8 +64,10 @@ export function parseComposedEmail(data: unknown): ComposeEmailAnswer | null {
   if (typeof r.from_name !== "string") return null;
   if (r.reply_to !== null && !isAddress(r.reply_to)) return null;
   if (r.list_unsubscribe !== null && (typeof r.list_unsubscribe !== "string" || !/^https?:\/\/[^\s<>]+$/.test(r.list_unsubscribe))) return null;
-  if (!Array.isArray(r.links) || r.links.length > 10) return null;
-  if (!r.links.every((url) => typeof url === "string" && url.length <= 2048 && /^https:\/\/[^\s<>"']+$/.test(url))) return null;
+  // delta review (2): a link that is not a plain https URL is left out (it is then plain text), never a failed answer
+  const links = Array.isArray(r.links)
+    ? r.links.filter((url): url is string => typeof url === "string" && url.length <= 2048 && /^https:\/\/[^\s<>"']+$/.test(url)).slice(0, 10)
+    : [];
   if (!Array.isArray(r.attachments) || r.attachments.length > 5) return null;
   const attachments = r.attachments.map(parseAttachment);
   if (attachments.some((a) => a === null)) return null;
@@ -78,10 +80,31 @@ export function parseComposedEmail(data: unknown): ComposeEmailAnswer | null {
       text: r.text,
       replyTo: r.reply_to,
       listUnsubscribe: r.list_unsubscribe,
-      links: r.links as string[],
+      links,
       attachments: attachments as EmailAttachmentRef[],
     },
   };
+}
+
+/**
+ * EML-01 delta review (1): the time one email may take, at worst, from the send check to Resend's answer: every file read
+ * together (EMAIL_ATTACHMENT_READS_MS, when it has files), the provider's longest request for it, and a margin for the
+ * database calls. Known from the payload alone, before anything is checked, counted or minted.
+ */
+export const EMAIL_ATTACHMENT_READS_MS = 30_000;
+export const SEND_TIME_MARGIN_MS = 10_000;
+export function emailWorstCaseMs(attachmentCount: number, uploadMs: number): number {
+  return (attachmentCount > 0 ? EMAIL_ATTACHMENT_READS_MS : 0) + uploadMs + SEND_TIME_MARGIN_MS;
+}
+
+/** Whether a job is handed back uncounted (started = false) because the time left on its lease or the run is too short. */
+export function handBackForTime(timeLeftMs: number | null, worstCaseMs: number): boolean {
+  return timeLeftMs !== null && timeLeftMs < worstCaseMs;
+}
+
+function emailAttachmentCount(payload: Record<string, unknown>): number {
+  const count = (value: unknown) => (Array.isArray(value) ? value.length : 0);
+  return count(payload.file_ids) + count(payload.library_file_ids);
 }
 
 function parseAnswer(data: unknown): MaySendAnswer | null {
@@ -174,13 +197,25 @@ export function createSendHandler(deps: {
   composeEmail?: ComposeCall;
   returnEmailQuota?: ComposeCall;
   // EML-01: a file of the email, read at the path the composer answered (base64), null when it cannot be read now
-  loadAttachment?: (ref: EmailAttachmentRef, job: ClaimedJob) => Promise<string | null>;
+  // the time it may take is bounded by timeoutMs (what is left of the email's EMAIL_ATTACHMENT_READS_MS)
+  loadAttachment?: (ref: EmailAttachmentRef, job: ClaimedJob, timeoutMs: number) => Promise<string | null>;
+  // EML-01 delta review (1): the time left for this job, the lesser of its lease and the run (ms), null = unknown
+  timeLeftMs?: (job: ClaimedJob) => number | null;
+  now?: () => number;
 }): JobHandler {
+  const now = deps.now ?? Date.now;
   return async (job) => {
     const to = target(job);
     if (!to) return { status: "failed", error: "payload", final: true };
     const provider = deps.providerFor(to.channel);
     if (!provider || provider.channel !== to.channel) return { status: "failed", error: "no provider for channel" };
+    // EML-01 delta review (1): an email that may not finish within its lease or the run is handed back uncounted before the
+    // send check (nothing counted, nothing minted), so it is never cut off mid-upload
+    if (provider.composes && to.channel === "email" && deps.timeLeftMs) {
+      const count = emailAttachmentCount(job.payload);
+      const worst = emailWorstCaseMs(count, provider.worstCaseMs ? provider.worstCaseMs(count) : 40_000);
+      if (handBackForTime(deps.timeLeftMs(job), worst)) return { status: "yield" };
+    }
     const answer = parseAnswer(await deps.maySend(job));
     if (!answer) return { status: "failed", error: "send check answered nothing" };
     if (!answer.may_send) return { status: "ended", reason: answer.reason };
@@ -198,8 +233,12 @@ export function createSendHandler(deps: {
         return { status: "failed", error: `refused ${composed.code}`, final: true, receipt: { provider: null, errorCode: composed.code } };
       }
       const files: LoadedEmail["attachments"] = [];
+      // every file of the email read within EMAIL_ATTACHMENT_READS_MS together
+      const readsEnd = now() + EMAIL_ATTACHMENT_READS_MS;
       for (const ref of composed.content.attachments) {
-        const bytes = await deps.loadAttachment(ref, job);
+        const left = readsEnd - now();
+        if (left <= 0) return { status: "failed", error: "attachment unavailable" };
+        const bytes = await deps.loadAttachment(ref, job, left);
         // a file that cannot be read now: nothing is sent, the job is tried again (the count stays: it was not refused)
         if (bytes === null) return { status: "failed", error: "attachment unavailable" };
         files.push({ name: ref.name, type: ref.type, content: bytes });

@@ -624,7 +624,8 @@ begin
                             'reply_to', v_reply, 'list_unsubscribe', v_unsubscribe_url,
                             'links', (select coalesce(jsonb_agg(distinct u), '[]'::jsonb)
                                         from jsonb_array_elements_text(v_link_urls) u
-                                       where u like 'https://%'),
+                                       -- delta review (2): only a plain https URL (no space, quote or angle bracket)
+                                       where u ~ '^https://[^[:space:]<>"'']+$'),
                             'attachments', v_attachments);
 end;
 $$;

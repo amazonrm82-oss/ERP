@@ -25,6 +25,19 @@ const siteOrigin = () => process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/
 const BACKGROUND_LEASE_SECONDS = 900;
 
 /**
+ * EML-01 delta review (1): the route's limit (= `maxDuration` of src/app/api/jobs/run/route.ts, kept equal by a unit test)
+ * and the lease a message job is claimed with (claim_jobs' default: the message pass passes none). An email whose worst
+ * case does not fit in the lesser of what is left of either is handed back uncounted before its send check.
+ */
+export const JOBS_RUN_MAX_MS = 180_000;
+const MESSAGE_LEASE_MS = 120_000;
+
+/** What is left for a job: the lesser of its lease (from its claim) and the run (from the route's start). */
+export function jobTimeLeftMs(now: number, claimedAt: number, routeStartedAt: number): number {
+  return Math.min(claimedAt + MESSAGE_LEASE_MS - now, routeStartedAt + JOBS_RUN_MAX_MS - now);
+}
+
+/**
  * The background job worker (OPS-04), route POST /api/jobs/run. Called by the database (app.wake_job_worker, through
  * pg_net, every minute while work is due), never by a user: it carries the push dispatcher's shared secret, checked
  * timing-safe before anything else. With the service role it calls only public.claim_jobs(), public.finish_job() and,
@@ -37,6 +50,9 @@ const BACKGROUND_LEASE_SECONDS = 900;
  * background kinds only when the signer is set up (backgroundJobsReady).
  */
 export async function runJobsRoute(request: Request): Promise<Response> {
+  const routeStartedAt = Date.now();
+  // when each message job was claimed, for jobTimeLeftMs
+  const claimedAt = new Map<string, number>();
   const secret = process.env.PUSH_DISPATCH_SECRET?.trim();
   if (!secret) return json(503, { error: "jobs are not configured" });
   if (!bearerSecretMatches(request.headers.get("authorization"), secret)) return json(401, { error: "unauthorized" });
@@ -78,7 +94,8 @@ export async function runJobsRoute(request: Request): Promise<Response> {
             return data;
           },
           // owner (195) א: the files only at the paths the composer answered, of the job's own business, bucket record-files
-          loadAttachment: (ref, job) => downloadEmailAttachment(supabase, ref, job.organization_id),
+          loadAttachment: (ref, job, timeoutMs) => downloadEmailAttachment(supabase, ref, job.organization_id, timeoutMs),
+          timeLeftMs: (job) => jobTimeLeftMs(Date.now(), claimedAt.get(job.id) ?? routeStartedAt, routeStartedAt),
         })
       : null,
   });
@@ -130,6 +147,13 @@ export async function runJobsRoute(request: Request): Promise<Response> {
         p_channels: channels,
       });
       if (error) throw new Error("claim failed");
+      if (leaseSeconds === undefined && Array.isArray(data)) {
+        const at = Date.now();
+        for (const row of data) {
+          const id = row && typeof row === "object" && !Array.isArray(row) ? (row as Record<string, unknown>).id : undefined;
+          if (typeof id === "string") claimedAt.set(id, at);
+        }
+      }
       return data;
     },
     finish: async (job, report) => {

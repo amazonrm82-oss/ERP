@@ -87,8 +87,9 @@ function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-// a link stands alone: nothing that could continue a URL right before or after it
-const LINK_BEFORE = /[\s(<"'\u00a0]/;
+// a link stands alone: nothing that could continue a URL right before it (a ':' or a Hebrew letter may: the href is always
+// the exact listed URL) and nothing after it but space or punctuation
+const LINK_BEFORE_CONTINUES = /[A-Za-z0-9._~/?#@!$&*+=%-]/;
 const LINK_AFTER = /[\s.,;:!?)\]>"'\u00a0]/;
 
 /**
@@ -108,7 +109,7 @@ export function emailHtml(text: string, links: readonly string[] = []): string {
       while (index !== -1) {
         const before = index === 0 ? "" : text[index - 1];
         const after = index + url.length >= text.length ? "" : text[index + url.length];
-        if ((before === "" || LINK_BEFORE.test(before)) && (after === "" || LINK_AFTER.test(after))) break;
+        if ((before === "" || !LINK_BEFORE_CONTINUES.test(before)) && (after === "" || LINK_AFTER.test(after))) break;
         index = text.indexOf(url, index + 1);
       }
       if (index !== -1 && (found === null || index < found.index)) found = { index, url };
@@ -146,6 +147,8 @@ export function createResendProvider(env: Env = process.env, deps: { fetch?: Fet
     name: "resend",
     channel: "email",
     composes: true,
+    // a message's text alone stays far under 1 MB (MSG-05's longest body); with files, the longest request
+    worstCaseMs: (attachmentCount) => (attachmentCount > 0 ? RESEND_MAX_TIMEOUT_MS : resendTimeoutMs(1_048_576)),
     async send(message) {
       const content = message.emailContent;
       if (!content) return notSent("no_content", false);

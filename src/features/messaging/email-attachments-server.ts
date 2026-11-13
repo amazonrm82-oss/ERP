@@ -9,8 +9,8 @@ import type { EmailAttachmentRef } from "./providers/types";
  * kept or logged; the bytes go to the adapter as base64.
  */
 export const EMAIL_ATTACHMENT_BUCKET = "record-files";
-/** A file that is not read within this time is not sent now (the job is tried again). */
-export const EMAIL_ATTACHMENT_TIMEOUT_MS = 15_000;
+/** A file not read within the time left of its email's reads (send-handler.ts, 30 s for all files together) is not sent now. */
+export const EMAIL_ATTACHMENT_TIMEOUT_MS = 30_000;
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const PATH = new RegExp(`^(${UUID})/${UUID}$`);
@@ -26,11 +26,16 @@ export function attachmentRefAllowed(ref: EmailAttachmentRef, organizationId: st
 }
 
 /** The file's bytes as base64, or null when it may not be read or cannot be read now. */
-export async function downloadEmailAttachment(client: StorageReader, ref: EmailAttachmentRef, organizationId: string): Promise<string | null> {
+export async function downloadEmailAttachment(
+  client: StorageReader,
+  ref: EmailAttachmentRef,
+  organizationId: string,
+  timeoutMs: number = EMAIL_ATTACHMENT_TIMEOUT_MS,
+): Promise<string | null> {
   if (!attachmentRefAllowed(ref, organizationId)) return null;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<null>((resolve) => {
-    timer = setTimeout(() => resolve(null), EMAIL_ATTACHMENT_TIMEOUT_MS);
+    timer = setTimeout(() => resolve(null), Math.max(0, Math.min(timeoutMs, EMAIL_ATTACHMENT_TIMEOUT_MS)));
   });
   const read = (async () => {
     try {

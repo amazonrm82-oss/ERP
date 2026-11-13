@@ -132,6 +132,8 @@ export type MessagingProvider = {
   // SMS-05: a provider that sends real text: the send handler asks the database's composer first and hands it `content`
   // (SMS) or `emailContent` (EML-01, email)
   composes?: boolean;
+  // EML-01: the longest one request may take (ms) for a message with this many attachments
+  worstCaseMs?(attachmentCount: number): number;
   send(message: OutgoingMessage): Promise<ProviderResult>;
 };
 

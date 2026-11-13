@@ -15,9 +15,10 @@ type Answer = Record<string, unknown>;
 // FUTURE SENDER" notes and 021198's header (the attachments); then update the md5.
 // Rechecked after the independent review of lane/n-eml05: the core also answers `links` (only the https URLs it put in the
 // text itself: the minted links and the stored review link); nothing else changed.
+// Then the delta review of 6b981972 (2): only a plain https URL (no space, quote or angle bracket) is listed in `links`.
 const REVIEWED_MD5: Record<string, string> = {
   "email_job_compose(uuid,uuid,text)": "c5c2ae88f99865569bd24ddf80c2168f",
-  "app.email_compose_core(uuid,uuid,text)": "9530cdcc73961003f5dfb51a87d52baf",
+  "app.email_compose_core(uuid,uuid,text)": "8431ab58312d5fa19a12fb0f37079d9e",
   "app.email_usage_give_back(uuid)": "c952eaea4bb85cf196cf49280e8b7816",
   "email_quota_return(uuid,uuid)": "9a75bbbe4baa464daf175f376f2be501",
 };
@@ -489,6 +490,13 @@ describe("the email composer (EML-01, Resend)", () => {
     expect(String(answer.text).startsWith("דנה, נשמח לביקורת: https://g.page/r/abc/review")).toBe(true);
     expect(String(answer.list_unsubscribe)).toMatch(/\/api\/forms\/unsub\/[A-Za-z0-9_-]{64}$/);
     expect((answer.links as string[]).sort()).toEqual(["https://g.page/r/abc/review", String(answer.text).slice(-(SITE.length + "/f/unsub/".length + 64))].sort());
+    // delta review (2): a stored link with a quote goes out as text, outside `links`, and the answer stays whole
+    await asAdmin((q) => q("update public.review_request_settings set review_url = $2 where organization_id = $1", [org, "https://g.page/r/a'b/review"]));
+    const quoted = await compose(await queue());
+    expect(String(quoted.text)).toContain("https://g.page/r/a'b/review");
+    expect((quoted.links as string[]).some((u) => u.includes("g.page"))).toBe(false);
+    expect((quoted.links as string[]).length).toBe(1);
+    await asAdmin((q) => q("update public.review_request_settings set review_url = 'https://g.page/r/abc/review' where organization_id = $1", [org]));
     const job = await queue();
     await asAdmin((q) => q("insert into app.qr_external_blocks (organization_id, blocked, reason) values ($1, true, 'בדיקה') on conflict (organization_id) do update set blocked = true", [org]));
     expect(await compose(job)).toEqual({ refused: "link_blocked" });

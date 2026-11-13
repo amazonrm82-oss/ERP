@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ClaimedJob } from "@/features/jobs/registry";
+import { jobTimeLeftMs, JOBS_RUN_MAX_MS } from "@/features/jobs/run-server";
 import { attachmentRefAllowed, downloadEmailAttachment, EMAIL_ATTACHMENT_BUCKET } from "@/features/messaging/email-attachments-server";
 import {
   attachmentFilename,
@@ -17,7 +18,7 @@ import {
 } from "@/features/messaging/providers/resend";
 import { messagingProviderFor } from "@/features/messaging/providers/select";
 import type { LoadedEmail, OutgoingMessage } from "@/features/messaging/providers/types";
-import { createSendHandler, parseComposedEmail } from "@/features/messaging/send-handler";
+import { createSendHandler, EMAIL_ATTACHMENT_READS_MS, emailWorstCaseMs, handBackForTime, parseComposedEmail } from "@/features/messaging/send-handler";
 
 vi.mock("server-only", () => ({}));
 
@@ -142,6 +143,10 @@ describe("EML-01: the Resend adapter", () => {
     expect(emailHtml("https://x.test/abc", ["https://x.test/a"])).not.toContain("<a ");
     expect(emailHtml("evil.https://x.test/a", ["https://x.test/a"])).not.toContain("<a ");
     expect(emailHtml("(https://x.test/a)", ["https://x.test/a"])).toContain('(<a href="https://x.test/a">');
+    // delta review (3): right after ':' or a Hebrew letter it is clickable; the href is the exact listed URL
+    expect(emailHtml("לחתימה:https://x.test/a", ["https://x.test/a"])).toContain(':<a href="https://x.test/a">');
+    expect(emailHtml("בקישורhttps://x.test/a.", ["https://x.test/a"])).toContain('בקישור<a href="https://x.test/a">https://x.test/a</a>.');
+    expect(emailHtml("x/https://x.test/a", ["https://x.test/a"])).not.toContain("<a ");
     expect(emailHtml("https://x.test/a https://x.test/a", ["https://x.test/a"]).match(/<a /g)).toHaveLength(2);
     expect(emailHtml("https://x.test/a")).not.toContain("<a ");
   });
@@ -163,7 +168,8 @@ describe("EML-01: the Resend adapter", () => {
     expect(resendTimeoutMs(14 * 1_048_576)).toBe(38_000);
     expect(resendTimeoutMs(100 * 1_048_576)).toBe(40_000);
     const route = readFileSync(join(root, "src", "app", "api", "jobs", "run", "route.ts"), "utf8");
-    expect(route).toMatch(/export const maxDuration = 120;/);
+    expect(route).toMatch(/export const maxDuration = 180;/);
+    expect(JOBS_RUN_MAX_MS).toBe(180_000);
   });
 
   it("only the adapter reads the Resend settings", () => {
@@ -265,6 +271,66 @@ describe("EML-01: the send handler asks the email composer for a composing provi
     expect(send).not.toHaveBeenCalled();
   });
 
+  it("hands an email back uncounted, before the send check, when its worst case does not fit (delta review (1))", async () => {
+    expect(emailWorstCaseMs(0, 12_000)).toBe(22_000);
+    expect(emailWorstCaseMs(2, 40_000)).toBe(80_000);
+    expect(handBackForTime(79_999, 80_000)).toBe(true);
+    expect(handBackForTime(80_000, 80_000)).toBe(false);
+    expect(handBackForTime(null, 80_000)).toBe(false);
+    // the lesser of the lease (120 s from the claim) and the run (180 s from the route's start)
+    expect(jobTimeLeftMs(1_000, 0, 0)).toBe(119_000);
+    expect(jobTimeLeftMs(150_000, 100_000, 0)).toBe(30_000);
+    expect(jobTimeLeftMs(50_000, 45_000, 0)).toBe(115_000);
+    const provider = createResendProvider(ENV, { fetch: vi.fn() })!;
+    expect(provider.worstCaseMs?.(0)).toBe(12_000);
+    expect(provider.worstCaseMs?.(3)).toBe(40_000);
+
+    const maySend = vi.fn(async () => ({ may_send: true }));
+    const composeEmail = vi.fn(async () => composed);
+    const send = vi.fn(async () => ({ ok: true as const, providerId: "x" }));
+    const base = { providerFor: () => ({ name: "resend", channel: "email" as const, composes: true, worstCaseMs: provider.worstCaseMs, send }), maySend, composeEmail, loadAttachment: async () => "QUJD" };
+    const withFiles: ClaimedJob = { ...job, payload: { ...job.payload, file_ids: ["66666666-6666-4666-8666-666666666666"] } };
+    expect(await createSendHandler({ ...base, timeLeftMs: () => 79_000 })(withFiles)).toEqual({ status: "yield" });
+    expect(maySend).not.toHaveBeenCalled();
+    expect(composeEmail).not.toHaveBeenCalled();
+    // without files the same time is enough
+    expect(await createSendHandler({ ...base, timeLeftMs: () => 79_000 })(job)).toMatchObject({ status: "done" });
+    expect(await createSendHandler({ ...base, timeLeftMs: () => 80_000 })(withFiles)).toMatchObject({ status: "done" });
+    expect(await createSendHandler({ ...base, timeLeftMs: () => 21_000 })(job)).toEqual({ status: "yield" });
+  });
+
+  it("reads every file of an email within 30 seconds together", async () => {
+    let clock = 0;
+    const timeouts: number[] = [];
+    const twoFiles = { ...composed, attachments: [composed.attachments[0], { ...composed.attachments[0], name: "b.pdf" }] };
+    const handler = createSendHandler({
+      providerFor: () => ({ name: "resend", channel: "email", composes: true, send: async () => ({ ok: true as const, providerId: "x" }) }),
+      maySend: async () => ({ may_send: true }),
+      composeEmail: async () => twoFiles,
+      now: () => clock,
+      loadAttachment: async (_ref, _job, timeoutMs) => {
+        timeouts.push(timeoutMs);
+        clock += 20_000;
+        return "QUJD";
+      },
+    });
+    expect(await handler(job)).toMatchObject({ status: "done" });
+    expect(timeouts).toEqual([EMAIL_ATTACHMENT_READS_MS, 10_000]);
+    timeouts.length = 0;
+    clock = 0;
+    const slow = createSendHandler({
+      providerFor: () => ({ name: "resend", channel: "email", composes: true, send: async () => ({ ok: true as const, providerId: "x" }) }),
+      maySend: async () => ({ may_send: true }),
+      composeEmail: async () => twoFiles,
+      now: () => clock,
+      loadAttachment: async () => {
+        clock += 30_000;
+        return "QUJD";
+      },
+    });
+    expect(await slow(job)).toEqual({ status: "failed", error: "attachment unavailable" });
+  });
+
   it("gives the email count back only for a message that never reached Resend", async () => {
     const returnEmailQuota = vi.fn(async () => ({ returned: true }));
     const base = { maySend: async () => ({ may_send: true }), composeEmail: async () => ({ ...composed, attachments: [] }), loadAttachment: async () => "x", returnEmailQuota };
@@ -285,9 +351,12 @@ describe("EML-01: the send handler asks the email composer for a composing provi
     expect(parseComposedEmail({ ...composed, attachments: [{ ...composed.attachments[0], path: "../x" }] })).toBeNull();
     expect(parseComposedEmail({ ...composed, attachments: Array(6).fill(composed.attachments[0]) })).toBeNull();
     expect(parseComposedEmail({ ...composed, list_unsubscribe: "javascript:x" })).toBeNull();
-    expect(parseComposedEmail({ ...composed, links: ["http://mexuz.test/x"] })).toBeNull();
-    expect(parseComposedEmail({ ...composed, links: undefined })).toBeNull();
-    expect(parseComposedEmail({ ...composed, links: ["https://a.test/x y"] })).toBeNull();
+    // delta review (2): a bad link is left out (plain text), never a failed answer
+    expect(parseComposedEmail({ ...composed, links: ["http://mexuz.test/x", "https://a.test/x'y", "https://a.test/x y", 5, "https://ok.test/a"] })).toMatchObject({
+      ok: true,
+      content: { links: ["https://ok.test/a"] },
+    });
+    expect(parseComposedEmail({ ...composed, links: undefined })).toMatchObject({ ok: true, content: { links: [] } });
     expect(parseComposedEmail(null)).toBeNull();
   });
 });
