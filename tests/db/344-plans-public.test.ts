@@ -11,16 +11,16 @@ afterAll(closePool);
 
 // md5(prosrc) of the reviewed body (migration 20261006021232_plans_public.sql; 6c246066dbf154393d0f4a05288c67f4)
 // RET-02 (migration 20261006021235_review_requests.sql): 021232's body with 'review_requests' added to the closed landing list
-// after 'sms'; rechecked: nothing else changed (no new field, table, argument or grant). Needs the fresh review the header asks for.
+// after 'sms'; rechecked: nothing else changed (no new field, table, argument or grant). Reviewed with the body as of 021263 (RVW-97, 13 November 2026).
 // BIZ-01 (migration 20261006021237_business_page.sql; f6fe40e4956b37f2ca09bae33678504c before): 021235's body with
 // 'public_page' added to the closed landing list after 'business_card'; rechecked: nothing else changed (no new field, table,
-// argument or grant). Needs the fresh review the header asks for.
+// argument or grant). Reviewed with the body as of 021263 (RVW-97, 13 November 2026).
 // SUB-01 (migration 20261006021260_recurring_billing_links.sql; a87ed637b1a911cabd027e80bb0f45ac before): 021237's body with
 // 'recurring_billing' added to the closed landing list after 'punch_cards'; rechecked: nothing else changed (no new field,
-// table, argument or grant). Needs the fresh review the header asks for.
+// table, argument or grant). Reviewed with the body as of 021263 (RVW-97, 13 November 2026).
 // BIZ-05 (migration 20261006021263_prefill_forms.sql; 7255a66cfb01154adbc975ee13d09421 before): 021260's body with
 // 'prefill_links' added to the closed landing list after 'public_page' (the list re-wrapped over its lines); rechecked: nothing
-// else changed (no new field, table, argument or grant). Needs the fresh review the header asks for.
+// else changed (no new field, table, argument or grant). Reviewed with the body as of 021263 (RVW-97, 13 November 2026).
 const REVIEWED_BODY_MD5 = "9b9d7b44344bc3ac01227bc8dc026648";
 
 type PublicPlan = Record<string, unknown> & { key: string; availability: string; limits: Record<string, unknown>; features: string[] };
