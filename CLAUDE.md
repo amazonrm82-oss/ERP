@@ -272,7 +272,7 @@ and build this CRM here instead. The old code is preserved on the branch
   that used the token (`turnstileTokenUsed`). CSP (`src/lib/csp.ts`, `proxy.ts`) adds `https://challenges.cloudflare.com` to script-src and
   frame-src on every page but `/f/` while the site key is set (client navigation keeps the first page's policy). Supabase's own CAPTCHA
   protection stays OFF.
-  In use (USR-13, owner 13 November 2026, answers (364) א and (370) א; migrations 021270 and 021271 (021271 pasted by hand); an
+  In use (USR-13, owner 13 November 2026, answers (364) א and (370) א; migrations 021270 and 021271 (021271 pasted by hand, md5 checked 13 November 2026); an
   independent review and two delta reviews): the sign-in lockout (`src/features/auth/login-guard-server.ts`, called only by the sign-in
   action in `src/features/auth/actions.ts`) calls only `public.login_guard()` (definer, service_role only) with two keyed hashes made
   through `src/lib/keyed-ip-hash.ts`: the typed address, trimmed and lower case (scope `login-email`), and the sender (scope `login`, IPv6
