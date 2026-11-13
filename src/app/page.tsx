@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { turnstileSiteKey } from "@/features/auth/turnstile-server";
 import { ContactSection } from "@/features/landing/components/contact-section";
 import { FlowSection } from "@/features/landing/components/flow";
 import { IndustryLinks } from "@/features/landing/components/industry-page";
@@ -46,7 +47,8 @@ export default async function LandingPage() {
         <PricingSection plans={plans} waiting={waiting} />
         <Quote />
         <Faq />
-        <ContactSection whatsappHref={SUPPORT.whatsappHref} />
+        {/* RVW-99: the widget only while the server checks it (both keys set) */}
+        <ContactSection whatsappHref={SUPPORT.whatsappHref} turnstileSiteKey={turnstileSiteKey()} />
         <Cta />
       </main>
       <LandingFooter />

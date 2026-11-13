@@ -29,9 +29,9 @@ type ErrorLike = {
 export const GENERIC_ERROR = "משהו השתבש. נסו שוב בעוד רגע.";
 /** MSG-02 (114) א: the business email (business details) takes Latin letters only; the form and the database say the same. */
 export const BUSINESS_EMAIL_LATIN = "את כתובת האימייל של העסק כותבים באותיות לועזיות בלבד.";
-// Turnstile on the sign-in, sign-up and reset forms (owner (275) א, FXS-12): the security check failed, or could not be done
-export const CAPTCHA_FAILED = "בדיקת האבטחה לא הושלמה. חכו שהבדיקה מעל הכפתור תסתיים ונסו שוב.";
-export const CAPTCHA_UNAVAILABLE = "לא הצלחנו להשלים את בדיקת האבטחה כרגע. נסו שוב בעוד דקה.";
+// Turnstile (owner (275) א, FXS-12): the two texts live in src/features/auth/turnstile.ts, so the verifier (and the landing
+// page that asks it for the site key, RVW-99) need not import this file
+export { CAPTCHA_FAILED, CAPTCHA_UNAVAILABLE } from "@/features/auth/turnstile";
 export const NETWORK_ERROR = "אין חיבור לשרת כרגע. בדקו את החיבור לאינטרנט ונסו שוב.";
 export const NO_PERMISSION = "אין לכם הרשאה לבצע את הפעולה הזו. אם צריך, בקשו מבעלי העסק או ממנהל מערכת.";
 export const NOT_FOUND = "הרשומה לא נמצאה. ייתכן שנמחקה או שאין לכם גישה אליה. רעננו את הדף ונסו שוב.";

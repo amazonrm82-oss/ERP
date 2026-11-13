@@ -3,11 +3,10 @@ import "server-only";
 import { headers } from "next/headers";
 import { isIP } from "node:net";
 
-import { CAPTCHA_FAILED, CAPTCHA_UNAVAILABLE } from "@/lib/errors";
 import { clientIp } from "@/lib/keyed-ip-hash";
 import { serverLog } from "@/lib/log-server";
 
-import { TURNSTILE_FIELD, type TurnstileAction } from "./turnstile";
+import { CAPTCHA_FAILED, CAPTCHA_UNAVAILABLE, TURNSTILE_FIELD, type TurnstileAction } from "./turnstile";
 
 // Cloudflare Turnstile, server side (owner (275) א; FXS-12). This file is the ONLY reader of TURNSTILE_SECRET_KEY (set by the
 // owner in Vercel; lint refuses the name anywhere else in src; never NEXT_PUBLIC_). With the project's secret key Supabase Auth

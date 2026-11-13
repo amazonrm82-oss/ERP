@@ -1,7 +1,12 @@
-// Cloudflare Turnstile on the sign-in, sign-up and forgot-password forms (owner (275) א; FXS-12: with the project's secret
-// key Supabase Auth skips its own CAPTCHA, so OUR server verifies the token before any Auth call; Supabase's CAPTCHA
-// protection stays off). This file holds only what both sides share: no key, no secret. The secret is read only by
-// ./turnstile-server.ts; the site key reaches the forms as a prop from their server pages, only while both keys are set.
+// Cloudflare Turnstile on the sign-in, sign-up and forgot-password forms and the landing page's contact form (owner (275) א,
+// (340) ב; FXS-12: with the project's secret key Supabase Auth skips its own CAPTCHA, so OUR server verifies the token before
+// any Auth call; Supabase's CAPTCHA protection stays off). This file holds only what both sides share: no key, no secret. The
+// secret is read only by ./turnstile-server.ts; the site key reaches every form as a prop from its server page
+// (`turnstileSiteKey()`), only while both keys are set (RVW-99).
+
+// The security check failed, or could not be done (re-exported by src/lib/errors.ts)
+export const CAPTCHA_FAILED = "בדיקת האבטחה לא הושלמה. חכו שהבדיקה מעל הכפתור תסתיים ונסו שוב.";
+export const CAPTCHA_UNAVAILABLE = "לא הצלחנו להשלים את בדיקת האבטחה כרגע. נסו שוב בעוד דקה.";
 
 /** The official script, explicit rendering (the widget is drawn by ./components/turnstile-widget.tsx). */
 export const TURNSTILE_SCRIPT_URL = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
@@ -15,7 +20,7 @@ export const TURNSTILE_FIELD = "cf-turnstile-response";
 /** The action each form's widget carries; the server accepts a token only for the same form. */
 // `resend`: sign-up's "send again" of the confirmation email (behaves like sign-up)
 // `contact`: the landing page's "נחזור אליכם" form (LND-20 v2), which then goes through the ordinary public intake; like
-// sign-up, it is refused while Cloudflare cannot be asked
+// sign-in, it passes while Cloudflare cannot be asked (owner (340) ב, `passesWhenUnavailable` in ./turnstile-server.ts)
 export const TURNSTILE_ACTIONS = { signIn: "login", signUp: "signup", forgotPassword: "forgot_password", resend: "resend", contact: "contact" } as const;
 
 export type TurnstileAction = (typeof TURNSTILE_ACTIONS)[keyof typeof TURNSTILE_ACTIONS];

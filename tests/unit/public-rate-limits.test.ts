@@ -106,7 +106,7 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
   "/api/forms/contact": {
     guard: "database",
     functions: ["intake_form", "intake_submit"],
-    limit: "Turnstile first (action contact; refused while Cloudflare cannot be asked), then the intake form's own: 10 per sender per form in 10 min and 500 per form an hour",
+    limit: "Turnstile first (action contact; passes while Cloudflare cannot be asked, owner (340) ב), then the intake form's own: 10 per sender per form in 10 min and 500 per form an hour",
     refusal: JSON_429,
     sender: { leftOut: "LND-20 v2: the landing page's own lead form, published to everyone like the lead form ((42) ד), so only its own limits apply" },
   },

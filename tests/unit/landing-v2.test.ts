@@ -140,6 +140,10 @@ describe("LND-20 v2 page", () => {
     expect(CONTACT_BUSINESS_TYPES).toEqual(["שירותים מקצועיים", "קליניקה או טיפולים", "קבלנות ושיפוצים", "מסחר וחנות", "סטודיו, יופי ובריאות", "אחר"]);
     const section = read("src/features/landing/components/contact-section.tsx");
     expect(section).toContain("contactFormToken(SUPPORT.formUrl)");
+    // RVW-99: the widget's site key comes from the server's turnstileSiteKey() (both keys set), never read here alone
+    expect(section).not.toContain("NEXT_PUBLIC_TURNSTILE_SITE_KEY");
+    expect(read("src/app/page.tsx")).toMatch(/<ContactSection[^>]*turnstileSiteKey=\{turnstileSiteKey\(\)\}/);
+    expect(read("src/app/page.tsx")).toContain('from "@/features/auth/turnstile-server"');
     expect(CONTACT_BUSINESS_TYPES).toHaveLength(6);
     expect([CONTACT_HONEYPOT_FIELD, CONTACT_STARTED_FIELD]).toEqual([HONEYPOT_FIELD, STARTED_AT_FIELD]);
     expect(contactMessage("אחר", CONTACT_CONSENT_VERSION)).toContain(`נוסח ${CONTACT_CONSENT_VERSION}`);
