@@ -341,6 +341,21 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
     refusal: TEXT_429,
     sender: "first",
   },
+  // BIZ-05 (owner, 11 November 2026, answer (271) ב): the form that fills an existing record, by a personal link
+  "/f/fill/[token]": {
+    guard: "database",
+    functions: ["public_sender_check", "public_sender_miss", "prefill_public"],
+    limit: SENDER + "120 calls per link and 60 per sender (keyed IP hash, scope prefill, re-scoped per link) in 10 min, after the lookup, shared with the submit route; a preview bot gets a generic page and no read",
+    refusal: PAGE_TEXT,
+    sender: "first",
+  },
+  "/api/forms/fill/[token]": {
+    guard: "database",
+    functions: ["public_sender_check", "public_sender_miss", "prefill_public_submit"],
+    limit: SENDER + "the page's call counters (120 per link, 60 per sender) plus 10 submissions per link in 10 min; one submission per link",
+    refusal: JSON_429,
+    sender: "first",
+  },
   "/api/forms/lib/[token]/file": {
     guard: "database",
     functions: ["public_sender_check", "public_sender_miss", "library_link_public_file"],

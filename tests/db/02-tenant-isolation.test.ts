@@ -511,6 +511,8 @@ describe("tenant isolation", () => {
     "message_templates",
     // SGN-01, also seeded
     "document_templates",
+    // BIZ-05, also seeded
+    "prefill_forms",
     // DEAL-03, also seeded
     "deal_loss_reasons",
     // CON-03 follow-up, also seeded
@@ -794,6 +796,7 @@ describe("tenant isolation", () => {
       whatsapp_templates: "name = name",
       message_templates: "name = name",
       document_templates: "name = name",
+      prefill_forms: "name = name",
       deal_loss_reasons: "name = name",
       deal_contact_roles: "name = name",
       activity_types: "name = name",
@@ -995,6 +998,7 @@ describe("tenant isolation", () => {
       ["insert into public.whatsapp_templates (organization_id, name, body) values ($1, 'x', 'x')", [orgA]],
       ["insert into public.message_templates (organization_id, name, channel, message_type, body) values ($1, 'x', 'sms', 'marketing', 'x')", [orgA]],
       ["insert into public.document_templates (organization_id, name, record_type, body) values ($1, 'x', 'contact', 'x')", [orgA]],
+      ["insert into public.prefill_forms (organization_id, name, record_type, title, fields) values ($1, 'x', 'contact', 'x', '{email}')", [orgA]],
       ["insert into public.deal_loss_reasons (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.deal_contact_roles (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.activity_types (organization_id, base_type, name) values ($1, 'meeting', 'x')", [orgA]],
@@ -1156,6 +1160,7 @@ describe("tenant isolation", () => {
       ["whatsapp_templates", "body = 'HACKED'", "body = 'HACKED'"],
       ["message_templates", "body = 'HACKED'", "body = 'HACKED'"],
       ["document_templates", "body = 'HACKED'", "body = 'HACKED'"],
+      ["prefill_forms", "title = 'HACKED'", "title = 'HACKED'"],
       ["deal_loss_reasons", "is_active = false", "not is_active"],
       ["deal_contact_roles", "is_active = false", "not is_active"],
       ["activity_types", "is_active = false", "not is_active"],

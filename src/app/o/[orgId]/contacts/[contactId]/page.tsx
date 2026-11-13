@@ -69,6 +69,7 @@ import { RecordQuotesCard } from "@/features/quotes/components/record-quotes-car
 import { RecordOrdersCard } from "@/features/orders/components/record-orders-card";
 import { RecordSignaturesCard } from "@/features/signatures/components/record-signatures-card";
 import { LibraryLinksCard } from "@/features/library-links/components/library-links-card";
+import { PrefillLinksCard } from "@/features/prefill-links/components/prefill-links-card";
 import { RecordDocumentsCard } from "@/features/documents/components/record-documents-card";
 import { RecordPaymentsCard } from "@/features/payments/components/record-payments-card";
 import { CustomerHoldCard } from "@/features/customer-holds/components/customer-hold-card";
@@ -310,6 +311,8 @@ export default async function ContactPage({ params, searchParams }: Props) {
           <RecordSignaturesCard orgId={orgId} kind="contact" recordId={contact.id} canEdit={canEdit} phoneE164={contact.phone_e164} />
           {/* LIB-02: library items sent by a tracked link, and when the customer opened them */}
           <LibraryLinksCard orgId={orgId} record={{ kind: "contact", id: contact.id }} recipient={{ name, phoneE164: contact.phone_e164, email: contact.email }} canEditRecord={canEditRecordHint(context, contact.owner_id)} />
+          {/* BIZ-05 */}
+          <PrefillLinksCard orgId={orgId} record={{ kind: "contact", id: contact.id }} recipient={{ name, phoneE164: contact.phone_e164 }} canEditRecord={canEditRecordHint(context, contact.owner_id)} />
           {/* DOC-01: documents issued outside the system and recorded here */}
           <RecordDocumentsCard orgId={orgId} subject={{ kind: "contact", id: contact.id }} />
           {/* PAY-01: payments received and recorded here */}

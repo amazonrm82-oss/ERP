@@ -62,6 +62,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   // MSG-02
   message_templates: "תבנית הודעה",
   document_templates: "תבנית מסמך",
+  // BIZ-05
+  prefill_forms: "טופס השלמת פרטים",
   // GOL-01
   goals: "יעד",
   // CON-02
@@ -214,6 +216,8 @@ export const ACTION_LABELS: Record<string, string> = {
   statement_link: "קישור לדף חשבון",
   // LIB-02: a library item sent to the record by a tracked link (created / revoked; never the token)
   library_link: "קישור לפריט מהספרייה",
+  // BIZ-05: a prefill form sent to the record by a personal link (created / revoked; never the token)
+  prefill_link: "קישור לטופס השלמת פרטים",
   consent_link: "קישור להעדפות דיוור",
   // PRK-02: the business's public privacy-request link (created / revoked; never the token)
   privacy_request_link: "קישור לבקשות פרטיות",

@@ -80,6 +80,8 @@ import { getSupabaseEnv } from "@/lib/env";
  *   - a library item sent by a tracked link (LIB-02, owner 11 November 2026)
  *     (src/features/library-links/public-server.ts): public.library_link_public() and
  *     library_link_public_file() only, and a 60-second signed link to the path the latter answers;
+ *   - the form that fills an existing record by a personal link (BIZ-05, owner 11 November 2026, answer (271) ב)
+ *     (src/features/prefill-links/public-server.ts): public.prefill_public() and prefill_public_submit() only;
  *   - the public privacy-request page (PRK-02, owner 26 October 2026, wave 3 use (3))
  *     (src/features/privacy-requests/public-server.ts): public.privacy_request_page()
  *     and privacy_request_submit() only;

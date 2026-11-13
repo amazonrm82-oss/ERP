@@ -20,8 +20,8 @@ const nextConfig: NextConfig = {
         // The app itself must never be framed by another site (clickjacking); nor the QR scan route, whose page
         // before an external link (BIZ-03) names the business on our domain, nor the customer's statement page (BAL-04),
         // which shows a customer's debts, nor the preferences and unsubscribe pages (CNS-09/10), nor a document for signature
-        // (SGN-02: a signature must never be clicked inside another site), nor a library item sent by a tracked link (LIB-02). Same prefixes as NOT_EMBEDDABLE_PUBLIC_PREFIXES in src/lib/csp.ts.
-        source: "/((?!f/(?!q/|statement/|prefs/|unsub/|sign/|lib/)).*)",
+        // (SGN-02: a signature must never be clicked inside another site), nor a library item sent by a tracked link (LIB-02), nor the prefill form that shows a person's details (BIZ-05). Same prefixes as NOT_EMBEDDABLE_PUBLIC_PREFIXES in src/lib/csp.ts.
+        source: "/((?!f/(?!q/|statement/|prefs/|unsub/|sign/|lib/|fill/)).*)",
         headers: [
           { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
           { key: "X-Frame-Options", value: "DENY" },
@@ -32,7 +32,7 @@ const nextConfig: NextConfig = {
       {
         // Public lead forms are made to be embedded in customers' websites (every /f/ page but the QR scan route and
         // the statement page, the preferences and unsubscribe pages and the signing page).
-        source: "/f/((?!q/|statement/|prefs/|unsub/|sign/|lib/).*)",
+        source: "/f/((?!q/|statement/|prefs/|unsub/|sign/|lib/|fill/).*)",
         headers: [
           { key: "Content-Security-Policy", value: "frame-ancestors *" },
           { key: "Referrer-Policy", value: "no-referrer" },

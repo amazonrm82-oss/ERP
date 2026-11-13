@@ -1,7 +1,7 @@
 // Plan keys, prices and states (owner's pricing of 13 October 2026; it replaces the
 // temporary "everything open, high values" defaults). Mirrors migrations plan_pricing
 // (the seed), plan_trial_built_with (the changes of the owner's later decisions) and
-// plan_review_fixes, lead_distribution_plan, campaign_costs_plan, punch_cards_plan, meta_leads_plan, meeting_customer_reminders, document_templates, sms_b_send, review_requests, business_page, free_plan_quotes and recurring_billing (the latest app.plan_key_defaults()): PLAN_VALUES = the seed with
+// plan_review_fixes, lead_distribution_plan, campaign_costs_plan, punch_cards_plan, meta_leads_plan, meeting_customer_reminders, document_templates, sms_b_send, review_requests, business_page, free_plan_quotes, recurring_billing and prefill_forms (the latest app.plan_key_defaults()): PLAN_VALUES = the seed with
 // those changes, PLAN_KEY_FALLBACK = the latest app.plan_key_defaults().
 // tests/unit/plan-keys.test.ts reads the migrations and compares; keep them in step.
 //
@@ -141,6 +141,8 @@ const FEATURES: Record<string, Record<SoldPlan, boolean>> = {
   business_card: ALL,
   // BIZ-01 (owner, 3 November 2026, answer (70) ב): every plan, its own key
   public_page: ALL,
+  // BIZ-05 (owner, 3 November 2026, answer (70) ב): every plan, its own key
+  prefill_links: ALL,
   qr_codes: ALL,
   site_widget: ALL,
   retention: ALL,
@@ -197,6 +199,8 @@ const WAVE2_FEATURE_LIST = [
   "money_waiting_actions",
   // SUB-01 (migration recurring_billing)
   "recurring_billing",
+  // BIZ-05 (migration prefill_forms)
+  "prefill_links",
 ] as const;
 const WAVE2_LIMIT_LIST = [
   "max_products", "max_price_lists", "max_quote_templates", "max_booking_pages", "max_booking_pages_per_user",

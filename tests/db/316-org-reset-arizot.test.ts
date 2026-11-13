@@ -42,6 +42,8 @@ const KEPT = new Set([
   "public.disqualify_reasons", "public.document_templates", "public.field_definitions", "public.forms", "public.goals", "public.integrations",
   // INT-03 (after the script): a kept connection keeps its sync log; the script does not know the table
   "public.integration_events",
+  // BIZ-05 (after the script): the prefill form templates are settings, kept like the document templates
+  "public.prefill_forms",
   "public.lead_distribution_settings", "public.lead_response_settings", "public.lead_routing_rules", "public.lead_score_rules",
   "public.lead_sources", "public.lead_statuses", "public.library_categories", "public.library_items", "public.meeting_types",
   "public.message_templates", "public.meta_lead_forms", "public.number_sequences", "public.org_bank_details",

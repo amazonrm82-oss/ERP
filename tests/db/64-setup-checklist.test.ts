@@ -888,6 +888,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // VRT-03 redefines app.sample_untouched() last (the sample punch card) and public.sample_data_add() of _setup_checklist.sql
       "_sample_data_kits.sql",
       "_sample_data_kits_add.sql",
+      // BIZ-05 redefines app.plan_key_defaults() and public.plans_public() (the key), then the three not-activity rules
+      "_prefill_forms.sql",
+      "_prefill_entry_rules.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

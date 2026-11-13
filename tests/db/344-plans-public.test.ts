@@ -18,7 +18,10 @@ afterAll(closePool);
 // SUB-01 (migration 20261006021260_recurring_billing_links.sql; a87ed637b1a911cabd027e80bb0f45ac before): 021237's body with
 // 'recurring_billing' added to the closed landing list after 'punch_cards'; rechecked: nothing else changed (no new field,
 // table, argument or grant). Needs the fresh review the header asks for.
-const REVIEWED_BODY_MD5 = "7255a66cfb01154adbc975ee13d09421";
+// BIZ-05 (migration 20261006021263_prefill_forms.sql; 7255a66cfb01154adbc975ee13d09421 before): 021260's body with
+// 'prefill_links' added to the closed landing list after 'public_page' (the list re-wrapped over its lines); rechecked: nothing
+// else changed (no new field, table, argument or grant). Needs the fresh review the header asks for.
+const REVIEWED_BODY_MD5 = "9b9d7b44344bc3ac01227bc8dc026648";
 
 type PublicPlan = Record<string, unknown> & { key: string; availability: string; limits: Record<string, unknown>; features: string[] };
 

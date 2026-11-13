@@ -44,6 +44,8 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "business_card", label: "כרטיס ביקור דיגיטלי", built: true },
   // BIZ-01 (owner, 3 November 2026, answer (70) ב): every plan, its own key
   { feature: "public_page", label: "דף עסק ציבורי", built: true },
+  // BIZ-05 (owner, 3 November 2026, answer (70) ב): every plan, its own key
+  { feature: "prefill_links", label: "טופס השלמת פרטים", built: true },
   // BIZ-03 part one: codes that open a form or a booking page, with scan counts
   { feature: "qr_codes", label: "קודי QR לטופס ולקביעת תור, עם ספירת סריקות", built: true },
   // SPD-07

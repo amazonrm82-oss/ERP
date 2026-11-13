@@ -602,6 +602,23 @@ export type BusinessCardWrite = {
   public_fields?: string[];
 };
 
+// BIZ-05: a template of the form that fills an existing lead or contact (managed list, owners/admins write); fields = built-in
+// keys or "cf:<key>" (src/features/prefill-links/fields.ts); key and draft_wording are server only
+export type PrefillFormRow = {
+  id: string;
+  organization_id: string;
+  name: string;
+  record_type: string;
+  title: string;
+  intro: string | null;
+  fields: string[];
+  is_active: boolean;
+  key: string | null;
+  draft_wording: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 // BIZ-01: the business's public page (one per business, owners/admins only); token = its public link (/f/biz/<token>),
 // made by the database; booking_page_ids = the booking pages it links to (the business's own, at most 20)
 export type BusinessPageRow = {
@@ -4265,6 +4282,12 @@ export type Database = {
       business_cards: Table<BusinessCardRow, BusinessCardWrite & { organization_id: string; user_id: string }, BusinessCardWrite>;
       // BIZ-01: owners and admins only; column grants (token made by the database, the form by the page's trigger); no delete
       business_pages: Table<BusinessPageRow, BusinessPageWrite & { organization_id: string }, BusinessPageWrite>;
+      // BIZ-05: record_type is insert-only; key and draft_wording are server only
+      prefill_forms: Table<
+        PrefillFormRow,
+        { organization_id: string; name: string; record_type: string; title: string; intro?: string | null; fields: string[]; is_active?: boolean },
+        { name?: string; title?: string; intro?: string | null; fields?: string[]; is_active?: boolean }
+      >;
       // BIZ-03: owners and admins only; column grants (token made by the database)
       // INT-02: owners and admins only; column grants (status, secret_set_at and the error are server-kept)
       meta_lead_forms: Table<
@@ -4689,6 +4712,12 @@ export type Database = {
       business_card_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       // BIZ-01: the public business page (service_role only)
       business_page_link_create: { Args: { p_org: string }; Returns: string };
+      // BIZ-05: the personal prefill link (staff) and the customer's page (service_role only)
+      prefill_link_create: { Args: { p_org: string; p_form: string; p_record_type: string; p_record_id: string }; Returns: string };
+      prefill_link_revoke: { Args: { p_org: string; p_link: string }; Returns: boolean };
+      prefill_links_for_record: { Args: { p_org: string; p_record_type: string; p_record_id: string }; Returns: Json };
+      prefill_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
+      prefill_public_submit: { Args: { p_token: string; p_ip_hash?: string | null; p_values?: Json | null }; Returns: Json };
       business_page_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       business_page_submit: {
         Args: { p_token: string; p_payload: Json; p_ip_hash?: string | null; p_user_agent?: string | null; p_is_spam?: boolean };

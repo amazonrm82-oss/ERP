@@ -1425,6 +1425,8 @@ describe("roles and record visibility", () => {
       "insert into public.message_templates (organization_id, name, channel, message_type, body) values ($1, 'x', 'sms', 'marketing', 'x')",
       // SGN-01
       "insert into public.document_templates (organization_id, name, record_type, body) values ($1, 'x', 'contact', 'x')",
+      // BIZ-05
+      "insert into public.prefill_forms (organization_id, name, record_type, title, fields) values ($1, 'x', 'contact', 'x', '{email}')",
       "insert into public.deal_loss_reasons (organization_id, name) values ($1, 'x')",
       "insert into public.deal_contact_roles (organization_id, name) values ($1, 'x')",
       // TASK-08
@@ -1507,6 +1509,7 @@ describe("roles and record visibility", () => {
       whatsapp_templates: "name = name",
       message_templates: "name = name",
       document_templates: "name = name",
+      prefill_forms: "name = name",
       deal_loss_reasons: "name = name",
       deal_contact_roles: "name = name",
       activity_types: "name = name",

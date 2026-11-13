@@ -162,6 +162,11 @@ export const FIELD_TYPE_SWITCHES: Record<string, SwitchPlace> = {
     decisions: { rich_text: "excluded", duration: "excluded", status: "excluded" , ...B_ADDRESS_ONLY },
     note: "FORM_EXCLUDED_TYPES. Part B: an address takes a plain one-line text input (allowed on forms, owner 26 October 2026); the others are not on forms",
   },
+  "src/features/prefill-links/components/public-prefill-form.tsx": {
+    what: "prefill form inputs (BIZ-05)",
+    decisions: { rich_text: "excluded", duration: "excluded", status: "excluded" , ...B_ADDRESS_ONLY },
+    note: "FORM_EXCLUDED_TYPES (app.prefill_excluded_types). Part B: an address takes a plain one-line text input; the others are never on a prefill form",
+  },
   "src/features/intake/public-validate.ts": {
     what: "public form messages",
     decisions: { rich_text: "excluded", duration: "excluded", status: "excluded" , ...B_ADDRESS_ONLY },

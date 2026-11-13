@@ -37,7 +37,7 @@ export const CSP_TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
 // CNS-09 / CNS-10: the customer's preferences page and unsubscribe confirmation change what the person receives, so they
 // never sit inside another site either (SGN-02's signing page too) (a framed button could be clicked without the person seeing it).
 // LIB-02: a library item sent by a tracked link counts a view and tells the rep, so it never sits inside another site either.
-export const NOT_EMBEDDABLE_PUBLIC_PREFIXES = ["/f/q/", "/f/statement/", "/f/prefs/", "/f/unsub/", "/f/sign/", "/f/lib/"] as const;
+export const NOT_EMBEDDABLE_PUBLIC_PREFIXES = ["/f/q/", "/f/statement/", "/f/prefs/", "/f/unsub/", "/f/sign/", "/f/lib/", "/f/fill/"] as const;
 
 export function isEmbeddablePublicPath(pathname: string): boolean {
   return pathname.startsWith("/f/") && !NOT_EMBEDDABLE_PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
