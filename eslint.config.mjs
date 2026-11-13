@@ -170,6 +170,9 @@ const serviceKeyAllowList = {
     // (public.signature_pdf_public, signature_pdf_public_store, signature_pdf_store)
     "src/features/signatures/public-server.ts",
     "src/features/signatures/pdf-server.ts",
+    // USR-13 (owner, 13 November 2026, answers (364) א and (370) א): the sign-in lockout (public.login_guard), keyed
+    // hashes of the typed address and the sender only, called from the sign-in action
+    "src/features/auth/login-guard-server.ts",
   ],
 };
 

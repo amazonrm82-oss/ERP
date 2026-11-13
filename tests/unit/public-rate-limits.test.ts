@@ -65,7 +65,12 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
       "no visitor input: the price list (LND-13) is one cached read for everyone, an hour in unstable_cache (tag plans-public, expired by the platform's plan actions); a failed read is not cached and backs off a minute; the rest of the page is code (its two forms post to /api/forms/contact and /api/forms/plan-notify)",
     refusal: "the price section without prices",
   },
-  "/login": { guard: "supabase-auth", limit: "Supabase Auth sign-in limits per IP (the server forwards X-Forwarded-For)", refusal: "form message (errors.ts over_request_rate_limit)" },
+  "/login": {
+    guard: "supabase-auth",
+    limit:
+      "Supabase Auth sign-in limits per IP (the server forwards X-Forwarded-For); and USR-13's lockout before the Auth call (public.login_guard through src/features/auth/login-guard-server.ts): 5 failed sign-ins per address in 15 min, or 20 per sender (keyed IP hash scope login) across addresses, lock for 15 min",
+    refusal: "form message (errors.ts over_request_rate_limit); a lockout answers exactly the wrong-password message",
+  },
   "/signup": { guard: "supabase-auth", limit: "Supabase Auth sign-up and e-mail send limits", refusal: "form message (over_email_send_rate_limit)" },
   "/forgot-password": { guard: "supabase-auth", limit: "Supabase Auth e-mail send limit (429 is shown, 'no such user' is not)", refusal: "form message" },
   "/auth/callback": { guard: "supabase-auth", limit: "Supabase Auth code / OTP verification limits", refusal: "redirect to /login with an error" },

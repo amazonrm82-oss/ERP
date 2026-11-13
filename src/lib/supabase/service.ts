@@ -58,6 +58,10 @@ import { getSupabaseEnv } from "@/lib/env";
  *   was checked: it calls only public.integration_test_claim() (the person checked again, 5 tests per connection
  *   in 10 minutes, the ciphertext and page id of that one connection) and public.integration_test_finish()
  *   (only verified_at / last_error_code and one log line, under CAP-11's page-ownership rule);
+ * - the sign-in lockout (src/features/auth/login-guard-server.ts; USR-13, owner 13 November 2026, answers
+ *   (364) א and (370) א), called from the sign-in action before and after the Auth call: it calls only
+ *   public.login_guard() with two keyed hashes (the typed address and the sender, HMAC with the
+ *   IP hash secret of src/lib/keyed-ip-hash.ts), never the plain address, IP or password, and acts for no signed-in user;
  * - the public secret-link pages (owner's approved pattern: one service_role-only
  *   definer function per action that checks the token; no table access):
  *   - the personal calendar feed (src/features/calendar-feed/feed-server.ts):

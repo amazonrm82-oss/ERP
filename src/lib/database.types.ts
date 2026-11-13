@@ -4365,6 +4365,8 @@ export type Database = {
       health_check: { Args: Record<string, never>; Returns: boolean };
       // LND-13: the public fields of available and coming-soon plans for the landing page's price list (anon and authenticated)
       plans_public: { Args: Record<string, never>; Returns: Json };
+      // USR-13: the sign-in lockout (service_role; keyed hashes only)
+      login_guard: { Args: { p_email_hash: string | null; p_ip_hash: string | null; p_event: string; p_email_window?: string | null; p_ip_window?: string | null }; Returns: Json };
       // LND-13: the landing page's "notify me" (service_role) and its platform reads
       landing_waitlist_submit: { Args: { p_email: string; p_plan: string; p_consent: boolean; p_wording_version: string; p_ip_hash: string | null }; Returns: Json };
       platform_landing_waitlist_counts: { Args: Record<string, never>; Returns: Json };

@@ -272,6 +272,23 @@ and build this CRM here instead. The old code is preserved on the branch
   that used the token (`turnstileTokenUsed`). CSP (`src/lib/csp.ts`, `proxy.ts`) adds `https://challenges.cloudflare.com` to script-src and
   frame-src on every page but `/f/` while the site key is set (client navigation keeps the first page's policy). Supabase's own CAPTCHA
   protection stays OFF.
+  In use (USR-13, owner 13 November 2026, answers (364) א and (370) א; migrations 021270 and 021271 (021271 pasted by hand); an
+  independent review and two delta reviews): the sign-in lockout (`src/features/auth/login-guard-server.ts`, called only by the sign-in
+  action in `src/features/auth/actions.ts`) calls only `public.login_guard()` (definer, service_role only) with two keyed hashes made
+  through `src/lib/keyed-ip-hash.ts`: the typed address, trimmed and lower case (scope `login-email`), and the sender (scope `login`, IPv6
+  by its /64); never the plain address, the IP, the password or the body. After zod and Turnstile and before `forwardedSignIn`, `attempt`
+  reads the sender without a row lock and refuses a locked sender before any address row is made, then locks the address row and then the
+  sender row, refuses while either is locked (nothing counted), else reserves one try of each. A refused sign-in answers exactly the
+  wrong-password message and Auth is not called. 5 tries per address, or 50 per sender across addresses (owner (374)
+  ב), within a fixed 15-minute window lock it for 15 minutes from the try that reached the threshold; a parallel burst passes at most 5.
+  `attempt` answers each try's window; `success` and `release` change a row only while it is in that window. A wrong address or password
+  (`invalid_credentials`) keeps its try; any other Auth failure or a throw gives both back (`release`; revisit if a password hook is ever
+  turned on); a success clears the address's count and gives the sender's try back, lifting a lock that try set. Storage
+  `app.login_attempts` (no grants; one row per kind and full hash). Stale rows are removed by `app.login_attempts_purge_rows` (021271,
+  pasted) through `app.run_login_attempts_purge` (pg_cron `crm-login-attempts-purge`, every 5 minutes; a no-op until pasted). Each lock
+  writes one `app.platform_log` line `login.locked` with its kind only (a refusal writes only `lock_logged_at`, never the counts). Fails
+  open without `INTAKE_IP_HASH_SECRET`, the service key or a database answer (one redacted `auth.login_guard_off` line per reason). In the
+  eslint allow-list. The advisor's finding on `app.login_attempts` is expected.
   In use (LND-13 / WEB-01, owner 11 November 2026; migration 021232; an independent review and a delta review): the landing page's price
   list (`src/features/landing/price-list-server.ts`, page `/`) calls only `public.plans_public()` with a plain anon client (no session,
   cookie or service key). The function is sql, stable, definer, no argument, `search_path ''`, executable by anon and authenticated only

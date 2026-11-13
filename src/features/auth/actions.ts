@@ -14,9 +14,13 @@ import { pick } from "@/lib/validation";
 import { validArg } from "@/lib/action-args";
 import { z } from "zod";
 
+import { isInvalidCredentials, recordLoginOutcome, reserveLoginAttempt } from "./login-guard-server";
 import { forgotPasswordSchema, newPasswordSchema, signInSchema, signUpSchema } from "./schema";
 import { TURNSTILE_ACTIONS } from "./turnstile";
 import { verifyTurnstile, verifyTurnstileToken } from "./turnstile-server";
+
+/** The one answer for a wrong address or password, and for a locked one (never tells which, or whether the address exists). */
+const WRONG_CREDENTIALS = authErrorMessage({ code: "invalid_credentials" });
 
 export async function signInAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const parsed = signInSchema.safeParse(pick(formData, ["email", "password"]));
@@ -28,11 +32,32 @@ export async function signInAction(_prev: FormState, formData: FormData): Promis
   const captcha = await verifyTurnstile(formData, TURNSTILE_ACTIONS.signIn);
   if (!captcha.ok) return fail(captcha.message, { values: formValues(formData) });
 
+  // USR-13 (owner (364) א, (370) א): one try is reserved before Auth; a locked address or sender gets EXACTLY the
+  // wrong-password answer, and Auth is not asked
+  const reservation = await reserveLoginAttempt(parsed.data.email);
+  if (reservation.locked) {
+    return fail(WRONG_CREDENTIALS, { values: formValues(formData) });
+  }
+
   // FXS-12: the user's address goes to Auth's rate limit (else the user's own client, as before)
-  const { error } = await forwardedSignIn(parsed.data);
+  let answer: Awaited<ReturnType<typeof forwardedSignIn>>;
+  try {
+    answer = await forwardedSignIn(parsed.data);
+  } catch (thrown) {
+    // Auth was not reached or did not answer: the reserved try is given back
+    await recordLoginOutcome(parsed.data.email, "release", reservation);
+    throw thrown;
+  }
+  const { error } = answer;
   if (error) {
+    // only Auth's own "wrong address or password" keeps the reserved try; a network error, a 5xx or a rate limit gives it back
+    if (isInvalidCredentials(error)) {
+      return fail(WRONG_CREDENTIALS, { values: formValues(formData) });
+    }
+    await recordLoginOutcome(parsed.data.email, "release", reservation);
     return fail(authErrorMessage(error, "לא הצלחנו לחבר אתכם. נסו שוב."), { values: formValues(formData) });
   }
+  await recordLoginOutcome(parsed.data.email, "success", reservation);
 
   const next = safeNextPath(formData.get("next")?.toString());
   // a verified authenticator on the account: the code comes next

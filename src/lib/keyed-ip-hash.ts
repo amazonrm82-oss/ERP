@@ -9,8 +9,9 @@ import { logEvent } from "@/lib/log";
 // to a plain hash. Changing the secret only restarts the rate-limit windows.
 
 /** Each public page hashes in its own scope, so one visitor is a different value on each kind of page. */
+/** `login` / `login-email` (USR-13): the sign-in lockout hashes the sender and the typed address (never stored plain). */
 /** `public` (OPS-02, owner (40) ב) is the one value per visitor across every public page, for the shared limit before a token is looked up. */
-export type IpHashScope = "intake" | "booking" | "card" | "widget" | "waitlist" | "order" | "quote" | "preview" | "statement" | "public" | "privacy" | "preferences" | "signature" | "library" | "bizpage" | "prefill";
+export type IpHashScope = "intake" | "booking" | "card" | "widget" | "waitlist" | "order" | "quote" | "preview" | "statement" | "public" | "privacy" | "preferences" | "signature" | "library" | "bizpage" | "prefill" | "login" | "login-email";
 
 const missingLogged = new Set<string>();
 
