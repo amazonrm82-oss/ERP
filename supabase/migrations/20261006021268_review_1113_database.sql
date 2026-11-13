@@ -5,7 +5,8 @@
 --   app.convert_library_links, the pattern of leads_review_requests_convert), so the contact's card shows the views and
 --   "turn off the link", and the first-opening notice goes by the contact. The public link keeps working while the contact
 --   is live (app.library_record_live). Links of leads converted before this migration stay on the lead (no backfill: a bulk
---   rewrite of rows needs the owner's go-ahead).
+--   rewrite of rows needs the owner's go-ahead). A lead merge sends the duplicate's links to the kept lead's contact when
+--   the kept lead is converted (app.merge_library_links, 021229's body plus that branch).
 -- * RVW-91: app.import_record_worked (021260's body) also counts a library link on any record, and a message or a prefill
 --   link on a lead or contact, as work, like app.sample_untouched (021266).
 -- * RVW-92 (SUB): a cycle that holds a document is not moved back to 'due' by a status change alone (hint
@@ -42,6 +43,44 @@ create or replace trigger leads_library_links_convert
   for each row
   when (new.converted_at is not null and new.converted_contact_id is not null)
   execute function app.convert_library_links();
+
+-- A lead merge (review of this fix): merge_records copies a converted duplicate's conversion onto the kept lead (the trigger
+-- above then moves the kept lead's own links), and the `merged` entry moves the duplicate's links; a kept lead that is
+-- converted sends them on to its contact, as app.merge_review_requests does (021240). 021229's body plus that lead branch.
+create or replace function app.merge_library_links() returns trigger
+language plpgsql security definer
+set search_path = ''
+as $$
+declare
+  v_merged uuid;
+  v_contact uuid;
+begin
+  if (new.metadata ->> 'merged_id') !~ '^[0-9a-fA-F-]{36}$' then
+    return null;
+  end if;
+  v_merged := (new.metadata ->> 'merged_id')::uuid;
+  if new.lead_id is not null and v_merged <> new.lead_id then
+    select l.converted_contact_id into v_contact
+      from public.leads l
+     where l.organization_id = new.organization_id and l.id = new.lead_id and l.converted_at is not null;
+    if v_contact is not null then
+      update public.library_links l set contact_id = v_contact, lead_id = null
+       where l.organization_id = new.organization_id and l.lead_id = v_merged;
+    else
+      update public.library_links l set lead_id = new.lead_id
+       where l.organization_id = new.organization_id and l.lead_id = v_merged;
+    end if;
+  elsif new.contact_id is not null and v_merged <> new.contact_id then
+    update public.library_links l set contact_id = new.contact_id
+     where l.organization_id = new.organization_id and l.contact_id = v_merged;
+  elsif new.company_id is not null and v_merged <> new.company_id then
+    update public.library_links l set company_id = new.company_id
+     where l.organization_id = new.organization_id and l.company_id = v_merged;
+  end if;
+  return null;
+end;
+$$;
+revoke all on function app.merge_library_links() from public, anon, authenticated, service_role;
 
 -- ----------------------------------------------------------------------------
 -- RVW-91: app.import_record_worked: 021260's body plus library links, messages and prefill links

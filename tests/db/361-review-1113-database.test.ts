@@ -66,6 +66,39 @@ describe("review 2026-11-13 database fixes", () => {
     expect(await asUser(owner.id, async (q) => (await q("select 1 from public.library_links where contact_id = $1", [contact])).rowCount)).toBe(1);
   });
 
+  it("RVW-90: a lead merge sends the duplicate's links to the kept lead's contact when either side is converted", async () => {
+    const where = (id: string) =>
+      asAdmin(async (q) => one<{ lead_id: string | null; contact_id: string | null }>(q, "select lead_id, contact_id from public.library_links where id = $1", [id]));
+    const merge = (keep: string, dup: string) => asUser(owner.id, (q) => q("select public.merge_records($1, 'lead', $2, $3, '{}')", [org, keep, dup]));
+
+    // (A) the kept lead is converted, the duplicate is not
+    const keepA = await insertLead(owner.id, org, { full_name: "שמור מומר", phone: "050-7311021" });
+    const dupA = await insertLead(owner.id, org, { full_name: "כפול", phone: "050-7311022" });
+    const contactA = await newContact();
+    await asAdmin((q) => q("update public.leads set converted_at = now(), converted_contact_id = $2 where id = $1", [keepA, contactA]));
+    const linkA = await link("lead_id", dupA);
+    await merge(keepA, dupA);
+    expect(await where(linkA)).toEqual({ lead_id: null, contact_id: contactA });
+
+    // (B) the duplicate is converted: its conversion passes to the kept lead, and both leads' links reach the contact
+    const keepB = await insertLead(owner.id, org, { full_name: "שמור", phone: "050-7311023" });
+    const dupB = await insertLead(owner.id, org, { full_name: "כפול מומר", phone: "050-7311024" });
+    const contactB = await newContact();
+    await asAdmin((q) => q("update public.leads set converted_at = now(), converted_contact_id = $2 where id = $1", [dupB, contactB]));
+    const ownB = await link("lead_id", keepB);
+    const dupLinkB = await link("lead_id", dupB);
+    await merge(keepB, dupB);
+    expect(await where(ownB)).toEqual({ lead_id: null, contact_id: contactB });
+    expect(await where(dupLinkB)).toEqual({ lead_id: null, contact_id: contactB });
+
+    // neither converted: the duplicate's links go to the kept lead, as before
+    const keepC = await insertLead(owner.id, org, { full_name: "שמור רגיל", phone: "050-7311025" });
+    const dupC = await insertLead(owner.id, org, { full_name: "כפול רגיל", phone: "050-7311026" });
+    const linkC = await link("lead_id", dupC);
+    await merge(keepC, dupC);
+    expect(await where(linkC)).toEqual({ lead_id: keepC, contact_id: null });
+  });
+
   it("RVW-91: a library link, a message or a prefill link is work for import undo", async () => {
     const lead = await insertLead(owner.id, org, { full_name: "ליד מיובא", phone: "050-7311003" });
     expect(await worked("lead", lead)).toBe(false);
