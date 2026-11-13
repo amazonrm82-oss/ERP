@@ -542,7 +542,11 @@ and build this CRM here instead. The old code is preserved on the branch
    characters; links minted last (second caller of `meeting_reminder_link`, `app.signature_link_issue`, `consent_preference_link_for_job`)
    and listed in `links` so only they become clickable. Answers `{to, from_name, subject, text, reply_to, list_unsubscribe, links,
    attachments}` or `{refused}`; `stale`, `paused`, `site_url` wait. A refusal (not stale) and `email_quota_return` give the count back once
-   (`app.email_usage_give_back`). From = `"<business name>" <RESEND_FROM>`, reply-to = the sending person's address while an active member.
+   (`app.email_usage_give_back`). From = `"<business name>" <RESEND_FROM>`, reply-to = the sending person's address while an active member; since 021278 (owner (8) ב)
+   an automation's email (no `reply_to_user_id`, button runs too) replies to the record owner (a deal email: the deal's owner) while an
+   active non-viewer member, else none. Owner (7) ב: a 401/403 from Resend ends the job at once, not sent, code `key_refused`, the count
+   given back, one error log line `email.key_refused`; `public.platform_email_health()` (platform owner/support, aal2, counts only,
+   index `app.jobs_key_refused_idx`) feeds a warning card on the admin dashboard. `app.email_compose_core` was last redefined in 021278.
    Addresses, text and keys never logged. Pinned by md5 in test 367 (email-compose).
    In use (OPS-04, owner 26 October 2026, answer (א) and wave 3 use (1); conditions of 2 November 2026, answers (52)-(55); migration
    `_jobs_queue.sql`): the background job worker (`src/features/jobs/run-server.ts`, route `POST /api/jobs/run`, public prefix in
@@ -881,9 +885,13 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   retired as `app.set_notification_settings_021276_retired`, no grants; without `p_quiet_set` stored hours are kept; hint
   `notification_settings:quiet`). During the window, read in the notification's business zone (checked in `pg_timezone_names`, an
   unknown zone holds nothing; remembered per transaction in `app.quiet_zone_ok`), `app.apply_notification_settings` stamps server-only
-  `notifications.push_after` = `app.quiet_hours_end(...)` (never longer than the window's length, so the autumn night releases an hour
-  early, accepted); `system` is never held; the bell is unchanged. `public.claim_push_notifications` and `app.dispatch_push` (both last
-  redefined in 021276, bodies of 020615 / 0010 but the freshness line) take a held row only after `push_after`, fresh for an hour from it
+  `notifications.push_after` = `app.quiet_hours_end(...)`; the bell is unchanged. Since 021277 (owner (4)-(6) ב, 13 November 2026):
+  never released before the set time (the wall-clock end; an end the spring change skips = the jump, an end the autumn change repeats =
+  its first showing after arrival); `app.quiet_hours_exempt_kinds()` (system, lead_new, meeting_reminder) are never held; a save with
+  `p_quiet_set` re-judges the caller's own held rows at once by the new setting (`push_after = now()` when released; a kind just made
+  bell-only or muted is marked pushed); accepted: a notification inserted during the save may keep the old window. `public.claim_push_notifications` and `app.dispatch_push` (both last
+  redefined in 021276, bodies of 020615 / 0010 but the freshness line; `app.quiet_hours_end`, `app.apply_notification_settings` and
+  `public.set_notification_settings` were last redefined in 021277) take a held row only after `push_after`, fresh for an hour from it
   (index `notifications_held_push_idx`). The daily email summary waits for `digest.send`.
 - List sorting (migration 0032): computed fields `sort_status(leads)`, `sort_source(leads)`,
   `sort_owner(leads|contacts|companies)`, `sort_company(contacts)` (security invoker) are ordered by as
