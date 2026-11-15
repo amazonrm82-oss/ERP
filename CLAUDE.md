@@ -747,6 +747,16 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
 - Access helpers live in schema `app` (not exposed by the API): `app.is_member`, `app.is_admin`,
   `app.can_write`, `app.can_read_record`, `app.can_edit_record`, `app.can_delete_record`,
   `app.org_writable`, `app.org_limit`, `app.org_has_feature`.
+  Since OPS-09 (migration 021280; an independent review) the select policies of leads, contacts, companies, deals, tasks and
+  profiles ask `app.can_read_record()`'s rule as sets computed once per statement (`app.my_record_orgs()`, `app.my_read_teams()`,
+  `app.my_teams()`, `app.my_shared_users()` = `app.shares_org`'s body); keep them in step with `app.can_read_record`,
+  `app.user_can_read_record` and `app.shares_org` (test 370 compares them for 19 kinds of person). `app.can_read_record` itself is
+  unchanged and serves every other table. `session_aal`, `has_verified_factor`, `membership_role`, `platform_role`, `support_session`,
+  `role_in`, `is_member`, `in_team` and `manages_team` were last redefined there (plpgsql, same queries). `sort_owner` (five tables)
+  inlines over definer `app.owner_sort_name`, a copy of profiles_select's rule (`shares_org`, `session_verified`: keep in step); a call
+  with no `auth.uid()` (service_role) gets no name (accepted, no such caller); the advisor's `function_search_path_mutable` on
+  `sort_owner` is expected. Measured locally on 300,000 leads: counts and pages under 0.2 s, sorting the whole list by owner still about
+  10 s (owner question 379). Test 371 is the speed bound. Scripts: `scripts/perf/access-load*.sql`.
 - Roles: `owner`, `admin`, `manager`, `member`, `viewer`. Record visibility per organization:
   `org` | `team` | `own`. Members edit what they own; managers their teams' records; admins everything.
   Deleting (recycle bin) is for admins and team managers; purging is admin-only.
