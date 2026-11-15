@@ -19,6 +19,7 @@ import { LeadsBoard } from "@/features/leads/components/leads-board";
 import { getScoreNumbers } from "@/features/data-quality/queries";
 import { LeadsTable } from "@/features/leads/components/leads-table";
 import { getLeadBoard, getLeadLookups, LEAD_DEFAULT_SORT, LEAD_SORT_COLUMNS, listLeads } from "@/features/leads/queries";
+import { OwnerSortNote } from "@/features/list-sort/components/owner-sort-note";
 import { CUSTOM_PREFIX, resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
@@ -82,7 +83,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
   const sortKeys = [...Object.keys(LEAD_SORT_COLUMNS), ...listColumns.fields.filter(sortableField).map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<
     keyof typeof LEAD_SORT_COLUMNS | CustomSortKey
   >;
-  const sort = parseSort(firstParam(query.sort), sortKeys, LEAD_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
+  const requestedSort = parseSort(firstParam(query.sort), sortKeys, LEAD_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
 
   // SEG-01: owners, admins and managers save filters as segments and add rows to hand-picked ones
   const segmentWriter = canWriteSegments(context.role, canWrite);
@@ -91,13 +92,15 @@ export default async function LeadsPage({ params, searchParams }: Props) {
     getLeadLookups(orgId),
     listTags(orgId),
     viewChips(orgId, "lead", context),
-    boardView ? null : listLeads(orgId, { search, statusId, tagId, page, sort, filter: filter.logic }),
+    boardView ? null : listLeads(orgId, { search, statusId, tagId, page, sort: requestedSort, filter: filter.logic }),
     boardView ? getLeadBoard(orgId, { search, tagId, filter: filter.logic }) : null,
     canWrite ? activeReasonNames(orgId) : [],
     segmentWriter && !boardView ? staticSegmentOptions(orgId, "lead") : null,
   ]);
   const leads = list?.leads ?? [];
   const hasMore = list?.hasMore ?? false;
+  // OPS-09: the sort the list was read with (a large list falls back from the owner sort)
+  const sort = list?.sort ?? requestedSort;
 
   const isFiltered = search !== "" || statusId !== null || tagId !== null || filter.tree !== null;
   // the same filters in the other view (the board has no status filter)
@@ -237,6 +240,8 @@ export default async function LeadsPage({ params, searchParams }: Props) {
 
       <LeadFilters orgId={orgId} statuses={lookups.statuses} tags={tags} search={search} statusId={statusId ?? ""} tagId={tagId ?? ""} board={boardView} />
 
+      <OwnerSortNote show={list?.ownerSortFellBack ?? false} />
+
       {board ? (
         <LeadsBoard orgId={orgId} board={board} canWrite={canWrite} reasons={reasons} peek={peek.rows} />
       ) : leads.length > 0 ? (
@@ -253,6 +258,7 @@ export default async function LeadsPage({ params, searchParams }: Props) {
               fields={await withFieldRefs(orgId, listColumns.fields, leads.map((row) => row.customFields))}
               sort={sort}
               sortHref={sortHref}
+              ownerSortBlocked={list?.ownerSortBlocked ?? false}
               editing={editing}
               tags={tags}
               reasons={reasons}

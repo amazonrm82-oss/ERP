@@ -6,6 +6,7 @@ import { taskTypeName } from "@/features/activity-types/types";
 import { getUserNames } from "@/features/shell/queries";
 import type { LeaveKind } from "@/features/work-hours/leave";
 import { getCurrentAbsences } from "@/features/work-hours/queries";
+import { OWNER_SORT_MAX_ROWS, withOwnerSortGuard } from "@/features/list-sort/owner-sort";
 import type { TaskStatus } from "@/lib/database.types";
 import { zoneDate, zonedIso } from "@/lib/format";
 import { PAGE_SIZE, textSearchFilter } from "@/lib/search";
@@ -301,34 +302,46 @@ export async function listTasks(
     ids?: string[];
     chunk?: { from: number; size: number };
   },
-): Promise<{ tasks: TaskListItem[]; hasMore: boolean }> {
+): Promise<{ tasks: TaskListItem[]; hasMore: boolean; sort: Sort<TaskSortKey>; ownerSortBlocked: boolean; ownerSortFellBack: boolean }> {
   const supabase = await createClient();
   const size = options.chunk?.size ?? PAGE_SIZE;
   const from = options.chunk?.from ?? (options.page - 1) * PAGE_SIZE;
 
-  let query = supabase
-    .from("tasks")
-    .select("id, title, task_type, activity_type_id, status, priority, due_at, owner_id, lead_id, contact_id, company_id, deal_id, parent_task_id, created_at")
-    .eq("organization_id", orgId)
-    .is("deleted_at", null);
-  if (options.ownerId) {
-    query = query.eq("owner_id", options.ownerId);
-  }
-  const searchFilter = textSearchFilter(options.search);
-  if (searchFilter) {
-    query = query.or(searchFilter);
-  }
-  if (options.ids) {
-    query = query.in("id", options.ids);
-  }
-  if (options.filter) {
-    query = query.or(options.filter);
-  }
-  const sort = options.sort ?? TASK_DEFAULT_SORT;
-  const { data, error } = await query
-    .order(sortColumn(TASK_SORT_COLUMNS, sort.key), { ascending: sort.ascending, nullsFirst: false })
-    .order("id", { ascending: sort.ascending })
-    .range(from, from + size);
+  // the list with its filters; built twice: the page, and the owner-sort probe (OPS-09)
+  const filtered = () => {
+    let query = supabase
+      .from("tasks")
+      .select("id, title, task_type, activity_type_id, status, priority, due_at, owner_id, lead_id, contact_id, company_id, deal_id, parent_task_id, created_at")
+      .eq("organization_id", orgId)
+      .is("deleted_at", null);
+    if (options.ownerId) {
+      query = query.eq("owner_id", options.ownerId);
+    }
+    const searchFilter = textSearchFilter(options.search);
+    if (searchFilter) {
+      query = query.or(searchFilter);
+    }
+    if (options.ids) {
+      query = query.in("id", options.ids);
+    }
+    if (options.filter) {
+      query = query.or(options.filter);
+    }
+    return query;
+  };
+
+  // OPS-09: the owner sort only while the filtered list is small enough
+  const guarded = await withOwnerSortGuard(
+    options.sort ?? TASK_DEFAULT_SORT,
+    TASK_DEFAULT_SORT,
+    options.ids || options.chunk ? null : () => filtered().order("id").range(OWNER_SORT_MAX_ROWS, OWNER_SORT_MAX_ROWS),
+    async (sort) =>
+      await filtered()
+        .order(sortColumn(TASK_SORT_COLUMNS, sort.key), { ascending: sort.ascending, nullsFirst: false })
+        .order("id", { ascending: sort.ascending })
+        .range(from, from + size),
+  );
+  const { data, error } = guarded.result;
   if (error) {
     throw new Error(`tasks query failed: ${error.message}`);
   }
@@ -343,6 +356,9 @@ export async function listTasks(
 
   return {
     hasMore: data.length > size,
+    sort: guarded.sort,
+    ownerSortBlocked: guarded.ownerSortBlocked,
+    ownerSortFellBack: guarded.ownerSortFellBack,
     tasks: rows.map((row) => {
       return {
         id: row.id,

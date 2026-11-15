@@ -13,6 +13,7 @@ import type { Sort } from "@/lib/sort";
 
 import type { TaskListItem } from "../queries";
 import { PRIORITY_LABEL } from "./task-fields";
+import { OWNER_SORT_LIMIT_TEXT } from "@/features/list-sort/owner-sort";
 
 type Props = {
   orgId: string;
@@ -21,6 +22,8 @@ type Props = {
   catalog: CatalogColumn[];
   sort: Sort<string>;
   sortHref: (key: string) => string;
+  // OPS-09: the list is too large to sort by owner now
+  ownerSortBlocked?: boolean;
   editing: InlineEditing;
   // now, to mark open tasks that are past due
   now: number;
@@ -42,7 +45,7 @@ const relatedHref = (orgId: string, related: NonNullable<TaskListItem["related"]
         : paths.deal(orgId, related.id);
 
 /** Tasks as a table (LST-09): sorting, the user's columns, editing in the cell and bulk actions, as in the other lists. */
-export function TasksTable({ orgId, tasks, columns, catalog, sort, sortHref, editing, now }: Props) {
+export function TasksTable({ orgId, tasks, columns, catalog, sort, sortHref, ownerSortBlocked = false, editing, now }: Props) {
   return (
     <BulkSelection
       orgId={orgId}
@@ -65,6 +68,7 @@ export function TasksTable({ orgId, tasks, columns, catalog, sort, sortHref, edi
         fields={[]}
         sort={sort}
         sortHref={sortHref}
+        unsortable={ownerSortBlocked ? { owner: OWNER_SORT_LIMIT_TEXT } : undefined}
         customValues={() => ({})}
         nameCell={(task) => (
           <div className="flex items-start gap-2">

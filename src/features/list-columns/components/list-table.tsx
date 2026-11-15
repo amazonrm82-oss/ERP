@@ -25,6 +25,8 @@ type Props<R> = {
   // every column sorts: built-in ones through the list's sort columns, custom fields by their value
   sort: Sort<string>;
   sortHref: (key: string) => string;
+  // OPS-09: columns that may not be sorted by now, with the reason (shown and announced on the header)
+  unsortable?: Partial<Record<string, string>>;
   label: string;
   // the first column's sort key and title (tasks: "title", "כותרת")
   nameColumn?: { key: string; label: string };
@@ -46,6 +48,7 @@ export function ListTable<R>({
   customValues,
   sort,
   sortHref,
+  unsortable,
   label,
   nameColumn = { key: "name", label: "שם" },
 }: Props<R>) {
@@ -66,6 +69,15 @@ export function ListTable<R>({
                 return (
                   <th key={column.key} scope="col" className={cn(th, WIDTH_CLASS[column.width])}>
                     {labels.get(column.key) ?? column.key}
+                  </th>
+                );
+              }
+              const blocked = unsortable?.[column.key];
+              if (blocked) {
+                return (
+                  <th key={column.key} scope="col" title={blocked} className={cn(th, WIDTH_CLASS[column.width])}>
+                    {labels.get(column.key) ?? column.key}
+                    <span className="sr-only">, {blocked}</span>
                   </th>
                 );
               }

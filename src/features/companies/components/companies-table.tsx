@@ -16,6 +16,7 @@ import { paths } from "@/lib/paths";
 import type { Sort } from "@/lib/sort";
 
 import type { CompanyListItem } from "../queries";
+import { OWNER_SORT_LIMIT_TEXT } from "@/features/list-sort/owner-sort";
 
 type Props = {
   orgId: string;
@@ -27,6 +28,8 @@ type Props = {
   // the current sort, and the address that sorts by a column (LST-02)
   sort: Sort<string>;
   sortHref: (key: string) => string;
+  // OPS-09: the list is too large to sort by owner now
+  ownerSortBlocked?: boolean;
   // editing name and owner in the cell (LST-06)
   editing: InlineEditing;
   // the organization's tags, for the bulk "add tag" (LST-07)
@@ -40,7 +43,7 @@ type Props = {
 };
 
 /** Companies as a table, with the columns the user chose. */
-export function CompaniesTable({ orgId, companies, columns, catalog, fields, sort, sortHref, editing, tags, credit, debt, customer }: Props) {
+export function CompaniesTable({ orgId, companies, columns, catalog, fields, sort, sortHref, ownerSortBlocked = false, editing, tags, credit, debt, customer }: Props) {
   return (
     <BulkSelection
       orgId={orgId}
@@ -62,6 +65,7 @@ export function CompaniesTable({ orgId, companies, columns, catalog, fields, sor
         fields={fields}
         sort={sort}
         sortHref={sortHref}
+        unsortable={ownerSortBlocked ? { owner: OWNER_SORT_LIMIT_TEXT } : undefined}
         customValues={(company) => asCustomValues(company.customFields)}
         nameCell={(company) => (
           <div className="flex items-start gap-2">

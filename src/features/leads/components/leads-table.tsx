@@ -19,6 +19,7 @@ import { leadDisplayName, statusTone } from "../display";
 import type { LeadListItem, LeadSourceOption, LeadStatusOption } from "../queries";
 import { takeOffered } from "../take";
 import { TakeLeadButton } from "./take-lead-button";
+import { OWNER_SORT_LIMIT_TEXT } from "@/features/list-sort/owner-sort";
 
 type Props = {
   orgId: string;
@@ -32,6 +33,8 @@ type Props = {
   // the current sort, and the address that sorts by a column (LST-02)
   sort: Sort<string>;
   sortHref: (key: string) => string;
+  // OPS-09: the list is too large to sort by owner now
+  ownerSortBlocked?: boolean;
   // editing name, status and owner in the cell (LST-06)
   editing: InlineEditing;
   // the organization's tags, for the bulk "add tag" (LST-07)
@@ -53,7 +56,7 @@ type Props = {
 };
 
 /** Leads as a table, with the columns the user chose. */
-export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, fields, sort, sortHref, editing, tags, reasons, completeness, whatsapp = null, segments = null, canWrite = false, nameHref, peekId = null }: Props) {
+export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, fields, sort, sortHref, ownerSortBlocked = false, editing, tags, reasons, completeness, whatsapp = null, segments = null, canWrite = false, nameHref, peekId = null }: Props) {
   const statusById = new Map(statuses.map((status) => [status.id, status]));
   // "converted" is set only by the conversion
   const statusOptions = statuses
@@ -88,6 +91,7 @@ export function LeadsTable({ orgId, leads, statuses, sources, columns, catalog, 
         fields={fields}
         sort={sort}
         sortHref={sortHref}
+        unsortable={ownerSortBlocked ? { owner: OWNER_SORT_LIMIT_TEXT } : undefined}
         customValues={(lead) => asCustomValues(lead.customFields)}
         nameCell={(lead) => (
           <div className="flex items-start gap-2">

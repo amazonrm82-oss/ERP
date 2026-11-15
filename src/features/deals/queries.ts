@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getUserNames } from "@/features/shell/queries";
+import { OWNER_SORT_MAX_ROWS, withOwnerSortGuard } from "@/features/list-sort/owner-sort";
 import type { Json, StageKind } from "@/lib/database.types";
 import { PAGE_SIZE, textSearchFilter } from "@/lib/search";
 import { sortColumn, type CustomSortKey, type Sort } from "@/lib/sort";
@@ -460,35 +461,47 @@ export async function listDeals(
     ids?: string[];
     chunk?: { from: number; size: number };
   },
-): Promise<{ deals: DealListItem[]; hasMore: boolean }> {
+): Promise<{ deals: DealListItem[]; hasMore: boolean; sort: Sort<DealSortKey | CustomSortKey>; ownerSortBlocked: boolean; ownerSortFellBack: boolean }> {
   const supabase = await createClient();
   const size = options.chunk?.size ?? PAGE_SIZE;
   const from = options.chunk?.from ?? (options.page - 1) * PAGE_SIZE;
 
-  let query = supabase
-    .from("deals")
-    .select("id, name, amount_agorot, currency, stage_id, status, contact_id, company_id, owner_id, expected_close_date, billing_kind, recurring_amount_agorot, recurring_amount_auto, recurring_start_date, renewal_date, created_at, original_created_on, custom_fields")
-    .eq("organization_id", orgId)
-    .eq("pipeline_id", options.pipelineId)
-    .is("deleted_at", null);
-  const searchFilter = textSearchFilter(options.search);
-  if (searchFilter) {
-    query = query.or(searchFilter);
-  }
-  if (options.tagId) {
-    query = query.contains("tag_ids", [options.tagId]);
-  }
-  if (options.ids) {
-    query = query.in("id", options.ids);
-  }
-  if (options.filter) {
-    query = query.or(options.filter);
-  }
-  const sort = options.sort ?? DEAL_DEFAULT_SORT;
-  const { data, error } = await query
-    .order(sortColumn(DEAL_SORT_COLUMNS, sort.key), { ascending: sort.ascending, nullsFirst: false })
-    .order("id", { ascending: sort.ascending })
-    .range(from, from + size);
+  // the list with its filters; built twice: the page, and the owner-sort probe (OPS-09)
+  const filtered = () => {
+    let query = supabase
+      .from("deals")
+      .select("id, name, amount_agorot, currency, stage_id, status, contact_id, company_id, owner_id, expected_close_date, billing_kind, recurring_amount_agorot, recurring_amount_auto, recurring_start_date, renewal_date, created_at, original_created_on, custom_fields")
+      .eq("organization_id", orgId)
+      .eq("pipeline_id", options.pipelineId)
+      .is("deleted_at", null);
+    const searchFilter = textSearchFilter(options.search);
+    if (searchFilter) {
+      query = query.or(searchFilter);
+    }
+    if (options.tagId) {
+      query = query.contains("tag_ids", [options.tagId]);
+    }
+    if (options.ids) {
+      query = query.in("id", options.ids);
+    }
+    if (options.filter) {
+      query = query.or(options.filter);
+    }
+    return query;
+  };
+
+  // OPS-09: the owner sort only while the filtered list is small enough
+  const guarded = await withOwnerSortGuard(
+    options.sort ?? DEAL_DEFAULT_SORT,
+    DEAL_DEFAULT_SORT,
+    options.ids || options.chunk ? null : () => filtered().order("id").range(OWNER_SORT_MAX_ROWS, OWNER_SORT_MAX_ROWS),
+    async (sort) =>
+      await filtered()
+        .order(sortColumn(DEAL_SORT_COLUMNS, sort.key), { ascending: sort.ascending, nullsFirst: false })
+        .order("id", { ascending: sort.ascending })
+        .range(from, from + size),
+  );
+  const { data, error } = guarded.result;
   if (error) {
     throw new Error(`deals query failed: ${error.message}`);
   }
@@ -506,6 +519,9 @@ export async function listDeals(
 
   return {
     hasMore: data.length > size,
+    sort: guarded.sort,
+    ownerSortBlocked: guarded.ownerSortBlocked,
+    ownerSortFellBack: guarded.ownerSortFellBack,
     deals: rows.map((row) => ({
       id: row.id,
       name: row.name,

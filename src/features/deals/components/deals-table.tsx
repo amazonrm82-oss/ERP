@@ -17,6 +17,7 @@ import { DealStageCell } from "./deal-stage-cell";
 import type { CloseWindowSetup } from "./deal-won-dialog";
 import type { DealListItem, StageOption } from "../queries";
 import { BILLING_KIND_LABELS, billingKindOf, recurringText } from "../recurring";
+import { OWNER_SORT_LIMIT_TEXT } from "@/features/list-sort/owner-sort";
 
 type Props = {
   orgId: string;
@@ -28,6 +29,8 @@ type Props = {
   fields: FieldDefinition[];
   sort: Sort<string>;
   sortHref: (key: string) => string;
+  // OPS-09: the list is too large to sort by owner now
+  ownerSortBlocked?: boolean;
   editing: InlineEditing;
   tags: TagOption[];
   // DEAL-03: the names of the active loss reasons, offered when a deal moves to a lost stage
@@ -37,7 +40,7 @@ type Props = {
 };
 
 /** A pipeline's deals as a table (LST-09): the same columns, sorting, editing in the cell and bulk actions as the other lists. */
-export function DealsTable({ orgId, deals, stages, columns, catalog, fields, sort, sortHref, editing, tags, lossReasons, closeWindow }: Props) {
+export function DealsTable({ orgId, deals, stages, columns, catalog, fields, sort, sortHref, ownerSortBlocked = false, editing, tags, lossReasons, closeWindow }: Props) {
   const stageById = new Map(stages.map((stage) => [stage.id, stage]));
   // a lost stage offers a reason, when the organization has any (optional)
   const stageOptions = stages.map((stage) => ({
@@ -72,6 +75,7 @@ export function DealsTable({ orgId, deals, stages, columns, catalog, fields, sor
         fields={fields}
         sort={sort}
         sortHref={sortHref}
+        unsortable={ownerSortBlocked ? { owner: OWNER_SORT_LIMIT_TEXT } : undefined}
         customValues={(deal) => asCustomValues(deal.customFields)}
         nameCell={(deal) => (
           <div className="flex items-start gap-2">

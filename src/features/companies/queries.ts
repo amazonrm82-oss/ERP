@@ -1,5 +1,6 @@
 import "server-only";
 
+import { OWNER_SORT_MAX_ROWS, withOwnerSortGuard } from "@/features/list-sort/owner-sort";
 import type { Json } from "@/lib/database.types";
 
 import { recordTypeNames } from "@/features/record-type-options/queries";
@@ -54,36 +55,47 @@ export const COMPANY_DEFAULT_SORT: Sort<CompanySortKey> = { key: "name", ascendi
 export async function listCompanies(
   orgId: string,
   options: { search: string; tagId?: string | null; page: number; sort?: Sort<CompanySortKey | CustomSortKey>; filter?: string | null; ids?: string[]; chunk?: { from: number; size: number } },
-): Promise<{ companies: CompanyListItem[]; hasMore: boolean }> {
+): Promise<{ companies: CompanyListItem[]; hasMore: boolean; sort: Sort<CompanySortKey | CustomSortKey>; ownerSortBlocked: boolean; ownerSortFellBack: boolean }> {
   const supabase = await createClient();
   // an export reads the list in larger chunks (LST-08)
   const size = options.chunk?.size ?? PAGE_SIZE;
   const from = options.chunk?.from ?? (options.page - 1) * PAGE_SIZE;
 
-  let query = supabase
-    .from("companies")
-    .select("id, name, phone, phone_e164, city, website, type_id, company_type, owner_id, created_at, original_created_on, custom_fields")
-    .eq("organization_id", orgId)
-    .is("deleted_at", null);
-  const searchFilter = personSearchFilter(options.search);
-  if (searchFilter) {
-    query = query.or(searchFilter);
-  }
-  if (options.tagId) {
-    query = query.contains("tag_ids", [options.tagId]);
-  }
-  if (options.ids) {
-    query = query.in("id", options.ids);
-  }
-  if (options.filter) {
-    query = query.or(options.filter);
-  }
+  // the list with its filters; built twice: the page, and the owner-sort probe (OPS-09)
+  const filtered = () => {
+    let query = supabase
+      .from("companies")
+      .select("id, name, phone, phone_e164, city, website, type_id, company_type, owner_id, created_at, original_created_on, custom_fields")
+      .eq("organization_id", orgId)
+      .is("deleted_at", null);
+    const searchFilter = personSearchFilter(options.search);
+    if (searchFilter) {
+      query = query.or(searchFilter);
+    }
+    if (options.tagId) {
+      query = query.contains("tag_ids", [options.tagId]);
+    }
+    if (options.ids) {
+      query = query.in("id", options.ids);
+    }
+    if (options.filter) {
+      query = query.or(options.filter);
+    }
+    return query;
+  };
 
-  const sort = options.sort ?? COMPANY_DEFAULT_SORT;
-  const { data, error } = await query
-    .order(sortColumn(COMPANY_SORT_COLUMNS, sort.key), { ascending: sort.ascending, nullsFirst: false })
-    .order("id", { ascending: sort.ascending })
-    .range(from, from + size);
+  // OPS-09: the owner sort only while the filtered list is small enough
+  const guarded = await withOwnerSortGuard(
+    options.sort ?? COMPANY_DEFAULT_SORT,
+    COMPANY_DEFAULT_SORT,
+    options.ids || options.chunk ? null : () => filtered().order("id").range(OWNER_SORT_MAX_ROWS, OWNER_SORT_MAX_ROWS),
+    async (sort) =>
+      await filtered()
+        .order(sortColumn(COMPANY_SORT_COLUMNS, sort.key), { ascending: sort.ascending, nullsFirst: false })
+        .order("id", { ascending: sort.ascending })
+        .range(from, from + size),
+  );
+  const { data, error } = guarded.result;
   if (error) {
     throw new Error(`companies query failed: ${error.message}`);
   }
@@ -92,6 +104,9 @@ export async function listCompanies(
 
   return {
     hasMore: data.length > size,
+    sort: guarded.sort,
+    ownerSortBlocked: guarded.ownerSortBlocked,
+    ownerSortFellBack: guarded.ownerSortFellBack,
     companies: rows.map((row) => ({
       id: row.id,
       name: row.name,

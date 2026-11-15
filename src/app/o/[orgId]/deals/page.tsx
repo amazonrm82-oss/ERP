@@ -23,6 +23,7 @@ import { DealsTable } from "@/features/deals/components/deals-table";
 import { BOARD_PREFERENCE, MAX_BOARD_FIELDS } from "@/features/deals/board-fields";
 import { DEAL_DEFAULT_SORT, DEAL_SORT_COLUMNS, FILTERED_TOTALS_LIMIT, getBoard, getBoardFields, getPipeline, isBoardFiltered, listDeals, listPipelines } from "@/features/deals/queries";
 import { inlineEditing } from "@/features/inline-edit/server";
+import { OwnerSortNote } from "@/features/list-sort/components/owner-sort-note";
 import { CUSTOM_PREFIX, resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
@@ -346,14 +347,14 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
   const filter = await prepareListFilter(orgId, "deal", firstParam(query.f), context.user.id, listColumns.fields, { stages: pipeline.stages });
   const filterParam = filter.tree ? JSON.stringify(filter.tree) : null;
   const sortKeys = [...Object.keys(DEAL_SORT_COLUMNS), ...listColumns.fields.filter(sortableField).map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<keyof typeof DEAL_SORT_COLUMNS | CustomSortKey>;
-  const sort = parseSort(firstParam(query.sort), sortKeys, DEAL_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
+  const requestedSort = parseSort(firstParam(query.sort), sortKeys, DEAL_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
   const pipelineParam = pipelines.find((p) => p.id === pipeline.id)?.isDefault ? null : pipeline.id;
 
-  const [editing, tags, viewData, { deals, hasMore }, lossReasons, calendar] = await Promise.all([
+  const [editing, tags, viewData, { deals, hasMore, sort, ownerSortBlocked, ownerSortFellBack }, lossReasons, calendar] = await Promise.all([
     inlineEditing(orgId, context),
     listTags(orgId),
     viewChips(orgId, "deal", context),
-    listDeals(orgId, { pipelineId: pipeline.id, search, tagId, page, sort, filter: filter.logic }),
+    listDeals(orgId, { pipelineId: pipeline.id, search, tagId, page, sort: requestedSort, filter: filter.logic }),
     context.canWrite ? listLossReasons(orgId) : Promise.resolve([]),
     context.canWrite ? getCalendarSettings(orgId) : Promise.resolve(null),
   ]);
@@ -445,6 +446,7 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
         </button>
       </Form>
 
+      <OwnerSortNote show={ownerSortFellBack} />
       {deals.length > 0 ? (
         <DealsTable
           orgId={orgId}
@@ -454,6 +456,7 @@ async function DealsTableView({ orgId, context, query }: { orgId: string; contex
           catalog={listColumns.catalog}
           fields={await withFieldRefs(orgId, listColumns.fields, deals.map((row) => row.customFields))}
           sort={sort}
+          ownerSortBlocked={ownerSortBlocked}
           sortHref={sortHref}
           editing={editing}
           tags={tags}

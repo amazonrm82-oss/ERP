@@ -15,6 +15,7 @@ import { getDebtNumbers } from "@/features/balances/queries";
 import { COMPANY_DEFAULT_SORT, COMPANY_SORT_COLUMNS, listCompanies } from "@/features/companies/queries";
 import { inlineEditing } from "@/features/inline-edit/server";
 import { getCustomerNumbers } from "@/features/customer-status/queries";
+import { OwnerSortNote } from "@/features/list-sort/components/owner-sort-note";
 import { CUSTOM_PREFIX, CUSTOMER_COLUMNS, DEBT_COLUMNS, offeredSortKeys, resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
@@ -61,12 +62,12 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
   const sortKeys = [...offeredSortKeys(Object.keys(COMPANY_SORT_COLUMNS), listColumns.catalog), ...listColumns.fields.filter(sortableField).map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<
     keyof typeof COMPANY_SORT_COLUMNS | CustomSortKey
   >;
-  const sort = parseSort(firstParam(query.sort), sortKeys, COMPANY_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
-  const [editing, tags, viewData, { companies, hasMore }] = await Promise.all([
+  const requestedSort = parseSort(firstParam(query.sort), sortKeys, COMPANY_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
+  const [editing, tags, viewData, { companies, hasMore, sort, ownerSortBlocked, ownerSortFellBack }] = await Promise.all([
     inlineEditing(orgId, context),
     listTags(orgId),
     viewChips(orgId, "company", context),
-    listCompanies(orgId, { search, tagId, page, sort, filter: filter.logic }),
+    listCompanies(orgId, { search, tagId, page, sort: requestedSort, filter: filter.logic }),
   ]);
 
   const views = viewData.chips;
@@ -163,6 +164,7 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
         </button>
       </Form>
 
+      <OwnerSortNote show={ownerSortFellBack} />
       {companies.length > 0 ? (
         <>
           <RecordCards
@@ -186,6 +188,7 @@ export default async function CompaniesPage({ params, searchParams }: Props) {
               fields={await withFieldRefs(orgId, listColumns.fields, companies.map((row) => row.customFields))}
               sort={sort}
               sortHref={sortHref}
+              ownerSortBlocked={ownerSortBlocked}
               editing={editing}
               tags={tags}
               credit={credit}

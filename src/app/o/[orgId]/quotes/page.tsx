@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/feedback";
 import { Input, Select } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
+import { OwnerSortNote } from "@/features/list-sort/components/owner-sort-note";
 import { resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
@@ -46,7 +47,6 @@ export default async function QuotesPage({ params, searchParams }: Props) {
   const { orgId } = await params;
   const query = await searchParams;
   const filters = quoteListFilters(query);
-  const sort = filters.sort ?? QUOTE_DEFAULT_SORT;
   const context = await getOrgContext(orgId);
   // FXC-09: the columns and the filter's choices load side by side; prepareListFilter reuses the same reads
   const [granted, members, listColumns] = await Promise.all([
@@ -58,7 +58,11 @@ export default async function QuotesPage({ params, searchParams }: Props) {
   ]);
   const filter = await prepareListFilter(orgId, "quote", firstParam(query.f), context.user.id, []);
   const filterParam = filter.tree ? JSON.stringify(filter.tree) : null;
-  const [{ quotes, hasMore }, viewData] = await Promise.all([listQuotes(orgId, { ...filters, filter: filter.logic }), viewChips(orgId, "quote", context)]);
+  const [list, viewData] = await Promise.all([listQuotes(orgId, { ...filters, filter: filter.logic }), viewChips(orgId, "quote", context)]);
+  const { quotes, hasMore, ownerSortBlocked, ownerSortFellBack } = list;
+  // OPS-09: the sort the list was read with (a large list falls back from the owner sort); the links keep it
+  const sort = list.sort;
+  const shownFilters = { ...filters, sort };
   const names = await getUserNames(quotes.map((quote) => quote.ownerId));
   const views = viewData.chips;
   const activeView = views.find((view) => view.id === firstParam(query.sv)) ?? null;
@@ -67,10 +71,10 @@ export default async function QuotesPage({ params, searchParams }: Props) {
   const filtered = filters.status !== null || filters.ownerId !== null || filters.from !== null || filters.to !== null || filter.tree !== null;
 
   const extra = { f: filterParam, sv: activeView?.id ?? null };
-  const hrefFor = (target: number) => quoteListHref(orgId, filters, target, extra);
+  const hrefFor = (target: number) => quoteListHref(orgId, shownFilters, target, extra);
   // a new sort starts again from the first page
   const sortHref = (key: string) =>
-    quoteListHref(orgId, { ...filters, sort: nextSort(sort, key as QuoteSortKey, quoteSortStartsAscending(key as QuoteSortKey)) }, 1, extra);
+    quoteListHref(orgId, { ...shownFilters, sort: nextSort(sort, key as QuoteSortKey, quoteSortStartsAscending(key as QuoteSortKey)) }, 1, extra);
   // what the advanced filter and a saved view keep from the page's own selects
   const kept: Record<string, string> = Object.fromEntries(
     Object.entries({ status: filters.status ?? "", owner: filters.ownerId ?? "", from: filters.from ?? "", to: filters.to ?? "" }).filter(([, value]) => value !== ""),
@@ -81,7 +85,7 @@ export default async function QuotesPage({ params, searchParams }: Props) {
       <PageHeader
         title="הצעות מחיר"
         description="כל הצעות המחיר של העסקאות ואנשי הקשר שאתם רואים. הצעה חדשה יוצרים מתוך עסקה או איש קשר."
-        actions={exportAllowed ? <ExportMenu href={exportHref(quotesPath(orgId), quoteListHref(orgId, filters, 1, { f: filterParam }))} /> : null}
+        actions={exportAllowed ? <ExportMenu href={exportHref(quotesPath(orgId), quoteListHref(orgId, shownFilters, 1, { f: filterParam }))} /> : null}
       />
       <SavedViewsBar
         orgId={orgId}
@@ -149,6 +153,7 @@ export default async function QuotesPage({ params, searchParams }: Props) {
           </Link>
         ) : null}
       </form>
+      <OwnerSortNote show={ownerSortFellBack} />
       {quotes.length === 0 ? (
         <Card>
           <EmptyState
@@ -192,6 +197,7 @@ export default async function QuotesPage({ params, searchParams }: Props) {
               catalog={listColumns.catalog}
               ownerNames={names}
               sort={sort}
+              ownerSortBlocked={ownerSortBlocked}
               sortHref={sortHref}
               exportPath={exportAllowed ? `${quotesPath(orgId)}/export` : null}
             />

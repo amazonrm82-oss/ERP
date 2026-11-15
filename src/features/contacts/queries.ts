@@ -1,5 +1,6 @@
 import "server-only";
 
+import { OWNER_SORT_MAX_ROWS, withOwnerSortGuard } from "@/features/list-sort/owner-sort";
 import type { Json } from "@/lib/database.types";
 
 import { recordTypeNames } from "@/features/record-type-options/queries";
@@ -109,39 +110,50 @@ export const CONTACT_DEFAULT_SORT: Sort<ContactSortKey> = { key: "created", asce
 export async function listContacts(
   orgId: string,
   options: { search: string; tagId?: string | null; page: number; sort?: Sort<ContactSortKey | CustomSortKey>; filter?: string | null; ids?: string[]; chunk?: { from: number; size: number } },
-): Promise<{ contacts: ContactListItem[]; hasMore: boolean }> {
+): Promise<{ contacts: ContactListItem[]; hasMore: boolean; sort: Sort<ContactSortKey | CustomSortKey>; ownerSortBlocked: boolean; ownerSortFellBack: boolean }> {
   const supabase = await createClient();
   // an export reads the list in larger chunks (LST-08)
   const size = options.chunk?.size ?? PAGE_SIZE;
   const from = options.chunk?.from ?? (options.page - 1) * PAGE_SIZE;
 
-  let query = supabase
-    .from("contacts")
-    .select("id, full_name, first_name, last_name, phone, phone_e164, email, job_title, company_id, type_id, contact_type, preferred_locale, preferred_channel, owner_id, created_at, original_created_on, custom_fields, source_id, campaign, last_source_id, last_campaign, last_source_at")
-    .eq("organization_id", orgId)
-    .is("deleted_at", null);
-
   const searchFilter = personSearchFilter(options.search);
-  if (searchFilter) {
-    // CON-01: a further phone or email finds its contact too
-    const byChannel = await contactIdsByChannelSearch(orgId, options.search);
-    query = query.or(byChannel.length ? `${searchFilter},id.in.(${byChannel.join(",")})` : searchFilter);
-  }
-  if (options.tagId) {
-    query = query.contains("tag_ids", [options.tagId]);
-  }
-  if (options.ids) {
-    query = query.in("id", options.ids);
-  }
-  if (options.filter) {
-    query = query.or(options.filter);
-  }
+  // CON-01: a further phone or email finds its contact too
+  const byChannel = searchFilter ? await contactIdsByChannelSearch(orgId, options.search) : [];
+  // the list with its filters; built twice: the page, and the owner-sort probe (OPS-09)
+  const filtered = () => {
+    let query = supabase
+      .from("contacts")
+      .select("id, full_name, first_name, last_name, phone, phone_e164, email, job_title, company_id, type_id, contact_type, preferred_locale, preferred_channel, owner_id, created_at, original_created_on, custom_fields, source_id, campaign, last_source_id, last_campaign, last_source_at")
+      .eq("organization_id", orgId)
+      .is("deleted_at", null);
 
-  const sort = options.sort ?? CONTACT_DEFAULT_SORT;
-  const { data, error } = await query
-    .order(sortColumn(CONTACT_SORT_COLUMNS, sort.key), { ascending: sort.ascending, nullsFirst: false })
-    .order("id", { ascending: sort.ascending })
-    .range(from, from + size);
+    if (searchFilter) {
+      query = query.or(byChannel.length ? `${searchFilter},id.in.(${byChannel.join(",")})` : searchFilter);
+    }
+    if (options.tagId) {
+      query = query.contains("tag_ids", [options.tagId]);
+    }
+    if (options.ids) {
+      query = query.in("id", options.ids);
+    }
+    if (options.filter) {
+      query = query.or(options.filter);
+    }
+    return query;
+  };
+
+  // OPS-09: the owner sort only while the filtered list is small enough
+  const guarded = await withOwnerSortGuard(
+    options.sort ?? CONTACT_DEFAULT_SORT,
+    CONTACT_DEFAULT_SORT,
+    options.ids || options.chunk ? null : () => filtered().order("id").range(OWNER_SORT_MAX_ROWS, OWNER_SORT_MAX_ROWS),
+    async (sort) =>
+      await filtered()
+        .order(sortColumn(CONTACT_SORT_COLUMNS, sort.key), { ascending: sort.ascending, nullsFirst: false })
+        .order("id", { ascending: sort.ascending })
+        .range(from, from + size),
+  );
+  const { data, error } = guarded.result;
   if (error) {
     throw new Error(`contacts query failed: ${error.message}`);
   }
@@ -159,6 +171,9 @@ export async function listContacts(
 
   return {
     hasMore: data.length > size,
+    sort: guarded.sort,
+    ownerSortBlocked: guarded.ownerSortBlocked,
+    ownerSortFellBack: guarded.ownerSortFellBack,
     contacts: rows.map((row) => ({
       id: row.id,
       fullName: row.full_name,

@@ -21,6 +21,7 @@ import type { Sort } from "@/lib/sort";
 import { contactDisplayName } from "../display";
 import { channelLabel, localeLabel } from "../preferences";
 import type { ContactListItem } from "../queries";
+import { OWNER_SORT_LIMIT_TEXT } from "@/features/list-sort/owner-sort";
 
 type Props = {
   orgId: string;
@@ -32,6 +33,8 @@ type Props = {
   // the current sort, and the address that sorts by a column (LST-02)
   sort: Sort<string>;
   sortHref: (key: string) => string;
+  // OPS-09: the list is too large to sort by owner now
+  ownerSortBlocked?: boolean;
   // editing name and owner in the cell (LST-06)
   editing: InlineEditing;
   // the organization's tags, for the bulk "add tag" (LST-07)
@@ -51,7 +54,7 @@ type Props = {
 };
 
 /** Contacts as a table, with the columns the user chose. */
-export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort, sortHref, editing, tags, completeness, credit, debt, customer, whatsapp = null, segments = null }: Props) {
+export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort, sortHref, ownerSortBlocked = false, editing, tags, completeness, credit, debt, customer, whatsapp = null, segments = null }: Props) {
   return (
     <BulkSelection
       orgId={orgId}
@@ -74,6 +77,7 @@ export function ContactsTable({ orgId, contacts, columns, catalog, fields, sort,
         fields={fields}
         sort={sort}
         sortHref={sortHref}
+        unsortable={ownerSortBlocked ? { owner: OWNER_SORT_LIMIT_TEXT } : undefined}
         customValues={(contact) => asCustomValues(contact.customFields)}
         nameCell={(contact) => (
           <div className="flex items-start gap-2">

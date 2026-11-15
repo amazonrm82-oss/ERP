@@ -18,6 +18,7 @@ import { displayCustomFields } from "@/features/custom-fields/values";
 import { getScoreNumbers } from "@/features/data-quality/queries";
 import { leadDisplayName } from "@/features/leads/display";
 import { getLeadLookups, LEAD_DEFAULT_SORT, LEAD_SORT_COLUMNS, listLeads } from "@/features/leads/queries";
+import { OWNER_SORT_KEY } from "@/features/list-sort/owner-sort";
 import { CUSTOM_PREFIX, CUSTOMER_COLUMNS, DEBT_COLUMNS, offeredSortKeys, resolveColumns, type ListObject } from "@/features/list-columns/columns";
 import { getListColumns } from "@/features/list-columns/queries";
 import { prepareListFilter } from "@/features/list-filters/prepare";
@@ -83,7 +84,23 @@ export async function exportList(request: Request, orgId: string, object: Exclud
   const sortColumns = { lead: LEAD_SORT_COLUMNS, contact: CONTACT_SORT_COLUMNS, company: COMPANY_SORT_COLUMNS, deal: DEAL_SORT_COLUMNS, task: TASK_SORT_COLUMNS }[object];
   const defaultSort = { lead: LEAD_DEFAULT_SORT, contact: CONTACT_DEFAULT_SORT, company: COMPANY_DEFAULT_SORT, deal: DEAL_DEFAULT_SORT, task: TASK_DEFAULT_SORT }[object];
   const sortKeys = [...offeredSortKeys(Object.keys(sortColumns), listColumns.catalog), ...listColumns.fields.filter(sortableField).map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<CustomSortKey>;
-  const sort = parseSort(params.get("sort") ?? "", sortKeys, defaultSort as unknown as Sort<CustomSortKey>);
+  const requestedSort = parseSort(params.get("sort") ?? "", sortKeys, defaultSort as unknown as Sort<CustomSortKey>);
+  // OPS-09: a list too large to sort by owner is not exported by owner either; its first page judges that once
+  const judgedSort = async (): Promise<Sort<CustomSortKey>> => {
+    const base = { search, tagId, page: 1, sort: requestedSort, filter: filter.logic };
+    const judged =
+      object === "lead"
+        ? (await listLeads(orgId, { ...base, statusId })).sort
+        : object === "contact"
+          ? (await listContacts(orgId, base)).sort
+          : object === "deal"
+            ? (await listDeals(orgId, { ...base, pipelineId: pipeline!.id })).sort
+            : object === "task"
+              ? (await listTasks(orgId, { ...base, ownerId: taskOwner, sort: requestedSort as unknown as Sort<TaskSortKey> })).sort
+              : (await listCompanies(orgId, base)).sort;
+    return judged as unknown as Sort<CustomSortKey>;
+  };
+  const sort = scope === "filtered" && (requestedSort.key as string) === OWNER_SORT_KEY ? await judgedSort() : requestedSort;
 
   // the columns of the open view, or the user's own
   const viewId = params.get("sv");

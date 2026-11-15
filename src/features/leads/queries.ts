@@ -5,6 +5,7 @@ import { cache } from "react";
 import type { TimelineRow } from "@/features/activities/queries";
 import { requestedProductNames } from "@/features/requested-product/queries";
 import { getUserNames } from "@/features/shell/queries";
+import { OWNER_SORT_MAX_ROWS, withOwnerSortGuard } from "@/features/list-sort/owner-sort";
 import type { Json, LeadStatusKind } from "@/lib/database.types";
 import { PAGE_SIZE, personSearchFilter } from "@/lib/search";
 import { sortColumn, type CustomSortKey, type Sort } from "@/lib/sort";
@@ -109,40 +110,54 @@ type ListOptions = {
 };
 
 /** One page of live leads, newest first unless sorted otherwise. Fetches one extra row to know if there is a next page. */
-export async function listLeads(orgId: string, options: ListOptions): Promise<{ leads: LeadListItem[]; hasMore: boolean }> {
+export async function listLeads(
+  orgId: string,
+  options: ListOptions,
+): Promise<{ leads: LeadListItem[]; hasMore: boolean; sort: Sort<LeadSortKey | CustomSortKey>; ownerSortBlocked: boolean; ownerSortFellBack: boolean }> {
   const supabase = await createClient();
   // an export reads the list in larger chunks (LST-08)
   const size = options.chunk?.size ?? PAGE_SIZE;
   const from = options.chunk?.from ?? (options.page - 1) * PAGE_SIZE;
 
-  let query = supabase
-    .from("leads")
-    .select("id, full_name, phone, phone_e164, email, company_name, status_id, source_id, requested_product_id, owner_id, last_contacted_at, score, created_at, original_created_on, custom_fields, last_source_id, last_campaign, last_source_at")
-    .eq("organization_id", orgId)
-    .is("deleted_at", null);
+  // the list with its filters; built twice: the page, and the owner-sort probe (OPS-09)
+  const filtered = () => {
+    let query = supabase
+      .from("leads")
+      .select("id, full_name, phone, phone_e164, email, company_name, status_id, source_id, requested_product_id, owner_id, last_contacted_at, score, created_at, original_created_on, custom_fields, last_source_id, last_campaign, last_source_at")
+      .eq("organization_id", orgId)
+      .is("deleted_at", null);
 
-  if (options.statusId) {
-    query = query.eq("status_id", options.statusId);
-  }
-  if (options.tagId) {
-    query = query.contains("tag_ids", [options.tagId]);
-  }
-  const searchFilter = personSearchFilter(options.search);
-  if (searchFilter) {
-    query = query.or(searchFilter);
-  }
-  if (options.ids) {
-    query = query.in("id", options.ids);
-  }
-  if (options.filter) {
-    query = query.or(options.filter);
-  }
+    if (options.statusId) {
+      query = query.eq("status_id", options.statusId);
+    }
+    if (options.tagId) {
+      query = query.contains("tag_ids", [options.tagId]);
+    }
+    const searchFilter = personSearchFilter(options.search);
+    if (searchFilter) {
+      query = query.or(searchFilter);
+    }
+    if (options.ids) {
+      query = query.in("id", options.ids);
+    }
+    if (options.filter) {
+      query = query.or(options.filter);
+    }
+    return query;
+  };
 
-  const sort = options.sort ?? LEAD_DEFAULT_SORT;
-  const { data, error } = await query
-    .order(sortColumn(LEAD_SORT_COLUMNS, sort.key), { ascending: sort.ascending, nullsFirst: false })
-    .order("id", { ascending: sort.ascending })
-    .range(from, from + size);
+  // OPS-09: the owner sort only while the filtered list is small enough
+  const guarded = await withOwnerSortGuard(
+    options.sort ?? LEAD_DEFAULT_SORT,
+    LEAD_DEFAULT_SORT,
+    options.ids || options.chunk ? null : () => filtered().order("id").range(OWNER_SORT_MAX_ROWS, OWNER_SORT_MAX_ROWS),
+    async (sort) =>
+      await filtered()
+        .order(sortColumn(LEAD_SORT_COLUMNS, sort.key), { ascending: sort.ascending, nullsFirst: false })
+        .order("id", { ascending: sort.ascending })
+        .range(from, from + size),
+  );
+  const { data, error } = guarded.result;
   if (error) {
     throw new Error(`leads query failed: ${error.message}`);
   }
@@ -156,6 +171,9 @@ export async function listLeads(orgId: string, options: ListOptions): Promise<{ 
 
   return {
     hasMore: data.length > size,
+    sort: guarded.sort,
+    ownerSortBlocked: guarded.ownerSortBlocked,
+    ownerSortFellBack: guarded.ownerSortFellBack,
     leads: rows.map((row) => ({
       id: row.id,
       fullName: row.full_name,

@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { customerPriceList } from "@/features/deal-lines/queries";
 import { conversionRateBp, isDealLineSource, type DealLineSource, type NamedPriceList } from "@/features/deal-lines/pricing";
 import { isBilling } from "@/features/deal-lines/recurring";
+import { OWNER_SORT_MAX_ROWS, withOwnerSortGuard } from "@/features/list-sort/owner-sort";
 import { isBundleDisplay, parseBundleItems, type BundleDisplay, type BundlePartSnapshot } from "@/features/products/bundle";
 import { withBundleDefaults } from "@/features/products/bundle-server";
 import type { Billing } from "@/features/products/schema";
@@ -514,32 +515,43 @@ export type QuoteListItem = QuoteSummary & {
  * column, the advanced filter, picked rows, export chunks). Read with the user's session: the quotes RLS shows only the
  * quotes of deals and contacts they read.
  */
-export async function listQuotes(orgId: string, filters: QuoteListFilters): Promise<{ quotes: QuoteListItem[]; hasMore: boolean }> {
+export async function listQuotes(
+  orgId: string,
+  filters: QuoteListFilters,
+): Promise<{ quotes: QuoteListItem[]; hasMore: boolean; sort: Sort<QuoteSortKey>; ownerSortBlocked: boolean; ownerSortFellBack: boolean }> {
   const supabase = await createClient();
   const size = filters.chunk?.size ?? PAGE_SIZE;
   const offset = filters.chunk?.from ?? (filters.page - 1) * PAGE_SIZE;
-  let query = supabase
-    .from("quotes")
-    .select("id, title, status, quote_date, valid_until, total_agorot, created_at, number_display, owner_id, sent_at, customer_name, deal_id, contact_id")
-    .eq("organization_id", orgId);
-  if (filters.ids) {
-    query = query.in("id", filters.ids);
-  } else {
-    if (filters.status) query = query.eq("status", filters.status);
-    if (filters.ownerId) query = query.eq("owner_id", filters.ownerId);
-    if (filters.from) query = query.gte("quote_date", filters.from);
-    if (filters.to) query = query.lte("quote_date", filters.to);
-    if (filters.filter) query = query.or(filters.filter);
-  }
-  const sort = filters.sort ?? QUOTE_DEFAULT_SORT;
-  const rows = must(
-    await query
-      .order(QUOTE_SORT_COLUMNS[sort.key], { ascending: sort.ascending, nullsFirst: false })
-      .order("created_at", { ascending: false })
-      .order("id")
-      .range(offset, offset + size),
-    "quotes list",
+  // the list with its filters; built twice: the page, and the owner-sort probe (OPS-09)
+  const filtered = () => {
+    let query = supabase
+      .from("quotes")
+      .select("id, title, status, quote_date, valid_until, total_agorot, created_at, number_display, owner_id, sent_at, customer_name, deal_id, contact_id")
+      .eq("organization_id", orgId);
+    if (filters.ids) {
+      query = query.in("id", filters.ids);
+    } else {
+      if (filters.status) query = query.eq("status", filters.status);
+      if (filters.ownerId) query = query.eq("owner_id", filters.ownerId);
+      if (filters.from) query = query.gte("quote_date", filters.from);
+      if (filters.to) query = query.lte("quote_date", filters.to);
+      if (filters.filter) query = query.or(filters.filter);
+    }
+    return query;
+  };
+  // OPS-09: the owner sort only while the filtered list is small enough
+  const guarded = await withOwnerSortGuard(
+    filters.sort ?? QUOTE_DEFAULT_SORT,
+    QUOTE_DEFAULT_SORT,
+    filters.ids || filters.chunk ? null : () => filtered().order("id").range(OWNER_SORT_MAX_ROWS, OWNER_SORT_MAX_ROWS),
+    async (sort) =>
+      await filtered()
+        .order(QUOTE_SORT_COLUMNS[sort.key], { ascending: sort.ascending, nullsFirst: false })
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(offset, offset + size),
   );
+  const rows = must(guarded.result, "quotes list");
   const page = rows.slice(0, size);
   // the names of the deals and contacts on this page, read separately (RLS: only those the user reads)
   const contactIds = [...new Set(page.flatMap((row) => (row.contact_id && !row.customer_name ? [row.contact_id] : [])))];
@@ -556,6 +568,9 @@ export async function listQuotes(orgId: string, filters: QuoteListFilters): Prom
   const dealNames = new Map(deals.map((row) => [row.id, row.name]));
   return {
     hasMore: rows.length > size,
+    sort: guarded.sort,
+    ownerSortBlocked: guarded.ownerSortBlocked,
+    ownerSortFellBack: guarded.ownerSortFellBack,
     quotes: page.map((row) => ({
       id: row.id,
       title: row.title,

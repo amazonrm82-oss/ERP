@@ -11,6 +11,7 @@ import { SearchIcon, CheckSquareIcon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { ScreenHelp } from "@/features/guide/components/screen-help";
 import { inlineEditing } from "@/features/inline-edit/server";
+import { OwnerSortNote } from "@/features/list-sort/components/owner-sort-note";
 import { resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
@@ -375,12 +376,12 @@ async function TasksTableView({ orgId, context, query, showAll }: { orgId: strin
   const filter = await prepareListFilter(orgId, "task", firstParam(query.f), context.user.id, []);
   const filterParam = filter.tree ? JSON.stringify(filter.tree) : null;
   const sortKeys = Object.keys(TASK_SORT_COLUMNS) as Array<keyof typeof TASK_SORT_COLUMNS>;
-  const sort = parseSort(firstParam(query.sort), sortKeys, TASK_DEFAULT_SORT);
+  const requestedSort = parseSort(firstParam(query.sort), sortKeys, TASK_DEFAULT_SORT);
 
-  const [editing, viewData, { tasks, hasMore }] = await Promise.all([
+  const [editing, viewData, { tasks, hasMore, sort, ownerSortBlocked, ownerSortFellBack }] = await Promise.all([
     inlineEditing(orgId, context),
     viewChips(orgId, "task", context),
-    listTasks(orgId, { ownerId: showAll ? null : context.user.id, search, page, sort, filter: filter.logic }),
+    listTasks(orgId, { ownerId: showAll ? null : context.user.id, search, page, sort: requestedSort, filter: filter.logic }),
   ]);
   const views = viewData.chips;
   const activeView = views.find((view) => view.id === firstParam(query.sv)) ?? null;
@@ -446,6 +447,7 @@ async function TasksTableView({ orgId, context, query, showAll }: { orgId: strin
         </button>
       </Form>
 
+      <OwnerSortNote show={ownerSortFellBack} />
       {tasks.length > 0 ? (
         <TasksTable
           orgId={orgId}
@@ -453,6 +455,7 @@ async function TasksTableView({ orgId, context, query, showAll }: { orgId: strin
           columns={shownColumns}
           catalog={listColumns.catalog}
           sort={sort}
+          ownerSortBlocked={ownerSortBlocked}
           sortHref={sortHref}
           editing={editing}
           now={now}

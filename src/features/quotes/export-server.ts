@@ -4,6 +4,7 @@ import { prepareListFilter } from "@/features/list-filters/prepare";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { canExport } from "@/features/reports/request";
 import { getOrgContext, getUserNames } from "@/features/shell/queries";
+import { OWNER_SORT_KEY } from "@/features/list-sort/owner-sort";
 import { csvText } from "@/lib/csv";
 import { zoneDate } from "@/lib/format";
 import { readAllPages } from "@/lib/paged-read";
@@ -43,6 +44,10 @@ export async function exportQuotes(request: Request, orgId: string): Promise<Res
   const filters = quoteListFilters(Object.fromEntries(params.entries()));
   // LST-05: the advanced filter, checked against the list's fields as on the page
   const filter = await prepareListFilter(orgId, "quote", params.get("f") ?? "", context.user.id, []);
+  // OPS-09: a list too large to sort by owner is not exported by owner either; its first page judges that once
+  if (scope === "filtered" && filters.sort?.key === OWNER_SORT_KEY) {
+    filters.sort = (await listQuotes(orgId, { ...filters, page: 1, filter: filter.logic })).sort;
+  }
 
   const { rows: quotes, complete } = await readAllPages<QuoteListItem>(
     async (from, to) =>

@@ -19,6 +19,7 @@ import { CONTACT_DEFAULT_SORT, CONTACT_SORT_COLUMNS, listContacts } from "@/feat
 import { inlineEditing } from "@/features/inline-edit/server";
 import { dormantCustomersPath } from "@/features/customer-status/paths";
 import { getCustomerNumbers } from "@/features/customer-status/queries";
+import { OwnerSortNote } from "@/features/list-sort/components/owner-sort-note";
 import { CUSTOM_PREFIX, CUSTOMER_COLUMNS, DEBT_COLUMNS, offeredSortKeys, resolveColumns } from "@/features/list-columns/columns";
 import { ColumnsPanel } from "@/features/list-columns/components/columns-panel";
 import { getListColumns } from "@/features/list-columns/queries";
@@ -77,14 +78,14 @@ export default async function ContactsPage({ params, searchParams }: Props) {
   const sortKeys = [...offeredSortKeys(Object.keys(CONTACT_SORT_COLUMNS), listColumns.catalog), ...listColumns.fields.filter(sortableField).map((f) => `${CUSTOM_PREFIX}${f.key}`)] as Array<
     keyof typeof CONTACT_SORT_COLUMNS | CustomSortKey
   >;
-  const sort = parseSort(firstParam(query.sort), sortKeys, CONTACT_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
+  const requestedSort = parseSort(firstParam(query.sort), sortKeys, CONTACT_DEFAULT_SORT as Sort<(typeof sortKeys)[number]>);
   // SEG-01: owners, admins and managers save filters as segments and add rows to hand-picked ones
   const segmentWriter = canWriteSegments(context.role, canWrite);
-  const [editing, tags, viewData, { contacts, hasMore }, segmentOptions] = await Promise.all([
+  const [editing, tags, viewData, { contacts, hasMore, sort, ownerSortBlocked, ownerSortFellBack }, segmentOptions] = await Promise.all([
     inlineEditing(orgId, context),
     listTags(orgId),
     viewChips(orgId, "contact", context),
-    listContacts(orgId, { search, tagId, page, sort, filter: filter.logic }),
+    listContacts(orgId, { search, tagId, page, sort: requestedSort, filter: filter.logic }),
     segmentWriter ? staticSegmentOptions(orgId, "contact") : null,
   ]);
 
@@ -203,6 +204,7 @@ export default async function ContactsPage({ params, searchParams }: Props) {
         </button>
       </Form>
 
+      <OwnerSortNote show={ownerSortFellBack} />
       {contacts.length > 0 ? (
         <>
           <RecordCards
@@ -232,6 +234,7 @@ export default async function ContactsPage({ params, searchParams }: Props) {
               catalog={listColumns.catalog}
               fields={await withFieldRefs(orgId, listColumns.fields, contacts.map((row) => row.customFields))}
               sort={sort}
+              ownerSortBlocked={ownerSortBlocked}
               sortHref={sortHref}
               editing={editing}
               tags={tags}

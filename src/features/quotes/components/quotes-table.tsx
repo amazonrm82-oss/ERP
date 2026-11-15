@@ -10,6 +10,7 @@ import type { Sort } from "@/lib/sort";
 import { quotePath } from "../paths";
 import type { QuoteListItem } from "../queries";
 import { QUOTE_STATUS_LABELS } from "../schema";
+import { OWNER_SORT_LIMIT_TEXT } from "@/features/list-sort/owner-sort";
 
 type Props = {
   orgId: string;
@@ -19,6 +20,8 @@ type Props = {
   ownerNames: Map<string, string>;
   sort: Sort<string>;
   sortHref: (key: string) => string;
+  // OPS-09: the list is too large to sort by owner now
+  ownerSortBlocked?: boolean;
   // the export route for "export the picked rows"; null when the user may not export
   exportPath: string | null;
 };
@@ -50,7 +53,7 @@ const day = (value: string | null) =>
  * changes only on its own screen (sending, versions, cancelling), so there are no other bulk actions and no editing in
  * the cell.
  */
-export function QuotesTable({ orgId, quotes, columns, catalog, ownerNames, sort, sortHref, exportPath }: Props) {
+export function QuotesTable({ orgId, quotes, columns, catalog, ownerNames, sort, sortHref, ownerSortBlocked = false, exportPath }: Props) {
   return (
     <BulkSelection
       orgId={orgId}
@@ -82,6 +85,7 @@ export function QuotesTable({ orgId, quotes, columns, catalog, ownerNames, sort,
         customValues={() => ({})}
         sort={sort}
         sortHref={sortHref}
+        unsortable={ownerSortBlocked ? { owner: OWNER_SORT_LIMIT_TEXT } : undefined}
         cell={(key, quote) => {
           switch (key) {
             case "status":
