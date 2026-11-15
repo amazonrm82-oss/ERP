@@ -68,6 +68,7 @@
 5. ~~**חלוקת לידים.**~~ נבנה (סבב וזיהוי ליד חוזר). מהאפיון עוד לא נבנו: חלוקה לפי משקל, לפי עומס, לפי כללים ולפי שעות עבודה, ויעד זמן תגובה (SLA). מתאים לבנות עם מנוע האוטומציות.
 6. ~~**מנוע אוטומציות בסיסי.**~~ נבנה. חסר: שליחת WhatsApp, אימייל ו-SMS (מחכה לספקים, ראו DECISIONS), תבנית החידוש (מחכה לתאריך חידוש בעסקה), הרצה חוזרת של צעד שנכשל, המתנות וענפים (גרסה 2).
    - כשנבחר ספק אימייל (RVW-84, RVW-96, RVW-98): מלחין האימייל (EML-01, Resend) מחיל את תנאי FUTURE SENDER של instant_reply, collection, review_request, punch_card_notice, תזכורת החתימה ללקוח ו-MNY-06, כל אחד עם שורת "In use" משלו; קישור ההעדפות למייל דרך `public.consent_preference_link_for_job`. (ארבע הפונקציות שחיכו לקורא קיבלו אותו במלחין ה-SMS, 021247/021248.)
+   - שיפור עתידי (תשובה 379 א): לשמור את שם האחראי ליד כל רשומה, כך שמיון לפי אחראי מהיר גם ברשימה של מאות אלפים.
    - מחיקה שנתית לטבלאות המעקב של app שאין להן שמירה (RVW-98, בקובץ מודבק): `app.anomaly_alerts_sent`, `app.anomaly_alert_days`, `app.review_requests`, `app.contract_renewal_alerts|tasks`, `app.signature_reminders`, `app.quote_months`, `app.recurring_billing_failures`, `app.instant_replies`, `app.message_sender_refusal_notices`.
    - עדכוני ספריות (RVW-74, תשובת בעל המוצר (78) א + ד): קבוצת ה-minor/patch של dependabot נכנסת אחרי שכל הבדיקות ירוקות, כולל e2e והשוואת המסכים; TypeScript 7 ו-ESLint 10 כל אחד לבד אחרי גל 3. בתור, אחרי האצווה הנוכחית (שטח משותף, לבד).
    - המשך UX-01 (RVW-84): קבוצת "פאנל צד" ב-`card_layouts`; פאנלים לאנשי קשר ולעסקאות. המשך RVW-83: העברת מסמכים לחתימה של ליד לאיש הקשר בהמרה.
