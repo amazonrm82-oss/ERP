@@ -28,3 +28,22 @@ export function marketingSmsMissingText(missing: MarketingDetailMissing[]): stri
   const what = missing.length === 2 ? "כתובת וטלפון" : missing[0] === "address" ? "כתובת" : "טלפון";
   return `SMS שיווקי דורש כתובת וטלפון בהגדרות המסמכים (חסר: ${what}). עד שימולאו, הודעות שיווק ובקשות ביקורת ב-SMS לא יישלחו.`;
 }
+
+/**
+ * EML-02 (owner, 15 November 2026): the same rule for a card's marketing email or SMS, from the values the card already read
+ * (businessPhone = the documents' phone, else the business phone; businessAddress = the documents' address line and city).
+ * The database refuses such a send too (hint record_message:business_details, app.marketing_details_missing).
+ */
+export function marketingEnvelopeMissing(values: { businessPhone?: string | null; businessAddress?: string | null }): MarketingDetailMissing[] {
+  const missing: MarketingDetailMissing[] = [];
+  if (!filled(values.businessAddress ?? null)) missing.push("address");
+  if (!filled(values.businessPhone ?? null)) missing.push("phone");
+  return missing;
+}
+
+/** The card's warning before a marketing send while the envelope's details are missing (DRAFT wording); null when none are. */
+export function marketingEnvelopeMissingText(missing: readonly MarketingDetailMissing[]): string | null {
+  if (missing.length === 0) return null;
+  const what = missing.length === 2 ? "כתובת וטלפון" : missing[0] === "address" ? "כתובת" : "טלפון";
+  return `חסרים כתובת או טלפון העסק בהגדרות המסמכים (חסר: ${what}). הודעה שיווקית כוללת אותם, ולכן לא תישלח עד שימולאו. אפשר להשלים אותם בהגדרות, במע"מ ופרטים למסמכים.`;
+}

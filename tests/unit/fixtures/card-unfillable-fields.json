@@ -1,0 +1,14 @@
+{
+  "_comment": "EML-02 (15 November 2026): the fields a card's or an automation's message leaves without a value. Run by tests/unit/card-fields.test.ts (cardUnfillableFields) and tests/db/369-card-message-fields.test.ts (app.card_unfillable_fields).",
+  "cases": [
+    { "type": "requested_document", "subject": "שלום {שם פרטי}", "body": "{שם מלא}, כאן {שם הנציג} מ{שם העסק}. {טלפון העסק}, {כתובת העסק}", "missing": [] },
+    { "type": "requested_document", "subject": "הצעת מחיר מ{שם העסק}", "body": "שלום {שם פרטי}, ההצעה כאן: {קישור להצעה}. בתוקף עד {תוקף}. {שם הנציג}", "missing": ["קישור להצעה", "תוקף"] },
+    { "type": "marketing", "subject": "עדכון מ{שם העסק}", "body": "{תוכן העדכון}\n{קישור הסרה}", "missing": ["תוכן העדכון"] },
+    { "type": "collection", "subject": null, "body": "תזכורת: {מסמך} על סך {סכום}. {קישור הסרה}", "missing": ["מסמך", "סכום", "קישור הסרה"] },
+    { "type": "requested_document", "subject": "{תוקף}", "body": "{תוקף} ושוב {תוקף} ואז {סכום}", "missing": ["תוקף", "סכום"] },
+    { "type": "marketing", "subject": null, "body": "שלום{, ב-{מיקום}} {שם פרטי}", "missing": [] },
+    { "type": "marketing", "subject": null, "body": "{זכר: שלום {שם פרטי} | נקבה: שלום {תאריך} | ניטרלי: שלום}", "missing": ["תאריך"] },
+    { "type": "marketing", "subject": null, "body": "סוגריים {לא שדה} ו-{שם העסק}", "missing": [] },
+    { "type": null, "subject": null, "body": "{קישור הסרה}", "missing": [] }
+  ]
+}

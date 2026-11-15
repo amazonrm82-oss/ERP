@@ -139,7 +139,9 @@ describe("EML-02: the dialog's rules equal the database's", () => {
     expect(queuedEmailStateText(rows[1])).toMatch(/^לא נשלח: אין הסכמה/);
     expect(queuedEmailStateText({ state: "not_sent", reason: "paused" })).toMatch(/עצורה/);
     expect(queuedEmailStateText({ state: "not_sent", reason: "other" })).toBe("לא נשלח");
-    expect(queuedMessage(false)).toMatch(/^האימייל ממתין לשליחה/);
+    expect(queuedMessage(false)).toMatch(/^האימייל נכנס לתור השליחה/);
+    // EML-02 (15 November 2026): it says where the result shows
+    expect(queuedMessage(false)).toContain("ברשימת ההודעות שנשלחו מהכרטיס ובציר הזמן");
     expect(queuedMessage(true)).toMatch(/עצורה/);
   });
 });

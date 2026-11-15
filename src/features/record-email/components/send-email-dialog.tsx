@@ -9,8 +9,10 @@ import { FormError } from "@/components/ui/feedback";
 import { Checkbox, SelectField } from "@/components/ui/field";
 import { MailIcon } from "@/components/ui/icons";
 import { formatBytes } from "@/features/files/types";
+import { hiddenTemplatesText, splitCardTemplates } from "@/features/message-templates/card-fields";
 import type { MergeValues } from "@/features/message-templates/fields";
 import { messageTemplatesPath } from "@/features/message-templates/paths";
+import { marketingEnvelopeMissing, marketingEnvelopeMissingText } from "@/features/message-sending/marketing-details";
 import { MESSAGE_TYPE_LABELS } from "@/features/message-templates/templates";
 import type { MessageType } from "@/features/messaging/providers/types";
 
@@ -65,7 +67,11 @@ export function SendEmailDialog(props: Props) {
   );
 }
 
-function SendEmailForm({ orgId, kind, recordId, address, templates, files, library, queued, values, canManageTemplates, timeZone, onClose }: Props & { onClose: () => void }) {
+function SendEmailForm({ orgId, kind, recordId, address, templates: allTemplates, files, library, queued, values, canManageTemplates, timeZone, onClose }: Props & { onClose: () => void }) {
+  // EML-02 (owner, 15 November 2026): a template holding a field the card does not fill is not offered at all; one line
+  // says how many were left out (the database refuses such a template too)
+  const { offered: templates, hidden } = splitCardTemplates(allTemplates);
+  const hiddenText = hiddenTemplatesText(hidden);
   const [templateId, setTemplateId] = useState(templates[0]?.id ?? "");
   const [picked, setPicked] = useState<string[]>([]);
   const [pickedLibrary, setPickedLibrary] = useState<string[]>([]);
@@ -74,6 +80,8 @@ function SendEmailForm({ orgId, kind, recordId, address, templates, files, libra
   const [pending, startTransition] = useTransition();
 
   const template = templates.find((t) => t.id === templateId) ?? null;
+  // a marketing message carries the business's address and phone (the envelope); warned and not sent while either is missing
+  const envelopeText = template && template.messageType === "marketing" ? marketingEnvelopeMissingText(marketingEnvelopeMissing(values)) : null;
   const preview = template ? emailPreview(template, values) : null;
   // owner (198) ב: library files go with a marketing template and with a card's service template alike (a manual send
   // from the card only); a service email stays a service email, without the marketing envelope
@@ -86,11 +94,11 @@ function SendEmailForm({ orgId, kind, recordId, address, templates, files, libra
   }
 
   function send() {
-    if (!template || fileProblem) return;
+    if (!template || fileProblem || envelopeText) return;
     setFailure(null);
     startTransition(async () => {
       const result = await sendRecordEmailAction(orgId, kind, recordId, template.id, picked, sentLibrary);
-      if (result.ok) setDone(result.message ?? "האימייל ממתין לשליחה.");
+      if (result.ok) setDone(result.message ?? "האימייל נכנס לתור השליחה.");
       else setFailure(result.message);
     });
   }
@@ -124,7 +132,9 @@ function SendEmailForm({ orgId, kind, recordId, address, templates, files, libra
             "בעלים ומנהלי מערכת יכולים להוסיף תבנית."
           )}
         </p>
-      ) : (
+      ) : null}
+      {templates.length === 0 && hiddenText ? <p className="text-sm text-ink-soft">{hiddenText}</p> : null}
+      {templates.length === 0 ? null : (
         <>
           <SelectField label="תבנית" value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
             {templates.map((t) => (
@@ -133,6 +143,8 @@ function SendEmailForm({ orgId, kind, recordId, address, templates, files, libra
               </option>
             ))}
           </SelectField>
+          {hiddenText ? <p className="text-sm text-ink-soft">{hiddenText}</p> : null}
+          <FormError message={envelopeText} />
           {preview ? (
             <div className="space-y-2 rounded-md border border-line bg-canvas px-3 py-3" aria-label="תצוגה מקדימה">
               {preview.subject !== null ? (
@@ -199,7 +211,7 @@ function SendEmailForm({ orgId, kind, recordId, address, templates, files, libra
 
       <FormError message={failure} />
       <div className="flex flex-wrap gap-2">
-        <Button onClick={send} loading={pending} disabled={!template || fileProblem !== null}>
+        <Button onClick={send} loading={pending} disabled={!template || fileProblem !== null || envelopeText !== null}>
           שליחה
         </Button>
         <Button variant="secondary" onClick={onClose}>

@@ -19,9 +19,12 @@ type Answer = Record<string, unknown>;
 // Then 021278 (owner's answer (8) ב, 13 November 2026): an automation's email (automation_id, no reply_to_user_id) answers to
 // the record's owner (a deal's email: the deal's owner) while an active member with a plain address; only those lines added.
 // Then the review of 72b39957 (low): that owner must also not be a viewer (role <> 'viewer'); one condition added.
+// Then 021279 (EML-02, 15 November 2026, the first live send): {שם הנציג} of an automation's email (button runs too) is the
+// reply-to's person of (8) ב (the record's owner, a deal's email the deal's owner), not a viewer; a card send keeps the sender.
+// Only the v_rep statement and the rep lookup's condition changed (diffed mechanically against 021278's body).
 const REVIEWED_MD5: Record<string, string> = {
   "email_job_compose(uuid,uuid,text)": "c5c2ae88f99865569bd24ddf80c2168f",
-  "app.email_compose_core(uuid,uuid,text)": "b38096b63dc3490c6a735463685566c4",
+  "app.email_compose_core(uuid,uuid,text)": "81eaeada9edc12723a5d4a3e3a299c1f",
   "app.email_usage_give_back(uuid)": "c952eaea4bb85cf196cf49280e8b7816",
   "email_quota_return(uuid,uuid)": "9a75bbbe4baa464daf175f376f2be501",
 };

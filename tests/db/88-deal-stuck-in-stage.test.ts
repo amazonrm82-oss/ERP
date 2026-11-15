@@ -189,6 +189,8 @@ const RERUN = [
   migrationFile("_composer_refusal_notices.sql"),
   // review 2026-11-13 (RVW-91..95) redefines app.import_record_worked() and app.lead_retention_candidates() last
   migrationFile("_review_1113_database.sql"),
+  // EML-02 (15 November 2026) redefines the card send's enqueue and refusal functions last
+  migrationFile("_card_email_fields.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

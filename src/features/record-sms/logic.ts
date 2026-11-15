@@ -6,7 +6,7 @@ import { marketingEnvelope } from "@/features/message-templates/envelope";
 import { fillMessage, unfilledMergeFields, type MergeValues } from "@/features/message-templates/fields";
 import { envelopedFilledProblem } from "@/features/message-templates/service-rule";
 import type { MessageType } from "@/features/messaging/providers/types";
-import { CARD_SERVICE_TYPES, type CardTemplate } from "@/features/record-email/logic";
+import { CARD_SERVICE_TYPES, QUEUED_RESULT_WHERE, type CardTemplate, UNFILLED_FIELD_TEXT } from "@/features/record-email/logic";
 
 export const RECORD_SMS_KINDS = ["lead", "contact", "deal"] as const;
 export type RecordSmsKind = (typeof RECORD_SMS_KINDS)[number];
@@ -67,11 +67,11 @@ export type QueuedSms = {
   templateName: string | null;
   senderId: string | null;
   state: "waiting" | "sent" | "not_sent";
-  reason: "consent" | "paused" | "other" | null;
+  reason: "consent" | "paused" | "unfilled" | "other" | null;
 };
 
 const STATES = new Set(["waiting", "sent", "not_sent"]);
-const REASONS = new Set(["consent", "paused", "other"]);
+const REASONS = new Set(["consent", "paused", "unfilled", "other"]);
 
 /** Parses public.record_sms_queue's answer; a malformed row is left out. */
 export function queuedSms(data: unknown): QueuedSms[] {
@@ -99,12 +99,15 @@ export function queuedSmsStateText(sms: Pick<QueuedSms, "state" | "reason">): st
   if (sms.state === "sent") return "נשלח";
   if (sms.reason === "consent") return "לא נשלח: אין הסכמה לקבל הודעות שיווקיות ב-SMS, או שהמספר חסום";
   if (sms.reason === "paused") return "לא נשלח: השליחה ללקוחות הייתה עצורה יותר מיממה";
+  if (sms.reason === "unfilled") return UNFILLED_FIELD_TEXT;
   return "לא נשלח";
 }
 
 /** What the dialog says after the SMS was queued. */
 export function queuedSmsMessage(paused: boolean): string {
-  return paused ? "ה-SMS ממתין לשליחה. השליחה ללקוחות עצורה כרגע, והוא יישלח כשהיא תחודש." : "ה-SMS ממתין לשליחה.";
+  return paused
+    ? `ה-SMS נכנס לתור השליחה. השליחה ללקוחות עצורה כרגע, והוא יישלח כשהיא תחודש. ${QUEUED_RESULT_WHERE}`
+    : `ה-SMS נכנס לתור השליחה. ${QUEUED_RESULT_WHERE}`;
 }
 
 /** Whether a type is one a card may send at all (marketing, or the card's service list). */

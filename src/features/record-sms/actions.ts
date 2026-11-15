@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { cardFieldsErrorMessage } from "@/features/message-templates/card-fields";
 import { getOrgContext } from "@/features/shell/queries";
 import { INVALID_ARGS, validArg } from "@/lib/action-args";
 import { actionContext } from "@/lib/action-context";
@@ -35,7 +36,7 @@ export async function sendRecordSmsAction(orgId: string, kind: string, recordId:
   }
   const { data, error } = await context.supabase.rpc("record_sms_send", { p_org: orgId, p_kind: kind, p_record: recordId, p_template: templateId });
   if (error) {
-    return fail(dbErrorMessage(error, "לא הצלחנו לשלוח את ה-SMS. נסו שוב."));
+    return fail(cardFieldsErrorMessage(error) ?? dbErrorMessage(error, "לא הצלחנו לשלוח את ה-SMS. נסו שוב."));
   }
   const paused = Boolean(data && typeof data === "object" && !Array.isArray(data) && (data as Record<string, unknown>).paused === true);
   revalidatePath(recordPage(kind, orgId, recordId));

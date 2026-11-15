@@ -105,6 +105,13 @@ describe("SMS from the record card and from an automation (SMS-02)", () => {
     await setKey(KEY);
     owner = await createUser("sms-owner");
     org = await createOrg(owner.id, "עסק SMS");
+    // EML-02 (owner, 15 November 2026): a marketing message is queued only while the envelope's business address and phone are set
+    await asAdmin((q) =>
+      q(
+        "insert into public.org_document_settings (organization_id, address_line, phone) values ($1, 'הרצל 1', '03-5550000') on conflict (organization_id) do update set address_line = excluded.address_line, phone = excluded.phone",
+        [org],
+      ),
+    );
     member = await addMember(org, owner.id, "member", "sms-member");
     other = await addMember(org, owner.id, "member", "sms-other");
     viewer = await addMember(org, owner.id, "viewer", "sms-viewer");

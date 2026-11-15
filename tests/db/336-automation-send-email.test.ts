@@ -117,6 +117,13 @@ describe("the automation step send_email (AUT-08)", () => {
     await setKey(KEY);
     owner = await createUser("eml-auto-owner");
     org = await createOrg(owner.id, "עסק אימייל");
+    // EML-02 (owner, 15 November 2026): a marketing message is queued only while the envelope's business address and phone are set
+    await asAdmin((q) =>
+      q(
+        "insert into public.org_document_settings (organization_id, address_line, phone) values ($1, 'הרצל 1', '03-5550000') on conflict (organization_id) do update set address_line = excluded.address_line, phone = excluded.phone",
+        [org],
+      ),
+    );
     member = await addMember(org, owner.id, "member", "eml-auto-member");
     ownerB = await createUser("eml-auto-owner-b");
     orgB = await createOrg(ownerB.id, "עסק אחר");

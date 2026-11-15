@@ -140,7 +140,7 @@ describe("SMS-02: the card's list", () => {
     expect(queuedSmsStateText({ state: "not_sent", reason: "paused" })).toContain("עצורה");
     expect(queuedSmsStateText({ state: "not_sent", reason: "other" })).toBe("לא נשלח");
     expect(queuedSmsMessage(true)).toContain("עצורה");
-    expect(queuedSmsMessage(false)).toBe("ה-SMS ממתין לשליחה.");
+    expect(queuedSmsMessage(false)).toBe("ה-SMS נכנס לתור השליחה. התוצאה תופיע ברשימת ההודעות שנשלחו מהכרטיס ובציר הזמן של הרשומה.");
   });
 });
 

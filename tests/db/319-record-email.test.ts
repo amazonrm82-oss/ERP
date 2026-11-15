@@ -107,6 +107,13 @@ describe("email from the record card (EML-02)", () => {
     await setKey(KEY);
     owner = await createUser("eml-owner");
     org = await createOrg(owner.id, "עסק אימייל");
+    // EML-02 (owner, 15 November 2026): a marketing message is queued only while the envelope's business address and phone are set
+    await asAdmin((q) =>
+      q(
+        "insert into public.org_document_settings (organization_id, address_line, phone) values ($1, 'הרצל 1', '03-5550000') on conflict (organization_id) do update set address_line = excluded.address_line, phone = excluded.phone",
+        [org],
+      ),
+    );
     member = await addMember(org, owner.id, "member", "eml-member");
     other = await addMember(org, owner.id, "member", "eml-other");
     viewer = await addMember(org, owner.id, "viewer", "eml-viewer");
@@ -290,7 +297,7 @@ describe("email from the record card (EML-02)", () => {
   });
 
   it("marketing needs the queue's consent check: refused without a grant, sent with one", async () => {
-    const marketing = await template(owner.id, org, { name: "עדכון", type: "marketing", body: "שלום {שם פרטי}, {תוכן העדכון}" });
+    const marketing = await template(owner.id, org, { name: "עדכון", type: "marketing", body: "שלום {שם פרטי}, יש לנו עדכון" });
     const lead = await insertLead(member.id, org, { email: "eml-mkt@example.test", owner_id: member.id });
     const first = await send(member.id, org, "lead", lead, marketing);
     expect(await maySend(await claimOne(first.job_id))).toEqual({ may_send: false, reason: "consent_missing" });

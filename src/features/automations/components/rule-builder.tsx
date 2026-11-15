@@ -9,6 +9,7 @@ import { FormError } from "@/components/ui/feedback";
 import { Checkbox, Select, SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { TextLink } from "@/components/ui/text-link";
+import { automationMissingText } from "@/features/message-templates/card-fields";
 import { messageTemplatesPath } from "@/features/message-templates/paths";
 import { quoteTemplatesPath } from "@/features/quotes/paths";
 import type { FormState } from "@/lib/action-result";
@@ -423,14 +424,18 @@ function ActionFields({ orgId, entity, action, index, lookups, onChange }: Field
       ))}
     </SelectField>
   );
-  const pick = (label: string, key: string, list: Array<{ id: string; name: string }>) => (
+  // EML-02 (15 November 2026): an item with missing fields (a message template a rule cannot fill) is shown disabled
+  const pick = (label: string, key: string, list: Array<{ id: string; name: string; missing?: readonly string[] }>) => (
     <SelectField label={label} value={action[key]} onChange={(e) => onChange({ [key]: e.target.value })} controlSize="sm">
       <option value="">בחירה</option>
-      {list.map((item) => (
-        <option key={item.id} value={item.id}>
-          {item.name}
-        </option>
-      ))}
+      {list.map((item) => {
+        const missing = automationMissingText(item.missing ?? []);
+        return (
+          <option key={item.id} value={item.id} disabled={missing !== null && item.id !== action[key]}>
+            {missing ? `${item.name} · ${missing}` : item.name}
+          </option>
+        );
+      })}
     </SelectField>
   );
 

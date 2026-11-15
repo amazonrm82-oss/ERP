@@ -3,6 +3,7 @@ import { getOrgTerms } from "@/features/terminology/queries";
 
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import type { FieldDefinition } from "@/features/custom-fields/types";
+import { cardUnfillableFields } from "@/features/message-templates/card-fields";
 import { listMembers, listTeams, orgHasFeature } from "@/features/settings/queries";
 import { listTags } from "@/features/tags/queries";
 import { canRecordPayments } from "@/features/permissions/keys";
@@ -44,9 +45,10 @@ export type Lookups = {
   forms?: Array<{ id: string; name: string }>;
   // SMS-02: the business's SMS templates of a type an automation may send (marketing, requested_document, collection), for a
   // "send SMS" step; inactive ones too, so a saved rule still names its template (the builder offers active ones)
-  smsTemplates?: Array<{ id: string; name: string; messageType: string; isActive: boolean }>;
+  // EML-02 (15 November 2026): missing = the fields an automation's message does not fill (cardUnfillableFields)
+  smsTemplates?: Array<{ id: string; name: string; messageType: string; isActive: boolean; missing?: string[] }>;
   // AUT-08: the business's email templates of a type an automation may send, for a "send email" step (inactive ones too)
-  emailTemplates?: Array<{ id: string; name: string; messageType: string; isActive: boolean }>;
+  emailTemplates?: Array<{ id: string; name: string; messageType: string; isActive: boolean; missing?: string[] }>;
 };
 
 type ReadFailure = { message: string; code?: string | null };
@@ -106,7 +108,7 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
     supabase.from("forms").select("id, name").eq("organization_id", orgId).eq("kind", "form").order("name").order("id").limit(1000),
     supabase
       .from("message_templates")
-      .select("id, name, message_type, is_active")
+      .select("id, name, message_type, is_active, body")
       .eq("organization_id", orgId)
       .eq("channel", "sms")
       .in("message_type", [...SMS_AUTOMATION_TYPES])
@@ -117,7 +119,7 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
     // AUT-08: the email templates a "send email" step may name
     supabase
       .from("message_templates")
-      .select("id, name, message_type, is_active")
+      .select("id, name, message_type, is_active, subject, body")
       .eq("organization_id", orgId)
       .eq("channel", "email")
       .in("message_type", [...EMAIL_AUTOMATION_TYPES])
@@ -162,8 +164,20 @@ export async function readLookups(orgId: string): Promise<{ data: Lookups; error
       canRecordPayments: recordsPayments,
       quoteTemplates: templates.data ?? [],
       forms: forms.data ?? [],
-      smsTemplates: (smsTemplates.data ?? []).map((t) => ({ id: t.id, name: t.name, messageType: t.message_type, isActive: t.is_active })),
-      emailTemplates: (emailTemplates.data ?? []).map((t) => ({ id: t.id, name: t.name, messageType: t.message_type, isActive: t.is_active })),
+      smsTemplates: (smsTemplates.data ?? []).map((t) => ({
+        id: t.id,
+        name: t.name,
+        messageType: t.message_type,
+        isActive: t.is_active,
+        missing: cardUnfillableFields({ messageType: t.message_type, body: t.body }),
+      })),
+      emailTemplates: (emailTemplates.data ?? []).map((t) => ({
+        id: t.id,
+        name: t.name,
+        messageType: t.message_type,
+        isActive: t.is_active,
+        missing: cardUnfillableFields({ messageType: t.message_type, subject: t.subject, body: t.body }),
+      })),
     },
     error: null,
   };

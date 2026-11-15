@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { cardFieldsErrorMessage } from "@/features/message-templates/card-fields";
 import { INVALID_ARGS, validArg } from "@/lib/action-args";
 import { actionContext } from "@/lib/action-context";
 import { fail, type ActionResult } from "@/lib/action-result";
@@ -42,7 +43,7 @@ export async function sendRecordEmailAction(
     p_library_items: [...new Set(libraryItemIds)],
   });
   if (error) {
-    return fail(dbErrorMessage(error, "לא הצלחנו לשלוח את האימייל. נסו שוב."));
+    return fail(cardFieldsErrorMessage(error) ?? dbErrorMessage(error, "לא הצלחנו לשלוח את האימייל. נסו שוב."));
   }
   const paused = Boolean(data && typeof data === "object" && !Array.isArray(data) && (data as Record<string, unknown>).paused === true);
   revalidatePath(recordPage(kind, orgId, recordId));

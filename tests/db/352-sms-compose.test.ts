@@ -25,9 +25,12 @@ type Answer = Record<string, unknown>;
 // and public.sms_quota_return are unchanged.
 // Then the final review of 902dcbfa (3): the core takes the job row FOR UPDATE (it writes composed_lease and sms_counted_on);
 // nothing else changed.
+// Then 021279 (EML-02, 15 November 2026, the first live send): {שם הנציג} of an automation's SMS is the record's owner (a deal's
+// SMS: the deal's owner) and an automation's rep is not a viewer; only the v_rep statement and the rep lookup's condition changed
+// (the SMS FUTURE SENDER conditions are untouched: diffed mechanically against 021247's body).
 const REVIEWED_MD5: Record<string, string> = {
   "sms_job_compose(uuid,uuid,text)": "1788e9cddb254947e6079bdb0dca46f4",
-  "app.sms_compose_core(uuid,uuid,text)": "f5a80b0d92abd021c1b127f73b651bc2",
+  "app.sms_compose_core(uuid,uuid,text)": "da6d31b81ef088f83782cb80df0e20d8",
   "app.sms_usage_give_back(uuid)": "f97f0d2ef0eadfbabd93f157793df96e",
   "sms_quota_return(uuid,uuid)": "166b0640aa22b85767118041be671199",
 };

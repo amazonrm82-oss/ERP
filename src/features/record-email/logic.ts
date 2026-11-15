@@ -92,11 +92,11 @@ export type QueuedEmail = {
   senderId: string | null;
   files: number;
   state: "waiting" | "sent" | "not_sent";
-  reason: "consent" | "paused" | "other" | null;
+  reason: "consent" | "paused" | "unfilled" | "other" | null;
 };
 
 const STATES = new Set(["waiting", "sent", "not_sent"]);
-const REASONS = new Set(["consent", "paused", "other"]);
+const REASONS = new Set(["consent", "paused", "unfilled", "other"]);
 
 /** Parses public.record_email_queue's answer; a malformed row is left out. */
 export function queuedEmails(data: unknown): QueuedEmail[] {
@@ -125,12 +125,20 @@ export function queuedEmailStateText(email: Pick<QueuedEmail, "state" | "reason"
   if (email.state === "sent") return "נשלח";
   if (email.reason === "consent") return "לא נשלח: אין הסכמה לקבל הודעות שיווקיות באימייל, או שהכתובת חסומה";
   if (email.reason === "paused") return "לא נשלח: השליחה ללקוחות הייתה עצורה יותר מיממה";
+  // EML-02 (15 November 2026): the composer refused it, a field of the template had no value (record_email_queue, 021279)
+  if (email.reason === "unfilled") return UNFILLED_FIELD_TEXT;
   return "לא נשלח";
 }
+
+/** = the card's line for a message the composer refused for a field without a value. */
+export const UNFILLED_FIELD_TEXT = "לא נשלח: בתבנית יש שדה בלי ערך";
+
+/** EML-02 (15 November 2026): where the person sees whether it went (it may still be refused when its turn comes). */
+export const QUEUED_RESULT_WHERE = "התוצאה תופיע ברשימת ההודעות שנשלחו מהכרטיס ובציר הזמן של הרשומה.";
 
 /** What the dialog says after the email was queued. */
 export function queuedMessage(paused: boolean): string {
   return paused
-    ? "האימייל ממתין לשליחה. השליחה ללקוחות עצורה כרגע, והוא יישלח כשהיא תחודש."
-    : "האימייל ממתין לשליחה. התשובות יגיעו לאימייל שלכם.";
+    ? `האימייל נכנס לתור השליחה. השליחה ללקוחות עצורה כרגע, והוא יישלח כשהיא תחודש. ${QUEUED_RESULT_WHERE}`
+    : `האימייל נכנס לתור השליחה. התשובות יגיעו לאימייל שלכם. ${QUEUED_RESULT_WHERE}`;
 }

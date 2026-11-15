@@ -609,6 +609,11 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "record_sms:type": "את סוג ההודעה הזה המערכת שולחת לבד בזמן המתאים, ולא מכרטיס הרשומה. בחרו תבנית אחרת.",
   // SGN-03 review M1: a template the system sends itself (a reminder before a document's last day, a meeting message)
   "record_message:notice_template": "את התבנית הזאת המערכת שולחת לבד בזמן המתאים, ולא מכרטיס הרשומה. בחרו תבנית אחרת.",
+  // EML-02 (15 November 2026, migration card_email_fields): the template holds a field a card's message cannot fill (the
+  // card's send dialog names them from the error's detail, cardFieldsErrorMessage)
+  // EML-02 (owner, 15 November 2026): a marketing message's envelope needs the business's address and phone (document settings)
+  "record_message:business_details": "חסרים כתובת או טלפון העסק בהגדרות המסמכים, והודעה שיווקית כוללת אותם. השלימו אותם בהגדרות, במע\"מ ופרטים למסמכים, או בחרו תבנית שירות.",
+  "record_message:unfillable_field": "בתבנית יש שדה שלא מתמלא בשליחה מהכרטיס, ולכן היא לא תישלח. בחרו תבנית אחרת, או בקשו מבעלי העסק לתקן אותה.",
   "record_sms:not_sendable": "התבנית הזו לא תישלח כרגע. בדקו אותה במסך תבניות ההודעה.",
   "record_sms:collection": "תבנית גבייה נשלחת רק על ידי מי שרושם תשלומים בעסק. בחרו תבנית אחרת.",
   "record_sms:rate": "שלחתם הרבה הודעות SMS בשעה האחרונה. אפשר לשלוח עד 30 בשעה. נסו שוב מאוחר יותר.",

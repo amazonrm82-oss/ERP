@@ -1,3 +1,4 @@
+import { automationMissingText } from "@/features/message-templates/card-fields";
 import type { Json } from "@/lib/database.types";
 
 import type { Entity } from "./definitions";
@@ -20,7 +21,7 @@ export const SEND_EMAIL_ENTITIES: readonly Entity[] = ["lead", "contact", "deal"
 /** = 'marketing' + app.record_email_service_types(): the message types an automation may send as an email. */
 export const EMAIL_AUTOMATION_TYPES = ["marketing", "requested_document", "collection"] as const;
 
-type EmailTemplate = { id: string; name: string; messageType: string; isActive: boolean };
+type EmailTemplate = { id: string; name: string; messageType: string; isActive: boolean; missing?: readonly string[] };
 
 /** The templates the builder offers: active ones of an allowed type, plus the step's current one (a saved rule keeps it). */
 export function offeredEmailTemplates(templates: readonly EmailTemplate[], current?: string): EmailTemplate[] {
@@ -39,6 +40,10 @@ export function sendEmailAction(
   const template = (lookups.emailTemplates ?? []).find((t) => t.id === input.template_id);
   if (!template || !(EMAIL_AUTOMATION_TYPES as readonly string[]).includes(template.messageType)) return "התבנית שנבחרה כבר לא קיימת.";
   if (!template.isActive) return "התבנית שנבחרה כבויה. הפעילו אותה במסך תבניות ההודעה או בחרו אחרת.";
+  // EML-02 (15 November 2026): a field an automation's message does not fill (= app.record_email_template_refusal's
+  // 'unfillable_field', which refuses it when the rule runs)
+  const missing = automationMissingText(template.missing ?? []);
+  if (missing) return `התבנית שנבחרה לא תישלח מאוטומציה. ${missing}. בחרו תבנית אחרת או תקנו אותה במסך תבניות ההודעה.`;
   // a collection step only for a payment recorder (= trigger automations_sms_collection, hint automation:email_collection)
   if (template.messageType === "collection" && !lookups.canRecordPayments) return EMAIL_COLLECTION_NEEDS_PAYMENTS;
   return { type: "send_email", template_id: input.template_id };

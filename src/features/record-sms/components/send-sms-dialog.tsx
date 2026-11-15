@@ -8,8 +8,10 @@ import { Dialog } from "@/components/ui/dialog";
 import { FormError } from "@/components/ui/feedback";
 import { SelectField } from "@/components/ui/field";
 import { ChatIcon } from "@/components/ui/icons";
+import { hiddenTemplatesText, splitCardTemplates } from "@/features/message-templates/card-fields";
 import type { MergeValues } from "@/features/message-templates/fields";
 import { messageTemplatesPath } from "@/features/message-templates/paths";
+import { marketingEnvelopeMissing, marketingEnvelopeMissingText } from "@/features/message-sending/marketing-details";
 import { MESSAGE_TYPE_LABELS } from "@/features/message-templates/templates";
 import type { MessageType } from "@/features/messaging/providers/types";
 
@@ -52,21 +54,27 @@ export function SendSmsDialog(props: Props) {
   );
 }
 
-function SendSmsForm({ orgId, kind, recordId, phone, templates, queued, values, canManageTemplates, timeZone, onClose }: Props & { onClose: () => void }) {
+function SendSmsForm({ orgId, kind, recordId, phone, templates: allTemplates, queued, values, canManageTemplates, timeZone, onClose }: Props & { onClose: () => void }) {
+  // EML-02 (owner, 15 November 2026): a template holding a field the card does not fill is not offered at all; one line
+  // says how many were left out (the database refuses such a template too)
+  const { offered: templates, hidden } = splitCardTemplates(allTemplates);
+  const hiddenText = hiddenTemplatesText(hidden);
   const [templateId, setTemplateId] = useState(templates[0]?.id ?? "");
   const [failure, setFailure] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const template = templates.find((t) => t.id === templateId) ?? null;
+  // a marketing message carries the business's address and phone (the envelope); warned and not sent while either is missing
+  const envelopeText = template && template.messageType === "marketing" ? marketingEnvelopeMissingText(marketingEnvelopeMissing(values)) : null;
   const preview = template ? smsPreview(template, values) : null;
 
   function send() {
-    if (!template || preview?.tooLong) return;
+    if (!template || preview?.tooLong || envelopeText) return;
     setFailure(null);
     startTransition(async () => {
       const result = await sendRecordSmsAction(orgId, kind, recordId, template.id);
-      if (result.ok) setDone(result.message ?? "ה-SMS ממתין לשליחה.");
+      if (result.ok) setDone(result.message ?? "ה-SMS נכנס לתור השליחה.");
       else setFailure(result.message);
     });
   }
@@ -100,7 +108,9 @@ function SendSmsForm({ orgId, kind, recordId, phone, templates, queued, values, 
             "בעלים ומנהלי מערכת יכולים להוסיף תבנית."
           )}
         </p>
-      ) : (
+      ) : null}
+      {templates.length === 0 && hiddenText ? <p className="text-sm text-ink-soft">{hiddenText}</p> : null}
+      {templates.length === 0 ? null : (
         <>
           <SelectField label="תבנית" value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
             {templates.map((t) => (
@@ -109,6 +119,8 @@ function SendSmsForm({ orgId, kind, recordId, phone, templates, queued, values, 
               </option>
             ))}
           </SelectField>
+          {hiddenText ? <p className="text-sm text-ink-soft">{hiddenText}</p> : null}
+          <FormError message={envelopeText} />
           {preview ? (
             <div className="space-y-2 rounded-md border border-line bg-canvas px-3 py-3" aria-label="תצוגה מקדימה">
               <p className="break-words whitespace-pre-wrap text-md text-ink">{preview.body}</p>
@@ -129,7 +141,7 @@ function SendSmsForm({ orgId, kind, recordId, phone, templates, queued, values, 
 
       <FormError message={failure} />
       <div className="flex flex-wrap gap-2">
-        <Button onClick={send} loading={pending} disabled={!template || preview?.tooLong === true}>
+        <Button onClick={send} loading={pending} disabled={!template || preview?.tooLong === true || envelopeText !== null}>
           שליחה
         </Button>
         <Button variant="secondary" onClick={onClose}>
