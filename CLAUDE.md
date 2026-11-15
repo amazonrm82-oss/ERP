@@ -546,8 +546,18 @@ and build this CRM here instead. The old code is preserved on the branch
    an automation's email (no `reply_to_user_id`, button runs too) replies to the record owner (a deal email: the deal's owner) while an
    active non-viewer member, else none. Owner (7) ב: a 401/403 from Resend ends the job at once, not sent, code `key_refused`, the count
    given back, one error log line `email.key_refused`; `public.platform_email_health()` (platform owner/support, aal2, counts only,
-   index `app.jobs_key_refused_idx`) feeds a warning card on the admin dashboard. `app.email_compose_core` was last redefined in 021278.
+   index `app.jobs_key_refused_idx`) feeds a warning card on the admin dashboard. `app.email_compose_core` was last redefined in 021278 (then 021279).
    Addresses, text and keys never logged. Pinned by md5 in test 367 (email-compose).
+   Card sends since 021279 (owner, 15 November 2026, after the live test): a card offers only templates whose fields a card can fill
+   (`app.card_message_fields`, `app.card_unfillable_fields(type, subject, body)`; refused otherwise with hint
+   `record_message:unfillable_field`, also for automation steps), `{שם הנציג}` is the sender or, for an automation, the record (deal) owner
+   while an active non-viewer; a marketing send without the business address or phone (`app.marketing_details_missing`) is refused with
+   `record_message:business_details`. Trigger `messages_refused_sender_notice` on `public.messages` tells the sending person in the bell once
+   per template, reason and business day (`app.message_sender_refusal_notices`, its advisor finding expected); trigger
+   `org_message_settings_rejudge_hours` moves the business's jobs waiting on sending hours to now when the hours change (5,000, skip locked).
+   `app.record_email_enqueue`, `app.record_sms_enqueue`, both template refusals, `app.automation_send_email|sms`, `app.email_compose_core`,
+   `app.sms_compose_core`, `public.record_email_queue` and `public.record_sms_queue` were last redefined in 021279 (tests 352, 367 pins
+   rechecked); tests 64 and 88 end with `_card_email_fields.sql`.
    In use (OPS-04, owner 26 October 2026, answer (א) and wave 3 use (1); conditions of 2 November 2026, answers (52)-(55); migration
    `_jobs_queue.sql`): the background job worker (`src/features/jobs/run-server.ts`, route `POST /api/jobs/run`, public prefix in
    `src/lib/supabase/proxy.ts`), woken by `app.wake_job_worker()` (pg_cron `crm-jobs-wake`, pg_net; `app.settings` `jobs_run_url`,
