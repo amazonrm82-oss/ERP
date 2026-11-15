@@ -1,8 +1,6 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { addMember, asAdmin, asAnon, asMfaUser, asUser, closePool, count, createOrg, createUser, insertLead, pgError } from "./helpers";
-import { MIGRATIONS_DIR, migrationFile } from "./rerun";
+import { migrationFile, rerunClosure } from "./rerun";
 
 // FXS-08: the customer's approval alone gives platform support nothing. Opening the session (platform_open_support)
 // is what gives the read, and it writes the platform log and the customer's audit log in the same transaction.
@@ -230,9 +228,9 @@ describe("support access needs an opened session (FXS-08)", () => {
     const g = await grant();
     try {
       await open(support.id);
-      const sql = readFileSync(join(MIGRATIONS_DIR, migrationFile("_support_session_open.sql")), "utf8");
-      await asAdmin((q) => q(sql));
-      await asAdmin((q) => q(sql));
+      // later migrations that redefine its functions (OPS-09's app.support_session) are re-run after it
+      const { sql } = rerunClosure([migrationFile("_support_session_open.sql")]);
+      for (let i = 0; i < 2; i++) await asAdmin(async (q) => { for (const text of sql) await q(text); });
       expect(await asAdmin((q) => count(q, "select 1 from app.support_sessions where grant_id = $1", [g.id]))).toBe(1);
       expect(await leads(support.id)).toBe(1);
       expect(await leads(support2.id)).toBe(0);
