@@ -191,6 +191,8 @@ const RERUN = [
   migrationFile("_review_1113_database.sql"),
   // EML-02 (15 November 2026) redefines the card send's enqueue and refusal functions last
   migrationFile("_card_email_fields.sql"),
+  // USR-11 / WAB-03 redefines app.job_kinds(), app.job_payload_ok() and app.plan_key_defaults() last
+  migrationFile("_daily_digest.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

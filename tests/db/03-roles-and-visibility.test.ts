@@ -1264,6 +1264,25 @@ describe("roles and record visibility", () => {
     await asUser(owner.id, (q) => q("update public.anomaly_alert_settings set idle_rep_on = true, lead_drop_percent = 50 where organization_id = $1", [org]));
   });
 
+  it("the daily summary setting: every role keeps its own row, nobody reads or changes another's (USR-11 / WAB-03)", async () => {
+    for (const u of [owner, admin, manager, m1, viewer]) {
+      await asUser(u.id, (q) => q("insert into public.digest_settings (organization_id, send_at) values ($1, '09:00')", [org]));
+      const rows = await asUser(u.id, async (q) =>
+        (await q<{ user_id: string; enabled: boolean }>("select user_id, enabled from public.digest_settings where organization_id = $1", [org])).rows,
+      );
+      expect(rows, u.email).toEqual([{ user_id: u.id, enabled: false }]);
+    }
+    // an owner changes only their own row
+    expect(await asUser(owner.id, async (q) => (await q("update public.digest_settings set send_at = '10:00' where organization_id = $1", [org])).rowCount)).toBe(1);
+    const others = await asAdmin(async (q) =>
+      (await q<{ n: number }>("select count(*)::int as n from public.digest_settings where organization_id = $1 and send_at = '10:00'", [org])).rows[0].n,
+    );
+    expect(others).toBe(1);
+    // a viewer switches their own summary on
+    expect(await asUser(viewer.id, async (q) => (await q("update public.digest_settings set enabled = true where organization_id = $1", [org])).rowCount)).toBe(1);
+    await asAdmin((q) => q("update public.digest_settings set enabled = false where organization_id = $1", [org]));
+  });
+
   it("the review requests: everyone reads them, only owners and admins of a writable business set them, nobody deletes them (RET-02)", async () => {
     for (const u of [manager, m1, viewer]) {
       expect(

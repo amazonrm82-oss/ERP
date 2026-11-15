@@ -361,6 +361,21 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
     refusal: JSON_429,
     sender: "first",
   },
+  // USR-11 / WAB-03 (owner (377) ב, 15 November 2026): the daily summary's one-click stop link
+  "/f/digest-stop/[token]": {
+    guard: "database",
+    functions: ["public_sender_check", "public_sender_miss", "digest_stop"],
+    limit: SENDER + "60 calls per sender (keyed IP hash, scope digest) across every stop link, then 30 per link, in 10 min; opening it changes nothing; a preview bot gets a generic page and no read",
+    refusal: PAGE_TEXT,
+    sender: "first",
+  },
+  "/api/forms/digest-stop/[token]": {
+    guard: "database",
+    functions: ["public_sender_check", "public_sender_miss", "digest_stop"],
+    limit: SENDER + "a call of the stop link (same counters); stops once; RFC 8058 one-click posts get plain text",
+    refusal: JSON_429 + ", or " + TEXT_429 + " for a one-click post",
+    sender: "first",
+  },
   "/api/forms/lib/[token]/file": {
     guard: "database",
     functions: ["public_sender_check", "public_sender_miss", "library_link_public_file"],

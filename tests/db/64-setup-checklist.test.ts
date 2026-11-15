@@ -900,6 +900,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // EML-02 (15 November 2026) redefines app.record_email_enqueue() of _automation_send_email.sql, app.record_sms_enqueue() and
       // app.record_sms_template_refusal() of _signature_status_reminders.sql and app.record_email_template_refusal() last
       "_card_email_fields.sql",
+      // USR-11 / WAB-03 redefines app.job_kinds() of _background_jobs.sql, app.job_payload_ok() of _review_requests_leads.sql and
+      // app.plan_key_defaults() of _prefill_forms.sql last
+      "_daily_digest.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

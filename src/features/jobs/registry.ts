@@ -3,7 +3,9 @@
 // not ready (no provider yet) stays queued instead of failing.
 
 // IMP-04 (owner (155) א): import.run and export.run, the background import and full export of src/features/background/
-export const JOB_KINDS = ["message.send", "import.run", "export.run"] as const;
+// USR-11 / WAB-03 (owner (267) א, (375) ב): digest.send, the daily summary email, registered while the email channel has a
+// provider (src/features/digest/send-handler.ts); until a worker asks for it app.queue_daily_digests queues nothing.
+export const JOB_KINDS = ["message.send", "import.run", "export.run", "digest.send"] as const;
 export type JobKind = (typeof JOB_KINDS)[number];
 
 export function isJobKind(value: unknown): value is JobKind {

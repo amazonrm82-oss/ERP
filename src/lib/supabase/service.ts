@@ -39,7 +39,9 @@ import { getSupabaseEnv } from "@/lib/env";
  *   (160) א), import.run and export.run, for which it calls only
  *   public.background_job_begin(), public.background_job_token(),
  *   public.background_job_progress() and public.background_job_end(); the work itself
- *   runs under a short token for the ordering person, never with the service key;
+ *   runs under a short token for the ordering person, never with the service key; and,
+ *   while the email channel has a provider, digest.send (USR-11 / WAB-03, owner (267) א, (375) ב), for which it calls
+ *   only public.digest_job_compose() (the daily summary's counts under the recipient's own read rules);
  * - InforU's delivery reports and replies (src/features/inforu-callbacks/webhook-server.ts,
  *   routes /api/sms/inforu/status/<secret> and /api/sms/inforu/inbound/<secret>; SMS-05,
  *   owner (318) א, wave 3 use (2)): the client is made only after the secret in the path
@@ -89,6 +91,8 @@ import { getSupabaseEnv } from "@/lib/env";
  *     library_link_public_file() only, and a 60-second signed link to the path the latter answers;
  *   - the form that fills an existing record by a personal link (BIZ-05, owner 11 November 2026, answer (271) ב)
  *     (src/features/prefill-links/public-server.ts): public.prefill_public() and prefill_public_submit() only;
+ *   - the daily summary email's one-click stop link (USR-11 / WAB-03, owner 15 November 2026, answer (377) ב)
+ *     (src/features/digest/stop-server.ts): public.digest_stop() only;
  *   - the public privacy-request page (PRK-02, owner 26 October 2026, wave 3 use (3))
  *     (src/features/privacy-requests/public-server.ts): public.privacy_request_page()
  *     and privacy_request_submit() only;

@@ -102,7 +102,8 @@ describe("OPS-04: the worker route", () => {
     const rpcs = [...code.matchAll(/\.rpc\(\s*"([a-z_]+)"/g)].map((m) => m[1]).sort();
     // SMS-05 (owner (318) א): the InforU sender's composer, sms_job_compose (wave 3 use (1))
     // EML-01 (owner (195) א, (268) א): the Resend sender's composer, email_job_compose, and email_quota_return
-    expect(rpcs).toEqual(["background_job_begin", "background_job_end", "background_job_progress", "claim_jobs", "email_job_compose", "email_quota_return", "finish_job", "job_message_may_send", "sms_job_compose", "sms_quota_return"]);
+    // USR-11 / WAB-03 (owner (267) א, (375) ב): the daily summary's composer, digest_job_compose
+    expect(rpcs).toEqual(["background_job_begin", "background_job_end", "background_job_progress", "claim_jobs", "digest_job_compose", "email_job_compose", "email_quota_return", "finish_job", "job_message_may_send", "sms_job_compose", "sms_quota_return"]);
     expect(code).not.toMatch(/\.from\(|\.storage\b|\.schema\(/);
     expect(read("src/app/api/jobs/run/route.ts")).toContain("runJobsRoute");
   });

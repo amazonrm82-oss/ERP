@@ -10,6 +10,9 @@ import { NewPasswordForm } from "@/features/auth/components/new-password-form";
 import { getCalendarSettings } from "@/features/calendar-days/queries";
 import { CalendarFeedCard } from "@/features/calendar-feed/components/calendar-feed-card";
 import { getCalendarFeedStatus } from "@/features/calendar-feed/queries";
+import { DigestSettingsForm } from "@/features/digest/components/digest-settings-form";
+import { getDigestSettings } from "@/features/digest/queries";
+import { digestKindFor } from "@/features/digest/settings";
 import { getSignedVersion } from "@/features/legal/queries";
 import { DeviceOffLine } from "@/features/notifications/components/device-warning";
 import { NotificationSettingsForm } from "@/features/notifications/components/notification-settings-form";
@@ -20,6 +23,7 @@ import { ProfileForm } from "@/features/profile/components/profile-form";
 import { ThemePicker } from "@/features/theme/components/theme-picker";
 import { getMyProfile } from "@/features/profile/queries";
 import { timeZones } from "@/features/profile/working-hours";
+import { orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { MemberHoursSection } from "@/features/work-hours/components/member-hours-section";
 import { getDeputyOptions, getFixedOwnerForms, getMemberHours, getOrgHours } from "@/features/work-hours/queries";
@@ -35,7 +39,7 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
   const supabase = await createClient();
   // CAP-09: a support session is not a member, and a viewer gets no leads
   const showHours = !supportUntil && role !== "viewer";
-  const [profile, sessionsResult, { data: org }, codesLeft, signedVersion, notificationSettings, calendarFeed, hours] = await Promise.all([
+  const [profile, sessionsResult, { data: org }, codesLeft, signedVersion, notificationSettings, calendarFeed, hours, digest] = await Promise.all([
     getMyProfile(user.id),
     listMySessions(),
     supabase.from("organizations").select("require_mfa").eq("id", orgId).maybeSingle(),
@@ -47,6 +51,8 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
     showHours
       ? Promise.all([getMemberHours(orgId, user.id, orgContext.timeZone), getOrgHours(orgId), getCalendarSettings(orgId), getDeputyOptions(orgId, user.id), getFixedOwnerForms(orgId, user.id)])
       : null,
+    // USR-11 / WAB-03: a support session is not a member: no summary of its own
+    supportUntil ? null : Promise.all([getDigestSettings(orgId), orgHasFeature(orgId, "daily_digest")]),
   ]);
   const sessions = sessionsResult.ok ? sessionsResult.sessions : [];
 
@@ -131,6 +137,22 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
               <TestNotificationButton orgId={orgId} />
             </div>
           )}
+          {/* USR-11 / WAB-03: the daily summary email is part of the person's notification settings (owner (377) ב: the stop link
+              in the email is recorded here, and switched on again here) */}
+          {digest ? (
+            <section aria-labelledby="account-digest" className="space-y-3 border-t border-line pt-4">
+              <h3 id="account-digest" className="text-md font-semibold">
+                סיכום יומי במייל
+              </h3>
+              <DigestSettingsForm
+                orgId={orgId}
+                settings={digest[0]}
+                kind={digestKindFor(role)}
+                inPlan={digest[1]}
+                stoppedText={digest[0].stoppedByLinkAt ? formatDateTime(digest[0].stoppedByLinkAt) : null}
+              />
+            </section>
+          ) : null}
         </CardBody>
       </Card>
 

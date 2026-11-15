@@ -3,6 +3,7 @@ import "server-only";
 import { createExportHandler, createImportHandler, type BackgroundCalls } from "@/features/background/handlers";
 import { BACKGROUND_RUN_BUDGET_MS } from "@/features/background/rules";
 import { backgroundJobsReady, createBackgroundTokenSource, createUserClient } from "@/features/background/user-token";
+import { createDigestHandler } from "@/features/digest/send-handler";
 import { AGREEMENT_VERSION } from "@/features/legal/agreement";
 import { downloadEmailAttachment } from "@/features/messaging/email-attachments-server";
 import { createSendHandler } from "@/features/messaging/send-handler";
@@ -32,6 +33,10 @@ const BACKGROUND_LEASE_SECONDS = 900;
 export const JOBS_RUN_MAX_MS = 180_000;
 const MESSAGE_LEASE_MS = 120_000;
 
+// review 8: the daily summaries' share of a run: claimed 5 at a time, for at most 15 seconds a run (the rest wait a minute)
+const DIGEST_BATCH = 5;
+const DIGEST_BUDGET_MS = 15_000;
+
 /** What is left for a job: the lesser of its lease (from its claim) and the run (from the route's start). */
 export function jobTimeLeftMs(now: number, claimedAt: number, routeStartedAt: number): number {
   return Math.min(claimedAt + MESSAGE_LEASE_MS - now, routeStartedAt + JOBS_RUN_MAX_MS - now);
@@ -41,7 +46,7 @@ export function jobTimeLeftMs(now: number, claimedAt: number, routeStartedAt: nu
  * The background job worker (OPS-04), route POST /api/jobs/run. Called by the database (app.wake_job_worker, through
  * pg_net, every minute while work is due), never by a user: it carries the push dispatcher's shared secret, checked
  * timing-safe before anything else. With the service role it calls only public.claim_jobs(), public.finish_job() and,
- * for message.send, public.job_message_may_send() and, for a composing SMS provider (InforU, SMS-05), public.sms_job_compose() and public.sms_quota_return() (owner (326) ב), and for the composing email provider (Resend, EML-01, owner (195) א) public.email_job_compose() and public.email_quota_return(), reading Storage only at the paths the composer answered (email-attachments-server.ts); for import.run and export.run (IMP-04, owner (155) א, (160) א) only
+ * for message.send, public.job_message_may_send() and, for a composing SMS provider (InforU, SMS-05), public.sms_job_compose() and public.sms_quota_return() (owner (326) ב), and for the composing email provider (Resend, EML-01, owner (195) א) public.email_job_compose() and public.email_quota_return(), for digest.send (USR-11 / WAB-03) only public.digest_job_compose(), reading Storage only at the paths the composer answered (email-attachments-server.ts); for import.run and export.run (IMP-04, owner (155) א, (160) א) only
  * public.background_job_begin(), background_job_progress() and background_job_end(), and, through the token source it hands
  * this client to (src/features/background/user-token.ts), background_job_token() before every signing of the person's token. No table is read or written with
  * the service role (CLAUDE.md hard rule 5, wave 3 use (1)): a background job's own work is done with a short-lived token
@@ -96,6 +101,24 @@ export async function runJobsRoute(request: Request): Promise<Response> {
           // owner (195) א: the files only at the paths the composer answered, of the job's own business, bucket record-files
           loadAttachment: (ref, job, timeoutMs) => downloadEmailAttachment(supabase, ref, job.organization_id, timeoutMs),
           timeLeftMs: (job) => jobTimeLeftMs(Date.now(), claimedAt.get(job.id) ?? routeStartedAt, routeStartedAt),
+        })
+      : null,
+  });
+
+  // USR-11 / WAB-03 (owner (267) א, (375) ב): the daily summary, through the email channel's provider; the composer re-checks
+  // the plan key, the person's switch, the membership and the business on the live lease and computes the counts under the
+  // recipient's own read rules. Review 8: its own pass after the customer messages, at most DIGEST_BATCH a claim and
+  // DIGEST_BUDGET_MS a run, so a morning of summaries never holds a customer message back.
+  const digestRegistry = createRegistry({
+    "digest.send": providers.email
+      ? createDigestHandler({
+          provider: providers.email,
+          siteOrigin,
+          compose: async (job) => {
+            const { data, error } = await supabase.rpc("digest_job_compose", { p_job: job.id, p_lease: job.lease });
+            if (error) throw new Error("compose failed");
+            return data;
+          },
         })
       : null,
   });
@@ -180,19 +203,25 @@ export async function runJobsRoute(request: Request): Promise<Response> {
     const requestId = requestIdOf(request.headers);
     const log: RunLog = (entry) => logEvent("error", "jobs.finish_not_recorded", { ...entry, request_id: requestId });
     const messages = await runJobs(calls(undefined, Object.keys(providers)), registry, { log });
-    // what the messages left of the run's time; a background job that does not fit waits for the next run
+    // review 8: the daily summaries after the messages, in a small batch and their own budget
+    const digestLeft = 50_000 - (Date.now() - startedAt);
+    const digests: RunSummary =
+      digestLeft > 5_000 && digestRegistry.kinds.length > 0
+        ? await runJobs(calls(undefined, undefined), digestRegistry, { batch: DIGEST_BATCH, budgetMs: Math.min(digestLeft - 5_000, DIGEST_BUDGET_MS), log })
+        : { claimed: 0, done: 0, failed: 0, ended: 0, released: 0, unconfirmed: 0 };
+    // what the messages and summaries left of the run's time; a background job that does not fit waits for the next run
     const left = 50_000 - (Date.now() - startedAt);
     const jobs: RunSummary =
       left > 5_000 && backgroundRegistry.kinds.length > 0
         ? await runJobs(calls(BACKGROUND_LEASE_SECONDS, undefined), backgroundRegistry, { batch: 1, budgetMs: Math.min(left, BACKGROUND_RUN_BUDGET_MS), log })
         : { claimed: 0, done: 0, failed: 0, ended: 0, released: 0, unconfirmed: 0 };
     const summary: RunSummary = {
-      claimed: messages.claimed + jobs.claimed,
-      done: messages.done + jobs.done,
-      failed: messages.failed + jobs.failed,
-      ended: messages.ended + jobs.ended,
-      released: messages.released + jobs.released,
-      unconfirmed: messages.unconfirmed + jobs.unconfirmed,
+      claimed: messages.claimed + digests.claimed + jobs.claimed,
+      done: messages.done + digests.done + jobs.done,
+      failed: messages.failed + digests.failed + jobs.failed,
+      ended: messages.ended + digests.ended + jobs.ended,
+      released: messages.released + digests.released + jobs.released,
+      unconfirmed: messages.unconfirmed + digests.unconfirmed + jobs.unconfirmed,
     };
     return json(200, summary);
   } catch {

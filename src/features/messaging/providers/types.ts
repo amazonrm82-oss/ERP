@@ -51,7 +51,9 @@ export type OutgoingMessage = {
   purpose: MessagePurpose;
   // SMS-01b: "sender_check" = the code that verifies the business's own sender number (recordId = the check's id; the
   // adapter gets the code and the phone from public.sms_sender_code_issue, its own approved path, not built yet)
-  recordType: "lead" | "contact" | "sender_check";
+  // USR-11 / WAB-03: "user" = the daily summary to the business's own person (recordId = the user id; emailContent is built by
+  // src/features/digest/send-handler.ts from public.digest_job_compose)
+  recordType: "lead" | "contact" | "sender_check" | "user";
   recordId: string;
   // EML-02: an email a person sent from a record's card: the template, the deal it was sent from (the record is then the
   // deal's contact), the record files and the content-library files to attach (told apart by their own payload keys) and

@@ -43,6 +43,20 @@ export type ListPreferencesRow = {
   updated_at: string;
 };
 
+// USR-11 / WAB-03 (migration daily_digest): the person's own daily summary email switch and time (05:00..12:00, quarter
+// hours, the business's zone); user_id comes from the session; no row = off
+export type DigestSettingsRow = {
+  id: string;
+  organization_id: string;
+  user_id: string;
+  enabled: boolean;
+  send_at: string;
+  // owner (377) ב: server only, when the stop link in an email switched it off
+  stopped_by_link_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // DQL-01 (migration record_completeness): one row per organization and record type (lead | contact | company | deal);
 // fields = built-in keys or "cf:<key>" (src/features/data-quality/completeness.ts)
 export type CompletenessSettingsRow = {
@@ -3760,6 +3774,8 @@ export type Database = {
       plan_waitlist: Table<PlanWaitlistRow, { organization_id: string; plan_key: string }, Record<string, never>>;
       // each user's columns per list (migration 0033); user_id comes from the session
       list_preferences: Table<ListPreferencesRow, { organization_id: string; object_type: string; columns?: Json }, { columns?: Json }>;
+      // USR-11 / WAB-03: the person's own daily summary setting; no delete
+      digest_settings: Table<DigestSettingsRow, { organization_id: string; enabled?: boolean; send_at?: string }, { enabled?: boolean; send_at?: string }>;
       companies: Table<CompanyRow, CompanyInsert>;
       contacts: Table<ContactRow, ContactInsert>;
       contact_channels: Table<
@@ -4734,6 +4750,9 @@ export type Database = {
       prefill_links_for_record: { Args: { p_org: string; p_record_type: string; p_record_id: string }; Returns: Json };
       prefill_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       prefill_public_submit: { Args: { p_token: string; p_ip_hash?: string | null; p_values?: Json | null }; Returns: Json };
+      // USR-11 / WAB-03 (service_role only): the daily summary's composer (the worker) and its one-click stop link
+      digest_job_compose: { Args: { p_job: string; p_lease: string }; Returns: Json };
+      digest_stop: { Args: { p_token: string; p_ip_hash?: string | null; p_stop?: boolean }; Returns: Json };
       business_page_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       business_page_submit: {
         Args: { p_token: string; p_payload: Json; p_ip_hash?: string | null; p_user_agent?: string | null; p_is_spam?: boolean };

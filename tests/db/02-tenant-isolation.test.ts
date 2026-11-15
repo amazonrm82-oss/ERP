@@ -106,6 +106,8 @@ describe("tenant isolation", () => {
       await q("insert into public.import_jobs (organization_id, entity_type, file_name, duplicate_mode) values ($1, 'lead', 'leads.csv', 'skip')", [orgA]);
       await q("insert into public.support_access_grants (organization_id, expires_at) values ($1, now() + interval '1 hour')", [orgA]);
       await q("insert into public.list_preferences (organization_id, object_type, columns) values ($1, 'lead', '[{\"key\": \"phone\"}]')", [orgA]);
+      // USR-11 / WAB-03 (off, so the daily summary cron never queues for it)
+      await q("insert into public.digest_settings (organization_id, send_at) values ($1, '08:00')", [orgA]);
       await q("insert into public.record_followers (organization_id, lead_id) values ($1, $2)", [orgA, ids.leadA]);
       await q("insert into public.org_calendar_settings (organization_id, rest_weekdays) values ($1, '{6}')", [orgA]);
       await q("insert into public.org_document_settings (organization_id, vat_status) values ($1, 'licensed')", [orgA]);
@@ -465,6 +467,8 @@ describe("tenant isolation", () => {
     "support_access_grants",
     "files",
     "list_preferences",
+    // USR-11 / WAB-03
+    "digest_settings",
     "record_followers",
     "meetings",
     "meeting_participants",
@@ -751,6 +755,7 @@ describe("tenant isolation", () => {
       support_access_grants: "revoked_at = revoked_at",
       files: "name = name",
       list_preferences: "columns = columns",
+      digest_settings: "send_at = send_at",
       // no update grant at all: a permission error is the expected outcome
       record_followers: "user_id = user_id",
       meetings: "title = title",
@@ -965,6 +970,7 @@ describe("tenant isolation", () => {
       // QUO-06: a quote's PDF
       ["insert into public.files (organization_id, quote_id, name, mime_type, size_bytes) values ($1, $2, 'x.pdf', 'application/pdf', 1)", [orgA, ids.quoteA]],
       ["insert into public.list_preferences (organization_id, object_type) values ($1, 'contact')", [orgA]],
+      ["insert into public.digest_settings (organization_id) values ($1)", [orgA]],
       ["insert into public.record_followers (organization_id, deal_id) values ($1, $2)", [orgA, ids.dealA]],
       // no organizer: the policy, not the organizer trigger, has to refuse it
       ["insert into public.meetings (organization_id, title, starts_at, ends_at) values ($1, 'x', now(), now() + interval '1 hour')", [orgA]],
@@ -1131,6 +1137,7 @@ describe("tenant isolation", () => {
       ["notifications", "read_at = '2001-01-01'", "read_at = '2001-01-01'"],
       ["files", "name = 'HACKED'", "name = 'HACKED'"],
       ["list_preferences", "columns = '[{\"key\": \"HACKED\"}]'", "columns::text like '%HACKED%'"],
+      ["digest_settings", "send_at = '11:45'", "send_at = '11:45'"],
       ["record_followers", "created_at = '2001-01-01'", "created_at = '2001-01-01'"],
       ["meetings", "outcome = 'HACKED'", "outcome = 'HACKED'"],
       ["meeting_participants", "created_at = '2001-01-01'", "created_at = '2001-01-01'"],

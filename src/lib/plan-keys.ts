@@ -126,6 +126,8 @@ const FEATURES: Record<string, Record<SoldPlan, boolean>> = {
   booking_team_pages: PRO_UP,
   // SUB-01..05 (owner, 11 November 2026, answer (269) ג): a new key, pro and up
   recurring_billing: PRO_UP,
+  // USR-11 / WAB-03 (owner, 15 November 2026, answer (376) ב): the daily summary email, every plan but the free plan
+  daily_digest: ALL,
   // business only
   field_permissions: BUSINESS,
   sso: BUSINESS,
@@ -201,6 +203,8 @@ const WAVE2_FEATURE_LIST = [
   "recurring_billing",
   // BIZ-05 (migration prefill_forms)
   "prefill_links",
+  // USR-11 / WAB-03 (migration daily_digest)
+  "daily_digest",
 ] as const;
 const WAVE2_LIMIT_LIST = [
   "max_products", "max_price_lists", "max_quote_templates", "max_booking_pages", "max_booking_pages_per_user",

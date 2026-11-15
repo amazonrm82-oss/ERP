@@ -21,7 +21,10 @@ afterAll(closePool);
 // BIZ-05 (migration 20261006021263_prefill_forms.sql; 7255a66cfb01154adbc975ee13d09421 before): 021260's body with
 // 'prefill_links' added to the closed landing list after 'public_page' (the list re-wrapped over its lines); rechecked: nothing
 // else changed (no new field, table, argument or grant). Reviewed with the body as of 021263 (RVW-97, 13 November 2026).
-const REVIEWED_BODY_MD5 = "9b9d7b44344bc3ac01227bc8dc026648";
+// USR-11 / WAB-03 (migration 20261006021281_daily_digest.sql; 9b9d7b44344bc3ac01227bc8dc026648 before): 021263's body with
+// 'daily_digest' added to the closed landing list after 'money_waiting' (its own line); rechecked: nothing else changed (no new
+// field, table, argument or grant; the grants are re-asserted unchanged: anon and authenticated only).
+const REVIEWED_BODY_MD5 = "27e0dca8bbc00d361135784b1a4b6001";
 
 type PublicPlan = Record<string, unknown> & { key: string; availability: string; limits: Record<string, unknown>; features: string[] };
 

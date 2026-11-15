@@ -145,6 +145,9 @@ const serviceKeyAllowList = {
     // BIZ-05: the prefill form that fills an existing record, approved public secret-link pattern (owner, 11 November 2026,
     // answer (271) ב): public.prefill_public, public.prefill_public_submit
     "src/features/prefill-links/public-server.ts",
+    // USR-11 / WAB-03 (owner (377) ב, 15 November 2026): the daily summary's one-click stop link, approved public secret-link
+    // pattern: public.digest_stop
+    "src/features/digest/stop-server.ts",
     // CNS-09 / CNS-10: the customer's preferences page and unsubscribe link, approved public secret-link pattern (owner's
     // answer (225) א, 10 November 2026)
     "src/features/preferences/public-server.ts",

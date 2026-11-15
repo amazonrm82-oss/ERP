@@ -753,10 +753,44 @@ describe("background job queue (OPS-04)", () => {
 
   // (55) א 3: every job kind needs the owner's own approval and its own "In use" line in CLAUDE.md (hard rule 5).
   // Adding a kind here without that approval is not allowed. IMP-04: import.run and export.run, owner's answer (155) א,
-  // 9 November 2026 (test 309 covers them).
-  it("(55) א: the job kinds are exactly {message.send, import.run, export.run}", async () => {
+  // 9 November 2026 (test 309 covers them). USR-11 / WAB-03: digest.send, owner's answers (267) א and (375)-(378), 11 and 15
+  // November 2026 (test 372; queued only while a worker asked for it; its functions are pinned below).
+  it("(55) א: the job kinds are exactly {message.send, import.run, export.run, digest.send}", async () => {
     const kinds = await asAdmin(async (q) => (await q<{ k: string[] }>("select app.job_kinds() as k")).rows[0].k);
-    expect(kinds).toEqual(["message.send", "import.run", "export.run"]);
+    expect(kinds).toEqual(["message.send", "import.run", "export.run", "digest.send"]);
+  });
+
+  // USR-11 / WAB-03 (owner (267) א, (375) ב): the daily summary's worker path, pinned like the queue's own functions (body,
+  // security definer, settings, arguments). A change of any of them needs a fresh independent review against hard rule 5's
+  // conditions (ids only in the queue; the counts under the recipient's own read rules; the stop link's one function). Rechecked
+  // after the review of 15 November 2026: one stop token per job (plain form cleared once the job ended), the run time kept on
+  // the summary's own day, the stop link's real state.
+  // Delta review: a used stop link refuses the job (token_gone); plain tokens also cleared when expired or of a past day.
+  it("USR-11 / WAB-03: the digest.send functions are the reviewed ones", async () => {
+    const rows = await asAdmin(
+      async (q) =>
+        (
+          await q<{ name: string; md5: string }>(
+            `select n.nspname || '.' || p.proname as name,
+                    md5(p.prosrc || '|' || p.prosecdef::text || '|' || coalesce(p.proconfig::text, '') || '|' || pg_get_function_identity_arguments(p.oid)) as md5
+               from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where (n.nspname, p.proname) in (('public', 'digest_job_compose'), ('public', 'digest_stop'), ('app', 'digest_counts'),
+                                               ('app', 'digest_read_teams'), ('app', 'digest_stop_token_issue'), ('app', 'queue_daily_digests'),
+                                               ('app', 'digest_clear_plain_tokens'), ('app', 'digest_run_at'))
+              order by 1`,
+          )
+        ).rows,
+    );
+    expect(Object.fromEntries(rows.map((r) => [r.name, r.md5]))).toEqual({
+      "app.digest_clear_plain_tokens": "0a53262a76acd73521c1eb47b9243b7a",
+      "app.digest_counts": "ed1b0536553b2bb295bed86e510251ae",
+      "app.digest_read_teams": "bb86c3271563d842794c72d3637d9a0e",
+      "app.digest_run_at": "82a56a6aa7b81b868840493820ca17c9",
+      "app.digest_stop_token_issue": "0af61d7bf17251d5d560308571b1c4f9",
+      "app.queue_daily_digests": "0d3e7e9d5fb7b79d6c470b00d010f82c",
+      "public.digest_job_compose": "d8c3e9c0b13c304d050c61cbdf00128f",
+      "public.digest_stop": "defdc06009a3c53baf03153a3aaf2638",
+    });
   });
 
   it("the worker is woken only with its settings, pg_net and due work; the cron job is registered where pg_cron exists", async () => {

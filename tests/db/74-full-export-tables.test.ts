@@ -21,6 +21,7 @@ const LEFT_OUT: Record<string, string> = {
   import_jobs: "engine bookkeeping",
   invitations: "carry secret tokens",
   list_preferences: "a person's screen settings",
+  digest_settings: "a person's own daily summary email setting",
   memberships: "people come in as names next to their ids",
   member_permissions: "access settings of the team, like memberships; the audit log keeps every change",
   notifications: "a person's bell",

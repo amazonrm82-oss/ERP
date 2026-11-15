@@ -51,6 +51,8 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   // SPD-07
   { feature: "site_widget", label: "כפתור צף לאתר: WhatsApp, חיוג וטופס קצר", built: true },
   { feature: "money_waiting", label: "כסף שמחכה", built: true },
+  // USR-11 / WAB-03 (owner, 15 November 2026, answer (376) ב): every plan but the free plan
+  { feature: "daily_digest", label: "סיכום יומי במייל", built: true },
   { feature: "instant_reply", label: "מענה מיידי ללקוח", built: true },
   { feature: "email_sync", label: "סנכרון אימייל ויומן", built: false },
   { feature: "whatsapp_inbox", label: "תיבת WhatsApp (ההודעות מהארנק)", built: false },
