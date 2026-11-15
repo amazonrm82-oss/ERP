@@ -54,6 +54,12 @@ const composeSms = (job: Claimed) =>
 
 const pgErr = (e: unknown) => e as { code?: string; hint?: string; detail?: string };
 
+// review of b219c81b (1): the sender's notice runs as a trigger on public.messages, beside the pinned app.jobs_record_message.
+// A change of its body, or a new trigger on public.messages, fails here until it gets a fresh independent review (it writes
+// a public table, notifications, on every failed message); then update the md5 / the list.
+const SENDER_NOTICE_MD5 = "57d1c65f2b45743a46439bea1d989702";
+const MESSAGES_TRIGGERS = ["messages_refused_sender_notice", "messages_touch"];
+
 describe("the fields a card's message fills (EML-02, 15 November 2026)", () => {
   let owner: { id: string }, member: { id: string }, viewer: { id: string };
   let org: string;
@@ -262,6 +268,9 @@ describe("the fields a card's message fills (EML-02, 15 November 2026)", () => {
     const paused = await job(org, lead, t, "waiting:sending_paused", null);
     const scheduled = await job(org, lead, t, null, null);
     const neighbour = await job(other, otherLead, t2, "waiting:sending_hours", null);
+    // a job that failed once and now waits for the window carries the same mark (status failed)
+    const failedWaiting = await job(org, lead, t, "waiting:sending_hours", null);
+    await asAdmin((q) => q("update app.jobs set status = 'failed', attempts = 1 where id = $1", [failedWaiting]));
     await asUser(owner.id, (q) =>
       q(
         "insert into public.org_message_settings (organization_id, window_from, window_until) values ($1, '07:00', '22:00') on conflict (organization_id) do update set window_from = excluded.window_from, window_until = excluded.window_until",
@@ -270,14 +279,94 @@ describe("the fields a card's message fills (EML-02, 15 November 2026)", () => {
     );
     const due = await asAdmin(
       async (q) =>
-        (await q<{ id: string; due: boolean }>("select id, next_run_at <= now() as due from app.jobs where id = any ($1)", [[waiting, capped, paused, scheduled, neighbour]])).rows,
+        (await q<{ id: string; due: boolean }>("select id, next_run_at <= now() as due from app.jobs where id = any ($1)", [[waiting, failedWaiting, capped, paused, scheduled, neighbour]])).rows,
     );
     const byId = Object.fromEntries(due.map((r) => [r.id, r.due]));
-    expect(byId).toEqual({ [waiting]: true, [capped]: false, [paused]: false, [scheduled]: false, [neighbour]: false });
+    expect(byId).toEqual({ [waiting]: true, [failedWaiting]: true, [capped]: false, [paused]: false, [scheduled]: false, [neighbour]: false });
     // a save that keeps the hours changes nothing
     await asAdmin((q) => q(`update app.jobs set next_run_at = ${later} where id = $1`, [waiting]));
     await asUser(owner.id, (q) => q("update public.org_message_settings set monthly_cap_email = 1000 where organization_id = $1", [org]));
     expect(await asAdmin(async (q) => (await q<{ due: boolean }>("select next_run_at <= now() as due from app.jobs where id = $1", [waiting])).rows[0].due)).toBe(false);
+  });
+
+  it("the sender's notice and the triggers of public.messages are pinned as reviewed", async () => {
+    const r = await asAdmin(
+      async (q) =>
+        (
+          await q<{ md5: string; triggers: string[] }>(
+            `select (select md5(p.prosrc) from pg_proc p where p.oid = 'app.messages_refused_sender_notice()'::regprocedure) as md5,
+                    (select array_agg(t.tgname::text order by t.tgname) from pg_trigger t
+                      where t.tgrelid = 'public.messages'::regclass and not t.tgisinternal) as triggers`,
+          )
+        ).rows[0],
+    );
+    expect(r.md5).toBe(SENDER_NOTICE_MD5);
+    expect(r.triggers).toEqual(MESSAGES_TRIGGERS);
+  });
+
+  it("the sender is told once per template and reason a business day", async () => {
+    const lead = await insertLead(member.id, org, { full_name: "חזרה", email: "again@example.test", owner_id: member.id });
+    const t = await template(org, { channel: "email", type: "requested_document", subject: "שלום", body: "שלום {שם פרטי}" });
+    const t2 = await template(org, { channel: "email", type: "requested_document", subject: "שלום", body: "שלום {שם פרטי}" });
+    const fail = async (tpl: string, code: string) => {
+      const job = await prepared(org, { channel: "email", message_type: "requested_document", template_id: tpl, lead_id: lead, reply_to_user_id: member.id });
+      await asService((q) => q("select public.finish_job($1, $2, false, $3, true, true, null, null, $4)", [job.id, job.lease, `refused ${code}`, code]));
+    };
+    await fail(t, "unfilled_field");
+    await fail(t, "unfilled_field");
+    await fail(t, "too_long");
+    await fail(t2, "unfilled_field");
+    const n = await asAdmin(
+      async (q) =>
+        (await q<{ n: number }>("select count(*)::int as n from public.notifications where organization_id = $1 and user_id = $2 and entity_id = $3", [org, member.id, lead])).rows[0].n,
+    );
+    // twice the same template and reason = one; another reason or another template = one more each
+    expect(n).toBe(3);
+    // the next business day tells again
+    await asAdmin((q) => q("update app.message_sender_refusal_notices set notified_on = notified_on - 1 where organization_id = $1 and user_id = $2", [org, member.id]));
+    await fail(t, "unfilled_field");
+    const after = await asAdmin(
+      async (q) =>
+        (await q<{ n: number }>("select count(*)::int as n from public.notifications where organization_id = $1 and user_id = $2 and entity_id = $3", [org, member.id, lead])).rows[0].n,
+    );
+    expect(after).toBe(4);
+  });
+
+  it("an automation's step names the two refusals in its own words", async () => {
+    const lead = await insertLead(owner.id, org, { full_name: "כלל", email: "rule@example.test", phone: "052-1113333", owner_id: owner.id });
+    const bad = await template(org, { channel: "email", type: "requested_document", body: "{קישור להצעה}" });
+    const badSms = await template(org, { channel: "sms", type: "requested_document", body: "{תוקף}" });
+    const rule = await asUser(owner.id, async (q) =>
+      (
+        await q<{ id: string }>(
+          `insert into public.automations (organization_id, name, entity_type, trigger_type, trigger_config, conditions, actions, is_active)
+           values ($1, 'כלל שדות', 'lead', 'created', '{}', '[]', $2, false) returning id`,
+          [org, JSON.stringify([{ type: "send_email", template_id: bad }, { type: "send_sms", template_id: badSms }])],
+        )
+      ).rows[0].id,
+    );
+    const steps = await asAdmin(
+      async (q) => (await q<{ s: Array<{ error?: string }> }>("select app.run_automation_actions(a, 'lead', $2) as s from public.automations a where a.id = $1", [rule, lead])).rows[0].s,
+    );
+    expect(steps.map((x) => x.error)).toEqual(["the template holds a field an automation cannot fill", "the template holds a field an automation cannot fill"]);
+    // a marketing template while the business details are missing
+    const bare = await createOrg(owner.id, "עסק כלל בלי פרטים");
+    await allow(bare);
+    const bareLead = await insertLead(owner.id, bare, { full_name: "כלל", email: "rule2@example.test", owner_id: owner.id });
+    const mkt = await template(bare, { channel: "email", type: "marketing", body: "שלום {שם פרטי}" });
+    const mRule = await asUser(owner.id, async (q) =>
+      (
+        await q<{ id: string }>(
+          `insert into public.automations (organization_id, name, entity_type, trigger_type, trigger_config, conditions, actions, is_active)
+           values ($1, 'כלל שיווק', 'lead', 'created', '{}', '[]', $2, false) returning id`,
+          [bare, JSON.stringify([{ type: "send_email", template_id: mkt }])],
+        )
+      ).rows[0].id,
+    );
+    const mSteps = await asAdmin(
+      async (q) => (await q<{ s: Array<{ error?: string }> }>("select app.run_automation_actions(a, 'lead', $2) as s from public.automations a where a.id = $1", [mRule, bareLead])).rows[0].s,
+    );
+    expect(mSteps[0].error).toBe("the business address or phone is missing for a marketing message");
   });
 
   it("an owner's own card send is told only by the business notice", async () => {

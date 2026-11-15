@@ -284,7 +284,13 @@ describe("prefill links (BIZ-05)", () => {
     expect(entries).toHaveLength(1);
     expect(entries[0].created_by).toBeNull();
     expect(entries[0].metadata).toMatchObject({ form_name: "שאלון", changed: ["שם פרטי", "אימייל", "תאריך לידה", "שדה diet"], skipped: ["טלפון", "שדה code", "שדה member_no"] });
-    for (const value of ["דניאלה", "052", "new@", "1990", "צמחוני", "B2", "777"]) expect(JSON.stringify(entries[0])).not.toContain(value);
+    // the entry's only id is the link's own uuid (it can hold "052" by chance): it is replaced before the values are looked
+    // for, and nothing else in the entry is uuid-shaped
+    const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
+    const raw = JSON.stringify(entries[0]);
+    expect(raw.match(UUID)).toEqual([entries[0].metadata.prefill_link_id]);
+    const text = raw.replace(UUID, "<id>");
+    for (const value of ["דניאלה", "052", "new@", "1990", "צמחוני", "B2", "777"]) expect(text).not.toContain(value);
     // the notice goes to the maker (an active member who reads the record)
     const notices = await asAdmin(async (q) => (await q<{ user_id: string; body: string; entity_type: string }>("select user_id, body, entity_type from public.notifications where entity_id = $1 and title = 'הלקוח מילא טופס השלמת פרטים'", [c])).rows);
     expect(notices).toEqual([{ user_id: member.id, body: "שאלון", entity_type: "contact" }]);

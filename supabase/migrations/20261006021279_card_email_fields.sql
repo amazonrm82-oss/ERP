@@ -24,7 +24,9 @@
 -- * The failure is visible: public.record_email_queue (021198's body) and public.record_sms_queue (021202's body) answer reason
 --   'unfilled' for a message the composer refused for a field without a value; and the person who sent it (a card send, or a
 --   button press) gets a 'system' notice too when they are not an owner or an admin (who are told by app.message_send_refused),
---   through an AFTER trigger on public.messages, outside the pinned app.jobs_record_message.
+--   through an AFTER trigger on public.messages, outside the pinned app.jobs_record_message, at most once per person,
+--   template and reason a business day (app.message_sender_refusal_notices). Its body and the trigger list of
+--   public.messages are pinned by test 369.
 -- The owner's feedback on the same day:
 -- * A marketing message carries the envelope's business line "{שם העסק} · {טלפון העסק} · {כתובת העסק}"; without the document
 --   settings' address (address line or city) or a phone (the documents' phone, else the business phone) the composer refuses
@@ -34,8 +36,8 @@
 -- * Changing the business's sending hours (org_message_settings window_from, window_until, skip_rest_days) judges again the
 --   message jobs now waiting for the window: public.job_message_may_send (pinned, unchanged) marks exactly such a job
 --   status 'queued' with last_error 'waiting:sending_hours' and next_run_at = the opening, and app.message_move_waiting 'hours'
---   marks the business's other jobs the same way. Trigger org_message_settings_rejudge_hours sets next_run_at = now() on the
---   business's own such jobs whose time is still ahead, at most 5,000 a change, rows a worker holds skipped (skip locked), so
+--   marks the business's other due jobs (status queued or failed) the same way. Trigger org_message_settings_rejudge_hours sets next_run_at = now() on the
+--   business's own such jobs (queued or failed) whose time is still ahead, at most 5,000 a change, rows a worker holds skipped (skip locked), so
 --   the send check judges them again by the new hours on the next claim (a job beyond the bound keeps its old opening, where
 --   it is judged anyway). A cap, rate or pause waiter carries another mark and is never touched.
 -- Every statement is safe to run twice; no row is removed here.
@@ -105,7 +107,7 @@ begin
   update app.jobs j
      set next_run_at = now()
    where j.id in (select w.id from app.jobs w
-                   where w.organization_id = new.organization_id and w.kind = 'message.send' and w.status = 'queued'
+                   where w.organization_id = new.organization_id and w.kind = 'message.send' and w.status in ('queued', 'failed')
                      and w.last_error = 'waiting:sending_hours' and w.next_run_at > now()
                    order by w.id
                    limit 5000
@@ -122,6 +124,20 @@ create or replace trigger org_message_settings_rejudge_hours
 -- ----------------------------------------------------------------------------
 -- The person who sent a message that the business's setup kept from going out is told too
 -- ----------------------------------------------------------------------------
+-- one notice per person, template and reason a business day (review of b219c81b: a person who sends the same broken
+-- template again is told once that day); schema app, RLS on, no policies, no grants
+create table if not exists app.message_sender_refusal_notices (
+  organization_id uuid not null references public.organizations (id) on delete cascade,
+  user_id         uuid not null references auth.users (id) on delete cascade,
+  template_key    uuid not null,
+  reason          text not null,
+  notified_on     date not null,
+  primary key (organization_id, user_id, template_key, reason)
+);
+create index if not exists message_sender_refusal_notices_user_idx on app.message_sender_refusal_notices (user_id);
+alter table app.message_sender_refusal_notices enable row level security;
+revoke all on app.message_sender_refusal_notices from public, anon, authenticated, service_role;
+
 create or replace function app.messages_refused_sender_notice() returns trigger
 language plpgsql security definer
 set search_path = ''
@@ -157,6 +173,18 @@ begin
     end if;
     v_reason := app.message_send_refusal_text(new.provider_error_code);
     if v_reason is null then
+      return null;
+    end if;
+    -- at most once per person, template and reason a business day (the business notice's pattern)
+    insert into app.message_sender_refusal_notices as r (organization_id, user_id, template_key, reason, notified_on)
+    select new.organization_id, v_user,
+           case when (v_payload ->> 'template_id') ~ v_uuid then (v_payload ->> 'template_id')::uuid
+                else '00000000-0000-0000-0000-000000000000'::uuid end,
+           new.provider_error_code, (now() at time zone app.intake_zone(o.timezone))::date
+      from public.organizations o where o.id = new.organization_id
+    on conflict (organization_id, user_id, template_key, reason)
+      do update set notified_on = excluded.notified_on where r.notified_on < excluded.notified_on;
+    if not found then
       return null;
     end if;
     if (v_payload ->> 'template_id') ~ v_uuid then
@@ -648,6 +676,252 @@ end;
 $$;
 revoke all on function app.record_sms_enqueue(uuid, text, uuid, uuid) from public, anon, authenticated;
 grant execute on function app.record_sms_enqueue(uuid, text, uuid, uuid) to authenticated;
+
+-- ----------------------------------------------------------------------------
+-- app.automation_send_email: 021224's body, the step's own error for the two new refusals
+-- ----------------------------------------------------------------------------
+create or replace function app.automation_send_email(p_auto public.automations, p_entity text, p_id uuid, p_template uuid)
+returns text
+language plpgsql volatile security definer
+set search_path = ''
+as $$
+declare
+  v_org uuid := p_auto.organization_id;
+  v_email text;
+  v_contact uuid;
+  v_deleted timestamptz;
+  v_c_owner uuid;
+  v_c_team uuid;
+  v_refusal text;
+  v_type text;
+  v_zone text;
+  v_day_start timestamptz;
+  v_record_key text;
+  v_presser uuid := auth.uid();
+begin
+  -- AUT-08 final review: a run with a session takes the person's two send locks up front, always record_email then record_sms,
+  -- so two button rules with their email and SMS steps in opposite orders never wait on each other (40P01); the later
+  -- per-person locks of this function are then re-entrant
+  if v_presser is not null then
+    perform pg_advisory_xact_lock(hashtextextended('record_email:' || v_presser::text, 0));
+    perform pg_advisory_xact_lock(hashtextextended('record_sms:' || v_presser::text, 0));
+  end if;
+  if p_entity not in ('lead', 'contact', 'deal') then
+    raise exception 'an email goes to a lead, a contact or a deal''s contact';
+  end if;
+  if p_template is null then
+    raise exception 'the email template no longer exists';
+  end if;
+  if p_entity = 'lead' then
+    select l.email, l.deleted_at into v_email, v_deleted from public.leads l where l.organization_id = v_org and l.id = p_id;
+  elsif p_entity = 'contact' then
+    select c.email, c.deleted_at into v_email, v_deleted from public.contacts c where c.organization_id = v_org and c.id = p_id;
+    v_contact := p_id;
+  else
+    select d.contact_id, d.deleted_at into v_contact, v_deleted from public.deals d where d.organization_id = v_org and d.id = p_id;
+  end if;
+  if not found then
+    raise exception 'the record no longer exists';
+  end if;
+  if v_deleted is not null then
+    raise exception 'the record is in the recycle bin';
+  end if;
+  if p_entity = 'deal' then
+    select c.email, c.owner_id, c.team_id into v_email, v_c_owner, v_c_team from public.contacts c
+     where c.organization_id = v_org and c.id = v_contact and c.deleted_at is null;
+    if v_contact is null or not found then
+      raise exception 'the deal has no contact';
+    end if;
+    -- EML-02: with a session the deal's contact must be readable by that person
+    if v_presser is not null and not app.record_email_readable(v_org, 'contact', v_contact, v_c_owner, v_c_team) then
+      raise exception 'the deal has no contact';
+    end if;
+  end if;
+  if v_email is null or btrim(v_email) !~ '^[^@[:space:]]+@[^@[:space:]]+$' then
+    raise exception 'the record has no email';
+  end if;
+  -- p_person: a run with a session (a button press, an admin's test run) judges collection by that person's right
+  v_refusal := app.record_email_template_refusal(v_org, p_template, v_presser is not null);
+  if v_refusal = 'template' then
+    raise exception 'the email template no longer exists';
+  elsif v_refusal = 'channel' then
+    raise exception 'the template is not an email template';
+  elsif v_refusal = 'type' then
+    raise exception 'this message type is not sent by an automation';
+  elsif v_refusal = 'notice_template' then
+    raise exception 'the system sends this template itself, not an automation';
+  elsif v_refusal = 'collection' then
+    raise exception 'collection messages need the payments right of the person who pressed';
+  elsif v_refusal like 'feature:%' then
+    raise exception 'collection messages are not in the plan';
+  elsif v_refusal = 'not_sendable:inactive' then
+    raise exception 'the email template is off';
+  elsif v_refusal = 'unfillable_field' then
+    -- EML-02 (15 November 2026): a field an automation's message does not fill (app.card_message_fields())
+    raise exception 'the template holds a field an automation cannot fill';
+  elsif v_refusal = 'business_details' then
+    -- EML-02 (owner, 15 November 2026): a marketing message's envelope needs the business's address and phone
+    raise exception 'the business address or phone is missing for a marketing message';
+  elsif v_refusal is not null then
+    raise exception 'the email template cannot be sent';
+  end if;
+  select t.message_type into v_type from public.message_templates t where t.organization_id = v_org and t.id = p_template;
+
+  -- one email per rule and record a business day (the business's zone), under a lock of the rule and record
+  v_record_key := case when p_entity = 'lead' then 'lead_id' when p_entity = 'contact' then 'contact_id' else 'deal_id' end;
+  perform pg_advisory_xact_lock(hashtextextended('automation_email:' || p_auto.id::text || ':' || p_id::text, 0));
+  select app.intake_zone(o.timezone) into v_zone from public.organizations o where o.id = v_org;
+  v_day_start := ((now() at time zone coalesce(v_zone, 'Asia/Jerusalem'))::date)::timestamp at time zone coalesce(v_zone, 'Asia/Jerusalem');
+  if exists (
+    select 1 from app.jobs j
+     where j.organization_id = v_org and j.kind = 'message.send' and j.payload ? 'automation_id' and j.created_at >= v_day_start
+       and (j.payload ->> 'channel') = 'email'
+       and (j.payload ->> 'automation_id') = p_auto.id::text
+       and (j.payload ->> v_record_key) = p_id::text) then
+    return 'an email was already sent today by this rule';
+  end if;
+  -- a run with a session counts in that person's 30 emails an hour (the card's lock, so the two cannot pass it together)
+  if v_presser is not null then
+    perform pg_advisory_xact_lock(hashtextextended('record_email:' || v_presser::text, 0));
+    if app.automation_email_sent_last_hour(v_presser) >= app.record_email_hourly_limit() then
+      return 'too many emails this hour by the person who pressed';
+    end if;
+  end if;
+
+  perform app.enqueue_job(v_org, 'message.send',
+    jsonb_build_object('channel', 'email', 'message_type', v_type, 'template_id', p_template, 'automation_id', p_auto.id)
+      || case when v_presser is not null then jsonb_build_object('pressed_by_user_id', v_presser) else '{}'::jsonb end
+      || case when p_entity = 'lead' then jsonb_build_object('lead_id', p_id) else jsonb_build_object('contact_id', v_contact) end
+      || case when p_entity = 'deal' then jsonb_build_object('deal_id', p_id) else '{}'::jsonb end,
+    null);
+  return case when coalesce(app.customer_sending_paused(v_org), false) then 'customer sending is paused' end;
+end;
+$$;
+revoke all on function app.automation_send_email(public.automations, text, uuid, uuid) from public, anon, authenticated, service_role;
+
+-- ----------------------------------------------------------------------------
+-- app.automation_send_sms: 021224's body, the step's own error for the two new refusals
+-- ----------------------------------------------------------------------------
+create or replace function app.automation_send_sms(p_auto public.automations, p_entity text, p_id uuid, p_template uuid)
+returns text
+language plpgsql volatile security definer
+set search_path = ''
+as $$
+declare
+  v_org uuid := p_auto.organization_id;
+  v_phone text;
+  v_contact uuid;
+  v_deleted timestamptz;
+  v_refusal text;
+  v_type text;
+  v_zone text;
+  v_day_start timestamptz;
+  v_record_key text;
+  v_presser uuid := auth.uid();
+begin
+  -- AUT-08 final review: a run with a session takes the person's two send locks up front, always record_email then record_sms,
+  -- so two button rules with their email and SMS steps in opposite orders never wait on each other (40P01); the later
+  -- per-person locks of this function are then re-entrant
+  if v_presser is not null then
+    perform pg_advisory_xact_lock(hashtextextended('record_email:' || v_presser::text, 0));
+    perform pg_advisory_xact_lock(hashtextextended('record_sms:' || v_presser::text, 0));
+  end if;
+  if p_entity not in ('lead', 'contact', 'deal') then
+    raise exception 'an SMS goes to a lead, a contact or a deal''s contact';
+  end if;
+  -- review F1: the plan's sms flag
+  if not app.org_has_feature(v_org, 'sms') then
+    raise exception 'SMS is not in the plan';
+  end if;
+  if p_template is null then
+    raise exception 'the SMS template no longer exists';
+  end if;
+  if p_entity = 'lead' then
+    select l.phone_e164, l.deleted_at into v_phone, v_deleted from public.leads l where l.organization_id = v_org and l.id = p_id;
+  elsif p_entity = 'contact' then
+    select c.phone_e164, c.deleted_at into v_phone, v_deleted from public.contacts c where c.organization_id = v_org and c.id = p_id;
+    v_contact := p_id;
+  else
+    select d.contact_id, d.deleted_at into v_contact, v_deleted from public.deals d where d.organization_id = v_org and d.id = p_id;
+  end if;
+  if not found then
+    raise exception 'the record no longer exists';
+  end if;
+  if v_deleted is not null then
+    raise exception 'the record is in the recycle bin';
+  end if;
+  if p_entity = 'deal' then
+    select c.phone_e164 into v_phone from public.contacts c
+     where c.organization_id = v_org and c.id = v_contact and c.deleted_at is null;
+    if v_contact is null or not found then
+      raise exception 'the deal has no contact';
+    end if;
+  end if;
+  if nullif(btrim(v_phone), '') is null then
+    raise exception 'the record has no phone';
+  end if;
+  -- p_person: a run with a session (a button press, an admin's test run) judges collection by that person's right
+  v_refusal := app.record_sms_template_refusal(v_org, p_template, auth.uid() is not null);
+  if v_refusal = 'template' then
+    raise exception 'the SMS template no longer exists';
+  elsif v_refusal = 'channel' then
+    raise exception 'the template is not an SMS template';
+  elsif v_refusal = 'feature:sms' then
+    raise exception 'SMS is not in the plan';
+  elsif v_refusal = 'type' then
+    raise exception 'this message type is not sent by an automation';
+  elsif v_refusal = 'notice_template' then
+    -- SGN-03 review M1
+    raise exception 'the system sends this template itself, not an automation';
+  elsif v_refusal = 'collection' then
+    raise exception 'collection messages need the payments right of the person who pressed';
+  elsif v_refusal like 'feature:%' then
+    raise exception 'collection messages are not in the plan';
+  elsif v_refusal = 'not_sendable:inactive' then
+    raise exception 'the SMS template is off';
+  elsif v_refusal = 'unfillable_field' then
+    -- EML-02 (15 November 2026): a field an automation's message does not fill (app.card_message_fields())
+    raise exception 'the template holds a field an automation cannot fill';
+  elsif v_refusal = 'business_details' then
+    -- EML-02 (owner, 15 November 2026): a marketing message's envelope needs the business's address and phone
+    raise exception 'the business address or phone is missing for a marketing message';
+  elsif v_refusal is not null then
+    raise exception 'the SMS template cannot be sent';
+  end if;
+  select t.message_type into v_type from public.message_templates t where t.organization_id = v_org and t.id = p_template;
+
+  -- review F4: one SMS per rule and record a business day (the business's zone), under a lock of the rule and record
+  v_record_key := case when p_entity = 'lead' then 'lead_id' when p_entity = 'contact' then 'contact_id' else 'deal_id' end;
+  perform pg_advisory_xact_lock(hashtextextended('automation_sms:' || p_auto.id::text || ':' || p_id::text, 0));
+  select app.intake_zone(o.timezone) into v_zone from public.organizations o where o.id = v_org;
+  v_day_start := ((now() at time zone coalesce(v_zone, 'Asia/Jerusalem'))::date)::timestamp at time zone coalesce(v_zone, 'Asia/Jerusalem');
+  if exists (
+    select 1 from app.jobs j
+     where j.organization_id = v_org and j.kind = 'message.send' and j.payload ? 'automation_id' and j.created_at >= v_day_start
+       and (j.payload ->> 'automation_id') = p_auto.id::text
+       -- AUT-08: only this rule's SMS (its email of the same record is counted by app.automation_send_email)
+       and (j.payload ->> 'channel') = 'sms'
+       and (j.payload ->> v_record_key) = p_id::text) then
+    return 'an SMS was already sent today by this rule';
+  end if;
+  -- review (7): a run with a session (a button press, an admin's test run) counts in that person's 30 an hour
+  if v_presser is not null then
+    perform pg_advisory_xact_lock(hashtextextended('record_sms:' || v_presser::text, 0));
+    if app.record_sms_sent_last_hour(v_presser) >= app.record_sms_hourly_limit() then
+      return 'too many SMS this hour by the person who pressed';
+    end if;
+  end if;
+
+  perform app.enqueue_job(v_org, 'message.send',
+    jsonb_build_object('channel', 'sms', 'message_type', v_type, 'template_id', p_template, 'automation_id', p_auto.id)
+      || case when v_presser is not null then jsonb_build_object('pressed_by_user_id', v_presser) else '{}'::jsonb end
+      || case when p_entity = 'lead' then jsonb_build_object('lead_id', p_id) else jsonb_build_object('contact_id', v_contact) end
+      || case when p_entity = 'deal' then jsonb_build_object('deal_id', p_id) else '{}'::jsonb end,
+    null);
+  return case when coalesce(app.customer_sending_paused(v_org), false) then 'customer sending is paused' end;
+end;
+$$;
+revoke all on function app.automation_send_sms(public.automations, text, uuid, uuid) from public, anon, authenticated;
 
 -- ----------------------------------------------------------------------------
 -- app.email_compose_core: 021278's body, the rep of {שם הנציג} only

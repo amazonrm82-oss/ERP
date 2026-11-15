@@ -162,6 +162,9 @@ export const STEP_ERRORS: Record<string, string> = {
   "the template is not an email template": "התבנית שנבחרה אינה תבנית אימייל",
   "the email template is off": "תבנית האימייל כבויה",
   "the email template cannot be sent": "התבנית לא תישלח: יש בה שדה שלא מתאים לסוג ההודעה, קישור חיצוני, או שהיא ארוכה מדי",
+  // EML-02 (15 November 2026, migration card_email_fields): both steps
+  "the template holds a field an automation cannot fill": "התבנית לא תישלח מאוטומציה: יש בה שדה שאוטומציה לא ממלאת. בחרו תבנית אחרת או תקנו אותה",
+  "the business address or phone is missing for a marketing message": "הודעה שיווקית לא תישלח: חסרים כתובת או טלפון העסק בהגדרות המסמכים",
 };
 
 /**
