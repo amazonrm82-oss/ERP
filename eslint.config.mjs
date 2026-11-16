@@ -182,6 +182,9 @@ const serviceKeyAllowList = {
     "src/features/privacy-requests/public-server.ts",
     // LND-13 (owner, 13 October 2026): the landing page's "notify me" for a coming-soon plan (public.landing_waitlist_submit)
     "src/features/landing/waitlist-server.ts",
+    // LND-14 (owner (388) א, 16 November 2026): the landing page's counters, a visit, a sign-up press and a sign-up
+    // (public.landing_event; counts only, keyed IP hash scope landing, no cookie or visitor id)
+    "src/features/landing/measure-server.ts",
     // SGN-02 (owner, 9 November 2026, answer (191) א): the customer's page of a document for signature
     // (public.signature_public, public.signature_public_sign) and the server's write of its signed PDF
     // (public.signature_pdf_public, signature_pdf_public_store, signature_pdf_store)

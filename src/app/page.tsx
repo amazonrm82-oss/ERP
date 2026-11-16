@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
+import { after } from "next/server";
 
 import { turnstileSiteKey } from "@/features/auth/turnstile-server";
 import { ContactSection } from "@/features/landing/components/contact-section";
@@ -10,6 +12,8 @@ import { PricingSection } from "@/features/landing/components/pricing-section";
 import { Cta, Faq, Hero, LandingFooter, LandingNav, Marquee, ProductBlocks, Quote, Steps } from "@/features/landing/components/sections";
 import { StandaloneRedirect } from "@/features/landing/components/standalone-redirect";
 import { INDUSTRY_PAGE_LINKS } from "@/features/landing/industries";
+import { landingSource, notAVisit, signupClickHref } from "@/features/landing/measure";
+import { recordLandingEvent } from "@/features/landing/measure-server";
 import { readPublicPlans } from "@/features/landing/price-list-server";
 import { providerReadiness, waitingForProvider } from "@/features/landing/provider-readiness";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/app";
@@ -27,29 +31,37 @@ export const metadata: Metadata = {
 // first (LND-06). LND-13: the price list comes from public.plans_public() (anon), cached an hour; the page is rendered per
 // request so a failed read is never kept in a prerendered page. No number on the page is invented: the product pictures carry
 // demo data only.
+// LND-14 (owner (388) א): the visit is counted on the server after the page is sent (no script, no cookie, no visitor id), by
+// utm_source only; a prefetch or a link-preview fetcher is not counted. The sign-up buttons go through /go/signup, which counts
+// the press and carries the source on.
 export const dynamic = "force-dynamic";
-export default async function LandingPage() {
+type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
+export default async function LandingPage({ searchParams }: Props) {
+  const source = landingSource((await searchParams).utm_source);
+  const requestHeaders = new Headers(await headers());
+  if (!notAVisit(requestHeaders)) after(() => recordLandingEvent("visit", source, requestHeaders));
+  const signupHref = signupClickHref(source);
   const plans = await readPublicPlans();
   // owner (339) ב: read from the provider configuration on the server; only feature keys go on
   const waiting = waitingForProvider(providerReadiness());
   return (
     <div id={LANDING_ROOT_ID} className={styles.page} data-paused="false">
       <StandaloneRedirect />
-      <LandingNav />
+      <LandingNav signupHref={signupHref} />
       <main className="flex-1">
-        <Hero />
+        <Hero signupHref={signupHref} />
         <Marquee />
         <FlowSection />
         <Steps />
         <ProductBlocks />
         {/* VRT-02: the industry pages */}
         <IndustryLinks pages={INDUSTRY_PAGE_LINKS} />
-        <PricingSection plans={plans} waiting={waiting} />
+        <PricingSection plans={plans} waiting={waiting} signupHref={signupHref} />
         <Quote />
         <Faq />
         {/* RVW-99: the widget only while the server checks it (both keys set) */}
         <ContactSection whatsappHref={SUPPORT.whatsappHref} turnstileSiteKey={turnstileSiteKey()} />
-        <Cta />
+        <Cta signupHref={signupHref} />
       </main>
       <LandingFooter />
     </div>

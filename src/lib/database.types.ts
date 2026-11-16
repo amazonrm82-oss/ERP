@@ -4395,6 +4395,10 @@ export type Database = {
       landing_waitlist_submit: { Args: { p_email: string; p_plan: string; p_consent: boolean; p_wording_version: string; p_ip_hash: string | null }; Returns: Json };
       platform_landing_waitlist_counts: { Args: Record<string, never>; Returns: Json };
       platform_landing_waitlist: { Args: { p_plan: string }; Returns: Json };
+      // LND-14: service_role only; counts a landing-page event ({counted}); kind visit|signup_click|signup
+      landing_event: { Args: { p_kind: string; p_source: string; p_ip_hash: string | null }; Returns: Json };
+      // LND-14: the platform screen ({from, to, days, rows: [{day, source, visits, signup_clicks, signups}]}); owner/support/readonly
+      platform_landing_measurement: { Args: { p_days?: number }; Returns: Json };
       create_organization: {
         Args: { p_name: string; p_industry?: string | null; p_team_size?: string | null; p_phone?: string | null };
         Returns: string;

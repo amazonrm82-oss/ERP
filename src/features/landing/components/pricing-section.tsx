@@ -1,6 +1,7 @@
 import type { PublicPlan } from "@/features/plans/public-plans";
 import { paths } from "@/lib/paths";
 
+import { SIGNUP_CLICK_PATH } from "../measure";
 import { comparisonRows, planCards, pricingFootnote, pricingShowsSoon, type ComparisonCell } from "../pricing";
 import styles from "./landing.module.css";
 import { PriceCards } from "./price-cards";
@@ -28,7 +29,7 @@ function Cell({ cell }: { cell: ComparisonCell }) {
  * plans only; a coming-soon plan is marked and offers "תודיעו לי כשנפתח". When the plans cannot be read, the section says so
  * and shows no price. `waiting`: the built capabilities that wait for their real provider (feature keys only, owner (339) ב).
  */
-export function PricingSection({ plans, waiting }: { plans: PublicPlan[] | null; waiting: readonly string[] }) {
+export function PricingSection({ plans, waiting, signupHref = paths.signup }: { plans: PublicPlan[] | null; waiting: readonly string[]; signupHref?: string }) {
   const shown = plans ?? [];
   const waitingSet = new Set(waiting);
   const rows = comparisonRows(shown, waitingSet);
@@ -45,7 +46,7 @@ export function PricingSection({ plans, waiting }: { plans: PublicPlan[] | null;
             <p className={`${styles.lead} text-ln-lead`} style={{ margin: "14px auto 0" }}>
               לא הצלחנו להציג כרגע את המחירים. נסו לרענן את הדף בעוד כמה דקות.
             </p>
-            <a href={paths.signup} className={`${styles.btn} ${styles.primary}`} style={{ marginTop: 24 }}>
+            <a href={signupHref} rel={signupHref.startsWith(SIGNUP_CLICK_PATH) ? "nofollow" : undefined} className={`${styles.btn} ${styles.primary}`} style={{ marginTop: 24 }}>
               הרשמה לתקופת ניסיון
             </a>
           </>
@@ -54,7 +55,7 @@ export function PricingSection({ plans, waiting }: { plans: PublicPlan[] | null;
             <p className={`${styles.lead} text-ln-lead`} style={{ margin: "14px auto 0" }}>
               המחירים לחודש, לפני מע&quot;מ. לחצו על חבילה כדי לראות הכול.
             </p>
-            <PriceCards cards={cards} />
+            <PriceCards cards={cards} signupHref={signupHref} />
             <details className={styles.all}>
               <summary>טבלת השוואה מלאה</summary>
               <div className={styles.tbl}>

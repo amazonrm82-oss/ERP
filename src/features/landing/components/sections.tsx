@@ -1,4 +1,5 @@
 import Image from "next/image";
+import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { ChatIcon, PhoneIcon } from "@/components/ui/icons";
@@ -9,6 +10,7 @@ import { SUPPORT_PHONE } from "@/lib/support-phone";
 import logoDark from "@/assets/mexuz-logo-dark.png";
 
 import { INDUSTRY_PAGE_LINKS } from "../industries";
+import { SIGNUP_CLICK_PATH } from "../measure";
 import { HeroCanvas } from "./hero-canvas";
 import styles from "./landing.module.css";
 import { PauseButton } from "./pause-button";
@@ -17,7 +19,23 @@ import { RotWord } from "./rot-word";
 // LND-20 v2: the landing page's sections, one to one with the owner's approved prototype (texts and order). Names, phones
 // and amounts in the product pictures are demo data.
 
-export function LandingNav() {
+/** LND-14: the landing page passes its counting link (/go/signup, a plain <a>, never prefetched); other pages keep /signup. */
+function SignupLink({ href, className, children }: { href: string; className: string; children: ReactNode }) {
+  if (href.startsWith(SIGNUP_CLICK_PATH)) {
+    return (
+      <a href={href} rel="nofollow" className={className}>
+        {children}
+      </a>
+    );
+  }
+  return (
+    <Link href={href} className={className}>
+      {children}
+    </Link>
+  );
+}
+
+export function LandingNav({ signupHref = paths.signup }: { signupHref?: string } = {}) {
   return (
     <header className={styles.nav}>
       <div className={`${styles.wrap} ${styles.navInner}`}>
@@ -28,9 +46,9 @@ export function LandingNav() {
           <Link href={paths.login} className={`${styles.btn} ${styles.ghost}`}>
             כניסה
           </Link>
-          <Link href={paths.signup} className={`${styles.btn} ${styles.primary}`}>
+          <SignupLink href={signupHref} className={`${styles.btn} ${styles.primary}`}>
             הרשמה
-          </Link>
+          </SignupLink>
         </nav>
       </div>
     </header>
@@ -95,7 +113,7 @@ function ProductMock() {
   );
 }
 
-export function Hero() {
+export function Hero({ signupHref = paths.signup }: { signupHref?: string } = {}) {
   return (
     <section aria-labelledby="hero-title" className={styles.hero}>
       <HeroCanvas />
@@ -115,9 +133,9 @@ export function Hero() {
           כל ה<RotWord /> של העסק, במקום אחד. בעברית, בטלפון ובמחשב.
         </p>
         <div className={styles.ctas}>
-          <Link href={paths.signup} className={`${styles.btn} ${styles.primary}`}>
+          <SignupLink href={signupHref} className={`${styles.btn} ${styles.primary}`}>
             הרשמה לתקופת ניסיון
-          </Link>
+          </SignupLink>
           <a href="#contact" className={`${styles.btn} ${styles.ghost}`}>
             שנחזור אליכם
           </a>
@@ -366,7 +384,7 @@ export function Faq() {
   );
 }
 
-export function Cta() {
+export function Cta({ signupHref = paths.signup }: { signupHref?: string } = {}) {
   return (
     <section aria-labelledby="cta-title" className={`${styles.sec} ${styles.cta}`}>
       <div className={styles.wrap}>
@@ -374,9 +392,9 @@ export function Cta() {
           מתחילים בכמה דקות
         </h2>
         <p>נרשמים, נותנים שם לעסק, ומוסיפים את הליד הראשון. אפשר לייבא את מה שיש לכם באקסל.</p>
-        <Link href={paths.signup} className={`${styles.btn} ${styles.ctaBtn}`}>
+        <SignupLink href={signupHref} className={`${styles.btn} ${styles.ctaBtn}`}>
           הרשמה לתקופת ניסיון
-        </Link>
+        </SignupLink>
       </div>
     </section>
   );

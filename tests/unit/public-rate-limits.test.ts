@@ -48,6 +48,11 @@ type Entry = {
    * checked by the test)
    */
   sender?: "first" | { leftOut: string };
+  /**
+   * LND-14 (owner (388) א): the page also counts a visit with the service key, only through this file, which may call only
+   * public.landing_event (checked by the test). The page's own guard is judged without it.
+   */
+  measure?: string;
 };
 
 const PAGE_TEXT = "page text RATE_LIMITED_PAGE_TEXT (HTTP 200: a page cannot answer 429)";
@@ -64,6 +69,16 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
     limit:
       "no visitor input: the price list (LND-13) is one cached read for everyone, an hour in unstable_cache (tag plans-public, expired by the platform's plan actions); a failed read is not cached and backs off a minute; the rest of the page is code (its two forms post to /api/forms/contact and /api/forms/plan-notify)",
     refusal: "the price section without prices",
+    measure: "src/features/landing/measure-server.ts",
+  },
+  // LND-14 (owner (388) א): the landing page's sign-up link counts the press, then 303 to /signup
+  "/go/signup": {
+    guard: "database",
+    functions: ["landing_event"],
+    limit:
+      "counts only, never refused: 10 presses per sender in 10 min are counted (keyed IP hash scope landing, only a bucket number kept), more are silently not counted; prefetches and preview bots are not counted",
+    refusal: "none: always 303 to /signup",
+    sender: { leftOut: "LND-14: a published link with no token to look up; it reads nothing and answers the same redirect to everyone" },
   },
   "/login": {
     guard: "supabase-auth",
@@ -484,7 +499,7 @@ function entryFile(pattern: string): string {
 const IMPORT = /\bfrom\s+"(@\/[^"]+|\.{1,2}\/[^"]+)"/g;
 
 /** The file and every file of src/ it imports, directly or not (the code a request to it can run). */
-function importClosure(start: string): Map<string, string> {
+function importClosure(start: string, stop: ReadonlySet<string> = new Set()): Map<string, string> {
   const seen = new Map<string, string>();
   const resolve = (spec: string, from: string): string | null => {
     const base = spec.startsWith("@/") ? join(ROOT, "src", spec.slice(2)) : join(from, "..", spec);
@@ -499,7 +514,7 @@ function importClosure(start: string): Map<string, string> {
     seen.set(file, text);
     for (const match of text.matchAll(IMPORT)) {
       const next = resolve(match[1], file);
-      if (next && !seen.has(next)) stack.push(next);
+      if (next && !seen.has(next) && !stop.has(relative(ROOT, next))) stack.push(next);
     }
   }
   return seen;
@@ -570,8 +585,17 @@ describe("OPS-02: every public path has a named limit", () => {
         // LND-13: the anon key only, no argument, through an hour-long unstable_cache, only the named functions
         expect(entry.sender, path).toBeUndefined();
         expect(entry.functions?.length, path).toBeGreaterThan(0);
-        const code = [...importClosure(entryFile(path)).values()].join("\n");
+        // LND-14: the visit counter is judged on its own below; everything else the page runs uses no service key
+        const code = [...importClosure(entryFile(path), new Set(entry.measure ? [entry.measure] : [])).values()].join("\n");
         expect(code, `${path} never uses the service key`).not.toMatch(/supabase\/service|SERVICE_ROLE|createServiceClient/);
+        if (entry.measure) {
+          expect([...importClosure(entryFile(path)).keys()].map((f) => relative(ROOT, f)), `${path} reaches its counter`).toContain(entry.measure);
+          const counter = readFileSync(join(ROOT, entry.measure), "utf8");
+          expect([...counter.matchAll(/\.rpc\(\s*([^,)]*)/g)].map((m) => m[1].trim()), `${entry.measure} calls only landing_event`).toEqual(['"landing_event"']);
+          expect(counter, `${entry.measure} reads no table`).not.toMatch(/\.from\(/);
+          expect(counter, `${entry.measure} touches no auth`).not.toMatch(/\.auth\./);
+          expect(migrations, "public.landing_event is for the service role").toMatch(/grant execute on function public\.landing_event\(text, text, text\) to service_role;/);
+        }
         const rpcs = [...code.matchAll(/\.rpc\(\s*([^)]*)\)/g)].map((m) => m[1].trim());
         for (const call of rpcs) expect((entry.functions ?? []).map((fn) => `"${fn}"`), `${path}: .rpc(${call}) takes no argument`).toContain(call);
         expect(code, `${path} reads no table`).not.toMatch(/\.from\(/);

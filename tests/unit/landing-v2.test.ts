@@ -88,7 +88,8 @@ describe("LND-20 v2 price cards", () => {
 describe("LND-20 v2 page", () => {
   it("follows the prototype's order, with no invented numbers strip", () => {
     const page = read("src/app/page.tsx");
-    const order = ["<LandingNav />", "<Hero />", "<Marquee />", "<FlowSection />", "<Steps />", "<ProductBlocks />", "<PricingSection plans={plans} waiting={waiting} />", "<Quote />", "<Faq />", "<ContactSection", "<Cta />", "<LandingFooter />"];
+    // LND-14: the sign-up buttons carry the counting link
+    const order = ["<LandingNav signupHref={signupHref} />", "<Hero signupHref={signupHref} />", "<Marquee />", "<FlowSection />", "<Steps />", "<ProductBlocks />", "<PricingSection plans={plans} waiting={waiting} signupHref={signupHref} />", "<Quote />", "<Faq />", "<ContactSection", "<Cta signupHref={signupHref} />", "<LandingFooter />"];
     const at = order.map((part) => page.indexOf(part));
     expect(at.every((i) => i >= 0), JSON.stringify(at)).toBe(true);
     expect([...at].sort((a, b) => a - b)).toEqual(at);

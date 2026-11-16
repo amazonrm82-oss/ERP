@@ -4,6 +4,7 @@ import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
 import { parseEmailHealth, type EmailHealth } from "./email-health";
+import { parseLandingMeasurement, type LandingMeasurement } from "./landing-measurement";
 import { parseAdminSupportList, SUPPORT_LIST_PAGE, type AdminSupportList } from "./support-requests";
 
 /** ADM-05: support requests, newest first, optionally of one status (platform owner and support). */
@@ -31,4 +32,10 @@ export async function getSupportRequestCounts(): Promise<SupportCounts> {
 export async function getEmailHealth(): Promise<EmailHealth> {
   const supabase = await createClient();
   return parseEmailHealth(must(await supabase.rpc("platform_email_health"), "platform_email_health"));
+}
+
+/** LND-14: the landing page's counters for the last 30 days (platform owner, support and readonly staff). */
+export async function getLandingMeasurement(): Promise<LandingMeasurement> {
+  const supabase = await createClient();
+  return parseLandingMeasurement(must(await supabase.rpc("platform_landing_measurement", { p_days: 30 }), "platform_landing_measurement"));
 }

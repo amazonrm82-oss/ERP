@@ -1,0 +1,82 @@
+[
+  {
+    "input": null,
+    "source": "direct"
+  },
+  {
+    "input": "",
+    "source": "direct"
+  },
+  {
+    "input": "   ",
+    "source": "direct"
+  },
+  {
+    "input": "facebook",
+    "source": "facebook"
+  },
+  {
+    "input": "  Facebook  ",
+    "source": "facebook"
+  },
+  {
+    "input": "GOOGLE.Ads_2026-Q4",
+    "source": "google.ads_2026-q4"
+  },
+  {
+    "input": "\tfacebook",
+    "source": "other"
+  },
+  {
+    "input": "facebook\n",
+    "source": "other"
+  },
+  {
+    "input": "\t",
+    "source": "other"
+  },
+  {
+    "input": "face book",
+    "source": "other"
+  },
+  {
+    "input": "פייסבוק",
+    "source": "other"
+  },
+  {
+    "input": "<script>",
+    "source": "other"
+  },
+  {
+    "input": "a/b",
+    "source": "other"
+  },
+  {
+    "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "source": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  },
+  {
+    "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "source": "other"
+  },
+  {
+    "input": "KelvinK",
+    "source": "other"
+  },
+  {
+    "input": "ı",
+    "source": "other"
+  },
+  {
+    "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source": "other"
+  },
+  {
+    "input": "                                                                                                                                                                                                         ",
+    "source": "other"
+  },
+  {
+    "input": "  facebook                                                                                                                                                                                              ",
+    "source": "facebook"
+  }
+]

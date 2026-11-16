@@ -6,7 +6,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ORG_STATUS_LABELS } from "@/features/platform/labels";
 import { consentHealthWarnings, getConsentHealth, getPlatformMetrics, platformReady } from "@/features/platform/queries";
 import { emailKeyRefusedText } from "@/features/platform/email-health";
-import { getEmailHealth, getSupportRequestCounts } from "@/features/platform/support-queries";
+import { getEmailHealth, getLandingMeasurement, getSupportRequestCounts } from "@/features/platform/support-queries";
+import { LandingMeasurementCard } from "@/features/platform/components/landing-measurement-card";
 import { paths } from "@/lib/paths";
 import { formatMoney, formatNumber } from "@/lib/format";
 
@@ -23,6 +24,8 @@ export default async function AdminHomePage() {
   const support = me.role === "owner" || me.role === "support" ? await getSupportRequestCounts() : null;
   // EML-01 owner (7) ב: emails stopped because Resend refused our key (counts only)
   const emailWarning = me.role === "owner" || me.role === "support" ? emailKeyRefusedText(await getEmailHealth()) : null;
+  // LND-14 (owner (388) א): the landing page's counters (owner, support and readonly staff; the function refuses finance)
+  const landing = me.role === "owner" || me.role === "support" || me.role === "readonly" ? await getLandingMeasurement() : null;
   const conversion = (m.trial_conversion ?? {}) as Obj;
   const health = (m.health ?? {}) as Obj;
   const ended = n(conversion.ended);
@@ -117,6 +120,7 @@ export default async function AdminHomePage() {
           />
         </Card>
       </div>
+      {landing ? <LandingMeasurementCard data={landing} /> : null}
       <Card aria-labelledby="health" className="mt-5">
         <CardHeader id="health" title="בריאות המערכת" />
         <dl className="grid gap-3 p-4 sm:grid-cols-3 sm:p-5">

@@ -5,6 +5,7 @@ import { useId, useRef, useState, type FormEvent, type PointerEvent } from "reac
 import { formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
+import { SIGNUP_CLICK_PATH } from "../measure";
 import type { PlanCardData, PlanLine } from "../pricing";
 import { WAITLIST_CONSENT_TEXT, WAITLIST_HONEYPOT, WAITLIST_TEXTS } from "../waitlist";
 import styles from "./landing.module.css";
@@ -89,7 +90,7 @@ function NotifyForm({ planKey, planName }: { planKey: string; planName: string }
   );
 }
 
-function Card({ plan, cycle }: { plan: PlanCardData; cycle: Cycle }) {
+function Card({ plan, cycle, signupHref }: { plan: PlanCardData; cycle: Cycle; signupHref: string }) {
   const [flipped, setFlipped] = useState(false);
   const [notify, setNotify] = useState(false);
   const backId = useId();
@@ -139,7 +140,7 @@ function Card({ plan, cycle }: { plan: PlanCardData; cycle: Cycle }) {
               </button>
             )
           ) : (
-            <a href={paths.signup} className={`${styles.btn} ${plan.highlighted ? styles.primary : styles.ghost}`}>
+            <a href={signupHref} rel={signupHref.startsWith(SIGNUP_CLICK_PATH) ? "nofollow" : undefined} className={`${styles.btn} ${plan.highlighted ? styles.primary : styles.ghost}`}>
               {plan.highlighted ? "הרשמה לתקופת ניסיון" : "הרשמה"}
               <span className="sr-only"> לחבילה {plan.name}</span>
             </a>
@@ -165,7 +166,7 @@ function Card({ plan, cycle }: { plan: PlanCardData; cycle: Cycle }) {
 }
 
 /** LND-20 v2 (6): the monthly/annual switch (both prices from the plans table, owner (338) ב) and the four flip cards. */
-export function PriceCards({ cards }: { cards: PlanCardData[] }) {
+export function PriceCards({ cards, signupHref = paths.signup }: { cards: PlanCardData[]; signupHref?: string }) {
   const [cycle, setCycle] = useState<Cycle>("monthly");
   return (
     <>
@@ -179,7 +180,7 @@ export function PriceCards({ cards }: { cards: PlanCardData[] }) {
       </div>
       <ul className={styles.plans}>
         {cards.map((plan) => (
-          <Card key={plan.key} plan={plan} cycle={cycle} />
+          <Card key={plan.key} plan={plan} cycle={cycle} signupHref={signupHref} />
         ))}
       </ul>
     </>

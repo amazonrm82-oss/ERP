@@ -1,7 +1,10 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { carriedSource, isNewSignupAccount, LANDING_SOURCE_FIELD } from "@/features/landing/measure";
+import { recordLandingEvent } from "@/features/landing/measure-server";
 import { LEGAL_VERSION } from "@/features/legal/documents";
 import { fail, invalid, formValues, type FormState } from "@/lib/action-result";
 import { owesSecondStep, sessionCheck } from "@/lib/auth";
@@ -131,6 +134,11 @@ export async function signUpAction(_prev: FormState, formData: FormData): Promis
   if (data.user && data.user.identities && data.user.identities.length === 0) {
     return fail("כבר קיים חשבון עם כתובת האימייל הזו. אפשר להתחבר.", { values: formValues(formData) });
   }
+
+  // LND-14: a NEW account (made by Auth within the last minute, with an identity) for a visitor who came through the landing
+  // page's sign-up button (the source it carried; an invitation never carries one). Counted before the email is confirmed.
+  const landingSource = next.startsWith("/invite/") ? null : carriedSource(formData.get(LANDING_SOURCE_FIELD));
+  if (landingSource && isNewSignupAccount(data.user)) await recordLandingEvent("signup", landingSource, new Headers(await headers()));
 
   if (data.session) {
     // email confirmation is off: the user is already signed in
