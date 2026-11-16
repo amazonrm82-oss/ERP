@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { draftLabel } from "@/features/guide/tour";
@@ -10,15 +11,18 @@ import { HelpSearch } from "./help-search";
 // The help center's two views, shared by the public center (/help, UX-06) and the one inside the app (/o/[org]/help,
 // UX-05): the same articles, the same layout; only the address the articles live under differs.
 
-/** Topics with their articles, and the search box above them. */
-export function HelpIndex({ articles, base }: { articles: HelpArticle[]; base: string }) {
+/**
+ * Topics with their articles, and the search box above them. `search` replaces the browser search box: the center inside
+ * the business searches on the server (TRU-04), the public center keeps the box over its public articles.
+ */
+export function HelpIndex({ articles, base, search }: { articles: HelpArticle[]; base: string; search?: ReactNode }) {
   const entries = articles.map((a) => ({ slug: a.slug, title: a.title, summary: a.summary, text: articleText(a) }));
   const categories = Object.keys(CATEGORY_LABELS) as HelpCategory[];
 
   return (
     <>
       <div className="mx-auto max-w-2xl">
-        <HelpSearch entries={entries} articleBase={base} />
+        {search ?? <HelpSearch entries={entries} articleBase={base} />}
       </div>
 
       <div className="mt-12 grid gap-x-10 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">

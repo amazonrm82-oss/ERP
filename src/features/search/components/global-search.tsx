@@ -7,7 +7,7 @@ import { IconButton } from "@/components/ui/button";
 import { CloseIcon, SearchIcon } from "@/components/ui/icons";
 
 import { commandsAction, searchAction, type SearchGroup, type SearchHit } from "../actions";
-import { COMMAND_GROUP_LABELS, matchCommands, type Command, type CommandGroup } from "../command-match";
+import { COMMAND_GROUP_LABELS, helpSearchCommand, matchCommands, type Command, type CommandGroup } from "../command-match";
 import { TOUR_REPLAY_EVENT } from "@/features/guide/tour";
 
 import { isSearchShortcut } from "../shortcut";
@@ -20,10 +20,11 @@ const GROUP_LABELS: Record<SearchGroup, string> = {
   notes: "בציר הזמן",
 };
 
-type Section = CommandGroup | SearchGroup;
-// REC-09: actions and places first, then the records
-const SECTION_ORDER: Section[] = ["create", "navigate", "help", "settings", "leads", "contacts", "companies", "deals", "notes"];
-const SECTION_LABELS: Record<Section, string> = { ...COMMAND_GROUP_LABELS, ...GROUP_LABELS };
+type Section = CommandGroup | SearchGroup | "guides";
+// REC-09: actions and places first, then the records; TRU-04: the guide search last, so Enter on a typed name still opens
+// the first record
+const SECTION_ORDER: Section[] = ["create", "navigate", "help", "settings", "leads", "contacts", "companies", "deals", "notes", "guides"];
+const SECTION_LABELS: Record<Section, string> = { ...COMMAND_GROUP_LABELS, ...GROUP_LABELS, guides: "במדריכים" };
 
 type Item = { key: string; section: Section; title: string; subtitle: string | null; href: string; action?: Command["action"] };
 
@@ -130,8 +131,11 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
       ...matched.map((c) => ({ key: c.key, section: c.group, title: c.label, subtitle: c.hint, href: c.href, action: c.action })),
       ...hits.map((h) => ({ key: h.key, section: h.group, title: h.title, subtitle: h.subtitle, href: h.href })),
     ];
+    // TRU-04: the typed text can always be looked up in the guides, in its own last section
+    const guides = commands ? helpSearchCommand(commands, typed) : null;
+    if (guides) items.push({ key: guides.key, section: "guides", title: guides.label, subtitle: null, href: guides.href });
     return SECTION_ORDER.flatMap((section) => items.filter((item) => item.section === section));
-  }, [typed, matched, hits]);
+  }, [typed, matched, hits, commands]);
   const groups = SECTION_ORDER.filter((g) => shown.some((h) => h.section === g));
   const activeIndex = Math.min(active, Math.max(shown.length - 1, 0));
 
@@ -206,8 +210,9 @@ export function GlobalSearch({ orgId }: { orgId: string }) {
             <div className="max-h-[60vh] overflow-y-auto">
               {typed.length < 2 ? (
                 <p className="px-4 py-4 text-sm text-ink-soft">הקלידו לפחות שתי אותיות. אפשר גם פעולה או מסך, כמו &quot;משימה חדשה&quot; או &quot;הגדרות&quot;.</p>
-              ) : shown.length === 0 && !pending && searched === typed ? (
+              ) : shown.every((item) => item.section === "guides") && !pending && searched === typed ? (
                 <p className="px-4 py-4 text-sm text-ink-soft" role="status">
+                  {/* TRU-04: the guide search below is offered even when nothing else matched */}
                   לא נמצא דבר.
                 </p>
               ) : null}

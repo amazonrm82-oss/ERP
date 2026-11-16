@@ -76,3 +76,22 @@ export function matchCommands(commands: readonly Command[], query: string, limit
     .slice(0, limit)
     .map((c) => c.command);
 }
+
+/**
+ * TRU-04: "חיפוש במדריכים" for the typed text, offered under "עזרה" while the palette has the help center among its
+ * places. It opens the help center inside the business with the text, where the server searches the guides.
+ */
+export function helpSearchCommand(commands: readonly Command[], query: string): Command | null {
+  const typed = query.trim().replace(/\s+/g, " ").slice(0, 100);
+  if (searchNorm(typed).replace(/`/g, "").trim().length < 2) return null;
+  const help = commands.find((c) => c.key === "nav:help");
+  if (!help) return null;
+  return {
+    key: "help:search",
+    group: "help",
+    label: `חיפוש במדריכים: ${typed}`,
+    hint: null,
+    href: `${help.href}?q=${encodeURIComponent(typed)}`,
+    keywords: [],
+  };
+}
