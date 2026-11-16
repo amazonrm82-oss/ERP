@@ -323,6 +323,23 @@ and build this CRM here instead. The old code is preserved on the branch
   `crm-landing-waitlist-purge` 02:51 UTC). THE FUTURE SENDER sends one message with an unsubscribe link, deletes the row after it, and
   needs its own "In use" line. In the eslint allow-list. The advisor's findings on the three app tables and the two platform definers
   are expected.
+  In use (LND-14, owner 16 November 2026, answer (388) א, LND-13's pattern; migrations 021287 and 021288 (021288 waits to be pasted
+  by hand); an independent review and a delta review): cookieless counters on the landing page (`src/features/landing/measure-server.ts`),
+  which calls only `public.landing_event()` (definer, service_role only; kind visit|signup_click|signup; source = utm_source folded by
+  `app.landing_event_source` = `landingSource()` (shared fixture `landing-sources.json`): over 200 characters = other, spaces trimmed,
+  `[A-Za-z0-9_.-]{1,40}` lower case, empty = direct, else other; at most 200 sources a day shared by the three kinds, judged under a
+  per-day advisory lock, then other; direct and other never held) from the page `/` (inside `after()`), the redirect link
+  `GET /go/signup` (counts, then 303 to `/signup?src=…`; exact public path in proxy.ts, OPS-02 list, disallowed in robots.txt, links
+  `rel="nofollow"`) and the sign-up action, only for an account Auth made within the last minute with an identity
+  (`isNewSignupAccount`), for a visitor carrying the source (never an invitation, never Google sign-in). Daily counters only in
+  `app.landing_event_days` (no grants, never a row per visitor); per sender and kind 30/10/5 in 10 minutes (keyed IP hash scope
+  `landing` of `publicSenderAddress()`, only one of 4,096 bucket numbers in `app.landing_event_counts`), then silently not counted; no
+  hash = not counted. Router prefetches, Purpose/Sec-Purpose prefetch, preview bots, a closed list of crawlers, uptime monitors and
+  HTTP clients, and a User-Agent over 1,000 characters are not counted. No cookie, storage, client script or visitor id. Read only
+  through `public.platform_landing_measurement(days)` (owner/support/readonly, aal2; counts per day and source) on the admin dashboard,
+  which names a source only on a day it had a visit. Counters older than 25 months are removed by the pasted
+  `app.landing_event_purge_rows` through `app.run_landing_event_purge` (pg_cron `crm-landing-measurement-purge` 02:43 UTC, a no-op
+  until pasted). In the eslint allow-list. The advisor's findings on the two app tables and the platform definer are expected.
   Built, no service-key use yet (RET-02, migration 021235; owner (271) ב, (273): plan key `review_requests` from basic up; an independent
   review and two delta reviews): review requests. `public.review_request_settings` (one row per business: switch, the Google review link,
   triggers deal won / meeting held, delay 0..30 days, server-only `enabled_at`; owners/admins of a writable business through column grants,
