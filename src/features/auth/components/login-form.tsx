@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { FormError } from "@/components/ui/feedback";
 import { TextField } from "@/components/ui/field";
@@ -11,12 +11,19 @@ import { paths } from "@/lib/paths";
 
 import { signInAction } from "../actions";
 import { GOOGLE_ENABLED, GoogleButton } from "./google-button";
+import { MagicLinkForm } from "./magic-link-form";
 import { TURNSTILE_ACTIONS } from "../turnstile";
 import { TurnstileWidget } from "./turnstile-widget";
 
 export function LoginForm({ next, initialError, turnstileSiteKey }: { next: string; initialError?: string; turnstileSiteKey?: string | null }) {
   const [state, formAction] = useActionState<FormState, FormData>(signInAction, null);
   const failure = state && !state.ok ? state : null;
+  // USR-10: while the one-time-link box is open, the password form (and its Turnstile widget) is not shown
+  const [magicOpen, setMagicOpen] = useState(false);
+
+  if (magicOpen) {
+    return <MagicLinkForm next={next} turnstileSiteKey={turnstileSiteKey} open onOpenChange={setMagicOpen} />;
+  }
 
   return (
     <div className="space-y-4">
@@ -59,6 +66,8 @@ export function LoginForm({ next, initialError, turnstileSiteKey }: { next: stri
           כניסה
         </SubmitButton>
       </form>
+      <p className="text-center text-sm text-ink-soft">או בלי סיסמה</p>
+      <MagicLinkForm next={next} turnstileSiteKey={turnstileSiteKey} open={false} onOpenChange={setMagicOpen} />
     </div>
   );
 }

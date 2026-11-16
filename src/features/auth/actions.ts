@@ -10,6 +10,7 @@ import { fail, invalid, formValues, type FormState } from "@/lib/action-result";
 import { owesSecondStep, sessionCheck } from "@/lib/auth";
 import { authErrorMessage } from "@/lib/errors";
 import { paths, safeNextPath } from "@/lib/paths";
+import { serverLog } from "@/lib/log-server";
 import { siteOrigin } from "@/lib/site-origin";
 import { forwardedResetPassword, forwardedSignIn, forwardedSignUp } from "@/lib/supabase/auth-forwarding-server";
 import { createClient } from "@/lib/supabase/server";
@@ -18,7 +19,9 @@ import { validArg } from "@/lib/action-args";
 import { z } from "zod";
 
 import { isInvalidCredentials, recordLoginOutcome, reserveLoginAttempt } from "./login-guard-server";
-import { forgotPasswordSchema, newPasswordSchema, signInSchema, signUpSchema } from "./schema";
+import { padAuthAnswer } from "./answer-floor";
+import { MAGIC_LINK_SENT, magicLinkRedirect } from "./magic-link";
+import { forgotPasswordSchema, magicLinkSchema, newPasswordSchema, signInSchema, signUpSchema } from "./schema";
 import { TURNSTILE_ACTIONS } from "./turnstile";
 import { verifyTurnstile, verifyTurnstileToken } from "./turnstile-server";
 
@@ -78,14 +81,61 @@ export async function forgotPasswordAction(_prev: FormState, formData: FormData)
   }
   const captcha = await verifyTurnstile(formData, TURNSTILE_ACTIONS.forgotPassword);
   if (!captcha.ok) return fail(captcha.message, { values: formValues(formData) });
-  const { error } = await forwardedResetPassword(parsed.data.email, {
-    redirectTo: `${await siteOrigin()}/auth/callback?next=${encodeURIComponent(paths.resetPassword)}`,
-  });
+  const redirectTo = `${await siteOrigin()}/auth/callback?next=${encodeURIComponent(paths.resetPassword)}`;
+  // USR-10 review: the answer takes the same time whether or not the address has an account (./answer-floor.ts)
+  const started = performance.now();
+  let answer: Awaited<ReturnType<typeof forwardedResetPassword>>;
+  try {
+    answer = await forwardedResetPassword(parsed.data.email, { redirectTo });
+  } finally {
+    await padAuthAnswer(started);
+  }
+  const { error } = answer;
   // rate limits are worth telling; "no such user" is not (it would reveal who has an account)
   if (error && error.status === 429) {
     return fail(authErrorMessage(error, "נשלחו יותר מדי בקשות. נסו שוב בעוד כמה דקות."), { values: formValues(formData) });
   }
   return { ok: true, message: `אם יש חשבון עם הכתובת ${parsed.data.email}, שלחנו אליה קישור לבחירת סיסמה חדשה.` };
+}
+
+/**
+ * USR-10 (owner (389) ג): sends a one-time sign-in link to the email. zod first, then Turnstile (refused while Cloudflare cannot
+ * be asked, like the reset email), then Auth through the user's OWN client (never the FXS-12 forwarding client). No account is
+ * ever made here (`shouldCreateUser: false`). Whatever Auth answers, the page gets MAGIC_LINK_SENT, and only after the same
+ * floor of time (padAuthAnswer), so neither the text nor the time tells whether the address has an account. The link returns
+ * through /auth/callback, so the session is an ordinary aal1 session: the two-step code, the agreement and an invitation's
+ * `next` apply exactly as after a password sign-in. Rate: Turnstile and Auth's own limits (no server-side counter: USR-13's
+ * guard serves the password sign-in only).
+ */
+export async function magicLinkAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const parsed = magicLinkSchema.safeParse(pick(formData, ["email"]));
+  if (!parsed.success) {
+    return invalid(parsed.error, formData);
+  }
+  const captcha = await verifyTurnstile(formData, TURNSTILE_ACTIONS.magicLink);
+  if (!captcha.ok) return fail(captcha.message, { values: formValues(formData) });
+  const next = safeNextPath(formData.get("next")?.toString());
+  const supabase = await createClient();
+  const emailRedirectTo = magicLinkRedirect(await siteOrigin(), next);
+  const started = performance.now();
+  let code: string | null = null;
+  let status = "0";
+  try {
+    const { error } = await supabase.auth.signInWithOtp({
+      email: parsed.data.email,
+      options: { shouldCreateUser: false, emailRedirectTo },
+    });
+    if (error) {
+      code = error.code ?? "none";
+      status = String(error.status ?? 0);
+    }
+  } catch (thrown) {
+    code = thrown instanceof Error ? thrown.name : "thrown";
+  }
+  await padAuthAnswer(started);
+  // the code and status only, never the address
+  if (code) await serverLog(code === "over_request_rate_limit" || code === "over_email_send_rate_limit" ? "warn" : "info", "auth.magic_link", { code, status });
+  return { ok: true, message: MAGIC_LINK_SENT };
 }
 
 /** New password for the signed-in user (after a reset link, or from the account page). */

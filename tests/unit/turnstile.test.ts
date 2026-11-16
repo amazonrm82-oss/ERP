@@ -120,6 +120,7 @@ describe("siteverify judgement", () => {
     expect(mod.passesWhenUnavailable("resend")).toBe(false);
     expect(mod.passesWhenUnavailable("signup")).toBe(false);
     expect(mod.passesWhenUnavailable("forgot_password")).toBe(false);
+    expect(mod.passesWhenUnavailable("magic_link")).toBe(false);
   });
 
   it("allowed hostnames: the two fixed ones and the site URL's host", async () => {
@@ -239,7 +240,8 @@ describe("the auth actions check Turnstile before any Supabase call", () => {
     const forwarded = { forwardedSignIn: vi.fn(), forwardedSignUp: vi.fn(), forwardedResetPassword: vi.fn() };
     vi.doMock("@/lib/supabase/auth-forwarding-server", () => forwarded);
     const resend = vi.fn();
-    vi.doMock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { resend } }) }));
+    const signInWithOtp = vi.fn();
+    vi.doMock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { resend, signInWithOtp } }) }));
     vi.stubGlobal("fetch", vi.fn(ok({ success: false, "error-codes": ["invalid-input-response"] })));
     const actions = await import("@/features/auth/actions");
     const f = new FormData();
@@ -247,7 +249,12 @@ describe("the auth actions check Turnstile before any Supabase call", () => {
     f.set("password", "a-long-password-1");
     f.set("full_name", "ישראל ישראלי");
     f.set("cf-turnstile-response", TOKEN);
-    const results = [await actions.signInAction(null, f), await actions.signUpAction(null, f), await actions.forgotPasswordAction(null, f)];
+    const results = [
+      await actions.signInAction(null, f),
+      await actions.signUpAction(null, f),
+      await actions.forgotPasswordAction(null, f),
+      await actions.magicLinkAction(null, f),
+    ];
     for (const result of results) {
       expect(result?.ok).toBe(false);
       // the token is never sent back to the page
@@ -264,6 +271,9 @@ describe("the auth actions check Turnstile before any Supabase call", () => {
     vi.stubGlobal("fetch", vi.fn(ok({}, 503)));
     expect(await actions.resendConfirmationAction("a@example.com", "/", TOKEN)).toEqual({ ok: false, message: CAPTCHA_UNAVAILABLE });
     expect(resend).not.toHaveBeenCalled();
+    // USR-10's one-time link: refused like the reset email while Cloudflare cannot be asked, before Auth
+    expect(await actions.magicLinkAction(null, f)).toMatchObject({ ok: false, message: CAPTCHA_UNAVAILABLE });
+    expect(signInWithOtp).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
 
@@ -274,6 +284,7 @@ describe("the auth actions check Turnstile before any Supabase call", () => {
       ["signUpAction", "forwardedSignUp("],
       ["forgotPasswordAction", "forwardedResetPassword("],
       ["resendConfirmationAction", ".auth.resend("],
+      ["magicLinkAction", ".auth.signInWithOtp("],
     ]) {
       const body = source.slice(source.indexOf(`export async function ${fn}`));
       const end = body.indexOf("\nexport ", 10);

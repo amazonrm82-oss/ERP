@@ -23,6 +23,9 @@ export const signUpSchema = z.object({
 
 export const forgotPasswordSchema = z.object({ email: requiredEmail });
 
+// USR-10: the one-time sign-in link
+export const magicLinkSchema = z.object({ email: requiredEmail });
+
 export const newPasswordSchema = z
   .object({ password: newPassword, confirm: z.string() })
   .refine((v) => v.password === v.confirm, { path: ["confirm"], error: "הסיסמאות אינן זהות." });

@@ -8,7 +8,7 @@ import { paths, safeNextPath } from "@/lib/paths";
 export const metadata: Metadata = { title: "כניסה" };
 
 const ERRORS: Record<string, string> = {
-  callback: "קישור האימות אינו תקף או שפג תוקפו. נסו להתחבר, או הירשמו שוב כדי לקבל קישור חדש.",
+  callback: "הקישור אינו תקף או שפג תוקפו. אפשר לבקש קישור חדש או להיכנס עם סיסמה.",
 };
 
 type Props = { searchParams: Promise<{ next?: string | string[]; error?: string | string[] }> };

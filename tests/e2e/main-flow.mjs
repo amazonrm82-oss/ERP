@@ -725,7 +725,7 @@ try {
   await ownerDesk.goto(`${APP}/login`);
   await ownerDesk.getByLabel("אימייל").fill(ownerEmail);
   await ownerDesk.getByLabel("סיסמה").fill(PASSWORD);
-  await ownerDesk.getByRole("button", { name: "כניסה" }).click();
+  await ownerDesk.getByRole("button", { name: "כניסה", exact: true }).click();
   await ownerDesk.waitForURL(/\/o\//);
 
   step("PWA: manifest, and the install item appears when the browser offers installation");
@@ -2374,7 +2374,7 @@ try {
   await relogin.waitForLoadState("networkidle");
   await relogin.getByLabel("אימייל").fill(resetEmail);
   await relogin.getByLabel("סיסמה").fill("New-pass-67890");
-  await relogin.getByRole("button", { name: "כניסה" }).click();
+  await relogin.getByRole("button", { name: "כניסה", exact: true }).click();
   await relogin.waitForURL((url) => !url.pathname.startsWith("/login"));
   console.log("signed in with the new password:", relogin.url());
 
@@ -2438,7 +2438,7 @@ try {
   await owner.waitForLoadState("networkidle");
   await owner.getByLabel("אימייל").fill(ownerEmail);
   await owner.getByLabel("סיסמה").fill(PASSWORD);
-  await owner.getByRole("button", { name: "כניסה" }).click();
+  await owner.getByRole("button", { name: "כניסה", exact: true }).click();
   await owner.waitForURL(/\/login\/mfa/);
   await shot(owner, "111-mfa-360");
   await owner.getByLabel("קוד אימות").fill(await freshTotp(ownerSecret));
@@ -2487,7 +2487,7 @@ try {
   await lost.waitForLoadState("networkidle");
   await lost.getByLabel("אימייל").fill(ownerEmail);
   await lost.getByLabel("סיסמה").fill(PASSWORD);
-  await lost.getByRole("button", { name: "כניסה" }).click();
+  await lost.getByRole("button", { name: "כניסה", exact: true }).click();
   await lost.waitForURL(/\/login\/mfa/);
   await lost.getByRole("button", { name: /כניסה עם קוד גיבוי/ }).click();
   await lost.getByLabel("קוד גיבוי").fill("0000-0000-0000");
@@ -2558,7 +2558,7 @@ try {
   await invitee.waitForLoadState("networkidle");
   await invitee.getByLabel("אימייל").fill(inviteeEmail);
   await invitee.getByLabel("סיסמה").fill(PASSWORD);
-  await invitee.getByRole("button", { name: "כניסה" }).click();
+  await invitee.getByRole("button", { name: "כניסה", exact: true }).click();
   await invitee.waitForURL(/\/login\/mfa/);
   await invitee.getByRole("img", { name: "קוד QR לחיבור אפליקציית האימות" }).waitFor({ timeout: 15000 });
   await lost.goto(`${orgUrl}/settings/audit?entity=memberships`);

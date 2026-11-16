@@ -21,7 +21,15 @@ export const TURNSTILE_FIELD = "cf-turnstile-response";
 // `resend`: sign-up's "send again" of the confirmation email (behaves like sign-up)
 // `contact`: the landing page's "נחזור אליכם" form (LND-20 v2), which then goes through the ordinary public intake; like
 // sign-in, it passes while Cloudflare cannot be asked (owner (340) ב, `passesWhenUnavailable` in ./turnstile-server.ts)
-export const TURNSTILE_ACTIONS = { signIn: "login", signUp: "signup", forgotPassword: "forgot_password", resend: "resend", contact: "contact" } as const;
+// `magic_link`: USR-10's "כניסה בקישור למייל" on /login; like the reset email it is refused while Cloudflare cannot be asked
+export const TURNSTILE_ACTIONS = {
+  signIn: "login",
+  signUp: "signup",
+  forgotPassword: "forgot_password",
+  resend: "resend",
+  contact: "contact",
+  magicLink: "magic_link",
+} as const;
 
 export type TurnstileAction = (typeof TURNSTILE_ACTIONS)[keyof typeof TURNSTILE_ACTIONS];
 
