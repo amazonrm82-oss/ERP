@@ -546,7 +546,7 @@ and build this CRM here instead. The old code is preserved on the branch
    an automation's email (no `reply_to_user_id`, button runs too) replies to the record owner (a deal email: the deal's owner) while an
    active non-viewer member, else none. Owner (7) ב: a 401/403 from Resend ends the job at once, not sent, code `key_refused`, the count
    given back, one error log line `email.key_refused`; `public.platform_email_health()` (platform owner/support, aal2, counts only,
-   index `app.jobs_key_refused_idx`) feeds a warning card on the admin dashboard. `app.email_compose_core` was last redefined in 021278 (then 021279).
+   index `app.jobs_key_refused_idx`) feeds a warning card on the admin dashboard. `app.email_compose_core` was last redefined in 021278 (then 021279, 021283).
    Addresses, text and keys never logged. Pinned by md5 in test 367 (email-compose).
    Card sends since 021279 (owner, 15 November 2026, after the live test): a card offers only templates whose fields a card can fill
    (`app.card_message_fields`, `app.card_unfillable_fields(type, subject, body)`; refused otherwise with hint
@@ -1234,6 +1234,8 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   announced once per business to its active owners (`system`, DRAFT wording; `app.subprocessor_announcements` keeps the latest per
   entry, `app.subprocessor_notices` keyed by its sequence). Staff read through `platform_list_subprocessors()`. Follow-ups: the
   announcement runs in the owner's transaction without batching; end-day edits have no cool-down.
+  Google LLC (USA, sign-in with Google only: name, email, profile picture of who chose it; owner (390) א) was added by migration
+  021286 through the same internal steps as 021244, in force from 30 November 2026; the legal texts are unchanged until the lawyer's round.
 - Prices, totals, currency (TAX-04..06, migrations 0141-0143): `org_document_settings.prices_include_vat` (default false); every
   document stores its own copy when made. `app.document_totals(lines, rate_bp, include_vat, discount_bp, discount_agorot,
   round)` (pure, agorot and basis points, half up, discounts before VAT, VAT once per document, hint `totals:invalid`) mirrors
@@ -1986,6 +1988,27 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `quotes` flag; sent, open quotes only, hints `quote:not_sent`, `quote:closed`; audited without the token). `public.quote_public(token)`
   (service_role) answers not found for a draft, cancelled, expired or customer-deleted quote, a missing flag or closed public pages; 120
   views per link in 10 minutes; returns no ids. Accept/sign (QUO-09), PDF (QUO-06), views (QUO-10) and versions (QUO-12) come later.
+- Quote to the customer and reminders (QUO-18, migrations 021283-021285; owner (89) א, (381) ב, (382) א, (383) א, (384) ב, (385) ב;
+  an independent review and a delta review): a sent or viewed quote still on offer (its chain's newest sent version) goes as a
+  `requested_document` service message to the customer on the quote, from the quote screen, by whoever may send its link:
+  `public.quote_message_send` (invoker) over definer `app.quote_message_enqueue` queues an OPS-04 `message.send` with ids only
+  (`quote_id`, contact, the person; `app.job_payload_ok`); `public.quote_message_queue` lists the quote's messages (advisor finding
+  expected). The email and SMS composers (`app.email_compose_core`, `app.sms_compose_core`, last redefined in 021283; tests 352/367
+  pins rechecked) have one quote branch: `app.quote_message_refusal` decides at compose time (also a reminder's row, mark, key, switch
+  and stage), `{מסמך}`, `{תוקף}` filled, `{קישור להצעה}` minted last by `app.quote_message_link_issue`. Reminders: pg_cron
+  `crm-quote-reminders` (`app.send_quote_reminders`, from 08:00 in the business zone, writable businesses with plan key
+  `quote_reminders` (basic and up) and `org_document_settings.quote_customer_reminder` (off by default), not while paused, in turns,
+  once per quote and stage in `app.quote_reminders`): up to two to a customer who did not open (3 and 7 business days after sending),
+  one to a customer who opened and did not answer (2 days before `valid_until`; none without it), never after validity; DRAFT templates
+  `notice_kind` 'quote_reminder' seeded once per business and channel; channel = last person's send, else email, else SMS.
+  `app.plan_key_defaults` and `public.plans_public` (test 344's pin) were last redefined in 021284. Links (385 ב): `app.quote_link_tokens`
+  (one row per issued link, SHA-256 only, made_by screen|message|reminder|migrated, no grants) through `app.quote_link_token_issue`, at
+  most 10 live (an 11th ends first a surely undelivered link, then a superseded attempt, then the oldest); `app.quote_links` keeps one
+  row per quote (newest live hash, null while none is live; view counters per quote); revoke ends all. Every token lookup
+  (`quote_public`, `_version`, `_answer`, `_pdf`, `_question`, `app.quote_signed_pdf_token_quote`, `link_preview_public`; test 253's pin
+  rechecked) looks among live links (`token_hash is not null`) under the `quote_links` row lock. THE FUTURE SENDERS are the existing
+  composers; no new service-key use. Tests 64 and 88 end with `_quote_message_send.sql`, `_quote_reminders.sql`, `_quote_links_many.sql`.
+  The advisor's findings on the four new app tables are expected.
 - Payment schedule (GAP-09, migration 020310): `public.quote_payment_steps` (name, `percent_bp`, `due_date` and/or `milestone`; rights
   follow the quote like `quote_lines`; definer trigger `app.quote_payment_steps_check`: outsider guard first, at most 20 steps and never
   over 100% (hints `quote_schedule:max|over`), frozen once the quote is not a draft (`quote:frozen`), quote taken FOR SHARE against
