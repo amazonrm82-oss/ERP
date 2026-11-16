@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getHelpArticle, PUBLIC_HELP_ARTICLES } from "@/features/help/articles";
 import { HelpArticleView } from "@/features/help/components/help-views";
 import { paths } from "@/lib/paths";
+import { publicPageMetadata } from "@/features/seo/page-metadata";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -16,12 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const article = getHelpArticle((await params).slug);
   if (!article) return {};
   const url = paths.helpArticle(article.slug);
-  return {
-    title: `${article.title} | מרכז עזרה`,
-    description: article.summary,
-    alternates: { canonical: url },
-    openGraph: { title: article.title, description: article.summary, url, type: "article", locale: "he_IL" },
-  };
+  return publicPageMetadata({ title: `${article.title} | מרכז עזרה`, description: article.summary, path: url, index: true, type: "article" });
 }
 
 export default async function HelpArticlePage({ params }: Props) {

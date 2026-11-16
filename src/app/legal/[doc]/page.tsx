@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { BlankText } from "@/features/legal/components/blank-text";
 import { getLegalDocument, LEGAL_DOCUMENTS } from "@/features/legal/documents";
 import { paths } from "@/lib/paths";
+import { publicPageMetadata } from "@/features/seo/page-metadata";
 
 type Props = { params: Promise<{ doc: string }> };
 
@@ -18,7 +19,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const doc = getLegalDocument((await params).doc);
   if (!doc) return {};
   // an interim text is not reviewed yet, so search engines do not index it
-  return { title: doc.title, description: doc.purpose, robots: doc.interim ? { index: false, follow: false } : { index: true, follow: true } };
+  return publicPageMetadata({ title: doc.title, description: doc.purpose, path: paths.legal(doc.slug), index: !doc.interim });
 }
 
 export default async function LegalDocumentPage({ params }: Props) {

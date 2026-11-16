@@ -6,8 +6,15 @@ import { groupByStatus, ROADMAP_STATUS_LABELS } from "@/features/roadmap/items";
 import { PUBLIC_ROADMAP_ITEMS, PUBLIC_ROADMAP_NOTE } from "@/features/roadmap/public-items";
 import { APP_NAME } from "@/lib/app";
 import { paths } from "@/lib/paths";
+import { publicPageMetadata } from "@/features/seo/page-metadata";
 
-export const metadata: Metadata = { title: "מפת דרכים", description: `מה בבנייה ומה מתוכנן ב-${APP_NAME}` };
+// WEB-03: canonical and share texts; indexed through the help layout
+export const metadata: Metadata = publicPageMetadata({
+  title: "מפת דרכים",
+  description: `מה בבנייה ומה מתוכנן ב-${APP_NAME}`,
+  path: paths.roadmap,
+  index: true,
+});
 
 // TRU-01: the public roadmap, published with the owner's approval (answer 192): titles and status only, no dates.
 // Static, from the code (src/features/roadmap/public-items.ts): it reads nothing from the database and takes no visitor

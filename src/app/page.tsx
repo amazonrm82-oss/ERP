@@ -16,15 +16,22 @@ import { landingSource, notAVisit, signupClickHref } from "@/features/landing/me
 import { recordLandingEvent } from "@/features/landing/measure-server";
 import { readPublicPlans } from "@/features/landing/price-list-server";
 import { providerReadiness, waitingForProvider } from "@/features/landing/provider-readiness";
+import { jsonLdText, landingJsonLd } from "@/features/seo/json-ld";
+import { publicPageMetadata } from "@/features/seo/page-metadata";
+import { cspNonce } from "@/features/theme/theme";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/app";
+import { paths } from "@/lib/paths";
+import { configuredSiteUrl } from "@/lib/site-origin";
 import { SUPPORT } from "@/lib/support";
 
-export const metadata: Metadata = {
-  title: { absolute: `${APP_NAME} | ${APP_DESCRIPTION}` },
+// the one page search engines should find first (LND-11); WEB-03: canonical, Open Graph, Twitter
+export const metadata: Metadata = publicPageMetadata({
+  title: `${APP_NAME} | ${APP_DESCRIPTION}`,
+  absoluteTitle: true,
   description: "Mexuz — מערכת לניהול לידים, לקוחות ועסקאות לעסקים קטנים ובינוניים בישראל. בעברית, בטלפון ובמחשב.",
-  // the one page search engines should find (LND-11)
-  robots: { index: true, follow: true },
-};
+  path: paths.landing,
+  index: true,
+});
 
 // The public landing page (LND-01 to LND-05, LND-09 to LND-13; LND-20 v2, owner 12 November 2026: the approved prototype, one
 // to one in structure, texts and order, always dark navy). A signed-in visitor never sees it: the proxy sends them into the app
@@ -45,6 +52,13 @@ export default async function LandingPage({ searchParams }: Props) {
   // owner (339) ב: read from the provider configuration on the server; only feature keys go on
   const waiting = waitingForProvider(providerReadiness());
   return (
+    <>
+    {/* WEB-03: structured data (name, address, logo, what the product is; no price or rating); a data block, never run */}
+    <script
+      type="application/ld+json"
+      nonce={cspNonce(requestHeaders.get("content-security-policy"))}
+      dangerouslySetInnerHTML={{ __html: jsonLdText(landingJsonLd(configuredSiteUrl())) }}
+    />
     <div id={LANDING_ROOT_ID} className={styles.page} data-paused="false">
       <StandaloneRedirect />
       <LandingNav signupHref={signupHref} />
@@ -65,5 +79,6 @@ export default async function LandingPage({ searchParams }: Props) {
       </main>
       <LandingFooter />
     </div>
+    </>
   );
 }

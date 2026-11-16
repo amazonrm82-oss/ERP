@@ -4,8 +4,15 @@ import Link from "next/link";
 import { LoginForm } from "@/features/auth/components/login-form";
 import { turnstileSiteKey } from "@/features/auth/turnstile-server";
 import { paths, safeNextPath } from "@/lib/paths";
+import { publicPageMetadata } from "@/features/seo/page-metadata";
 
-export const metadata: Metadata = { title: "כניסה" };
+// WEB-03: a title and description for a shared link; the sign-in screens stay out of search engines (LND-11)
+export const metadata: Metadata = publicPageMetadata({
+  title: "כניסה",
+  description: "כניסה ל-Mexuz: הלידים, הלקוחות והעסקאות של העסק במקום אחד.",
+  path: paths.login,
+  index: false,
+});
 
 const ERRORS: Record<string, string> = {
   callback: "הקישור אינו תקף או שפג תוקפו. אפשר לבקש קישור חדש או להיכנס עם סיסמה.",

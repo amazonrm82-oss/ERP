@@ -6,13 +6,16 @@ import styles from "@/features/landing/components/landing.module.css";
 import { LandingFooter, LandingNav } from "@/features/landing/components/sections";
 import { APP_NAME } from "@/lib/app";
 import { paths } from "@/lib/paths";
+import { publicPageMetadata } from "@/features/seo/page-metadata";
 
-export const metadata: Metadata = {
-  title: { absolute: `כל היכולות | ${APP_NAME}` },
+// LND-20 v2 (5): public and listed in the sitemap, like the landing page; WEB-03: canonical and share texts
+export const metadata: Metadata = publicPageMetadata({
+  title: `כל היכולות | ${APP_NAME}`,
+  absoluteTitle: true,
   description: "כל מה שיש ב-Mexuz היום: לידים, אנשי קשר, עסקאות, משימות, הצעות מחיר, תשלומים, דוחות ועוד.",
-  // LND-20 v2 (5): public and listed in the sitemap, like the landing page
-  robots: { index: true, follow: true },
-};
+  path: paths.features,
+  index: true,
+});
 
 /** LND-20 v2 (5): every capability that works today, from the landing catalog (texts unchanged), in the landing page's dark style. */
 export default function FeaturesPage() {

@@ -5,8 +5,15 @@ import { SignupForm } from "@/features/auth/components/signup-form";
 import { turnstileSiteKey } from "@/features/auth/turnstile-server";
 import { carriedSource, LANDING_SOURCE_PARAM } from "@/features/landing/measure";
 import { paths, safeNextPath } from "@/lib/paths";
+import { publicPageMetadata } from "@/features/seo/page-metadata";
 
-export const metadata: Metadata = { title: "הרשמה" };
+// WEB-03: a title and description for a shared link; the sign-in screens stay out of search engines (LND-11)
+export const metadata: Metadata = publicPageMetadata({
+  title: "הרשמה",
+  description: "פותחים חשבון ב-Mexuz ומתחילים לנהל לידים, לקוחות ועסקאות. בעברית, בטלפון ובמחשב.",
+  path: paths.signup,
+  index: false,
+});
 
 type Props = { searchParams: Promise<{ next?: string | string[]; [LANDING_SOURCE_PARAM]?: string | string[] }> };
 

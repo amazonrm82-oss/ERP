@@ -7,14 +7,12 @@ import { readPublicSubprocessors } from "@/features/legal/subprocessors-public-s
 import { splitPublicList, type Subprocessor } from "@/features/platform/subprocessors";
 import { formatDate, zoneDate } from "@/lib/format";
 import { paths } from "@/lib/paths";
+import { publicPageMetadata } from "@/features/seo/page-metadata";
 
 const doc = getLegalDocument("subprocessors")!;
 
-export const metadata: Metadata = {
-  title: doc.title,
-  description: doc.purpose,
-  robots: doc.interim ? { index: false, follow: false } : { index: true, follow: true },
-};
+// an interim text is not reviewed yet, so search engines do not index it
+export const metadata: Metadata = publicPageMetadata({ title: doc.title, description: doc.purpose, path: paths.legal(doc.slug), index: !doc.interim });
 
 function Paragraph({ text }: { text: string }) {
   return (
