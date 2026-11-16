@@ -199,6 +199,8 @@ const RERUN = [
   migrationFile("_quote_reminders.sql"),
   // owner (385) ב redefines the quote page and link functions last
   migrationFile("_quote_links_many.sql"),
+  // RPT-03 redefines app.job_kinds() and app.job_payload_ok() last (report.send)
+  migrationFile("_scheduled_reports.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

@@ -3256,3 +3256,53 @@ describe("background jobs by role (IMP-04)", () => {
     }
   });
 });
+
+describe("scheduled reports by role (RPT-03)", () => {
+  let org: string;
+  let schedule: string;
+  const people: Record<string, { id: string; email: string }> = {};
+
+  beforeAll(async () => {
+    const owner = await createUser("rptrole-owner");
+    org = await createOrg(owner.id);
+    people.owner = owner;
+    for (const role of ["admin", "manager", "member", "viewer"] as const) {
+      people[role] = await addMember(org, owner.id, role, `rptrole-${role}`);
+    }
+    schedule = await asUser(owner.id, async (q) =>
+      (
+        await q<{ id: string }>("select public.scheduled_report_create($1, 'revenue', 'last_7', 'weekly', 1::smallint, '08:00'::time, $2) as id", [
+          org,
+          [people.member.id, people.viewer.id],
+        ])
+      ).rows[0].id,
+    );
+  });
+
+  it("owners and admins make, change and remove schedules; everyone else sees only what they receive", async () => {
+    // before being a recipient, a manager sees nothing
+    expect(await asUser(people.manager.id, (q) => count(q, "select 1 from public.report_schedules where organization_id = $1", [org]))).toBe(0);
+    for (const [role, user] of Object.entries(people)) {
+      const insert = asUser(user.id, (q) => q("insert into public.report_schedules (organization_id, report_key, period, weekday) values ($1, 'funnel', 'last_7', 2)", [org]));
+      if (role === "owner" || role === "admin") await insert;
+      else expect((await pgError(insert)).code, role).toBe("42501");
+      const update = await asUser(user.id, async (q) => (await q("update public.report_schedules set send_at = '09:00' where id = $1", [schedule])).rowCount);
+      expect(update, role).toBe(role === "owner" || role === "admin" ? 1 : 0);
+      const seen = await asUser(user.id, (q) => count(q, "select 1 from public.report_schedules where id = $1", [schedule]));
+      // the manager became a recipient in the owner's turn (owner comes first), so every role here sees it
+      expect(seen, role).toBe(1);
+      const recipients = await asUser(user.id, (q) => count(q, "select 1 from public.report_schedule_recipients where schedule_id = $1", [schedule]));
+      const total = await asAdmin((q) => count(q, "select 1 from public.report_schedule_recipients where schedule_id = $1", [schedule]));
+      expect(recipients, role).toBe(role === "owner" || role === "admin" ? total : 1);
+      const add = asUser(user.id, (q) => q("insert into public.report_schedule_recipients (organization_id, schedule_id, user_id) values ($1, $2, $3)", [org, schedule, people.manager.id]));
+      if (role === "owner") await add;
+      else if (role === "admin") expect((await pgError(add)).code, role).toBe("23505");
+      else expect((await pgError(add)).code, role).toBe("42501");
+    }
+    // a member takes only themselves off; a manager cannot take anyone off
+    expect(await asUser(people.manager.id, async (q) => (await q("delete from public.report_schedule_recipients where schedule_id = $1 and user_id <> $2", [schedule, people.manager.id])).rowCount)).toBe(0);
+    expect(await asUser(people.viewer.id, async (q) => (await q("delete from public.report_schedule_recipients where schedule_id = $1", [schedule])).rowCount)).toBe(1);
+    expect(await asUser(people.member.id, async (q) => (await q("delete from public.report_schedules where id = $1", [schedule])).rowCount)).toBe(0);
+    expect(await asUser(people.admin.id, async (q) => (await q("delete from public.report_schedules where id = $1", [schedule])).rowCount)).toBe(1);
+  });
+});

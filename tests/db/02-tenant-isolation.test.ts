@@ -189,6 +189,11 @@ describe("tenant isolation", () => {
         await q<{ id: string }>("insert into public.segments (organization_id, object_type, kind, name) values ($1, 'lead', 'static', 'סגמנט של א') returning id", [orgA])
       ).rows[0].id;
       await q("insert into public.segment_members (organization_id, segment_id, lead_id) values ($1, $2, $3)", [orgA, ids.segmentA, ids.leadA]);
+      // RPT-03: a scheduled report of A with A's owner as its recipient (switched off, so the cron never queues it)
+      ids.reportScheduleA = (
+        await q<{ id: string }>("insert into public.report_schedules (organization_id, report_key, period, frequency, weekday, enabled) values ($1, 'revenue', 'last_7', 'weekly', 1, false) returning id", [orgA])
+      ).rows[0].id;
+      await q("insert into public.report_schedule_recipients (organization_id, schedule_id, user_id) values ($1, $2, $3)", [orgA, ids.reportScheduleA, a.id]);
       // LIB-01: a link item and a file item of A, with the file item's file (the categories are seeded)
       ids.libraryCategoryA = (await q<{ id: string }>("select id from public.library_categories where organization_id = $1 order by position limit 1", [orgA])).rows[0].id;
       await q("insert into public.library_items (organization_id, category_id, kind, title, url) values ($1, $2, 'link', 'קטלוג של א', 'https://a.example.com/catalog')", [
@@ -530,6 +535,9 @@ describe("tenant isolation", () => {
     // SEG-01
     "segments",
     "segment_members",
+    // RPT-03
+    "report_schedules",
+    "report_schedule_recipients",
     // SEG-03
     "campaign_costs",
     // LIB-01, the categories seeded
@@ -810,6 +818,9 @@ describe("tenant isolation", () => {
       segments: "name = name",
       // no update grant at all: a permission error is the expected outcome
       segment_members: "lead_id = lead_id",
+      report_schedules: "send_at = send_at",
+      // no update grant at all: a permission error is the expected outcome
+      report_schedule_recipients: "user_id = user_id",
       campaign_costs: "note = note",
       library_categories: "name = name",
       library_items: "title = title",
@@ -1012,6 +1023,8 @@ describe("tenant isolation", () => {
       ["insert into public.booking_pages (organization_id, user_id, title) values ($1, $2, 'x')", [orgA, a.id]],
       ["insert into public.segments (organization_id, object_type, kind, name) values ($1, 'lead', 'static', 'x')", [orgA]],
       ["insert into public.segment_members (organization_id, segment_id, contact_id) values ($1, $2, $3)", [orgA, ids.segmentA, ids.contactA]],
+      ["insert into public.report_schedules (organization_id, report_key, period) values ($1, 'revenue', 'last_7')", [orgA]],
+      ["insert into public.report_schedule_recipients (organization_id, schedule_id, user_id) values ($1, $2, $3)", [orgA, ids.reportScheduleA, a.id]],
       ["insert into public.campaign_costs (organization_id, campaign, month, amount_agorot) values ($1, 'x', '2026-10-01', 100)", [orgA]],
       ["insert into public.library_categories (organization_id, name) values ($1, 'x')", [orgA]],
       ["insert into public.library_items (organization_id, kind, title, url) values ($1, 'link', 'x', 'https://example.com/')", [orgA]],
@@ -1175,6 +1188,8 @@ describe("tenant isolation", () => {
       ["booking_pages", "title = 'HACKED'", "title = 'HACKED'"],
       ["segments", "name = 'HACKED'", "name = 'HACKED'"],
       ["segment_members", "created_at = '2001-01-01'", "created_at = '2001-01-01'"],
+      ["report_schedules", "send_at = '21:45'", "send_at = '21:45'"],
+      ["report_schedule_recipients", "created_at = '2001-01-01'", "created_at = '2001-01-01'"],
       ["campaign_costs", "amount_agorot = 777", "amount_agorot = 777"],
       ["library_categories", "position = 777", "position = 777"],
       ["library_items", "description = 'HACKED'", "description = 'HACKED'"],

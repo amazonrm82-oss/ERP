@@ -755,9 +755,11 @@ describe("background job queue (OPS-04)", () => {
   // Adding a kind here without that approval is not allowed. IMP-04: import.run and export.run, owner's answer (155) א,
   // 9 November 2026 (test 309 covers them). USR-11 / WAB-03: digest.send, owner's answers (267) א and (375)-(378), 11 and 15
   // November 2026 (test 372; queued only while a worker asked for it; its functions are pinned below).
-  it("(55) א: the job kinds are exactly {message.send, import.run, export.run, digest.send}", async () => {
+  // RPT-03: report.send, owner's answer (386) א, 16 November 2026 (test 377; queued only while a worker asked for it; its
+  // functions are pinned below).
+  it("(55) א: the job kinds are exactly {message.send, import.run, export.run, digest.send, report.send}", async () => {
     const kinds = await asAdmin(async (q) => (await q<{ k: string[] }>("select app.job_kinds() as k")).rows[0].k);
-    expect(kinds).toEqual(["message.send", "import.run", "export.run", "digest.send"]);
+    expect(kinds).toEqual(["message.send", "import.run", "export.run", "digest.send", "report.send"]);
   });
 
   // USR-11 / WAB-03 (owner (267) א, (375) ב): the daily summary's worker path, pinned like the queue's own functions (body,
@@ -790,6 +792,37 @@ describe("background job queue (OPS-04)", () => {
       "app.queue_daily_digests": "0d3e7e9d5fb7b79d6c470b00d010f82c",
       "public.digest_job_compose": "d8c3e9c0b13c304d050c61cbdf00128f",
       "public.digest_stop": "defdc06009a3c53baf03153a3aaf2638",
+    });
+  });
+
+  // RPT-03 (owner (386) א): the scheduled report's worker path, pinned like the daily summary's. A change of any of them needs
+  // a fresh independent review against hard rule 5's conditions (ids only in the queue; no number of any report in the email;
+  // the composer re-checks the business, the schedule, the report's availability, the recipient and the day).
+  // Rechecked after the independent review (16 November 2026): sends counted without a cascade from the schedule, the evening
+  // send times without wrap, the cost reports restricted and judged by app.scheduled_report_user_may; delta review: the
+  // composer also answers the business's FLD-10 term keys (org_terms), nothing else.
+  it("RPT-03: the report.send functions are the reviewed ones", async () => {
+    const rows = await asAdmin(
+      async (q) =>
+        (
+          await q<{ name: string; md5: string }>(
+            `select n.nspname || '.' || p.proname as name,
+                    md5(p.prosrc || '|' || p.prosecdef::text || '|' || coalesce(p.proconfig::text, '') || '|' || pg_get_function_identity_arguments(p.oid)) as md5
+               from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where (n.nspname, p.proname) in (('public', 'scheduled_report_compose'), ('app', 'queue_scheduled_reports'),
+                                               ('app', 'scheduled_report_catalog'), ('app', 'scheduled_report_available'),
+                                               ('app', 'scheduled_report_period'), ('app', 'scheduled_report_user_may'))
+              order by 1`,
+          )
+        ).rows,
+    );
+    expect(Object.fromEntries(rows.map((r) => [r.name, r.md5]))).toEqual({
+      "app.queue_scheduled_reports": "2909ca88ef8cf2fd861799382824c25a",
+      "app.scheduled_report_available": "3c4de6d83a722ce976bd2903dacf15ad",
+      "app.scheduled_report_catalog": "45e0e2fede66943a3a57edbe6f07d1a2",
+      "app.scheduled_report_period": "5c090efde9c5b52e9e5d0e41b78d5740",
+      "app.scheduled_report_user_may": "32c6084be210c72237a10a56fdc2deaa",
+      "public.scheduled_report_compose": "d13ac17d3c59a141dce844d2a96eea58",
     });
   });
 

@@ -22,6 +22,8 @@ const LEFT_OUT: Record<string, string> = {
   invitations: "carry secret tokens",
   list_preferences: "a person's screen settings",
   digest_settings: "a person's own daily summary email setting",
+  report_schedules: "RPT-03: configuration of report emails (a report key, a period and a time), not business data",
+  report_schedule_recipients: "RPT-03: who gets a scheduled report email, like memberships",
   memberships: "people come in as names next to their ids",
   member_permissions: "access settings of the team, like memberships; the audit log keeps every change",
   notifications: "a person's bell",

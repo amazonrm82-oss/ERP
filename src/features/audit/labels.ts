@@ -142,6 +142,9 @@ export const ENTITY_LABELS: Record<string, string> = {
   punch_card_alert_settings: "התראות כרטיסייה",
   // MNY-04
   anomaly_alert_settings: "התראות חריגה",
+  // RPT-03
+  report_schedules: "דוח מתוזמן",
+  report_schedule_recipients: "נמען של דוח מתוזמן",
   // RET-02
   review_request_settings: "בקשת ביקורת",
   // HEB-09

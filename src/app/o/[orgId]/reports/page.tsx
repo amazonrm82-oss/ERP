@@ -12,6 +12,7 @@ import { paymentsPath } from "@/features/payments/paths";
 import { ManagerDashboard } from "@/features/reports/components/manager-dashboard";
 import { getDashboard } from "@/features/reports/dashboard";
 import { REPORTS, reportRoleAllows, reportTexts } from "@/features/reports/definitions";
+import { reportSchedulesPath } from "@/features/report-schedules/paths";
 import { getOrgTerms } from "@/features/terminology/queries";
 import { withReportShape } from "@/features/reports/schemas";
 import { canViewCosts } from "@/features/permissions/keys";
@@ -77,6 +78,10 @@ export default async function ReportsPage({
             </ButtonLink>
             <ButtonLink href={paths.goals(orgId)} variant="secondary" size="sm">
               יעדים
+            </ButtonLink>
+            {/* RPT-03 */}
+            <ButtonLink href={reportSchedulesPath(orgId)} variant="secondary" size="sm">
+              דוחות מתוזמנים
             </ButtonLink>
             {/* DQL-01 */}
             <ButtonLink href={toCompletePath(orgId)} variant="secondary" size="sm">

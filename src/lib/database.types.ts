@@ -57,6 +57,32 @@ export type DigestSettingsRow = {
   updated_at: string;
 };
 
+// RPT-03 (migration scheduled_reports): a report sent by email on a schedule, with a link only; owners and admins write
+export type ReportScheduleRow = {
+  id: string;
+  organization_id: string;
+  report_key: string;
+  // null for a report without a period filter (yesterday | last_7 | this_month | last_month | last_30; a check constraint, so typed as text)
+  period: string | null;
+  // "daily" | "weekly" (a check constraint)
+  frequency: string;
+  // weekly only: 0 = Sunday .. 6 = Saturday
+  weekday: number | null;
+  send_at: string;
+  enabled: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ReportScheduleRecipientRow = {
+  id: string;
+  organization_id: string;
+  schedule_id: string;
+  user_id: string;
+  created_at: string;
+};
+
 // DQL-01 (migration record_completeness): one row per organization and record type (lead | contact | company | deal);
 // fields = built-in keys or "cf:<key>" (src/features/data-quality/completeness.ts)
 export type CompletenessSettingsRow = {
@@ -3777,6 +3803,14 @@ export type Database = {
       plan_waitlist: Table<PlanWaitlistRow, { organization_id: string; plan_key: string }, Record<string, never>>;
       // each user's columns per list (migration 0033); user_id comes from the session
       list_preferences: Table<ListPreferencesRow, { organization_id: string; object_type: string; columns?: Json }, { columns?: Json }>;
+      // RPT-03: made through scheduled_report_create; report_key is insert-only
+      report_schedules: Table<
+        ReportScheduleRow,
+        { organization_id: string; report_key: string; period?: string | null; frequency?: string; weekday?: number | null; send_at?: string; enabled?: boolean },
+        { period?: string | null; frequency?: string; weekday?: number | null; send_at?: string; enabled?: boolean }
+      >;
+      // RPT-03: no update; an owner or admin removes anyone, a member themselves
+      report_schedule_recipients: Table<ReportScheduleRecipientRow, { organization_id: string; schedule_id: string; user_id: string }, Record<string, never>>;
       // USR-11 / WAB-03: the person's own daily summary setting; no delete
       digest_settings: Table<DigestSettingsRow, { organization_id: string; enabled?: boolean; send_at?: string }, { enabled?: boolean; send_at?: string }>;
       companies: Table<CompanyRow, CompanyInsert>;
@@ -4759,6 +4793,11 @@ export type Database = {
       prefill_public_submit: { Args: { p_token: string; p_ip_hash?: string | null; p_values?: Json | null }; Returns: Json };
       // USR-11 / WAB-03 (service_role only): the daily summary's composer (the worker) and its one-click stop link
       digest_job_compose: { Args: { p_job: string; p_lease: string }; Returns: Json };
+      scheduled_report_compose: { Args: { p_job: string; p_lease: string }; Returns: Json };
+      scheduled_report_create: {
+        Args: { p_org: string; p_report: string; p_period: string | null; p_frequency: string; p_weekday: number | null; p_send_at: string; p_recipients: string[] };
+        Returns: string;
+      };
       digest_stop: { Args: { p_token: string; p_ip_hash?: string | null; p_stop?: boolean }; Returns: Json };
       business_page_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       business_page_submit: {
