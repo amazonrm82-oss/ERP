@@ -559,7 +559,7 @@ and build this CRM here instead. The old code is preserved on the branch
    `app.sms_compose_core`, `public.record_email_queue` and `public.record_sms_queue` were last redefined in 021279 (tests 352, 367 pins
    rechecked); tests 64 and 88 end with `_card_email_fields.sql`.
    In use (USR-11 / WAB-03 / MNY-03 daily summary, owner (267) א and 15 November 2026 answers (375) ב, (376) ב, (377) ב, (378) א;
-   migrations 021281 and 021282 (021282 pasted by hand); an independent review and a delta review): the OPS-04 worker (same route and
+   migrations 021281 and 021282 (021282 pasted by hand, md5 checked 16 November 2026); an independent review and a delta review): the OPS-04 worker (same route and
    secret) claims `digest.send` (payload `{user_id, organization_id, digest_kind, day}` only, queued by pg_cron `crm-daily-digests` /
    `app.queue_daily_digests` only while a worker asked for the kind and the business holds plan key `daily_digest`, every plan but
    free; run time by `app.digest_run_at`, which waits for the end of the person's quiet hours only when it falls on the same business
