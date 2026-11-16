@@ -638,7 +638,7 @@ and build this CRM here instead. The old code is preserved on the branch
    timing-safe first (`src/lib/shared-secret.ts`) and calls only `public.claim_jobs()`, `public.finish_job()` and
    `public.job_message_may_send()`. (55) א: only `job_message_may_send` reads customer records and it answers may_send, reason and
    retry only; `claim_jobs` answers only id, lease, kind, organization_id, payload (ids and codes, optional event_at) and attempt,
-   `finish_job` only its status; `app.job_kinds()` is exactly `message.send`, `import.run` and `export.run` (IMP-04), `digest.send`, `report.send` and `invite.send` (each with its own In use line), and every new kind needs the owner's approval and its
+   `finish_job` only its status; `app.job_kinds()` is exactly `message.send`, `import.run` and `export.run` (IMP-04, its own In use line), and every new kind needs the owner's approval and its
    own In use line; the three bodies are pinned by md5 and a change needs a fresh review (test 284). The send check works on a live
    lease only: a business that cannot write (`app.org_writable`: deleted, suspended, cancelled or read-only, (53) א, (54) ב) or an
    `event_at` that passed cancels the job; while HEB-09 `app.customer_sending_paused` holds, the job waits uncounted (with the
