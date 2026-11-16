@@ -169,11 +169,12 @@ export async function collectPerson(orgId: string, kind: PersonKind, id: string,
   files.push(...(await readByIds(supabase, orgId, "files", FILE_COLUMNS, "payment_id", uniqueIds(payments.map((p) => p.id)))));
   // PAY-08: the refunds of those payments
   const paymentRefunds = await readByIds(supabase, orgId, "payment_refunds", "*", "payment_id", uniqueIds(payments.map((p) => p.id)));
-  // LNK-02: the payment links made for the person (a free amount on a contact) and for their quotes and orders
+  // LNK-02: the payment links made for the person (a free amount on a contact) and for their quotes, orders and documents
   const linkGroups = await Promise.all([
     readByIds(supabase, orgId, "payment_links", "*", "contact_id", contactIds),
     readByIds(supabase, orgId, "payment_links", "*", "quote_id", quoteIds),
     readByIds(supabase, orgId, "payment_links", "*", "order_id", uniqueIds(orders.map((o) => o.id))),
+    readByIds(supabase, orgId, "payment_links", "*", "accounting_document_id", uniqueIds(accountingDocuments.map((d) => d.id))),
   ]);
   const paymentLinks = [...new Map(linkGroups.flat().map((l) => [l.id, l])).values()];
   // PKG-01: the person's punch cards with only what is theirs, and the cards they held before (src/features/punch-cards/export.ts)

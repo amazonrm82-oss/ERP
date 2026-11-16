@@ -31,6 +31,8 @@ describe("tenant isolation", () => {
     b = await createUser("bob");
     orgA = await createOrg(a.id, "ארגון א");
     orgB = await createOrg(b.id, "ארגון ב");
+    // LNK-02: the fake payment provider is on only where app.settings says so (the local test database)
+    await asAdmin((q) => q("insert into app.settings (key, value) values ('payment_links_fake', 'on') on conflict (key) do update set value = excluded.value"));
 
     const pipe = await defaultPipeline(orgA);
     ids.pipelineA = pipe.pipelineId;

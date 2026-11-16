@@ -319,7 +319,7 @@ export default async function ContactPage({ params, searchParams }: Props) {
           {/* PAY-01: payments received and recorded here */}
           <RecordPaymentsCard orgId={orgId} subject={{ kind: "contact", id: contact.id }} />
           {/* LNK-02: a payment link for a free amount (hidden without a payment provider) */}
-          <PaymentLinksCard orgId={orgId} source={{ kind: "contact", id: contact.id }} openAgorot={null} canOpen />
+          <PaymentLinksCard orgId={orgId} source={{ kind: "contact", id: contact.id }} totalAgorot={null} canOpen />
           {/* PKG-01, PKG-02: the contact's punch cards and their balance */}
           <PunchCardsCard orgId={orgId} contactId={contact.id} timeZone={context.org.timeZone} />
           {/* SUB-01: the contact's recurring billings */}

@@ -19,8 +19,11 @@ const STATUS_TONES: Record<PaymentLinkStatus, BadgeTone> = {
 type Props = {
   orgId: string;
   source: PaymentLinkSource;
-  // what is open on the source (a quote's or order's total with VAT, a document's balance), or null for a free amount
-  openAgorot: number | null;
+  // the source's total with VAT (a quote or an order), or null for a free amount; the database caps the pending links of a
+  // source together at it (a document's cap is its balance, judged by the database only)
+  totalAgorot: number | null;
+  // "ההצעה", "ההזמנה": what the total belongs to, for the hint
+  totalOf?: string;
   // false when the source is not open for payment now (a draft, a cancelled order, an expired quote): only the list shows
   canOpen: boolean;
 };
@@ -31,7 +34,7 @@ type Props = {
  * (1) א: only the fake exists, never on the live site) or the plan lacks `payments` / `payment_links`. The payer pays on the
  * provider's page (LNK-03); with the fake provider there is no page, and the card says so.
  */
-export async function PaymentLinksCard({ orgId, source, openAgorot, canOpen }: Props) {
+export async function PaymentLinksCard({ orgId, source, totalAgorot, totalOf = "המסמך", canOpen }: Props) {
   const access = await getPaymentLinksAccess(orgId);
   if (!access.provider || !access.inPlan) return null;
   const [links, context] = await Promise.all([listPaymentLinks(orgId, source), getOrgContext(orgId)]);
@@ -39,8 +42,15 @@ export async function PaymentLinksCard({ orgId, source, openAgorot, canOpen }: P
   if (links.length === 0 && !showCreate) return null;
   const today = zoneDate(new Date(), context.org.timeZone);
   const titleId = `payment-links-${source.id}`;
+  // what the source's pending links already ask for: the next link may ask at most the rest
+  const pending = links.filter((l) => l.status === "pending").reduce((sum, l) => sum + l.amountAgorot, 0);
+  const rest = totalAgorot === null ? null : Math.max(totalAgorot - pending, 0);
   const amountHint =
-    openAgorot === null ? "סכום חופשי, כולל מע״מ." : `עד ${formatMoney(openAgorot)}, הסכום הפתוח כולל מע״מ. אפשר גם מקדמה או חלק מהסכום.`;
+    totalAgorot === null
+      ? "סכום חופשי, כולל מע״מ."
+      : pending > 0
+        ? `הסכום של ${totalOf} כולל מע״מ: ${formatMoney(totalAgorot)}. קישורים ממתינים כבר מבקשים ${formatMoney(pending)}, אז אפשר עד ${formatMoney(rest ?? 0)}.`
+        : `הסכום של ${totalOf} כולל מע״מ: ${formatMoney(totalAgorot)}. אפשר גם מקדמה או חלק מהסכום.`;
   return (
     <Card aria-labelledby={titleId}>
       <CardHeader
@@ -51,7 +61,7 @@ export async function PaymentLinksCard({ orgId, source, openAgorot, canOpen }: P
             <CreatePaymentLinkButton
               orgId={orgId}
               source={source}
-              defaultAmount={openAgorot !== null && openAgorot > 0 ? agorotInput(openAgorot) : ""}
+              defaultAmount={rest !== null && rest > 0 ? agorotInput(rest) : ""}
               defaultLastDay={addDays(today, PAYMENT_LINK_DAYS_DEFAULT)}
               today={today}
               lastDayMax={addDays(today, PAYMENT_LINK_DAYS_MAX)}

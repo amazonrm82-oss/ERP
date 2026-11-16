@@ -577,6 +577,49 @@ describe("roles and record visibility", () => {
     expect((await pgError(asUser(admin.id, (q) => q("delete from public.payments where id = $1", [byManager])))).code).toBe("42501");
   });
 
+  it("payment links follow their source; payment recorders make and cancel them, nobody deletes (LNK-02)", async () => {
+    await asAdmin((q) => q("insert into app.settings (key, value) values ('payment_links_fake', 'on') on conflict (key) do update set value = excluded.value"));
+    await asAdmin((q) =>
+      q("update public.subscriptions set feature_overrides = coalesce(feature_overrides, '{}'::jsonb) || '{\"payments\": true, \"payment_links\": true}' where organization_id = $1", [org]),
+    );
+    try {
+      await setVisibility("own");
+      // m1's own contact: m1 reads it, m2 and the viewer do not
+      const c = await asUser(m1.id, async (q) =>
+        (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח לקישור') returning id", [org])).rows[0].id,
+      );
+      const make = (u: U) =>
+        asUser(u.id, async (q) =>
+          (
+            await q<{ id: string }>(
+              "insert into public.payment_links (organization_id, contact_id, amount_agorot, expires_on, provider) values ($1, $2, 1000, current_date + 3, 'fake') returning id",
+              [org, c],
+            )
+          ).rows[0].id,
+        );
+      // owners, admins and managers by role record payments; a member without the key and a viewer do not
+      const l1 = await make(owner);
+      await make(admin);
+      await make(manager);
+      for (const u of [m1, m2, viewer]) expect((await pgError(make(u))).code, u.email).toBe("42501");
+      const seen = (u: U) => asUser(u.id, (q) => count(q, "select 1 from public.payment_links where id = $1", [l1]));
+      for (const u of [owner, admin, manager, m1]) expect(await seen(u), u.email).toBe(1);
+      for (const u of [m2, viewer]) expect(await seen(u), u.email).toBe(0);
+      // the member reads it but does not cancel it (no right to record payments)
+      expect(await asUser(m1.id, async (q) => (await q("update public.payment_links set status = 'cancelled' where id = $1", [l1])).rowCount)).toBe(0);
+      await setVisibility("org");
+      expect(await seen(viewer)).toBe(1);
+      expect(await asUser(viewer.id, async (q) => (await q("update public.payment_links set status = 'cancelled' where id = $1", [l1])).rowCount)).toBe(0);
+      // nobody deletes a link, owners included
+      for (const u of [owner, viewer]) expect((await pgError(asUser(u.id, (q) => q("delete from public.payment_links where id = $1", [l1])))).code, u.email).toBe("42501");
+      // a manager cancels a pending link
+      expect(await asUser(manager.id, async (q) => (await q("update public.payment_links set status = 'cancelled' where id = $1", [l1])).rowCount)).toBe(1);
+    } finally {
+      await setVisibility("org");
+      await asAdmin((q) => q("update public.subscriptions set feature_overrides = feature_overrides - 'payment_links' where organization_id = $1", [org]));
+    }
+  });
+
   it("refunds follow their payment; only owners and admins refund and cancel a refund, nobody deletes (PAY-08)", async () => {
     await setVisibility("own");
     const pipe = (await asAdmin((q) => q<{ id: string }>("select id from public.pipelines where organization_id = $1 limit 1", [org]))).rows[0].id;

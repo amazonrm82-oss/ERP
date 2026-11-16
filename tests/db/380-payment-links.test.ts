@@ -80,6 +80,8 @@ describe("payment links (LNK-02)", () => {
     await asAdmin((q) =>
       q("insert into public.org_document_settings (organization_id, vat_status) values ($1, 'licensed') on conflict (organization_id) do update set vat_status = 'licensed'", [org]),
     );
+    // the fake provider is on only where app.settings says so (the local test database; never the hosted project)
+    await asAdmin((q) => q("insert into app.settings (key, value) values ('payment_links_fake', 'on') on conflict (key) do update set value = excluded.value"));
   });
 
   it("a free amount on a contact: the server fills title, status, provider id and the end of the last day", async () => {
@@ -225,7 +227,7 @@ describe("payment links (LNK-02)", () => {
     expect((await pgError(run(owner, (q) => q("delete from public.payment_links where id = $1", [l.id])))).code).toBe("42501");
   });
 
-  it("a pending link past its last day expires by the job; a finished one stays", async () => {
+  it("a pending link past its last day expires by the job; a finished one stays (and open ones stay pending)", async () => {
     const c = await contact();
     const due = await link(owner, "contact_id", c, 100);
     const later = await link(owner, "contact_id", c, 100);
@@ -234,7 +236,7 @@ describe("payment links (LNK-02)", () => {
       await q("set local session_replication_role = replica");
       await q("update public.payment_links set expires_at = now() - interval '1 minute' where id = $1", [due.id]);
     });
-    expect(await asAdmin(async (q) => Number((await one<{ n: number }>(q, "select app.expire_payment_links() as n")).n))).toBeGreaterThanOrEqual(1);
+    expect(await asAdmin(async (q) => Number((await one<{ n: number }>(q, "select app.close_payment_links() as n")).n))).toBeGreaterThanOrEqual(1);
     const states = await asAdmin(async (q) => (await q<{ id: string; status: string }>("select id, status from public.payment_links where id = any($1)", [[due.id, later.id]])).rows);
     expect(Object.fromEntries(states.map((s) => [s.id, s.status]))).toEqual({ [due.id]: "expired", [later.id]: "pending" });
     // the server never moves a finished link
@@ -296,5 +298,120 @@ describe("payment links (LNK-02)", () => {
     expect(all.filter((c) => /card|cvv|cvc|pan|security/.test(c))).toEqual([]);
     // anon has nothing
     expect(await asAdmin(async (q) => (await q("select 1 from information_schema.role_table_grants where table_name = 'payment_links' and grantee = 'anon'")).rowCount)).toBe(0);
+  });
+
+  it("the fake provider is refused unless app.settings payment_links_fake is 'on' (finding 4)", async () => {
+    const c = await contact();
+    try {
+      await asAdmin((q) => q("update app.settings set value = 'off' where key = 'payment_links_fake'"));
+      expect(await hint(link(owner, "contact_id", c, 100))).toBe("payment_link:provider");
+      await asAdmin((q) => q("update app.settings set value = '' where key = 'payment_links_fake'"));
+      expect(await hint(link(owner, "contact_id", c, 100))).toBe("payment_link:provider");
+    } finally {
+      await asAdmin((q) => q("update app.settings set value = 'on' where key = 'payment_links_fake'"));
+    }
+    expect((await link(owner, "contact_id", c, 100)).status).toBe("pending");
+  });
+
+  it("a recorder who does not read the source learns nothing: only 42501, whatever the amount (finding 1)", async () => {
+    await run(owner, (q) => q("select public.set_member_permissions($1, $2, '{record_payments}')", [org, member.id]));
+    await asAdmin((q) => q("update public.organizations set record_visibility = 'own' where id = $1", [org]));
+    try {
+      const c = await contact(owner, "סודי");
+      const d = await invoice(c, 5000);
+      const q = await sentQuote(c, 10000);
+      const o = await numberedOrder(c);
+      const cancelled = await sentQuote(c, 10000);
+      await run(owner, (x) => x("select public.quote_cancel($1, $2)", [org, cancelled]));
+      for (const [column, id] of [
+        ["accounting_document_id", d],
+        ["quote_id", q],
+        ["order_id", o],
+        ["quote_id", cancelled],
+        ["contact_id", c],
+      ] as [string, string][]) {
+        for (const amount of [1, 4999, 5001, 999_999_999]) {
+          const e = await pgError(link(member, column, id, amount));
+          expect([e.code, e.hint ?? null], `${column} ${amount}`).toEqual(["42501", null]);
+        }
+      }
+      // the owner, who reads them, gets the real answers
+      expect(await hint(link(owner, "accounting_document_id", d, 5001))).toBe("payment_link:over");
+      expect(await hint(link(owner, "quote_id", cancelled, 1))).toBe("payment_link:source_state");
+    } finally {
+      await asAdmin((q) => q("update public.organizations set record_visibility = 'org' where id = $1", [org]));
+      await run(owner, (q) => q("select public.set_member_permissions($1, $2, '{}')", [org, member.id]));
+    }
+  });
+
+  it("the pending links of a source together never pass what is open (finding 2)", async () => {
+    const c = await contact();
+    const q = await sentQuote(c, 10000); // 11800 with VAT
+    await link(owner, "quote_id", q, 5000);
+    await link(owner, "quote_id", q, 5000);
+    expect(await hint(link(owner, "quote_id", q, 1801))).toBe("payment_link:over");
+    const last = await link(owner, "quote_id", q, 1800);
+    expect(await hint(link(owner, "quote_id", q, 1))).toBe("payment_link:over");
+    // a cancelled link frees its amount
+    await run(owner, (x) => x("update public.payment_links set status = 'cancelled' where id = $1", [last.id]));
+    expect((await link(owner, "quote_id", q, 1800)).status).toBe("pending");
+    // a document: its balance less the pending links
+    const d = await invoice(c, 3000);
+    await link(owner, "accounting_document_id", d, 2000);
+    expect(await hint(link(owner, "accounting_document_id", d, 1001))).toBe("payment_link:over");
+    expect((await link(owner, "accounting_document_id", d, 1000)).status).toBe("pending");
+  });
+
+  it("a pending link stops when its source closes: the job cancels it with closed_reason source_closed (finding 3)", async () => {
+    const c = await contact();
+    const closeRun = () => asAdmin(async (q) => Number((await one<{ n: number }>(q, "select app.close_payment_links() as n")).n));
+    const state = (id: string) =>
+      asAdmin(async (q) => one<{ status: string; closed_reason: string | null; cancelled_by: string | null }>(q, "select status, closed_reason, cancelled_by from public.payment_links where id = $1", [id]));
+
+    // a quote cancelled, a quote superseded by a newer sent version, a quote past its validity
+    const cancelledQuote = await sentQuote(c);
+    const qa = await link(owner, "quote_id", cancelledQuote, 100);
+    await run(owner, (x) => x("select public.quote_cancel($1, $2)", [org, cancelledQuote]));
+    const versioned = await sentQuote(c);
+    const qb = await link(owner, "quote_id", versioned, 100);
+    await run(owner, async (x) => {
+      const v = (await one<{ id: string }>(x, "select public.quote_new_version($1, $2) as id", [org, versioned])).id;
+      await x("select public.quote_send($1, $2)", [org, v]);
+    });
+    const old = await sentQuote(c);
+    const qc = await link(owner, "quote_id", old, 100);
+    await asAdmin(async (x) => {
+      await x("set local session_replication_role = replica");
+      await x("update public.quotes set quote_date = current_date - 5, valid_until = current_date - 2 where id = $1", [old]);
+    });
+    // an order cancelled
+    const o = await numberedOrder(c);
+    const ol = await link(owner, "order_id", o, 100);
+    await run(owner, (x) => x("update public.orders set status = 'cancelled' where id = $1", [o]));
+    // a document paid in full, and one cancelled
+    const paid = await invoice(c, 1000);
+    const dl = await link(owner, "accounting_document_id", paid, 1000);
+    await run(owner, async (x) => {
+      const p = (await one<{ id: string }>(x, "insert into public.payments (organization_id, contact_id, amount_agorot, method) values ($1, $2, 1000, 'cash') returning id", [org, c])).id;
+      await x("insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, 1000)", [org, p, paid]);
+    });
+    const gone = await invoice(c, 1000);
+    const dg = await link(owner, "accounting_document_id", gone, 500);
+    await run(owner, (x) => x("update public.accounting_documents set status = 'cancelled', cancel_reason = 'טעות' where id = $1", [gone]));
+    // a contact in the recycle bin
+    const binned = await contact();
+    const cl = await link(owner, "contact_id", binned, 100);
+    await run(owner, (x) => x("update public.contacts set deleted_at = now() where id = $1", [binned]));
+    // still open: stays pending
+    const open = await sentQuote(c);
+    const keep = await link(owner, "quote_id", open, 100);
+
+    expect(await closeRun()).toBeGreaterThanOrEqual(7);
+    for (const l of [qa, qb, qc, ol, dl, dg, cl]) expect(await state(l.id), l.title).toEqual({ status: "cancelled", closed_reason: "source_closed", cancelled_by: null });
+    expect(await state(keep.id)).toEqual({ status: "pending", closed_reason: null, cancelled_by: null });
+    // a person's cancel carries no reason; a person never writes one
+    await run(owner, (x) => x("update public.payment_links set status = 'cancelled' where id = $1", [keep.id]));
+    expect((await state(keep.id)).closed_reason).toBeNull();
+    expect((await pgError(run(owner, (x) => x("update public.payment_links set closed_reason = 'source_closed' where id = $1", [keep.id])))).code).toBe("42501");
   });
 });

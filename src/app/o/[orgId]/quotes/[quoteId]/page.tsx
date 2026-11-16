@@ -594,7 +594,8 @@ export default async function QuotePage({ params, searchParams }: Props) {
           <PaymentLinksCard
             orgId={orgId}
             source={{ kind: "quote", id: quote.id }}
-            openAgorot={quote.totalAgorot}
+            totalAgorot={quote.totalAgorot}
+            totalOf="ההצעה"
             canOpen={
               !quote.customerDeletedAt &&
               (quote.status === "accepted" ||

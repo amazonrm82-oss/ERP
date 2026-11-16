@@ -2817,6 +2817,8 @@ export type PaymentLinkRow = {
   hosted_url: string | null;
   status: string;
   status_at: string | null;
+  // the server cancelled it because its source closed ('source_closed'); null for a person's cancel
+  closed_reason: string | null;
   payment_id: string | null;
   paid_at: string | null;
   cancelled_at: string | null;

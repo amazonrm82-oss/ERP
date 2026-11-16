@@ -366,7 +366,8 @@ export default async function OrderPage({ params }: Props) {
             <PaymentLinksCard
               orgId={orgId}
               source={{ kind: "order", id: order.id }}
-              openAgorot={order.totalAgorot}
+              totalAgorot={order.totalAgorot}
+              totalOf="ההזמנה"
               canOpen={order.status !== "cancelled" && !order.customerDeletedAt}
             />
           </>
