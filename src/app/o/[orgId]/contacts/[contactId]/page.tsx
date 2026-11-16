@@ -72,6 +72,7 @@ import { LibraryLinksCard } from "@/features/library-links/components/library-li
 import { PrefillLinksCard } from "@/features/prefill-links/components/prefill-links-card";
 import { RecordDocumentsCard } from "@/features/documents/components/record-documents-card";
 import { RecordPaymentsCard } from "@/features/payments/components/record-payments-card";
+import { PaymentLinksCard } from "@/features/payment-links/components/payment-links-card";
 import { CustomerHoldCard } from "@/features/customer-holds/components/customer-hold-card";
 import { PunchCardsCard } from "@/features/punch-cards/components/punch-cards-card";
 import { RecurringBillingsCard } from "@/features/recurring-billing/components/recurring-billings-card";
@@ -317,6 +318,8 @@ export default async function ContactPage({ params, searchParams }: Props) {
           <RecordDocumentsCard orgId={orgId} subject={{ kind: "contact", id: contact.id }} />
           {/* PAY-01: payments received and recorded here */}
           <RecordPaymentsCard orgId={orgId} subject={{ kind: "contact", id: contact.id }} />
+          {/* LNK-02: a payment link for a free amount (hidden without a payment provider) */}
+          <PaymentLinksCard orgId={orgId} source={{ kind: "contact", id: contact.id }} openAgorot={null} canOpen />
           {/* PKG-01, PKG-02: the contact's punch cards and their balance */}
           <PunchCardsCard orgId={orgId} contactId={contact.id} timeZone={context.org.timeZone} />
           {/* SUB-01: the contact's recurring billings */}

@@ -359,6 +359,13 @@ describe("tenant isolation", () => {
       await q("insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, 500)", [orgA, ids.paymentA, ids.invoiceA]);
       // PAY-08: part of the payment refunded
       await q("insert into public.payment_refunds (organization_id, payment_id, amount_agorot, method) values ($1, $2, 100, 'cash')", [orgA, ids.paymentA]);
+      // LNK-02: a payment link for a free amount on A's contact
+      ids.paymentLinkA = (
+        await q<{ id: string }>(
+          "insert into public.payment_links (organization_id, contact_id, amount_agorot, expires_on, provider) values ($1, $2, 1000, current_date + 1, 'fake') returning id",
+          [orgA, ids.contactA],
+        )
+      ).rows[0].id;
       // GAP-12: a negative opening balance of A's contact, offset against a tax invoice of the contact
       ids.openingCreditA = (
         await q<{ id: string }>("select public.opening_balance_set($1, $2, null, -800, '2026-01-01') as id", [orgA, ids.contactA])
@@ -613,6 +620,8 @@ describe("tenant isolation", () => {
     "payment_allocations",
     // PAY-08
     "payment_refunds",
+    // LNK-02
+    "payment_links",
     // GAP-12
     "opening_credit_allocations",
     // PAY-03
@@ -880,6 +889,8 @@ describe("tenant isolation", () => {
       payment_allocations: "amount_agorot = amount_agorot",
       // no delete grant at all (cancelled, never deleted): a permission error is the expected outcome for the delete
       payment_refunds: "status = status",
+      // no delete grant at all (cancelled, never deleted): a permission error is the expected outcome for the delete
+      payment_links: "status = status",
       // no delete grant at all (undone, never deleted): a permission error is the expected outcome for the delete
       opening_credit_allocations: "amount_agorot = amount_agorot",
       // no write grant at all (quote_public_decide() writes): a permission error is the expected outcome
@@ -1071,6 +1082,7 @@ describe("tenant isolation", () => {
       ["insert into public.accounting_document_lines (organization_id, document_id, description) values ($1, $2, 'x')", [orgA, ids.documentA]],
       ["insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, 1)", [orgA, ids.paymentA, ids.invoiceA]],
       ["insert into public.payment_refunds (organization_id, payment_id, amount_agorot, method) values ($1, $2, 1, 'cash')", [orgA, ids.paymentA]],
+      ["insert into public.payment_links (organization_id, contact_id, amount_agorot, expires_on, provider) values ($1, $2, 1, current_date + 1, 'fake')", [orgA, ids.contactA]],
       ["insert into public.opening_credit_allocations (organization_id, credit_document_id, document_id, amount_agorot) values ($1, $2, $3, 1)", [orgA, ids.openingCreditA, ids.contactInvoiceA]],
       ["insert into public.quote_decisions (organization_id, quote_id, decision, content_sha256) values ($1, $2, 'rejected', repeat('1', 64))", [orgA, ids.quoteA]],
       ["insert into public.quote_views (organization_id, quote_id) values ($1, $2)", [orgA, ids.quoteA]],
@@ -1233,6 +1245,7 @@ describe("tenant isolation", () => {
       ["accounting_document_lines", "description = 'HACKED'", "description = 'HACKED'"],
       ["payment_allocations", "amount_agorot = 777", "amount_agorot = 777"],
       ["payment_refunds", "status = 'cancelled', cancel_reason = 'HACKED'", "cancel_reason = 'HACKED'"],
+      ["payment_links", "status = 'cancelled'", "status = 'cancelled'"],
       ["opening_credit_allocations", "amount_agorot = 777", "amount_agorot = 777"],
       ["payment_credit_companies", "credit_agorot = 777", "credit_agorot = 777"],
       ["customer_credit_totals", "credit_agorot = 777", "credit_agorot = 777"],
@@ -1324,6 +1337,9 @@ describe("tenant isolation", () => {
     for (const [sql, params] of [
       ["insert into public.recurring_billings (organization_id, contact_id, name, cycle, start_date, billing_day) values ($1, $2, 'x', 'monthly', current_date, 1)", [orgB, ids.contactA]],
       ["insert into public.recurring_billing_lines (organization_id, billing_id, description, unit_price_agorot) values ($1, $2, 'x', 1)", [orgB, ids.billingA]],
+      // LNK-02: a payment link of org B on org A's contact, quote, order or document
+      ["insert into public.payment_links (organization_id, contact_id, amount_agorot, expires_on, provider) values ($1, $2, 1, current_date + 1, 'fake')", [orgB, ids.contactA]],
+      ["insert into public.payment_links (organization_id, accounting_document_id, amount_agorot, expires_on, provider) values ($1, $2, 1, current_date + 1, 'fake')", [orgB, ids.invoiceA]],
     ] as [string, unknown[]][]) {
       expect(["23503", "42501"], sql).toContain((await pgError(asUser(b.id, (q) => q(sql, params)))).code);
     }

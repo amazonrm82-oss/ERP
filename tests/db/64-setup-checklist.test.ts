@@ -914,6 +914,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_scheduled_reports.sql",
       // USR-09 redefines app.job_kinds() and app.job_payload_ok() of _scheduled_reports.sql last (invite.send)
       "_staff_invite_email.sql",
+      // LNK-02 redefines app.sample_untouched() of _sample_data_kits.sql and app.import_record_worked() of
+      // _review_1113_database.sql last (a payment link is real work)
+      "_payment_links_work.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

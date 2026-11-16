@@ -35,6 +35,7 @@ import { isAdminRole } from "@/features/settings/permissions";
 import { getDealOpen, getQuote, getQuoteAcceptDeal, getQuoteAcceptedAt, getQuoteAddenda, getQuoteCustomerNow, getQuoteDecision, getQuoteLinkStatus, getQuoteParties, getQuoteVersions, getQuoteViews, getQuotePricing, listArchivedLineProducts, listCopySkippedLines, listQuoteLines, listQuoteSchedule } from "@/features/quotes/queries";
 import { quoteViewsCount } from "@/features/quotes/views";
 import { PaymentScheduleCard } from "@/features/quotes/components/quote-schedule-card";
+import { PaymentLinksCard } from "@/features/payment-links/components/payment-links-card";
 import { QuoteLinkCard } from "@/features/quotes/components/quote-link-card";
 import { QuoteMessageButton } from "@/features/quote-message/components/quote-message-button";
 import { QuoteDecisionCard } from "@/features/quotes/components/quote-decision-card";
@@ -587,6 +588,21 @@ export default async function QuotePage({ params, searchParams }: Props) {
       <div className="mt-5">
         <PaymentScheduleCard orgId={orgId} ownerId={quote.id} steps={schedule} totalAgorot={quote.totalAgorot} canEdit={canEdit} />
       </div>
+      {/* LNK-02: payment links for a deposit or the whole quote (hidden without a payment provider) */}
+      {quote.status !== "draft" ? (
+        <div className="mt-5">
+          <PaymentLinksCard
+            orgId={orgId}
+            source={{ kind: "quote", id: quote.id }}
+            openAgorot={quote.totalAgorot}
+            canOpen={
+              !quote.customerDeletedAt &&
+              (quote.status === "accepted" ||
+                ((quote.status === "sent" || quote.status === "viewed") && (quote.validUntil === null || quote.validUntil >= zoneDate(new Date(), context.org.timeZone))))
+            }
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

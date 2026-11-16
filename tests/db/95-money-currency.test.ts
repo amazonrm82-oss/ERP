@@ -202,6 +202,11 @@ describe("currency next to every amount", () => {
         const payment = (await q<{ id: string }>("insert into public.payments (organization_id, contact_id, amount_agorot, method) values ($1, $2, 1000, 'transfer') returning id", [org, contact])).rows[0].id;
         await q("insert into public.payment_refunds (organization_id, payment_id, amount_agorot, method) values ($1, $2, 100, 'transfer')", [org, payment]);
       },
+      // LNK-02 (triggers are off here: the row is the server's)
+      payment_links: async (q) => {
+        const contact = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח לקישור') returning id", [org])).rows[0].id;
+        await q("insert into public.payment_links (organization_id, contact_id, amount_agorot, expires_on, provider) values ($1, $2, 1000, current_date + 1, 'fake')", [org, contact]);
+      },
       // PKG-01 (triggers are off here: the row is the server's)
       punch_cards: async (q) => {
         const contact = (await q<{ id: string }>("insert into public.contacts (organization_id, first_name) values ($1, 'לקוח לכרטיסייה') returning id", [org])).rows[0].id;

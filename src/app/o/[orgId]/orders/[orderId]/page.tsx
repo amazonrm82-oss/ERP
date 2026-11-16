@@ -22,6 +22,7 @@ import { QuoteDecisionCard } from "@/features/quotes/components/quote-decision-c
 import { PaymentScheduleCard } from "@/features/quotes/components/quote-schedule-card";
 import { RecordDocumentsCard } from "@/features/documents/components/record-documents-card";
 import { RecordPaymentsCard } from "@/features/payments/components/record-payments-card";
+import { PaymentLinksCard } from "@/features/payment-links/components/payment-links-card";
 import { orderEditing } from "@/features/orders/schema";
 import { deliveryContactLabel, orderSourceLabels, shippingAddressHint } from "@/features/orders/texts";
 import { getOrgTerms } from "@/features/terminology/queries";
@@ -361,6 +362,13 @@ export default async function OrderPage({ params }: Props) {
           <>
             <RecordDocumentsCard orgId={orgId} subject={{ kind: "order", id: order.id }} />
             <RecordPaymentsCard orgId={orgId} subject={{ kind: "order", id: order.id }} />
+            {/* LNK-02: payment links for the order (hidden without a payment provider) */}
+            <PaymentLinksCard
+              orgId={orgId}
+              source={{ kind: "order", id: order.id }}
+              openAgorot={order.totalAgorot}
+              canOpen={order.status !== "cancelled" && !order.customerDeletedAt}
+            />
           </>
         ) : null}
 

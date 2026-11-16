@@ -2797,6 +2797,35 @@ export type PaymentRefundRow = {
   updated_at: string;
 };
 
+// LNK-02: a payment link for an amount, from a quote, an order, an open document or a contact (migration payment_links).
+// Never deleted: a pending link is cancelled. The page is the provider's; card details never reach us (LNK-03).
+export type PaymentLinkRow = {
+  id: string;
+  organization_id: string;
+  quote_id: string | null;
+  order_id: string | null;
+  accounting_document_id: string | null;
+  contact_id: string | null;
+  amount_agorot: number;
+  currency: string;
+  max_installments: number;
+  expires_on: string;
+  expires_at: string;
+  title: string | null;
+  provider: string;
+  provider_link_id: string | null;
+  hosted_url: string | null;
+  status: string;
+  status_at: string | null;
+  payment_id: string | null;
+  paid_at: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // GAP-12: a share of a negative opening balance (a customer's credit) offset against a document of the same customer
 // (migration opening_credit). Never deleted: undone by an owner or admin (removed_at), released by the server (released_at).
 export type OpeningCreditAllocationRow = {
@@ -4201,6 +4230,23 @@ export type Database = {
         PaymentAllocationRow,
         { organization_id: string; payment_id: string; document_id: string; amount_agorot: number; currency?: string },
         { amount_agorot?: number; removed_at?: string | null }
+      >;
+      // LNK-02: column grants; whoever records payments creates a link and cancels a pending one (no delete)
+      payment_links: Table<
+        PaymentLinkRow,
+        {
+          organization_id: string;
+          quote_id?: string | null;
+          order_id?: string | null;
+          accounting_document_id?: string | null;
+          contact_id?: string | null;
+          amount_agorot: number;
+          currency?: string;
+          max_installments?: number;
+          expires_on: string;
+          provider: string;
+        },
+        { status?: string }
       >;
       // PAY-08: column grants; owners and admins refund and cancel a refund (no delete)
       payment_refunds: Table<
