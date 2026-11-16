@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type FormEvent, type PointerEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import { formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
@@ -112,12 +112,9 @@ function Card({ plan, cycle, signupHref }: { plan: PlanCardData; cycle: Cycle; s
     setFlipped(to);
     window.setTimeout(() => (to ? backRef : openRef).current?.focus(), 60);
   };
-  // the prototype: a mouse turns the card on hover; a touch screen and the keyboard use the button
-  const hover = (to: boolean) => (event: PointerEvent) => {
-    if (event.pointerType === "mouse" && !notify && window.matchMedia("(hover: hover)").matches) setFlipped(to);
-  };
+  // owner (397) א: the card turns only by the button, with a mouse too (a hover turn left the front's buttons unreachable)
   return (
-    <li aria-labelledby={titleId} className={`${styles.plan} ${plan.highlighted ? styles.rec : ""}`} data-flipped={String(flipped)} onPointerEnter={hover(true)} onPointerLeave={hover(false)}>
+    <li aria-labelledby={titleId} className={`${styles.plan} ${plan.highlighted ? styles.rec : ""}`} data-flipped={String(flipped)}>
       {plan.highlighted && !plan.soon ? <span className={styles.badge}>מומלצת</span> : null}
       {plan.soon ? <span className={`${styles.badge} ${styles.badgeSoon}`}>בקרוב</span> : null}
       <div className={`${styles.face}`} inert={flipped ? true : undefined}>
@@ -143,6 +140,9 @@ function Card({ plan, cycle, signupHref }: { plan: PlanCardData; cycle: Cycle; s
           <button ref={openRef} type="button" className={styles.flipbtn} aria-expanded={flipped} aria-controls={backId} onClick={() => turn(true)}>
             מה כלול? ←
           </button>
+          <p className={styles.flipHint} aria-hidden="true">
+            לחיצה מציגה את כל מה שבחבילה
+          </p>
           {plan.soon ? (
             notify ? null : (
               <button type="button" className={`${styles.btn} ${styles.ghost}`} onClick={() => setNotify(true)}>

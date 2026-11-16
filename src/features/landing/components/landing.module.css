@@ -1139,6 +1139,12 @@
   text-align: start;
   min-height: 44px;
 }
+/* owner (397) א: a small hint that the card opens on a click */
+.flipHint {
+  margin: -6px 0 0;
+  font-size: 0.8125rem;
+  color: var(--color-ln-muted);
+}
 @media (max-width: 1000px) {
   .plans {
     grid-template-columns: repeat(2, 1fr);
