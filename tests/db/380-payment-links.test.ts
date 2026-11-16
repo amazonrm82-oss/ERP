@@ -414,4 +414,89 @@ describe("payment links (LNK-02)", () => {
     expect((await state(keep.id)).closed_reason).toBeNull();
     expect((await pgError(run(owner, (x) => x("update public.payment_links set closed_reason = 'source_closed' where id = $1", [keep.id])))).code).toBe("42501");
   });
+
+  it("a person who sees only part of a document's money gets one neutral answer (delta 1)", async () => {
+    await run(owner, (q) => q("select public.set_member_permissions($1, $2, '{record_payments}')", [org, member.id]));
+    await asAdmin((q) => q("update public.organizations set record_visibility = 'own' where id = $1", [org]));
+    try {
+      const company = await run(owner, async (q) => (await one<{ id: string }>(q, "insert into public.companies (organization_id, name) values ($1, 'חברת הכסף') returning id", [org])).id);
+      const own = (u: U, name: string) =>
+        run(u, async (q) =>
+          (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id, company_id) values ($1, $2, $3, $4) returning id", [org, name, u.id, company])).id,
+        );
+      const mine = await own(member, "של החבר");
+      const theirs = await own(owner, "של הבעלים");
+      const doc = (contactId: string, type: string, amount: number, proforma: string | null = null) =>
+        run(owner, async (q) =>
+          (
+            await one<{ id: string }>(
+              q,
+              "insert into public.accounting_documents (organization_id, contact_id, doc_type, number, amount_agorot, proforma_id) values ($1, $2, $3, $4, $5, $6) returning id",
+              [org, contactId, type, `LNK-${++n}`, amount, proforma],
+            )
+          ).id,
+        );
+      // a proforma the member reads, billed by a tax invoice they cannot read
+      const proforma = await doc(mine, "proforma", 4000);
+      await doc(theirs, "tax_invoice", 4000, proforma);
+      expect(await hint(link(member, "accounting_document_id", proforma, 100))).toBe("payment_link:partial");
+      expect(await hint(link(member, "accounting_document_id", proforma, 999_999))).toBe("payment_link:partial");
+      // the owner, who reads everything, gets the real state
+      expect(await hint(link(owner, "accounting_document_id", proforma, 100))).toBe("payment_link:source_state");
+      // a tax invoice the member reads, billing a proforma they cannot read that was partly paid
+      const hidden = await doc(theirs, "proforma", 5000);
+      await run(owner, async (q) => {
+        const p = (await one<{ id: string }>(q, "insert into public.payments (organization_id, contact_id, amount_agorot, method) values ($1, $2, 2000, 'cash') returning id", [org, theirs])).id;
+        await q("insert into public.payment_allocations (organization_id, payment_id, document_id, amount_agorot) values ($1, $2, $3, 2000)", [org, p, hidden]);
+      });
+      const invoiceOfMine = await doc(mine, "tax_invoice", 5000, hidden);
+      const seen = await run(member, async (q) =>
+        Number((await one<{ b: string }>(q, "select (public.money_allocation_state($1, array[$2]::uuid[], '{}') -> 'documents' -> 0 ->> 'balance') as b", [org, invoiceOfMine])).b),
+      );
+      const full = await asAdmin(async (q) => Number((await one<{ b: string }>(q, "select app.document_balance($1, $2)::text as b", [org, invoiceOfMine])).b));
+      expect(seen).not.toBe(full);
+      for (const amount of [1, 3000, 5000]) expect(await hint(link(member, "accounting_document_id", invoiceOfMine, amount)), String(amount)).toBe("payment_link:partial");
+      // a document whose money the member sees in full answers as usual
+      const plain = await doc(mine, "tax_invoice", 700);
+      expect(await hint(link(member, "accounting_document_id", plain, 701))).toBe("payment_link:over");
+      expect((await link(member, "accounting_document_id", plain, 700)).status).toBe("pending");
+    } finally {
+      await asAdmin((q) => q("update public.organizations set record_visibility = 'org' where id = $1", [org]));
+      await run(owner, (q) => q("select public.set_member_permissions($1, $2, '{}')", [org, member.id]));
+    }
+  });
+
+  it("a quote's links already paid count in its cap (delta 2)", async () => {
+    const c = await contact();
+    const q = await sentQuote(c, 10000); // 11800
+    const paid = await link(owner, "quote_id", q, 10000);
+    await asAdmin(async (x) => {
+      await x("select set_config('app.payment_link_server', 'on', true)");
+      await x("update public.payment_links set status = 'paid' where id = $1", [paid.id]);
+    });
+    expect(await hint(link(owner, "quote_id", q, 1801))).toBe("payment_link:over");
+    expect((await link(owner, "quote_id", q, 1800)).status).toBe("pending");
+  });
+
+  it("the closing pass is bounded: oldest-checked first, at most p_scan a run, each judged link stamped (delta 3)", async () => {
+    const c = await contact();
+    const a = await link(owner, "contact_id", c, 100);
+    const b = await link(owner, "contact_id", c, 100);
+    // every pending link is judged once, so these two are next in line
+    for (let i = 0; i < 50; i++) {
+      const left = await asAdmin(async (q) => Number((await one<{ n: string }>(q, "select count(*)::text as n from public.payment_links where status = 'pending' and source_checked_at is null")).n));
+      if (left === 0) break;
+      await asAdmin((q) => q("select app.close_payment_links(2000, 500, 30)"));
+    }
+    const checked = (id: string) => asAdmin(async (q) => (await one<{ t: string | null }>(q, "select source_checked_at::text as t from public.payment_links where id = $1", [id])).t);
+    expect(await checked(a.id)).not.toBeNull();
+    expect(await checked(b.id)).not.toBeNull();
+    // a scan of one judges exactly one link: the one judged longest ago
+    const before = await asAdmin(async (q) => (await one<{ id: string }>(q, "select id from public.payment_links where status = 'pending' order by source_checked_at nulls first, id limit 1")).id);
+    const stamp = await checked(before);
+    await asAdmin((q) => q("select app.close_payment_links(2000, 1, 30)"));
+    expect(await checked(before)).not.toBe(stamp);
+    // a person never writes the stamp
+    expect((await pgError(run(owner, (q) => q("update public.payment_links set source_checked_at = now() where id = $1", [a.id])))).code).toBe("42501");
+  });
 });

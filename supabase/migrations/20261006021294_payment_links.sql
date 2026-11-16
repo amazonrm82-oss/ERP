@@ -32,6 +32,15 @@
 --   'source_closed', pending links whose source is no longer open by app.payment_link_source_open (the same rule the
 --   insert uses: a quote cancelled, declined, expired, past its validity or superseded by a newer sent version; an order
 --   cancelled or its customer deleted; a document paid or cancelled; a contact in the recycle bin).
+-- * A document's money as the person sees it (delta review 1): for a person, the invoker trigger also computes the
+--   document's balance with public.money_allocation_state under the caller's own RLS and hands it to the check (setting
+--   app.payment_link_caller_balance, written for this link id just before, so nobody can bring their own). When it differs
+--   from the full balance (a billed proforma or an allocation the person cannot read), the link is refused with the one
+--   neutral hint payment_link:partial, before any other state or amount answer.
+-- * The cap of a quote or an order counts its pending links and the links already paid (delta review 2). An order's
+--   payments recorded outside links are not subtracted (the order money rules are read-time and per caller; follow-up).
+-- * The closing job's second pass is bounded (delta review 3): pending links in order of `source_checked_at` (server
+--   only; null first), at most p_scan a run, within a time budget of p_seconds; each checked link is stamped.
 -- * The fake provider in the database (review finding 4): 'fake' is refused (hint payment_link:provider) unless
 --   app.settings key `payment_links_fake` is 'on'. No migration sets it; only the local test database and a developer's
 --   local stack do. On the hosted project it is unset, so no fake link can be made there even through the API.
@@ -59,6 +68,8 @@ create table if not exists public.payment_links (
   status                 text not null default 'pending' check (status in ('pending', 'paid', 'failed', 'expired', 'cancelled')),
   status_at              timestamptz,
   -- why the server cancelled a pending link (finding 3); null for a person's cancel
+  -- when the closing job last judged the source (delta review 3): its scan order
+  source_checked_at      timestamptz,
   closed_reason          text check (closed_reason is null or closed_reason in ('source_closed')),
   payment_id             uuid,
   paid_at                timestamptz,
@@ -91,6 +102,7 @@ create index if not exists payment_links_document_idx on public.payment_links (o
 create index if not exists payment_links_contact_idx on public.payment_links (organization_id, contact_id);
 create index if not exists payment_links_payment_idx on public.payment_links (organization_id, payment_id);
 create index if not exists payment_links_pending_idx on public.payment_links (expires_at) where status = 'pending';
+create index if not exists payment_links_pending_checked_idx on public.payment_links (source_checked_at nulls first, id) where status = 'pending';
 
 alter table public.payment_links enable row level security;
 
@@ -209,6 +221,13 @@ begin
                   end, false) then
     raise exception 'new row violates row-level security policy for table "payment_links"' using errcode = '42501';
   end if;
+  -- delta review 1: the document's balance as this person sees it (their own RLS), for the check to compare
+  if new.accounting_document_id is not null then
+    perform set_config('app.payment_link_caller_balance',
+      new.id::text || ':' || coalesce((public.money_allocation_state(new.organization_id, array[new.accounting_document_id], '{}'::uuid[])
+                                         -> 'documents' -> 0 ->> 'balance'), ''),
+      true);
+  end if;
   return new;
 end;
 $$;
@@ -228,9 +247,13 @@ declare
   v_count integer;
   v_key text;
   v_pending bigint;
+  v_balance bigint;
+  v_seen text;
 begin
-  -- outsider guard: RLS refuses (42501) a person who may not record payments here, before anything is revealed
-  if auth.uid() is not null and not (app.can_record_payments(new.organization_id) and app.org_writable(new.organization_id)) then
+  -- outsider guard on INSERT: RLS refuses (42501) a person who may not record payments here, before anything is revealed.
+  -- (An UPDATE by such a person never reaches this trigger: payment_links_update's USING needs the same rights; the
+  -- server's merge and FK paths below are judged by their own branches.)
+  if tg_op = 'INSERT' and auth.uid() is not null and not (app.can_record_payments(new.organization_id) and app.org_writable(new.organization_id)) then
     return new;
   end if;
 
@@ -284,6 +307,15 @@ begin
     if v_key is not null and not app.org_has_feature(new.organization_id, v_key) then
       raise exception 'the source''s module is not in the plan' using errcode = 'P0001', hint = 'feature:' || v_key;
     end if;
+    -- delta review 1: a person who sees only part of a document's money gets one neutral answer
+    if new.accounting_document_id is not null and auth.uid() is not null then
+      v_balance := app.document_balance(new.organization_id, new.accounting_document_id);
+      v_seen := current_setting('app.payment_link_caller_balance', true);
+      if v_seen is null or split_part(v_seen, ':', 1) <> new.id::text
+         or nullif(split_part(v_seen, ':', 2), '')::bigint is distinct from v_balance then
+        raise exception 'part of this document''s money is hidden from you' using errcode = 'P0001', hint = 'payment_link:partial';
+      end if;
+    end if;
     if not v_ok then
       raise exception 'the source is not open for payment' using errcode = 'P0001', hint = 'payment_link:source_state';
     end if;
@@ -304,6 +336,13 @@ begin
     if v_count >= 20 then
       raise exception 'too many open payment links on this source' using errcode = 'P0001', hint = 'payment_link:max';
     end if;
+    -- delta review 2: a quote's or an order's links already paid count too (a document's balance already holds its payments)
+    if new.quote_id is not null or new.order_id is not null then
+      v_pending := v_pending + coalesce((
+        select sum(l.amount_agorot) from public.payment_links l
+         where l.organization_id = new.organization_id and l.status = 'paid'
+           and l.quote_id is not distinct from new.quote_id and l.order_id is not distinct from new.order_id), 0);
+    end if;
     -- finding 2: this link and the source's other pending links together never pass what is open
     if v_open is not null and new.amount_agorot > v_open - v_pending then
       raise exception 'the amount is more than is open' using errcode = 'P0001', hint = 'payment_link:over';
@@ -319,6 +358,7 @@ begin
     new.cancelled_at := null;
     new.cancelled_by := null;
     new.closed_reason := null;
+    new.source_checked_at := null;
     new.hosted_url := null;
     -- LNK-01: the fake provider's id is fixed by the link (no page); a real provider's comes from the worker
     new.provider_link_id := case when new.provider = 'fake' then 'fake_' || new.id::text end;
@@ -338,9 +378,14 @@ begin
   end if;
   -- the server's status changes (expiry, a closed source; later the provider's webhook): from pending only, never back
   if current_setting('app.payment_link_server', true) = 'on' and auth.uid() is null then
+    -- the closing job stamps a pending link it judged still open (only that column)
+    if old.status = 'pending' and new.status = 'pending'
+       and (to_jsonb(new) - 'source_checked_at' - 'updated_at') = (to_jsonb(old) - 'source_checked_at' - 'updated_at') then
+      return new;
+    end if;
     if old.status <> 'pending' or new.status not in ('expired', 'paid', 'failed', 'cancelled')
-       or (to_jsonb(new) - 'status' - 'status_at' - 'payment_id' - 'paid_at' - 'cancelled_at' - 'closed_reason' - 'updated_at')
-          <> (to_jsonb(old) - 'status' - 'status_at' - 'payment_id' - 'paid_at' - 'cancelled_at' - 'closed_reason' - 'updated_at') then
+       or (to_jsonb(new) - 'status' - 'status_at' - 'payment_id' - 'paid_at' - 'cancelled_at' - 'closed_reason' - 'source_checked_at' - 'updated_at')
+          <> (to_jsonb(old) - 'status' - 'status_at' - 'payment_id' - 'paid_at' - 'cancelled_at' - 'closed_reason' - 'source_checked_at' - 'updated_at') then
       raise exception 'a payment link moves only from pending' using errcode = 'P0001', hint = 'payment_link:closed';
     end if;
     new.status_at := now();
@@ -390,15 +435,18 @@ create or replace trigger payment_links_audit after insert or update or delete o
 -- pending link whose source is no longer open (app.payment_link_source_open) is cancelled with closed_reason
 -- 'source_closed'. At most p_limit rows of each a run, skip locked.
 -- ----------------------------------------------------------------------------
-create or replace function app.close_payment_links(p_limit integer default 2000) returns integer
+create or replace function app.close_payment_links(p_limit integer default 2000, p_scan integer default 2000, p_seconds integer default 30)
+returns integer
 language plpgsql security definer
 set search_path = ''
 as $$
 declare
   v_server text := current_setting('app.payment_link_server', true);
   v_limit integer := greatest(coalesce(p_limit, 2000), 1);
+  v_deadline timestamptz := clock_timestamp() + make_interval(secs => greatest(coalesce(p_seconds, 30), 1));
   v_expired integer;
-  v_closed integer;
+  v_closed integer := 0;
+  r record;
 begin
   perform set_config('app.payment_link_server', 'on', true);
   with due as (
@@ -410,21 +458,28 @@ begin
   update public.payment_links l set status = 'expired'
     from due where l.id = due.id;
   get diagnostics v_expired = row_count;
-  with closed as (
-    select l.id from public.payment_links l
+  -- the second pass: the links judged longest ago first, at most p_scan, within the time budget
+  for r in
+    select l.id, l.organization_id, l.quote_id, l.order_id, l.accounting_document_id, l.contact_id
+      from public.payment_links l
      where l.status = 'pending'
-       and not coalesce(app.payment_link_source_open(l.organization_id, l.quote_id, l.order_id, l.accounting_document_id, l.contact_id), false)
-     order by l.created_at, l.id
-     limit v_limit
-     for update skip locked)
-  update public.payment_links l set status = 'cancelled'
-    from closed where l.id = closed.id;
-  get diagnostics v_closed = row_count;
+     order by l.source_checked_at nulls first, l.id
+     limit greatest(coalesce(p_scan, 2000), 1)
+     for update skip locked
+  loop
+    exit when clock_timestamp() > v_deadline;
+    if coalesce(app.payment_link_source_open(r.organization_id, r.quote_id, r.order_id, r.accounting_document_id, r.contact_id), false) then
+      update public.payment_links set source_checked_at = now() where id = r.id;
+    else
+      update public.payment_links set status = 'cancelled', source_checked_at = now() where id = r.id;
+      v_closed := v_closed + 1;
+    end if;
+  end loop;
   perform set_config('app.payment_link_server', coalesce(v_server, ''), true);
   return v_expired + v_closed;
 end;
 $$;
-revoke all on function app.close_payment_links(integer) from public, anon, authenticated, service_role;
+revoke all on function app.close_payment_links(integer, integer, integer) from public, anon, authenticated, service_role;
 
 do $$
 begin
