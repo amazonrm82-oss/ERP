@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { MAIN_CONTENT_ID, SkipLink } from "@/components/skip-link";
 import { Wordmark } from "@/components/wordmark";
 import { LEGAL_DOCUMENTS } from "@/features/legal/documents";
 import { SUPPORT } from "@/lib/support";
@@ -11,6 +12,7 @@ import { paths } from "@/lib/paths";
 export function PublicShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col bg-surface">
+      <SkipLink />
       <header className="border-b border-line">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
           <Link href={paths.landing} className="shrink-0 rounded-md">
@@ -26,7 +28,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
           </nav>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 sm:py-12">{children}</main>
+      <main id={MAIN_CONTENT_ID} className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 sm:py-12">{children}</main>
       <SiteFooter />
     </div>
   );

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { after } from "next/server";
 
+import { MAIN_CONTENT_ID } from "@/components/skip-link";
 import { turnstileSiteKey } from "@/features/auth/turnstile-server";
 import { ContactSection } from "@/features/landing/components/contact-section";
 import { FlowSection } from "@/features/landing/components/flow";
@@ -62,7 +63,7 @@ export default async function LandingPage({ searchParams }: Props) {
     <div id={LANDING_ROOT_ID} className={styles.page} data-paused="false">
       <StandaloneRedirect />
       <LandingNav signupHref={signupHref} />
-      <main className="flex-1">
+      <main id={MAIN_CONTENT_ID} className="flex-1">
         <Hero signupHref={signupHref} />
         <Marquee />
         <FlowSection />

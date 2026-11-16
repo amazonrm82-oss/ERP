@@ -77,3 +77,15 @@ export const CONTACT_TEXTS = {
   type: "בחרו סוג עסק מהרשימה.",
   unavailable: "הטופס לא זמין כרגע. אפשר לכתוב לנו ב-WhatsApp.",
 } as const;
+
+/** The server's field names (the intake's own ones) as this form's inputs. */
+const ANSWER_INPUT: Record<string, string> = { full_name: "name", phone: "phone", business_type: "business_type", consent: "consent" };
+
+/**
+ * WEB-04 (WCAG 3.3.1, the accessibility statement): the input a refusal names, so the message is tied to it
+ * (aria-invalid + aria-describedby) and the focus moves to it; null when the refusal names none of them.
+ */
+export function contactErrorInput(answer: { ok: boolean; field?: string } | null): string | null {
+  if (!answer || answer.ok || !answer.field) return null;
+  return Object.hasOwn(ANSWER_INPUT, answer.field) ? ANSWER_INPUT[answer.field] : null;
+}

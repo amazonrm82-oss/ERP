@@ -1,9 +1,12 @@
 import Link from "next/link";
 
+import { MAIN_CONTENT_ID } from "@/components/skip-link";
 import { paths } from "@/lib/paths";
 
 import type { IndustryPage } from "../industries";
 import styles from "./landing.module.css";
+import { LANDING_ROOT_ID } from "./motion";
+import { PauseButton } from "./pause-button";
 import { LandingFooter, LandingNav } from "./sections";
 
 // VRT-02: an industry's marketing page, in the landing page's dark look. The pictures are drawn panels (not screenshots made on
@@ -112,9 +115,10 @@ function CardPicture({ card }: { card: NonNullable<IndustryPage["pictures"]["car
 export function IndustryLanding({ page }: { page: IndustryPage }) {
   const { copy, setup, pictures } = page;
   return (
-    <div className={styles.page}>
+    // WEB-04: the root the pause button stops (the closing section's gradient runs longer than five seconds, WCAG 2.2.2)
+    <div id={LANDING_ROOT_ID} className={styles.page} data-paused="false">
       <LandingNav />
-      <main className="flex-1">
+      <main id={MAIN_CONTENT_ID} className="flex-1">
         <section aria-labelledby="industry-title" className={`${styles.hero} ${styles.indHero}`}>
           <div className={styles.wrap}>
             <span className={styles.tag}>
@@ -132,6 +136,8 @@ export function IndustryLanding({ page }: { page: IndustryPage }) {
                 למחירון
               </Link>
             </div>
+            {/* WEB-04: not shown under prefers-reduced-motion, where nothing moves */}
+            <PauseButton />
           </div>
         </section>
 

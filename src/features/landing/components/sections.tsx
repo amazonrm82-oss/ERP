@@ -2,6 +2,7 @@ import Image from "next/image";
 import type { ReactNode } from "react";
 import Link from "next/link";
 
+import { SkipLink } from "@/components/skip-link";
 import { ChatIcon, PhoneIcon } from "@/components/ui/icons";
 import { LEGAL_DOCUMENTS } from "@/features/legal/documents";
 import { paths } from "@/lib/paths";
@@ -38,6 +39,8 @@ function SignupLink({ href, className, children }: { href: string; className: st
 export function LandingNav({ signupHref = paths.signup }: { signupHref?: string } = {}) {
   return (
     <header className={styles.nav}>
+      {/* WEB-04: the first stop of the keyboard on every page with this bar */}
+      <SkipLink />
       <div className={`${styles.wrap} ${styles.navInner}`}>
         <Link href={paths.landing} aria-label="Mexuz, לדף הבית" className="rounded-md">
           <Image src={logoDark} alt="" priority className={styles.logo} sizes="160px" />

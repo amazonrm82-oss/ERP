@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { MAIN_CONTENT_ID } from "@/components/skip-link";
 import { LIVE_FEATURES } from "@/features/landing/catalog";
 import styles from "@/features/landing/components/landing.module.css";
 import { LandingFooter, LandingNav } from "@/features/landing/components/sections";
@@ -22,7 +23,7 @@ export default function FeaturesPage() {
   return (
     <div className={styles.page}>
       <LandingNav />
-      <main className={`flex-1 ${styles.sec}`}>
+      <main id={MAIN_CONTENT_ID} className={`flex-1 ${styles.sec}`}>
         <div className={styles.wrap}>
           <span className={styles.eyebrow}>כל היכולות</span>
           <h1 className="mt-3 text-ln-h2">כל מה שיש במערכת</h1>

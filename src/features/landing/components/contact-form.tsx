@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import { TurnstileWidget } from "@/features/auth/components/turnstile-widget";
 import { TURNSTILE_ACTIONS, TURNSTILE_FIELD } from "@/features/auth/turnstile";
-import { CONTACT_BUSINESS_TYPES, CONTACT_CONSENT_TEXT, CONTACT_HONEYPOT_FIELD as HONEYPOT_FIELD, CONTACT_STARTED_FIELD as STARTED_AT_FIELD } from "../contact";
+import { CONTACT_BUSINESS_TYPES, CONTACT_CONSENT_TEXT, CONTACT_HONEYPOT_FIELD as HONEYPOT_FIELD, CONTACT_STARTED_FIELD as STARTED_AT_FIELD, contactErrorInput } from "../contact";
 import styles from "./landing.module.css";
 
 type Answer = { ok: boolean; message: string; field?: string };
@@ -19,9 +19,19 @@ export function ContactForm({ siteKey, privacyHref }: { siteKey: string | null; 
   const [token, setToken] = useState<string | null>(null);
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [busy, setBusy] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const errorId = useId();
+  const wrong = contactErrorInput(answer);
   useEffect(() => {
     started.current = Date.now();
   }, []);
+  // after a refusal the focus goes to the field it names (WEB-04)
+  useEffect(() => {
+    if (!wrong) return;
+    const input = formRef.current?.elements.namedItem(wrong);
+    if (input instanceof HTMLElement) input.focus();
+  }, [answer, wrong]);
+  const fieldError = (input: string) => (wrong === input ? { "aria-invalid": true, "aria-describedby": errorId } : {});
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -60,16 +70,16 @@ export function ContactForm({ siteKey, privacyHref }: { siteKey: string | null; 
     );
   }
   return (
-    <form className={styles.form} onSubmit={submit} noValidate>
+    <form ref={formRef} className={styles.form} onSubmit={submit} noValidate>
       <label>
-        שם מלא <input name="name" type="text" autoComplete="name" required aria-invalid={answer?.field === "full_name" || undefined} />
+        שם מלא <input name="name" type="text" autoComplete="name" required {...fieldError("name")} />
       </label>
       <label>
-        טלפון <input name="phone" type="tel" dir="ltr" autoComplete="tel" inputMode="tel" required aria-invalid={answer?.field === "phone" || undefined} />
+        טלפון <input name="phone" type="tel" dir="ltr" autoComplete="tel" inputMode="tel" required {...fieldError("phone")} />
       </label>
       <label>
         סוג העסק
-        <select name="business_type" defaultValue="">
+        <select name="business_type" defaultValue="" {...fieldError("business_type")}>
           <option value="">בחרו</option>
           {CONTACT_BUSINESS_TYPES.map((type) => (
             <option key={type}>{type}</option>
@@ -77,7 +87,7 @@ export function ContactForm({ siteKey, privacyHref }: { siteKey: string | null; 
         </select>
       </label>
       <label className={styles.consent}>
-        <input type="checkbox" name="consent" required aria-invalid={answer?.field === "consent" || undefined} />
+        <input type="checkbox" name="consent" required {...fieldError("consent")} />
         <span>
           {CONTACT_CONSENT_TEXT} <span className={styles.tiny}>(נוסח טיוטה, עד אישור עורך הדין)</span>
         </span>
@@ -92,7 +102,7 @@ export function ContactForm({ siteKey, privacyHref }: { siteKey: string | null; 
         שנחזור אליכם
       </button>
       {answer ? (
-        <p role="alert" className={`${styles.formMsg} ${styles.formErr}`}>
+        <p id={errorId} role="alert" className={`${styles.formMsg} ${styles.formErr}`}>
           {answer.message}
         </p>
       ) : null}

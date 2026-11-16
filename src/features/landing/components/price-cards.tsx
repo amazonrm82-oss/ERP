@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState, type FormEvent, type PointerEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type PointerEvent } from "react";
 
 import { formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
@@ -31,8 +31,18 @@ function Line({ line }: { line: PlanLine }) {
 /** LND-13: "תודיעו לי כשנפתח" (email, an unticked consent with its DRAFT wording, a honeypot); POST /api/forms/plan-notify. */
 function NotifyForm({ planKey, planName }: { planKey: string; planName: string }) {
   const id = useId();
-  const [state, setState] = useState<{ ok: boolean; message: string } | null>(null);
+  const [state, setState] = useState<{ ok: boolean; message: string; field?: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const consentRef = useRef<HTMLInputElement>(null);
+  // WEB-04: the button that opened the form is gone, so the focus starts in the form; after a refusal it goes to the field
+  // the refusal names (the email when it names none)
+  useEffect(() => {
+    if (state?.ok) return;
+    (state?.field === "consent" ? consentRef : emailRef).current?.focus();
+  }, [state]);
+  const wrong = state && !state.ok ? (state.field === "consent" ? "consent" : "email") : null;
+  const fieldError = (input: "email" | "consent") => (wrong === input ? { "aria-invalid": true, "aria-describedby": `${id}-error` } : {});
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -48,8 +58,8 @@ function NotifyForm({ planKey, planName }: { planKey: string; planName: string }
           [WAITLIST_HONEYPOT]: form.get(WAITLIST_HONEYPOT) ?? "",
         }),
       });
-      const answer = (await res.json().catch(() => null)) as { ok?: boolean; message?: string } | null;
-      setState({ ok: Boolean(answer?.ok), message: answer?.message ?? WAITLIST_TEXTS.error });
+      const answer = (await res.json().catch(() => null)) as { ok?: boolean; message?: string; field?: string } | null;
+      setState({ ok: Boolean(answer?.ok), message: answer?.message ?? WAITLIST_TEXTS.error, field: answer?.field });
     } catch {
       setState({ ok: false, message: WAITLIST_TEXTS.error });
     } finally {
@@ -66,9 +76,9 @@ function NotifyForm({ planKey, planName }: { planKey: string; planName: string }
   return (
     <form className={styles.notify} onSubmit={submit} noValidate>
       <label htmlFor={`${id}-email`}>האימייל שלכם, ונודיע כשחבילת {planName} נפתחת</label>
-      <input id={`${id}-email`} name="email" type="email" dir="ltr" autoComplete="email" required />
+      <input ref={emailRef} id={`${id}-email`} name="email" type="email" dir="ltr" autoComplete="email" required {...fieldError("email")} />
       <label className={styles.consent}>
-        <input type="checkbox" name="consent" required />
+        <input ref={consentRef} type="checkbox" name="consent" required {...fieldError("consent")} />
         <span>
           {WAITLIST_CONSENT_TEXT} <span className={styles.tiny}>(נוסח טיוטה)</span>
         </span>
@@ -82,7 +92,7 @@ function NotifyForm({ planKey, planName }: { planKey: string; planName: string }
         תודיעו לי כשנפתח
       </button>
       {state ? (
-        <p role="alert" className={`${styles.formMsg} ${styles.formErr}`}>
+        <p id={`${id}-error`} role="alert" className={`${styles.formMsg} ${styles.formErr}`}>
           {state.message}
         </p>
       ) : null}
