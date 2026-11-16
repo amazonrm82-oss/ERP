@@ -3,8 +3,8 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// FXS-12 (owner (281) א): one server file forwards the user's address to Supabase Auth's rate limit on sign-in, sign-up
-// and password reset with the project's secret key. These tests pin the address rule, the header, the fallback, and that
+// FXS-12 (owner (281) א): one server file forwards the user's address to Supabase Auth's rate limit on sign-in, sign-up,
+// password reset and (owner (392) א) USR-10's one-time sign-in link, with the project's secret key. These tests pin the address rule, the header, the fallback, and that
 // the key can never reach the browser.
 
 const root = process.cwd();
@@ -18,11 +18,13 @@ const forwardedAuth = {
   signInWithPassword: vi.fn(async () => ({ data: { user: { id: "u1" }, session: { access_token: "at", refresh_token: "rt" } }, error: null })),
   signUp: vi.fn(async () => ({ data: { user: { id: "u1", identities: [{}] }, session: null }, error: null })),
   resetPasswordForEmail: vi.fn(async () => ({ data: {}, error: null })),
+  signInWithOtp: vi.fn(async () => ({ data: { user: null, session: null }, error: null })),
 };
 const ownAuth = {
   signInWithPassword: vi.fn(async () => ({ data: { user: { id: "u1" }, session: { access_token: "own", refresh_token: "own" } }, error: null })),
   signUp: vi.fn(async () => ({ data: { user: null, session: null }, error: null })),
   resetPasswordForEmail: vi.fn(async () => ({ data: {}, error: null })),
+  signInWithOtp: vi.fn(async () => ({ data: { user: null, session: null }, error: null })),
   setSession: vi.fn(async () => ({ data: {}, error: null })),
   signOut: vi.fn(async () => ({ error: null })),
 };
@@ -110,7 +112,7 @@ describe("FXS-12: the address, the key and the header", () => {
   });
 });
 
-describe("FXS-12: the three calls", () => {
+describe("FXS-12: the four calls", () => {
   it("with the key: one client with the key and the header, the cookies' own options, and the session handed to the request's client", async () => {
     process.env.SUPABASE_SECRET_KEY = KEY;
     const mod = await import("@/lib/supabase/auth-forwarding-server");
@@ -132,7 +134,28 @@ describe("FXS-12: the three calls", () => {
     expect(forwardedAuth.resetPasswordForEmail).toHaveBeenCalledWith("a@example.com", { redirectTo: "https://x/auth/callback" });
     expect(ownAuth.signUp).not.toHaveBeenCalled();
     expect(ownAuth.resetPasswordForEmail).not.toHaveBeenCalled();
+
+    // owner (392) א: the one-time link, never making an account, the callback unchanged
+    await mod.forwardedMagicLink("a@example.com", { emailRedirectTo: "https://x/auth/callback?next=%2F" });
+    expect(forwardedAuth.signInWithOtp).toHaveBeenCalledWith({
+      email: "a@example.com",
+      options: { shouldCreateUser: false, emailRedirectTo: "https://x/auth/callback?next=%2F" },
+    });
+    expect(ownAuth.signInWithOtp).not.toHaveBeenCalled();
+    expect(created.every((c) => c.key === KEY && c.options.global?.headers?.["sb-forwarded-for"] === "203.0.113.7")).toBe(true);
     expect(logged.join("\n")).not.toContain(KEY);
+  });
+
+  it("the one-time link's shape is closed: only an email and the callback, shouldCreateUser always false", async () => {
+    process.env.SUPABASE_SECRET_KEY = KEY;
+    const mod = await import("@/lib/supabase/auth-forwarding-server");
+    // a caller that smuggles more options in (outside the type) still sends only the fixed shape
+    await mod.forwardedMagicLink("a@example.com", { emailRedirectTo: "https://x", shouldCreateUser: true, data: { x: 1 } } as never);
+    expect(forwardedAuth.signInWithOtp).toHaveBeenCalledWith({ email: "a@example.com", options: { shouldCreateUser: false, emailRedirectTo: "https://x" } });
+    // the file makes no other Auth call than the four
+    const source = readFileSync(MODULE, "utf8");
+    const calls = [...source.matchAll(/auth\.([A-Za-z]+)\(/g)].map((m) => m[1]);
+    expect(new Set(calls)).toEqual(new Set(["signInWithPassword", "setSession", "signOut", "signUp", "resetPasswordForEmail", "signInWithOtp"]));
   });
 
   it("a failed hand-over of the session signs the request's client out locally and is the sign-in's error", async () => {
@@ -154,6 +177,7 @@ describe("FXS-12: the three calls", () => {
     forwardedAuth.signInWithPassword.mockResolvedValueOnce(keyRefusal as never);
     forwardedAuth.signUp.mockResolvedValueOnce(keyRefusal as never);
     forwardedAuth.resetPasswordForEmail.mockResolvedValueOnce({ data: null, error: { status: 403, message: "Forbidden" } } as never);
+    forwardedAuth.signInWithOtp.mockResolvedValueOnce(keyRefusal as never);
     const mod = await import("@/lib/supabase/auth-forwarding-server");
     const signIn = await mod.forwardedSignIn({ email: "a@example.com", password: "pw" });
     expect(signIn.error).toBeNull();
@@ -167,6 +191,9 @@ describe("FXS-12: the three calls", () => {
     expect(ownAuth.signUp).toHaveBeenCalledTimes(1);
     expect((await mod.forwardedResetPassword("a@example.com", { redirectTo: "https://x" })).error).toBeNull();
     expect(ownAuth.resetPasswordForEmail).toHaveBeenCalledWith("a@example.com", { redirectTo: "https://x" });
+    expect((await mod.forwardedMagicLink("a@example.com", { emailRedirectTo: "https://x" })).error).toBeNull();
+    expect(forwardedAuth.signInWithOtp).toHaveBeenCalledTimes(1);
+    expect(ownAuth.signInWithOtp).toHaveBeenCalledWith({ email: "a@example.com", options: { shouldCreateUser: false, emailRedirectTo: "https://x" } });
     const lines = logged.filter((l) => l.includes("secret_key_refused"));
     expect(lines).toHaveLength(1);
     expect(logged.join("\n")).not.toContain(KEY);
@@ -190,7 +217,10 @@ describe("FXS-12: the three calls", () => {
     await mod.forwardedSignIn({ email: "a@example.com", password: "pw" });
     await mod.forwardedSignUp({ email: "a@example.com", password: "pw" });
     await mod.forwardedResetPassword("a@example.com", { redirectTo: "https://x" });
+    await mod.forwardedMagicLink("a@example.com", { emailRedirectTo: "https://x" });
     expect(created).toHaveLength(0);
+    expect(ownAuth.signInWithOtp).toHaveBeenCalledTimes(1);
+    expect(forwardedAuth.signInWithOtp).not.toHaveBeenCalled();
     expect(ownAuth.signInWithPassword).toHaveBeenCalledTimes(1);
     expect(ownAuth.signUp).toHaveBeenCalledTimes(1);
     expect(ownAuth.resetPasswordForEmail).toHaveBeenCalledTimes(1);

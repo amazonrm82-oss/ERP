@@ -17,7 +17,8 @@ import { createClient, sessionCookieMethods } from "@/lib/supabase/server";
 // Supabase dashboard, a request made with the project's SECRET key (sb_secret_…) may name the user's address in the
 // header sb-forwarded-for, and Auth limits per user again. This file is the ONLY reader of SUPABASE_SECRET_KEY (set by
 // the owner in Vercel; lint refuses the name anywhere else) and only src/features/auth/actions.ts imports it. The key is
-// used for exactly these three Auth calls and nothing else: the client below is never handed out (no .from, .rpc,
+// used for exactly these four Auth calls (sign-in, sign-up, the reset email and, since owner (392) א of 16 November 2026,
+// USR-10's one-time sign-in link, signInWithOtp with shouldCreateUser false only) and nothing else: the client below is never handed out (no .from, .rpc,
 // .storage, no other auth call), and only the call's own answer goes back, the same answer the user's own client gave.
 // The session cookies are written exactly as before: the client uses the same cookie methods and options as
 // src/lib/supabase/server.ts (the PKCE code verifier of sign-up and reset is written there at once by @supabase/ssr), and
@@ -32,7 +33,7 @@ import { createClient, sessionCookieMethods } from "@/lib/supabase/server";
 // revoked, rotated or blocked key; never Auth's own answer such as 400 invalid_credentials), the same call is made once
 // more through the user's own client. One redacted line per reason and process is logged; never the key or the address.
 // CAPTCHA (owner (275): Cloudflare Turnstile): with the secret key, Supabase Auth treats these calls as admin calls and
-// skips its own CAPTCHA check. So a CAPTCHA for sign-in, sign-up and reset must be verified by OUR server (the Turnstile
+// skips its own CAPTCHA check. So a CAPTCHA for sign-in, sign-up, reset and the one-time link must be verified by OUR server (the Turnstile
 // siteverify call) before any of these functions is called, never through Supabase's built-in CAPTCHA setting.
 
 const SECRET_KEY = /^sb_secret_[A-Za-z0-9_-]{10,200}$/;
@@ -163,4 +164,13 @@ export async function forwardedSignUp(credentials: SignUpWithPasswordCredentials
 /** resetPasswordForEmail with the user's address forwarded. */
 export async function forwardedResetPassword(email: string, options: { redirectTo: string }) {
   return (await run((auth) => auth.resetPasswordForEmail(email, options))).result;
+}
+
+/**
+ * USR-10 (owner (392) א): the one-time sign-in link to an EXISTING account only, with the user's address forwarded. The
+ * shape is closed: an email and the callback; `shouldCreateUser` is always false here (never a sign-up through this door).
+ * The PKCE code verifier is written to this request's cookies as for the reset email.
+ */
+export async function forwardedMagicLink(email: string, options: { emailRedirectTo: string }) {
+  return (await run((auth) => auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: options.emailRedirectTo } }))).result;
 }

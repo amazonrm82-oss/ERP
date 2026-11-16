@@ -87,7 +87,7 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
     refusal: "form message (errors.ts over_request_rate_limit); a lockout answers exactly the wrong-password message",
   },
   "/signup": { guard: "supabase-auth", limit: "Supabase Auth sign-up and e-mail send limits", refusal: "form message (over_email_send_rate_limit)" },
-  "/forgot-password": { guard: "supabase-auth", limit: "Supabase Auth e-mail send limit (429 is shown, 'no such user' is not)", refusal: "form message" },
+  "/forgot-password": { guard: "supabase-auth", limit: "Supabase Auth e-mail send limit per user address (FXS-12 forwarding)", refusal: "none shown: the same 'sent' answer for every outcome (owner (393) א), one redacted log line" },
   "/auth/callback": { guard: "supabase-auth", limit: "Supabase Auth code / OTP verification limits", refusal: "redirect to /login with an error" },
   "/help": { guard: "static", limit: "help center from code", refusal: "none" },
   "/help/[slug]": { guard: "static", limit: "help center from code", refusal: "none" },

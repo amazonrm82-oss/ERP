@@ -12,7 +12,7 @@ import { authErrorMessage } from "@/lib/errors";
 import { paths, safeNextPath } from "@/lib/paths";
 import { serverLog } from "@/lib/log-server";
 import { siteOrigin } from "@/lib/site-origin";
-import { forwardedResetPassword, forwardedSignIn, forwardedSignUp } from "@/lib/supabase/auth-forwarding-server";
+import { forwardedMagicLink, forwardedResetPassword, forwardedSignIn, forwardedSignUp } from "@/lib/supabase/auth-forwarding-server";
 import { createClient } from "@/lib/supabase/server";
 import { pick } from "@/lib/validation";
 import { validArg } from "@/lib/action-args";
@@ -73,7 +73,11 @@ export async function signInAction(_prev: FormState, formData: FormData): Promis
   redirect(next);
 }
 
-/** Sends a reset link. Answers the same whether or not the address has an account. */
+/**
+ * Sends a reset link. Owner (393) א: the page gets the same answer for every outcome (an existing or a missing address, a
+ * rate limit, a send failure, a throw), after the same time floor; only one redacted log line (code and status, never the
+ * address) tells what Auth really answered.
+ */
 export async function forgotPasswordAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const parsed = forgotPasswordSchema.safeParse(pick(formData, ["email"]));
   if (!parsed.success) {
@@ -84,28 +88,40 @@ export async function forgotPasswordAction(_prev: FormState, formData: FormData)
   const redirectTo = `${await siteOrigin()}/auth/callback?next=${encodeURIComponent(paths.resetPassword)}`;
   // USR-10 review: the answer takes the same time whether or not the address has an account (./answer-floor.ts)
   const started = performance.now();
-  let answer: Awaited<ReturnType<typeof forwardedResetPassword>>;
-  try {
-    answer = await forwardedResetPassword(parsed.data.email, { redirectTo });
-  } finally {
-    await padAuthAnswer(started);
-  }
-  const { error } = answer;
-  // rate limits are worth telling; "no such user" is not (it would reveal who has an account)
-  if (error && error.status === 429) {
-    return fail(authErrorMessage(error, "נשלחו יותר מדי בקשות. נסו שוב בעוד כמה דקות."), { values: formValues(formData) });
-  }
+  const outcome = await authOutcome(() => forwardedResetPassword(parsed.data.email, { redirectTo }));
+  await padAuthAnswer(started);
+  await logAuthOutcome("auth.reset_password", outcome);
   return { ok: true, message: `אם יש חשבון עם הכתובת ${parsed.data.email}, שלחנו אליה קישור לבחירת סיסמה חדשה.` };
+}
+
+type AuthOutcome = { code: string; status: string } | null;
+
+/** Runs an Auth call whose answer the page never shows: null when it went well, else its code and status only (a throw too). */
+async function authOutcome(call: () => Promise<{ error: { code?: string; status?: number } | null }>): Promise<AuthOutcome> {
+  try {
+    const { error } = await call();
+    return error ? { code: error.code ?? "none", status: String(error.status ?? 0) } : null;
+  } catch (thrown) {
+    return { code: thrown instanceof Error ? thrown.name : "thrown", status: "0" };
+  }
+}
+
+/** One line per failed call: the code and status only, never the address. A rate limit is a warning. */
+async function logAuthOutcome(event: "auth.reset_password" | "auth.magic_link", outcome: AuthOutcome): Promise<void> {
+  if (!outcome) return;
+  const limited = outcome.code === "over_request_rate_limit" || outcome.code === "over_email_send_rate_limit" || outcome.status === "429";
+  await serverLog(limited ? "warn" : "info", event, outcome);
 }
 
 /**
  * USR-10 (owner (389) ג): sends a one-time sign-in link to the email. zod first, then Turnstile (refused while Cloudflare cannot
- * be asked, like the reset email), then Auth through the user's OWN client (never the FXS-12 forwarding client). No account is
- * ever made here (`shouldCreateUser: false`). Whatever Auth answers, the page gets MAGIC_LINK_SENT, and only after the same
- * floor of time (padAuthAnswer), so neither the text nor the time tells whether the address has an account. The link returns
- * through /auth/callback, so the session is an ordinary aal1 session: the two-step code, the agreement and an invitation's
- * `next` apply exactly as after a password sign-in. Rate: Turnstile and Auth's own limits (no server-side counter: USR-13's
- * guard serves the password sign-in only).
+ * be asked, like the reset email), then Auth through the FXS-12 forwarding client (owner (392) א: the user's address goes to
+ * Auth's rate limit; without the key, a valid address, or when the gateway refuses the key, the user's own client as before).
+ * No account is ever made here (`shouldCreateUser: false`, fixed inside forwardedMagicLink). Whatever Auth answers, the page
+ * gets MAGIC_LINK_SENT, and only after the same floor of time (padAuthAnswer), so neither the text nor the time tells whether
+ * the address has an account. The link returns through /auth/callback, so the session is an ordinary aal1 session: the
+ * two-step code, the agreement and an invitation's `next` apply exactly as after a password sign-in. Rate: Turnstile and
+ * Auth's own limits (no server-side counter: USR-13's guard serves the password sign-in only).
  */
 export async function magicLinkAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const parsed = magicLinkSchema.safeParse(pick(formData, ["email"]));
@@ -115,26 +131,11 @@ export async function magicLinkAction(_prev: FormState, formData: FormData): Pro
   const captcha = await verifyTurnstile(formData, TURNSTILE_ACTIONS.magicLink);
   if (!captcha.ok) return fail(captcha.message, { values: formValues(formData) });
   const next = safeNextPath(formData.get("next")?.toString());
-  const supabase = await createClient();
   const emailRedirectTo = magicLinkRedirect(await siteOrigin(), next);
   const started = performance.now();
-  let code: string | null = null;
-  let status = "0";
-  try {
-    const { error } = await supabase.auth.signInWithOtp({
-      email: parsed.data.email,
-      options: { shouldCreateUser: false, emailRedirectTo },
-    });
-    if (error) {
-      code = error.code ?? "none";
-      status = String(error.status ?? 0);
-    }
-  } catch (thrown) {
-    code = thrown instanceof Error ? thrown.name : "thrown";
-  }
+  const outcome = await authOutcome(() => forwardedMagicLink(parsed.data.email, { emailRedirectTo }));
   await padAuthAnswer(started);
-  // the code and status only, never the address
-  if (code) await serverLog(code === "over_request_rate_limit" || code === "over_email_send_rate_limit" ? "warn" : "info", "auth.magic_link", { code, status });
+  await logAuthOutcome("auth.magic_link", outcome);
   return { ok: true, message: MAGIC_LINK_SENT };
 }
 

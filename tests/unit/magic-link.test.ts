@@ -2,8 +2,9 @@ import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // USR-10 (owner (389) ג): sign-in by a one-time link to the email. The action checks the fields, then Turnstile, then asks Auth
-// through the user's own client with shouldCreateUser false; the page gets the same answer whether or not the address has an
-// account; the link returns through /auth/callback with a same-site `next`; no address is ever logged.
+// through the FXS-12 forwarding client (owner (392) א; shouldCreateUser false is fixed there, tests/unit/auth-forwarding.test.ts);
+// the page gets the same answer whether or not the address has an account; the link returns through /auth/callback with a
+// same-site `next`; no address is ever logged. Owner (393) א: the reset email answers the same way for every outcome.
 
 let requestHeaders = new Headers();
 vi.mock("next/headers", () => ({
@@ -34,12 +35,18 @@ afterEach(() => {
   vi.doUnmock("@/features/auth/answer-floor");
 });
 
-async function withAuth(answer: { error: unknown }) {
-  const signInWithOtp = vi.fn(async () => ({ data: {}, ...answer }));
+async function withAuth(answer: { error: unknown } | (() => Promise<never>)) {
+  const respond = typeof answer === "function" ? answer : async () => ({ data: {}, ...answer });
+  const signInWithOtp = vi.fn();
   // the time floor is pinned on its own below; here it only must be awaited on every path
   vi.doMock("@/features/auth/answer-floor", () => ({ padAuthAnswer }));
   vi.doMock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { signInWithOtp } }) }));
-  const forwarded = { forwardedSignIn: vi.fn(), forwardedSignUp: vi.fn(), forwardedResetPassword: vi.fn() };
+  const forwarded = {
+    forwardedSignIn: vi.fn(),
+    forwardedSignUp: vi.fn(),
+    forwardedResetPassword: vi.fn(respond),
+    forwardedMagicLink: vi.fn(respond),
+  };
   vi.doMock("@/lib/supabase/auth-forwarding-server", () => forwarded);
   const actions = await import("@/features/auth/actions");
   return { actions, signInWithOtp, forwarded };
@@ -83,14 +90,51 @@ describe("the answer never tells whether the address has an account", () => {
     }
     vi.resetModules();
     padAuthAnswer.mockClear();
-    const signInWithOtp = vi.fn(async () => {
+    const { actions } = await withAuth(async () => {
       throw new TypeError("fetch failed");
     });
-    vi.doMock("@/features/auth/answer-floor", () => ({ padAuthAnswer }));
-    vi.doMock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { signInWithOtp } }) }));
-    const actions = await import("@/features/auth/actions");
     expect(await actions.magicLinkAction(null, form(ADDRESS))).toEqual({ ok: true, message: MAGIC_LINK_SENT });
     expect(padAuthAnswer).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("owner (393) א: the reset email answers the same for every outcome", () => {
+  const SENT = `אם יש חשבון עם הכתובת ${ADDRESS}, שלחנו אליה קישור לבחירת סיסמה חדשה.`;
+  const outcomes: Array<{ error: unknown } | (() => Promise<never>)> = [
+    { error: null },
+    { error: { status: 429, code: "over_email_send_rate_limit", message: "Email rate limit exceeded" } },
+    { error: { status: 429, code: "over_request_rate_limit", message: "Request rate limit reached" } },
+    { error: { status: 429, message: "For security purposes, you can only request this after 42 seconds." } },
+    { error: { status: 500, code: "unexpected_failure", message: `Error sending recovery email to ${ADDRESS}` } },
+    { error: { status: 400, code: "user_not_found", message: "User not found" } },
+    async () => {
+      throw new TypeError("fetch failed");
+    },
+  ];
+
+  it("a 429, any other error and a throw all answer the sent text, after the time floor", async () => {
+    for (const outcome of outcomes) {
+      vi.resetModules();
+      padAuthAnswer.mockClear();
+      const { actions, forwarded } = await withAuth(outcome);
+      expect(await actions.forgotPasswordAction(null, form(ADDRESS))).toEqual({ ok: true, message: SENT });
+      expect(forwarded.forwardedResetPassword).toHaveBeenCalledTimes(1);
+      expect(padAuthAnswer).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("an error writes one redacted line (code and status, never the address); a success writes none", async () => {
+    const quiet = await withAuth({ error: null });
+    await quiet.actions.forgotPasswordAction(null, form(ADDRESS));
+    expect(logged.filter((l) => l.includes("auth.reset_password"))).toEqual([]);
+    vi.resetModules();
+    const limited = await withAuth({ error: { status: 429, code: "over_email_send_rate_limit", message: `limit for ${ADDRESS}` } });
+    await limited.actions.forgotPasswordAction(null, form(ADDRESS));
+    const lines = logged.filter((l) => l.includes("auth.reset_password"));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain("over_email_send_rate_limit");
+    expect(lines[0]).toContain('"level":"warn"');
+    expect(logged.join("\n")).not.toContain(ADDRESS);
   });
 });
 
@@ -119,10 +163,12 @@ describe("the time floor (./answer-floor.ts)", () => {
     const own = body.slice(0, body.indexOf("\nexport ", 10));
     expect(own.indexOf("performance.now()")).toBeLessThan(own.indexOf("forwardedResetPassword("));
     expect(own.indexOf("padAuthAnswer(")).toBeGreaterThan(own.indexOf("forwardedResetPassword("));
+    // owner (393) א: no answer but the sent text (no fail() after the Auth call)
+    expect(own.slice(own.indexOf("forwardedResetPassword("))).not.toMatch(/\bfail\(/);
     // the magic link also pads after its Auth call, and never uses after() (the PKCE cookie must be on this response)
     const magic = source.slice(source.indexOf("export async function magicLinkAction"));
     const magicOwn = magic.slice(0, magic.indexOf("\nexport ", 10));
-    expect(magicOwn.indexOf("padAuthAnswer(")).toBeGreaterThan(magicOwn.indexOf(".auth.signInWithOtp("));
+    expect(magicOwn.indexOf("padAuthAnswer(")).toBeGreaterThan(magicOwn.indexOf("forwardedMagicLink("));
     expect(magicOwn).not.toMatch(/\bafter\(/);
   });
 });
@@ -132,18 +178,16 @@ describe("the Auth call", () => {
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "https://mexuzsystem.com/");
     const { actions, signInWithOtp, forwarded } = await withAuth({ error: null });
     await actions.magicLinkAction(null, form(ADDRESS, "/invite/abc123"));
-    expect(signInWithOtp).toHaveBeenCalledWith({
-      email: ADDRESS,
-      options: { shouldCreateUser: false, emailRedirectTo: "https://mexuzsystem.com/auth/callback?next=%2Finvite%2Fabc123" },
+    // owner (392) א: through the FXS-12 forwarding client only (shouldCreateUser false is fixed inside it)
+    expect(forwarded.forwardedMagicLink).toHaveBeenCalledWith(ADDRESS, {
+      emailRedirectTo: "https://mexuzsystem.com/auth/callback?next=%2Finvite%2Fabc123",
     });
-    // never through the FXS-12 forwarding client
+    expect(signInWithOtp).not.toHaveBeenCalled();
     expect(forwarded.forwardedSignIn).not.toHaveBeenCalled();
     expect(forwarded.forwardedResetPassword).not.toHaveBeenCalled();
     // an outside next falls back to "/"
     await actions.magicLinkAction(null, form(ADDRESS, "//evil.example/x"));
-    expect(signInWithOtp).toHaveBeenLastCalledWith(
-      expect.objectContaining({ options: expect.objectContaining({ emailRedirectTo: "https://mexuzsystem.com/auth/callback?next=%2F" }) }),
-    );
+    expect(forwarded.forwardedMagicLink).toHaveBeenLastCalledWith(ADDRESS, { emailRedirectTo: "https://mexuzsystem.com/auth/callback?next=%2F" });
   });
 
   it("a bad address is refused before Turnstile and Auth", async () => {
@@ -151,12 +195,12 @@ describe("the Auth call", () => {
     vi.stubGlobal("fetch", fetchSpy);
     vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "0x4AAAAAAAsitekeysitekey");
     vi.stubEnv("TURNSTILE_SECRET_KEY", "0x4AAAAAAAsecretsecretsecretsecretsecret");
-    const { actions, signInWithOtp } = await withAuth({ error: null });
+    const { actions, forwarded } = await withAuth({ error: null });
     const result = await actions.magicLinkAction(null, form("not-an-address"));
     expect(result).toMatchObject({ ok: false });
     expect(result && !result.ok ? result.fieldErrors?.email : undefined).toBeTruthy();
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(signInWithOtp).not.toHaveBeenCalled();
+    expect(forwarded.forwardedMagicLink).not.toHaveBeenCalled();
   });
 
   it("logs the code only, never the address", async () => {
@@ -168,20 +212,21 @@ describe("the Auth call", () => {
     expect(logged.join("\n")).not.toContain(ADDRESS);
   });
 
-  it("in the source: zod, then Turnstile, then the user's own client; never the forwarding client", () => {
+  it("in the source: zod, then Turnstile, then the forwarding client; never the user's own client directly", () => {
     const source = readFileSync("src/features/auth/actions.ts", "utf8");
     const body = source.slice(source.indexOf("export async function magicLinkAction"));
     const own = body.slice(0, body.indexOf("\nexport ", 10));
     const zod = own.indexOf("magicLinkSchema.safeParse(");
     const captcha = own.indexOf("verifyTurnstile(");
-    const client = own.indexOf("createClient()");
-    const call = own.indexOf(".auth.signInWithOtp(");
+    const call = own.indexOf("forwardedMagicLink(");
     expect(zod).toBeGreaterThan(0);
     expect(zod).toBeLessThan(captcha);
-    expect(captcha).toBeLessThan(client);
-    expect(client).toBeLessThan(call);
-    expect(own).toContain("shouldCreateUser: false");
-    expect(own).not.toMatch(/forwarded[A-Z]/);
+    expect(captcha).toBeLessThan(call);
+    expect(own).not.toContain("createClient()");
+    expect(own).not.toContain(".auth.signInWithOtp(");
+    const forwarding = readFileSync("src/lib/supabase/auth-forwarding-server.ts", "utf8");
+    const fn = forwarding.slice(forwarding.indexOf("export async function forwardedMagicLink"));
+    expect(fn).toContain("shouldCreateUser: false");
   });
 });
 

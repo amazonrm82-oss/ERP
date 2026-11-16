@@ -234,14 +234,13 @@ describe("verifyTurnstile in a request", () => {
 });
 
 describe("the auth actions check Turnstile before any Supabase call", () => {
-  it("a refusal stops each of the three actions before the forwarding client is called", async () => {
+  it("a refusal stops each of the four actions before the forwarding client is called", async () => {
     vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", SITE);
     vi.stubEnv("TURNSTILE_SECRET_KEY", SECRET);
-    const forwarded = { forwardedSignIn: vi.fn(), forwardedSignUp: vi.fn(), forwardedResetPassword: vi.fn() };
+    const forwarded = { forwardedSignIn: vi.fn(), forwardedSignUp: vi.fn(), forwardedResetPassword: vi.fn(), forwardedMagicLink: vi.fn() };
     vi.doMock("@/lib/supabase/auth-forwarding-server", () => forwarded);
     const resend = vi.fn();
-    const signInWithOtp = vi.fn();
-    vi.doMock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { resend, signInWithOtp } }) }));
+    vi.doMock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { resend } }) }));
     vi.stubGlobal("fetch", vi.fn(ok({ success: false, "error-codes": ["invalid-input-response"] })));
     const actions = await import("@/features/auth/actions");
     const f = new FormData();
@@ -263,6 +262,7 @@ describe("the auth actions check Turnstile before any Supabase call", () => {
     expect(forwarded.forwardedSignIn).not.toHaveBeenCalled();
     expect(forwarded.forwardedSignUp).not.toHaveBeenCalled();
     expect(forwarded.forwardedResetPassword).not.toHaveBeenCalled();
+    expect(forwarded.forwardedMagicLink).not.toHaveBeenCalled();
     // sign-up's "send again": the token is an argument; refused without one or with a bad one, before Auth
     const { CAPTCHA_FAILED, CAPTCHA_UNAVAILABLE } = await import("@/lib/errors");
     expect(await actions.resendConfirmationAction("a@example.com", "/")).toEqual({ ok: false, message: CAPTCHA_FAILED });
@@ -273,7 +273,7 @@ describe("the auth actions check Turnstile before any Supabase call", () => {
     expect(resend).not.toHaveBeenCalled();
     // USR-10's one-time link: refused like the reset email while Cloudflare cannot be asked, before Auth
     expect(await actions.magicLinkAction(null, f)).toMatchObject({ ok: false, message: CAPTCHA_UNAVAILABLE });
-    expect(signInWithOtp).not.toHaveBeenCalled();
+    expect(forwarded.forwardedMagicLink).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
 
@@ -284,7 +284,7 @@ describe("the auth actions check Turnstile before any Supabase call", () => {
       ["signUpAction", "forwardedSignUp("],
       ["forgotPasswordAction", "forwardedResetPassword("],
       ["resendConfirmationAction", ".auth.resend("],
-      ["magicLinkAction", ".auth.signInWithOtp("],
+      ["magicLinkAction", "forwardedMagicLink("],
     ]) {
       const body = source.slice(source.indexOf(`export async function ${fn}`));
       const end = body.indexOf("\nexport ", 10);
