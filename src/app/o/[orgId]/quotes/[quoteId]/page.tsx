@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { CustomerHoldWarning } from "@/features/customer-holds/components/customer-hold-warning";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
@@ -35,6 +36,7 @@ import { getDealOpen, getQuote, getQuoteAcceptDeal, getQuoteAcceptedAt, getQuote
 import { quoteViewsCount } from "@/features/quotes/views";
 import { PaymentScheduleCard } from "@/features/quotes/components/quote-schedule-card";
 import { QuoteLinkCard } from "@/features/quotes/components/quote-link-card";
+import { QuoteMessageButton } from "@/features/quote-message/components/quote-message-button";
 import { QuoteDecisionCard } from "@/features/quotes/components/quote-decision-card";
 import { SendQuoteFlow } from "@/features/quotes/components/send-quote-flow";
 import { QuotePdfButton } from "@/features/quotes/components/quote-pdf-button";
@@ -508,6 +510,22 @@ export default async function QuotePage({ params, searchParams }: Props) {
             ))}
           </ul>
         </section>
+      ) : null}
+      {/* QUO-18: a sent quote still on offer goes to its customer by email or SMS; its reads wait in Suspense */}
+      {linkStatus && hasQuotes && context.canWrite && (quote.status === "sent" || quote.status === "viewed") ? (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <Suspense fallback={null}>
+            <QuoteMessageButton
+              orgId={orgId}
+              quote={quote}
+              linkActive={linkStatus.active}
+              userName={context.user.displayName}
+              businessName={context.org.name}
+              timeZone={context.org.timeZone}
+              canManageTemplates={isAdminRole(context.role)}
+            />
+          </Suspense>
+        </div>
       ) : null}
       {linkStatus ? (
         <QuoteLinkCard

@@ -5075,6 +5075,9 @@ export type Database = {
       quote_link_create: { Args: { p_org: string; p_quote: string }; Returns: string };
       quote_link_revoke: { Args: { p_org: string; p_quote: string }; Returns: boolean };
       quote_link_status: { Args: { p_org: string; p_quote: string }; Returns: Json };
+      // QUO-18 (migration quote_message_send): a sent quote to its customer by email or SMS, and its messages' state
+      quote_message_send: { Args: { p_org: string; p_quote: string; p_channel: string; p_template: string }; Returns: Json };
+      quote_message_queue: { Args: { p_org: string; p_quote: string }; Returns: Json };
       quote_public: { Args: { p_token: string }; Returns: Json };
       // QUO-06 follow-ups: the person's right (their own session); the server's write (service_role only); the customer's
       // download of the shown version's stored PDF (service_role only)

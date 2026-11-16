@@ -903,6 +903,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       // USR-11 / WAB-03 redefines app.job_kinds() of _background_jobs.sql, app.job_payload_ok() of _review_requests_leads.sql and
       // app.plan_key_defaults() of _prefill_forms.sql last
       "_daily_digest.sql",
+      // QUO-18 redefines app.job_payload_ok() of _daily_digest.sql and the two composers of _card_email_fields.sql last
+      "_quote_message_send.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

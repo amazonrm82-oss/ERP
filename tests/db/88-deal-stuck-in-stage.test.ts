@@ -193,6 +193,8 @@ const RERUN = [
   migrationFile("_card_email_fields.sql"),
   // USR-11 / WAB-03 redefines app.job_kinds(), app.job_payload_ok() and app.plan_key_defaults() last
   migrationFile("_daily_digest.sql"),
+  // QUO-18 redefines app.job_payload_ok() and the two composers last
+  migrationFile("_quote_message_send.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its
