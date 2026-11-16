@@ -75,6 +75,15 @@ describe("ADM-01: subprocessors from the platform panel", () => {
     // LEGAL-2 (agreement_legal_review) adds five entries and fills two locations when it runs: the last change is that day
     const migrated = await asAdmin(async (q) => (await q<{ d: string }>("select to_char(max(greatest(created_at, updated_at) at time zone 'Asia/Jerusalem'), 'YYYY-MM-DD') as d from public.subprocessors where cancelled_at is null")).rows[0].d);
     expect(result.updated_on).toBe(migrated);
+    // ADM-01 (390) א (subprocessor_google): Google LLC for sign-in with Google, 14 days ahead, in the United States, once
+    const google = await asAdmin(async (q) =>
+      (await q<{ n: number; days: number; location: string; data: string }>(
+        `select count(*)::int as n, max(effective_from - (created_at at time zone 'Asia/Jerusalem')::date) as days,
+                max(location) as location, max(data_categories) as data
+           from public.subprocessors where name = 'Google LLC' and cancelled_at is null`,
+      )).rows[0],
+    );
+    expect(google).toEqual({ n: 1, days: 14, location: "ארצות הברית", data: "שם, אימייל ותמונת פרופיל של משתמש שבחר בכך." });
     const list = result.entries;
     expect(list.length).toBeGreaterThanOrEqual(3);
     for (const entry of list) {
