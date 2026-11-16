@@ -150,6 +150,7 @@ export default async function AccountPage({ params }: { params: Promise<{ orgId:
                 kind={digestKindFor(role)}
                 inPlan={digest[1]}
                 stoppedText={digest[0].stoppedByLinkAt ? formatDateTime(digest[0].stoppedByLinkAt) : null}
+                quiet={notificationSettings.quiet}
               />
             </section>
           ) : null}

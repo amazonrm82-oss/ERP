@@ -9,6 +9,7 @@ import type { FormState } from "@/lib/action-result";
 import { submitWith } from "@/lib/use-submit";
 
 import { saveDigestSettingsAction } from "../actions";
+import { digestQuietNote, type QuietHoursWindow } from "../quiet-note";
 import { DIGEST_TIMES, type DigestKind, type DigestSettings } from "../settings";
 
 /**
@@ -21,6 +22,7 @@ export function DigestSettingsForm({
   kind,
   inPlan,
   stoppedText,
+  quiet,
 }: {
   orgId: string;
   settings: DigestSettings;
@@ -29,10 +31,13 @@ export function DigestSettingsForm({
   inPlan: boolean;
   /** when the person stopped it from the email's link, as the business shows dates (null = not stopped that way) */
   stoppedText: string | null;
+  /** the person's own quiet hours (USR-11), read with their session; null = off */
+  quiet: QuietHoursWindow;
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(saveDigestSettingsAction.bind(null, orgId), null);
   const [enabled, setEnabled] = useState(settings.enabled);
   const [sendAt, setSendAt] = useState(settings.sendAt);
+  const quietNote = enabled ? digestQuietNote(sendAt, quiet) : null;
   const errors = state && !state.ok ? (state.fieldErrors ?? {}) : {};
   return (
     <form onSubmit={submitWith(formAction)} className="space-y-4">
@@ -68,6 +73,10 @@ export function DigestSettingsForm({
       ) : (
         <input type="hidden" name="digest_send_at" value={sendAt} />
       )}
+      {/* owner (380) א: a time inside the quiet hours; the line follows the picker live */}
+      <p aria-live="polite" className="text-sm text-ink-soft empty:hidden">
+        {quietNote}
+      </p>
       {stoppedText && !enabled ? (
         <p className="text-sm text-ink-soft">הסיכום הופסק מהקישור במייל ב-{stoppedText}. אפשר להפעיל אותו מחדש כאן.</p>
       ) : null}
@@ -75,7 +84,7 @@ export function DigestSettingsForm({
         <p className="text-sm text-ink-soft">הסיכום היומי לא כלול בחבילה הנוכחית. הבחירה נשמרת, והסיכום יישלח כשהחבילה תכלול אותו.</p>
       )}
       <p className="text-sm text-ink-soft">
-        בימי מנוחה של העסק ובזמן חופשה לא נשלח סיכום. בשעות השקט שלכם הסיכום מחכה לסופן. בכל מייל יש קישור להפסקה בלחיצה אחת.
+        בימי מנוחה של העסק ובזמן חופשה לא נשלח סיכום. בשעות השקט שלכם הסיכום מחכה לסופן, כשהן נגמרות באותו יום. בכל מייל יש קישור להפסקה בלחיצה אחת.
       </p>
       <SubmitButton pendingText="שומרים…" pending={pending}>
         שמירה
