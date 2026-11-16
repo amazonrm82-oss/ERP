@@ -558,6 +558,32 @@ and build this CRM here instead. The old code is preserved on the branch
    `app.record_email_enqueue`, `app.record_sms_enqueue`, both template refusals, `app.automation_send_email|sms`, `app.email_compose_core`,
    `app.sms_compose_core`, `public.record_email_queue` and `public.record_sms_queue` were last redefined in 021279 (tests 352, 367 pins
    rechecked); tests 64 and 88 end with `_card_email_fields.sql`.
+   In use (USR-11 / WAB-03 / MNY-03 daily summary, owner (267) א and 15 November 2026 answers (375) ב, (376) ב, (377) ב, (378) א;
+   migrations 021281 and 021282 (021282 pasted by hand); an independent review and a delta review): the OPS-04 worker (same route and
+   secret) claims `digest.send` (payload `{user_id, organization_id, digest_kind, day}` only, queued by pg_cron `crm-daily-digests` /
+   `app.queue_daily_digests` only while a worker asked for the kind and the business holds plan key `daily_digest`, every plan but
+   free; run time by `app.digest_run_at`, which waits for the end of the person's quiet hours only when it falls on the same business
+   day) in its own pass after the customer messages (5 at a time, at most 15 s a run), while the email channel has a provider, and
+   calls with the service key only `public.digest_job_compose()` (service_role, the job's live lease; re-checks the open business, the
+   key, an active membership, the person's switch and the day; answers the sign-in email, the business display name, the kind by the
+   current role, counts only from `app.digest_counts` computed under the recipient's own read rules (`app.user_can_read_record`'s rule
+   through `app.digest_read_teams`, `app.deputy_records`, TASK-07 team tasks, SPD-01 taken leads, MNY-01 groups; debts for
+   owners/admins only; `reads_anything` false = fixed text and a link; never the OPS-09 auth.uid() sets), and a stop token). Counted
+   without a session also where the business requires two-step verification (lead's decision: the numbers equal what the person sees
+   after the second step, sent only to their own sign-in address). One stop token per job, the same on every try (SHA-256 kept in
+   `app.digest_stop_tokens` for 30 days; the plain form kept there, no grants, only while the job can be tried and its day has not
+   passed, cleared by `app.digest_clear_plain_tokens` on each `crm-daily-digests` pass; a stop link used while a job waits for its
+   retry makes the composer refuse it, `token_gone`). It sends through the provider layer (`src/features/digest/send-handler.ts`, text
+   `src/features/digest/email.ts`, numbers and links only, never a customer name) with RFC 8058 List-Unsubscribe. The stop link
+   (`src/features/digest/stop-server.ts`, page `/f/digest-stop/<token>`, which only reads, and route `POST /api/forms/digest-stop/<token>`)
+   calls only `public.digest_stop()` (service_role; answers active|stopped|used and the display name only; 60 per sender (keyed IP hash
+   scope `digest`, 4,096 buckets) and 30 per link in 10 minutes), which sets `digest_settings.enabled=false` and server-only
+   `stopped_by_link_at`, shown in the person's notification settings where it is switched on again. OPS-02 guard first; never framed,
+   no-referrer, preview bots read nothing, no cookies. Eight digest functions are pinned by md5 in test 284; `public.plans_public` (test
+   344's pin), `app.job_kinds`, `app.job_payload_ok` and `app.plan_key_defaults` were last redefined in 021281. Expired tokens and old
+   once-a-day rows are removed by the pasted `app.digest_cleanup_rows` through `app.run_digest_cleanup` (pg_cron `crm-digest-cleanup`,
+   a no-op until pasted). In the eslint allow-list. The advisor's findings on `app.digest_stop_tokens`, `app.digest_stop_counts` and
+   `app.digest_sends` are expected.
    In use (OPS-04, owner 26 October 2026, answer (א) and wave 3 use (1); conditions of 2 November 2026, answers (52)-(55); migration
    `_jobs_queue.sql`): the background job worker (`src/features/jobs/run-server.ts`, route `POST /api/jobs/run`, public prefix in
    `src/lib/supabase/proxy.ts`), woken by `app.wake_job_worker()` (pg_cron `crm-jobs-wake`, pg_net; `app.settings` `jobs_run_url`,
