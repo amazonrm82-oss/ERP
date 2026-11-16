@@ -24,7 +24,10 @@ afterAll(closePool);
 // USR-11 / WAB-03 (migration 20261006021281_daily_digest.sql; 9b9d7b44344bc3ac01227bc8dc026648 before): 021263's body with
 // 'daily_digest' added to the closed landing list after 'money_waiting' (its own line); rechecked: nothing else changed (no new
 // field, table, argument or grant; the grants are re-asserted unchanged: anon and authenticated only).
-const REVIEWED_BODY_MD5 = "27e0dca8bbc00d361135784b1a4b6001";
+// QUO-18 reminders (migration 20261006021284_quote_reminders.sql; 27e0dca8bbc00d361135784b1a4b6001 before): 021281's body with
+// 'quote_reminders' added to the closed landing list after 'quotes' (owner (384) ב, a built capability of PLAN_CAPABILITIES);
+// rechecked: nothing else changed (no new field, table, argument or grant; the grants re-asserted: anon and authenticated only).
+const REVIEWED_BODY_MD5 = "5b88297851fa0fedc55dc486460225a4";
 
 type PublicPlan = Record<string, unknown> & { key: string; availability: string; limits: Record<string, unknown>; features: string[] };
 

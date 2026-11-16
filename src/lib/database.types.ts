@@ -190,6 +190,8 @@ export type OrgDocumentSettingsRow = {
   signature_reminder_days: number;
   // SGN-03 (owner (249) א): the customer's one reminder 2 days before a document's last day (default on)
   signature_customer_reminder: boolean;
+  // QUO-18 (owner (383) א, migration quote_reminders): automatic quote reminders to the customer (default off)
+  quote_customer_reminder: boolean;
   // SGN-04 (migration contract_renewals): days before a signed contract's renewal day (else its last day) the alert task is
   // made, 0 = off (0..365)
   contract_renewal_days: number;
@@ -341,6 +343,7 @@ type OrgDocumentSettingsWrite = {
   meeting_order_draft?: "button" | "auto";
   signature_reminder_days?: number;
   signature_customer_reminder?: boolean;
+  quote_customer_reminder?: boolean;
   contract_renewal_days?: number;
   collection_customer_reminder?: boolean;
   collection_customer_stages?: number[];

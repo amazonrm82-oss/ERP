@@ -905,6 +905,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_daily_digest.sql",
       // QUO-18 redefines app.job_payload_ok() of _daily_digest.sql and the two composers of _card_email_fields.sql last
       "_quote_message_send.sql",
+      // QUO-18 reminders redefine app.plan_key_defaults() and public.plans_public() of _daily_digest.sql and
+      // app.quote_message_refusal() of _quote_message_send.sql last
+      "_quote_reminders.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

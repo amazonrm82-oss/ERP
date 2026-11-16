@@ -13,6 +13,7 @@ import {
   queuedQuoteMessages,
   queuedQuoteMessageText,
 } from "@/features/quote-message/logic";
+import { DEFAULT_QUOTE_REMINDER_TEMPLATES, quoteCustomerReminderOf, quoteReminderSchema } from "@/features/quote-message/reminders";
 
 const MIGRATIONS = join(process.cwd(), "supabase", "migrations");
 
@@ -77,5 +78,25 @@ describe("sending a quote to its customer (QUO-18)", () => {
     ]);
     expect(rows).toHaveLength(1);
     expect(queuedQuoteMessageText(rows[0])).toBe("לא נשלחה: ההצעה או הלקוח שלה השתנו לפני השליחה");
+  });
+});
+
+describe("automatic quote reminders (QUO-18, owner (381)-(384))", () => {
+  it("seeds the same DRAFT templates as app.seed_quote_reminder_templates", () => {
+    const sql = latest("create or replace function app.seed_quote_reminder_templates(");
+    const body = sql.slice(sql.indexOf("create or replace function app.seed_quote_reminder_templates("));
+    for (const t of DEFAULT_QUOTE_REMINDER_TEMPLATES) {
+      expect(body).toContain(`'${t.name}', '${t.channel}'`);
+      if (t.subject) expect(body).toContain(`'${t.subject}'`);
+      for (const line of t.body.split("\n").filter((l) => l !== "")) expect(body, line).toContain(line);
+    }
+    expect(body).toContain("'quote-reminder-draft-1'");
+  });
+
+  it("is off unless switched on", () => {
+    expect(quoteCustomerReminderOf(true)).toBe(true);
+    for (const v of [false, null, undefined, "true"]) expect(quoteCustomerReminderOf(v)).toBe(false);
+    expect(quoteReminderSchema.parse({ quote_customer_reminder: "on" })).toEqual({ quote_customer_reminder: true });
+    expect(quoteReminderSchema.parse({})).toEqual({ quote_customer_reminder: false });
   });
 });

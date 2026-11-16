@@ -5,6 +5,8 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { getOrgBranding } from "@/features/branding/queries";
 import { quoteAcceptDealLabel } from "@/features/quotes/accept-deal";
 import { QuoteAcceptDealForm } from "@/features/quotes/components/quote-accept-deal-form";
+import { QuoteReminderForm } from "@/features/quote-message/components/quote-reminder-form";
+import { getQuoteReminderSetting } from "@/features/quote-message/queries";
 import { QuoteDesignForm } from "@/features/quotes/components/quote-design-form";
 import { QuoteDocument } from "@/features/quotes/components/quote-document";
 import { getSampleDocumentData } from "@/features/quotes/design-server";
@@ -24,7 +26,12 @@ const linkClass = "text-accent-strong underline-offset-4 hover:underline";
 export default async function QuoteDesignPage({ params }: Props) {
   const { orgId } = await params;
   const context = await getOrgContext(orgId);
-  const [sample, branding, acceptDeal] = await Promise.all([getSampleDocumentData(orgId, context.org.name), getOrgBranding(orgId), getQuoteAcceptDeal(orgId)]);
+  const [sample, branding, acceptDeal, reminders] = await Promise.all([
+    getSampleDocumentData(orgId, context.org.name),
+    getOrgBranding(orgId),
+    getQuoteAcceptDeal(orgId),
+    getQuoteReminderSetting(orgId),
+  ]);
   const editable = isAdminRole(context.role) && context.canWrite;
   return (
     <div className="space-y-5">
@@ -58,6 +65,21 @@ export default async function QuoteDesignPage({ params }: Props) {
           ) : (
             <p className="text-sm">
               כשלקוח מאשר הצעה, בעסקה שלה: <span className="font-medium">{quoteAcceptDealLabel(acceptDeal)}</span>
+            </p>
+          )}
+        </CardBody>
+      </Card>
+      {/* QUO-18 (381)-(384): automatic reminders to the customer, off until an owner or admin switches them on */}
+      <Card aria-labelledby="quote-reminders-title">
+        <CardHeader id="quote-reminders-title" title="תזכורות ללקוח" />
+        <CardBody>
+          {!reminders.inPlan ? (
+            <p className="text-sm text-ink-soft">תזכורות אוטומטיות על הצעות מחיר זמינות מחבילת בסיס ומעלה.</p>
+          ) : editable ? (
+            <QuoteReminderForm orgId={orgId} on={reminders.on} />
+          ) : (
+            <p className="text-sm">
+              תזכורות אוטומטיות ללקוח: <span className="font-medium">{reminders.on ? "פעילות" : "כבויות"}</span>
             </p>
           )}
         </CardBody>

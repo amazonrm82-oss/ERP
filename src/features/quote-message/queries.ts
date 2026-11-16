@@ -12,6 +12,7 @@ import { firstNameOf } from "@/features/whatsapp/templates";
 import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
+import { quoteCustomerReminderOf } from "./reminders";
 import { quoteDocumentName, quoteMessageTemplates, queuedQuoteMessages, type QueuedQuoteMessage, type QuoteMessageChannel } from "./logic";
 
 export type QuoteMessageOption = {
@@ -76,4 +77,15 @@ export async function getQuoteMessageSetup(orgId: string, quote: Quote, hasValid
       document: quoteDocumentName(quote.numberDisplay),
     },
   };
+}
+
+/** QUO-18 (383) א: whether the business sends automatic quote reminders, and whether its plan holds them (with the user's session). */
+export async function getQuoteReminderSetting(orgId: string): Promise<{ on: boolean; inPlan: boolean }> {
+  const supabase = await createClient();
+  const [row, inPlan] = await Promise.all([
+    supabase.from("org_document_settings").select("quote_customer_reminder").eq("organization_id", orgId).maybeSingle(),
+    orgHasFeature(orgId, "quote_reminders"),
+  ]);
+  const settings = must(row, "quote reminder setting");
+  return { on: quoteCustomerReminderOf(settings?.quote_customer_reminder), inPlan };
 }

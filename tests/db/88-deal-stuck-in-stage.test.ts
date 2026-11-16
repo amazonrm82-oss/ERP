@@ -195,6 +195,8 @@ const RERUN = [
   migrationFile("_daily_digest.sql"),
   // QUO-18 redefines app.job_payload_ok() and the two composers last
   migrationFile("_quote_message_send.sql"),
+  // QUO-18 reminders redefine app.plan_key_defaults(), public.plans_public() and app.quote_message_refusal() last
+  migrationFile("_quote_reminders.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

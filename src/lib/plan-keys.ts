@@ -112,6 +112,8 @@ const FEATURES: Record<string, Record<SoldPlan, boolean>> = {
   sms: BASIC_UP,
   // RET-02 (owner, 11 November 2026, answer (273)): a new key, basic and up
   review_requests: BASIC_UP,
+  // QUO-18 (owner, 16 November 2026, answer (384) ב): automatic quote reminders to the customer, basic and up
+  quote_reminders: BASIC_UP,
   orders: BASIC_UP,
   api: BASIC_UP,
   custom_reports: BASIC_UP,
@@ -205,6 +207,8 @@ const WAVE2_FEATURE_LIST = [
   "prefill_links",
   // USR-11 / WAB-03 (migration daily_digest)
   "daily_digest",
+  // QUO-18 (migration quote_reminders)
+  "quote_reminders",
 ] as const;
 const WAVE2_LIMIT_LIST = [
   "max_products", "max_price_lists", "max_quote_templates", "max_booking_pages", "max_booking_pages_per_user",

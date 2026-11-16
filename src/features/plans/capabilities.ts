@@ -30,6 +30,8 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   { feature: "discounts", label: "הנחה בשורה", built: true },
   // QUO-01..17
   { feature: "quotes", label: "הצעות מחיר וחתימה", built: true },
+  // QUO-18 (owner, 16 November 2026, answer (384) ב): basic and up
+  { feature: "quote_reminders", label: "תזכורות אוטומטיות ללקוח על הצעת מחיר", built: true },
   // DOC-01: invoices and receipts issued outside the system
   { feature: "documents", label: "רישום חשבוניות וקבלות", built: true },
   // PAY-01/05/06
