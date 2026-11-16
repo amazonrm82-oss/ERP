@@ -89,8 +89,8 @@ export async function forgotPasswordAction(_prev: FormState, formData: FormData)
   // USR-10 review: the answer takes the same time whether or not the address has an account (./answer-floor.ts)
   const started = performance.now();
   const outcome = await authOutcome(() => forwardedResetPassword(parsed.data.email, { redirectTo }));
-  await padAuthAnswer(started);
   await logAuthOutcome("auth.reset_password", outcome);
+  await padAuthAnswer(started);
   return { ok: true, message: `אם יש חשבון עם הכתובת ${parsed.data.email}, שלחנו אליה קישור לבחירת סיסמה חדשה.` };
 }
 
@@ -106,11 +106,14 @@ async function authOutcome(call: () => Promise<{ error: { code?: string; status?
   }
 }
 
-/** One line per failed call: the code and status only, never the address. A rate limit is a warning. */
+/** One line per failed call: the code and status only, never the address. A rate limit is a warning, a throw an error. Logged
+ * before the time floor, so the floor absorbs it. */
 async function logAuthOutcome(event: "auth.reset_password" | "auth.magic_link", outcome: AuthOutcome): Promise<void> {
   if (!outcome) return;
   const limited = outcome.code === "over_request_rate_limit" || outcome.code === "over_email_send_rate_limit" || outcome.status === "429";
-  await serverLog(limited ? "warn" : "info", event, outcome);
+  // a throw (status "0": missing configuration, Supabase unreachable) is an error, so a broken setup is never silent
+  const level = outcome.status === "0" ? "error" : limited ? "warn" : "info";
+  await serverLog(level, event, outcome);
 }
 
 /**
@@ -134,8 +137,8 @@ export async function magicLinkAction(_prev: FormState, formData: FormData): Pro
   const emailRedirectTo = magicLinkRedirect(await siteOrigin(), next);
   const started = performance.now();
   const outcome = await authOutcome(() => forwardedMagicLink(parsed.data.email, { emailRedirectTo }));
-  await padAuthAnswer(started);
   await logAuthOutcome("auth.magic_link", outcome);
+  await padAuthAnswer(started);
   return { ok: true, message: MAGIC_LINK_SENT };
 }
 

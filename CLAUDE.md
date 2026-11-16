@@ -250,18 +250,22 @@ and build this CRM here instead. The old code is preserved on the branch
   sets in Vercel; only a key starting `sb_secret_`; lint refuses the name elsewhere, and only `src/features/auth/actions.ts` may import
   the file) makes, per request, an Auth-only `@supabase/ssr` client with that key, the header `sb-forwarded-for` (the user's address from
   `clientIp()`, a valid IPv4/IPv6 only) and the fixed User-Agent `mexuz-server` (Supabase refuses a secret key with a browser one). It
-  calls only `auth.signInWithPassword`, `auth.signUp` and `auth.resetPasswordForEmail` for the sign-in, sign-up and forgot-password
-  actions and answers only that call's result. Same session cookie methods and options as `src/lib/supabase/server.ts`; after a sign-in
+  calls only `auth.signInWithPassword`, `auth.signUp`, `auth.resetPasswordForEmail` and (owner (392) א, 16 November 2026)
+  `auth.signInWithOtp` (USR-10's one-time link through `forwardedMagicLink`: the email and `emailRedirectTo` only, `shouldCreateUser:
+  false` fixed inside) for the sign-in, sign-up, forgot-password and magic-link actions and answers only that call's result. Same session cookie methods and options as `src/lib/supabase/server.ts`; after a sign-in
   the session goes to the request's own client with `setSession` (on failure that client signs out locally). No data call is made with
   the key. Without the key or a valid address, or when the gateway refuses the key (401/403 without an Auth error code), the call runs
   through the user's own client as before (never locked out; one redacted `auth.ip_forwarding_off` line per reason; `secret_key_refused`
   in the logs means "fix the key"). With the key Auth treats these calls as admin and skips its own CAPTCHA, so any CAPTCHA on these
-  three forms (Turnstile, owner (275)) is verified by our server before the call, never by Supabase's setting.
+  four forms (Turnstile, owner (275)) is verified by our server before the call, never by Supabase's setting.
   `tests/unit/auth-forwarding.test.ts` proves no client component reaches the file, the name is never `NEXT_PUBLIC_`, and lint refuses it
-  elsewhere. Sessions started this way carry the User-Agent `mexuz-server` at Auth.
+  elsewhere. Sessions started this way carry the User-Agent `mexuz-server` at Auth. Owner (393) א: forgot-password and the magic link answer the same
+  "sent" text for every Auth outcome (429, any error, a throw), after USR-10's time floor, and log one redacted line (code and status; a
+  throw at error level). Accepted (review): a flood of one address from many IPs is held only by Turnstile and Auth's per-address and
+  project email limits.
   In use (CAP-12 / FXS-12 Turnstile, owner (275) א and (319) א, 12 November 2026; no migration; an independent review): Cloudflare
-  Turnstile on sign-in, sign-up, sign-up's "send again", forgot-password and the landing page's contact form (actions `login`, `signup`,
-  `resend`, `forgot_password`, `contact`; `contact` since LND-20, owner (340) ב),
+  Turnstile on sign-in, sign-up, sign-up's "send again", forgot-password, the email sign-in link and the landing page's contact form
+  (actions `login`, `signup`, `resend`, `forgot_password`, `magic_link`, `contact`; `contact` since LND-20, owner (340) ב),
   verified by OUR server (`src/features/auth/turnstile-server.ts`, server-only, the ONLY reader of `TURNSTILE_SECRET_KEY`; lint refuses
   the name elsewhere) after the zod check and before any Supabase call: siteverify with secret, token and `remoteip` (never stored or
   logged), 3 s timeout; ok only with success, a hostname on the closed list (mexuzsystem.com, erp-3yft.vercel.app, the host of
