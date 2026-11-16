@@ -908,6 +908,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       // QUO-18 reminders redefine app.plan_key_defaults() and public.plans_public() of _daily_digest.sql and
       // app.quote_message_refusal() of _quote_message_send.sql last
       "_quote_reminders.sql",
+      // owner (385) ב redefines the quote page functions, the link functions and app.quote_message_link_issue() last
+      "_quote_links_many.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

@@ -519,7 +519,11 @@ describe("link previews for preview bots (WAB-05)", () => {
     // PRD-09 (product_bundles) adds only `components` to each line of the full page; every not-found branch is unchanged (rechecked)
     // PKG-06 (punch_recipient_names, owner (156) א) adds only `recipient` (the name as sent) to each line of the full page;
     // every not-found branch is unchanged (changed: the line object; rechecked 9 November 2026 against the matrix above)
-    "public.quote_public(text)": "1653fd8f9786ebecea94410698c06186",
+    // QUO-08 / QUO-18 (quote_links_many, owner (385) ב): only the token lookup changed: the token is found among the quote's
+    // live links (app.quote_link_tokens, revoked_at null) and the quote's row is read as before; an unknown or revoked token
+    // still answers not found, every other branch is unchanged (rechecked 16 November 2026 against the matrix above). Then the
+    // delta review (1): the lookup also needs the quote's row to say it has a live link (l.token_hash is not null)
+    "public.quote_public(text)": "2ac8269e53ba90f13820b390437835ef",
     // TAX-02 (021087, bank details) adds only `bank` to the full page (rechecked 3 November 2026, RVW-65)
     // ORD-05 PDF (order_pdfs) adds only the `pdf` key to the full page; every not-found branch is unchanged (rechecked)
     // PRD-09 (product_bundles) adds only `components` to each line of the full page (rechecked)

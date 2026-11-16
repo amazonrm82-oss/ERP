@@ -182,7 +182,7 @@ describe("sending a quote to its customer (QUO-18)", () => {
     expect(String((await compose("sms", job)).text)).toMatch(/^שלום דנה: https:\/\/mexuz\.test\/f\/quote\/[A-Za-z0-9_-]{64}$/);
   });
 
-  it("composes the email with the quote's fields and a NEW link that replaces the old one", async () => {
+  it("composes the email with the quote's fields and one more link; the earlier link keeps working (owner (385) ב)", async () => {
     const { quote } = await newQuote(member, org);
     await sendQuote(member, org, quote);
     const oldToken = await asUser(member.id, async (q) => (await one<{ t: string }>(q, "select public.quote_link_create($1, $2) as t", [org, quote])).t);
@@ -197,12 +197,17 @@ describe("sending a quote to its customer (QUO-18)", () => {
     expect(text).toContain("משה החבר");
     expect(answer.to).toBe("dana@example.test");
     expect(answer.links).toEqual([`${SITE}/f/quote/${token}`]);
-    const hash = await asAdmin(async (q) => (await one<{ h: string }>(q, "select token_hash as h from app.quote_links where quote_id = $1", [quote])).h);
-    expect(hash).toBe(sha256(token as string));
-    expect(hash).not.toBe(sha256(oldToken));
-    const page = await asService(async (q) => (await one<{ p: Answer }>(q, "select public.quote_public($1) as p", [token])).p);
-    expect(page).toHaveProperty("quote");
-    expect((await pgError(asService((q) => q("select public.quote_public($1)", [oldToken])))).code).toBe("P0002");
+    const links = await asAdmin(
+      async (q) => (await q<{ h: string; made_by: string; job_id: string | null }>("select token_hash as h, made_by, job_id from app.quote_link_tokens where quote_id = $1 order by created_at", [quote])).rows,
+    );
+    expect(links).toEqual([
+      { h: sha256(oldToken), made_by: "screen", job_id: null },
+      { h: sha256(token as string), made_by: "message", job_id: r.job_id },
+    ]);
+    for (const t of [token as string, oldToken]) {
+      const page = await asService(async (q) => (await one<{ p: Answer }>(q, "select public.quote_public($1) as p", [t])).p);
+      expect(page).toHaveProperty("quote");
+    }
   });
 
   it("composes the SMS, and refuses when the quote changed state, the customer changed or the number is blocked", async () => {

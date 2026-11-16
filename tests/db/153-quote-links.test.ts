@@ -238,16 +238,18 @@ describe("the customer's link to a quote (QUO-08)", () => {
     await notFound("");
   });
 
-  it("a new link replaces the old one, and a link turned off stops at once", async () => {
+  it("owner (385) ב: a new link adds to the earlier ones; turning the link off stops every one of them at once", async () => {
     const { quote } = await newSentQuote(member, org, { pipelineId, stageId });
     await send(member, org, quote);
     const first = await create(member, org, quote);
     const second = await create(admin, org, quote);
-    await notFound(first);
+    expect((await publicPage(first)).quote.title).toBe("הצעה ללקוח");
     expect((await publicPage(second)).quote.title).toBe("הצעה ללקוח");
+    expect(await status(member, org, quote)).toMatchObject({ active: true, live: 2 });
     expect(await revoke(member, org, quote)).toBe(true);
+    await notFound(first);
     await notFound(second);
-    expect(await status(member, org, quote)).toEqual({ active: false, created_at: null });
+    expect(await status(member, org, quote)).toEqual({ active: false, created_at: null, live: 0 });
     expect(await revoke(member, org, quote)).toBe(false);
     const audit = await asAdmin((q) => q<{ changes: { link: string } }>("select changes from public.audit_log where entity_id = $1 and action = 'quote_link' order by id", [quote]));
     expect(audit.rows.map((r) => r.changes.link)).toEqual(["created", "created", "revoked"]);
@@ -307,7 +309,7 @@ describe("the customer's link to a quote (QUO-08)", () => {
     await notFound(token);
   });
 
-  it("at most 120 views of a link in 10 minutes; a new link starts again", async () => {
+  it("owner (385) ב: at most 120 views of a QUOTE in 10 minutes, across its links; a new link does not start again", async () => {
     const { quote } = await newSentQuote(member, org, { pipelineId, stageId });
     await send(member, org, quote);
     const token = await create(member, org, quote);
@@ -323,7 +325,8 @@ describe("the customer's link to a quote (QUO-08)", () => {
     expect((await publicPage(token)).rate_limited).toBeUndefined();
     await asAdmin((q) => q("update app.quote_links set window_count = 500 where quote_id = $1", [quote]));
     const fresh = await create(member, org, quote);
-    expect((await publicPage(fresh)).rate_limited).toBeUndefined();
+    expect((await publicPage(fresh)).rate_limited).toBe(true);
+    expect((await publicPage(token)).rate_limited).toBe(true);
   });
 
   it("a read-only business keeps its links working, and makes none", async () => {

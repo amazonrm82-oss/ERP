@@ -28,8 +28,8 @@ type Props = {
 
 /**
  * QUO-08 (and QUO-07's link): the customer's link to a sent quote. The link is shown once, right after it is made
- * (only its hash is kept): copy it or send it in WhatsApp or by email then. After that a new link replaces it (the old one
- * stops working, and the person is told so first), or it is turned off.
+ * (only its hash is kept): copy it or send it in WhatsApp or by email then. After that a new link is added (owner (385) ב:
+ * the earlier ones keep working, up to 10), or every link is turned off at once.
  */
 export function QuoteLinkCard({ orgId, quoteId, numberDisplay, active, createdText, businessName, recipient }: Props) {
   const router = useRouter();
@@ -94,7 +94,7 @@ export function QuoteLinkCard({ orgId, quoteId, numberDisplay, active, createdTe
                 size="sm"
                 title="לבטל את הקישור?"
                 // QUO-12 (owner, 19 October 2026): an older version's link still leads to the newest sent version
-                description="הלקוח לא יוכל לפתוח את ההצעה מהקישור הזה. קישורים שנשלחו לגרסאות קודמות של ההצעה עדיין מובילים אליה; כדי לחסום גם אותם, בטלו את הקישור בכל גרסה קודמת."
+                description="הלקוח לא יוכל לפתוח את ההצעה מאף אחד מהקישורים שנשלחו לה. קישורים שנשלחו לגרסאות קודמות של ההצעה עדיין מובילים אליה; כדי לחסום גם אותם, בטלו את הקישור בכל גרסה קודמת."
                 confirmLabel="ביטול הקישור"
                 action={revokeQuoteLinkAction.bind(null, orgId, quoteId)}
                 onDone={() => router.refresh()}

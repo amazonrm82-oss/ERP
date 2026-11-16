@@ -110,7 +110,7 @@ export function queuedQuoteMessageText(message: Pick<QueuedQuoteMessage, "state"
 export const CHANNEL_LABELS: Record<QuoteMessageChannel, string> = { email: "אימייל", sms: "SMS" };
 
 /** DRAFT wording: what the dialog says first, while the quote already has a live link. */
-export const LINK_REPLACED_NOTE = "ההודעה תצא עם קישור חדש להצעה. הקישור הקודם שנשלח ללקוח יפסיק לעבוד.";
+export const LINK_REPLACED_NOTE = "ההודעה תצא עם קישור חדש להצעה. הקישורים שכבר נשלחו ללקוח ימשיכו לעבוד.";
 
 /** What the dialog says after the message was queued. */
 export function queuedQuoteMessage(channel: QuoteMessageChannel, paused: boolean): string {

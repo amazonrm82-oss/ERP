@@ -4,7 +4,8 @@
 import { firstNameOf } from "@/features/whatsapp/templates";
 
 /** Asked before a new link replaces a working one (owner, 18 October 2026: "הקישור הקודם יפסיק לעבוד"). */
-export const NEW_LINK_WARNING = "הקישור הקודם יפסיק לעבוד מיד: מי שיפתח אותו לא יראה את ההצעה. אחר כך שלחו ללקוח את הקישור החדש.";
+// owner (385) ב: several live links per quote (up to 10; a new one past them ends the oldest)
+export const NEW_LINK_WARNING = "הקישורים שכבר נשלחו ימשיכו לעבוד עד שההצעה תיסגר או עד שתבטלו אותם. אפשר עד 10 קישורים פעילים להצעה: קישור חדש מעבר להם מבטל את הישן ביותר. אחר כך שלחו ללקוח את הקישור החדש.";
 
 /** Who the WhatsApp message is from and to; every part may be missing. */
 export type QuoteMessageParties = { customerName?: string | null; senderName?: string | null; businessName?: string | null };

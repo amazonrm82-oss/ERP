@@ -9,7 +9,7 @@ const url = "https://crm.example/f/quote/abc";
 
 describe("sending the customer's link", () => {
   it("warns that the previous link stops working", () => {
-    expect(NEW_LINK_WARNING).toContain("הקישור הקודם יפסיק לעבוד");
+    expect(NEW_LINK_WARNING).toContain("ימשיכו לעבוד");
   });
 
   it("opens WhatsApp with the customer's number when it is E.164, else lets the person pick the chat", () => {
