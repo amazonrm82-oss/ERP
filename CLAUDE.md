@@ -323,8 +323,8 @@ and build this CRM here instead. The old code is preserved on the branch
   `crm-landing-waitlist-purge` 02:51 UTC). THE FUTURE SENDER sends one message with an unsubscribe link, deletes the row after it, and
   needs its own "In use" line. In the eslint allow-list. The advisor's findings on the three app tables and the two platform definers
   are expected.
-  In use (LND-14, owner 16 November 2026, answer (388) א, LND-13's pattern; migrations 021287 and 021288 (021288 waits to be pasted
-  by hand); an independent review and a delta review): cookieless counters on the landing page (`src/features/landing/measure-server.ts`),
+  In use (LND-14, owner 16 November 2026, answer (388) א, LND-13's pattern; migrations 021287 and 021288 (021288 pasted by hand,
+  md5 checked 16 November 2026); an independent review and a delta review): cookieless counters on the landing page (`src/features/landing/measure-server.ts`),
   which calls only `public.landing_event()` (definer, service_role only; kind visit|signup_click|signup; source = utm_source folded by
   `app.landing_event_source` = `landingSource()` (shared fixture `landing-sources.json`): over 200 characters = other, spaces trimmed,
   `[A-Za-z0-9_.-]{1,40}` lower case, empty = direct, else other; at most 200 sources a day shared by the three kinds, judged under a
@@ -601,7 +601,36 @@ and build this CRM here instead. The old code is preserved on the branch
    once-a-day rows are removed by the pasted `app.digest_cleanup_rows` through `app.run_digest_cleanup` (pg_cron `crm-digest-cleanup`,
    a no-op until pasted). In the eslint allow-list. The advisor's findings on `app.digest_stop_tokens`, `app.digest_stop_counts` and
    `app.digest_sends` are expected.
-   In use (OPS-04, owner 26 October 2026, answer (א) and wave 3 use (1); conditions of 2 November 2026, answers (52)-(55); migration
+   In use (RPT-03 scheduled reports, owner 16 November 2026, answer (386) א; migration 021289; an independent review and a delta
+  review): the OPS-04 worker (same route and secret) claims `report.send` (payload `{schedule_id, user_id, day}` only), queued by
+  pg_cron `crm-scheduled-reports` (`app.queue_scheduled_reports`, every 15 minutes) only while a worker asked for the kind: daily
+  schedules on working days, weekly on their weekday, from the send time for 3 hours (no wrap past midnight), once per schedule,
+  recipient and day, 200 a business day; members on leave skipped; quiet hours through `app.digest_run_at`. `app.report_schedule_sends`
+  has no FK to the schedule, so a delete never lowers a count. It runs in the digest's staff pass while the email channel has a
+  provider, and calls with the service key only `public.scheduled_report_compose()` (service_role, live lease; re-checks the open
+  business, the schedule and its switch, `app.scheduled_report_available` (plan keys, leads module), an active membership still a
+  recipient, `app.scheduled_report_user_may` (restricted reports to owners/admins/managers, cost reports `categories`, `campaign_roi`,
+  `profit` only with `app.can_view_costs`'s rule) and the day; answers the sign-in email, the business display name, its term keys,
+  the report key, the period and dates, never a number). Email `src/features/report-schedules/email.ts` (DRAFT): name in the
+  business's terms, period, a link. Tables `public.report_schedules` / `report_schedule_recipients` (owners/admins of a writable
+  business manage; a member sees and leaves what they receive; 20 schedules, 20 recipients; audited); page `/o/[org]/reports/scheduled`.
+  Pinned by md5 in test 284. The advisor's finding on `app.report_schedule_sends` is expected.
+  In use (USR-09 invitation emails, owner 16 November 2026, answer (387) א; migrations 021290 and 021291 (021291 waits to be pasted
+  by hand); an independent review and a delta review): the OPS-04 worker (same pass) claims `invite.send` (payload `{invitation_id,
+  requested_by}` only, never a token), queued by `public.invitation_email_queue` (definer: `create_invitation`'s rights; caps through
+  `app.invitation_email_limits` under locks requester, address, business, invitation: 3 per address per business day, 100 per business
+  a day, 100 per requesting person in 24 hours, 5 per address in 24 hours across all businesses; `unavailable` while no worker asked
+  for the kind; `app.invitation_email_sends` has no FK to the invitation, so a delete never lowers a count). With the service key it
+  calls only `public.invitation_job_compose()` (service_role, live lease): re-checks a pending unexpired invitation, a writable
+  business, the requester still an owner/admin (an admin invitation only by the owner), then mints a new 64-hex token, keeps only its
+  SHA-256 on `invitations.token_hash` (the latest email's link is the working one; the screen says so before every send and shows a
+  failed send, `public.invitation_email_status`), stamps `composed_at`, and answers `{to, business_name, role, expires_at, token}`;
+  a business name holding a link, `@` or `://` is sent as "העסק". Fixed DRAFT text `invite-draft-1`, no reply-to. Send rows are
+  removed by the pasted `app.staff_mail_purge_rows` (invitation sends after 30 days, report sends after 90) through
+  `app.run_staff_mail_purge` (pg_cron `crm-staff-mail-purge` 02:47 UTC, a no-op until pasted). Pinned by md5 in test 284; `app.job_kinds`
+  and `app.job_payload_ok` were last redefined in 021290. The advisor's findings on `invitation_email_queue`, `invitation_email_status`
+  and `app.invitation_email_sends` are expected.
+  In use (OPS-04, owner 26 October 2026, answer (א) and wave 3 use (1); conditions of 2 November 2026, answers (52)-(55); migration
    `_jobs_queue.sql`): the background job worker (`src/features/jobs/run-server.ts`, route `POST /api/jobs/run`, public prefix in
    `src/lib/supabase/proxy.ts`), woken by `app.wake_job_worker()` (pg_cron `crm-jobs-wake`, pg_net; `app.settings` `jobs_run_url`,
    else derived from `push_dispatch_url`; secret `push_dispatch_secret`) every minute while due jobs are of a kind a worker asked
@@ -609,7 +638,7 @@ and build this CRM here instead. The old code is preserved on the branch
    timing-safe first (`src/lib/shared-secret.ts`) and calls only `public.claim_jobs()`, `public.finish_job()` and
    `public.job_message_may_send()`. (55) א: only `job_message_may_send` reads customer records and it answers may_send, reason and
    retry only; `claim_jobs` answers only id, lease, kind, organization_id, payload (ids and codes, optional event_at) and attempt,
-   `finish_job` only its status; `app.job_kinds()` is exactly `message.send`, `import.run` and `export.run` (IMP-04, its own In use line), and every new kind needs the owner's approval and its
+   `finish_job` only its status; `app.job_kinds()` is exactly `message.send`, `import.run` and `export.run` (IMP-04), `digest.send`, `report.send` and `invite.send` (each with its own In use line), and every new kind needs the owner's approval and its
    own In use line; the three bodies are pinned by md5 and a change needs a fresh review (test 284). The send check works on a live
    lease only: a business that cannot write (`app.org_writable`: deleted, suspended, cancelled or read-only, (53) א, (54) ב) or an
    `event_at` that passed cancels the job; while HEB-09 `app.customer_sending_paused` holds, the job waits uncounted (with the
