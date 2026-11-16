@@ -15,6 +15,11 @@ type Answer = Record<string, unknown>;
 
 afterAll(closePool);
 
+// The job starts at 08:00 in the business's zone. The business gets a whole-hour zone where it is about noon now, so the test
+// passes at any hour of the day (it used Asia/Jerusalem and failed every night between 00:00 and 08:00 Israel time).
+const NOON_OFFSET = 12 - new Date().getUTCHours(); // -11 .. 12
+const ZONE = NOON_OFFSET === 0 ? "Etc/GMT" : `Etc/GMT${NOON_OFFSET > 0 ? "-" : "+"}${Math.abs(NOON_OFFSET)}`;
+
 describe("automatic quote reminders (QUO-18)", () => {
   let owner: U, member: U, viewer: U;
   let org: string;
@@ -69,7 +74,7 @@ describe("automatic quote reminders (QUO-18)", () => {
       await q("set local session_replication_role = replica");
       if (fields.sentOn) {
         await q(
-          "update public.quotes set sent_at = ($2::date + time '10:00') at time zone 'Asia/Jerusalem', quote_date = least(quote_date, $2::date) where id = $1",
+          `update public.quotes set sent_at = ($2::date + time '10:00') at time zone '${ZONE}', quote_date = least(quote_date, $2::date) where id = $1`,
           [quote, fields.sentOn],
         );
       }
@@ -118,7 +123,7 @@ describe("automatic quote reminders (QUO-18)", () => {
     const p = await defaultPipeline(org);
     pipe = { pipelineId: p.pipelineId, stageId: p.stages[0].id };
     await asAdmin(async (q) => {
-      await q("update public.organizations set timezone = 'Asia/Jerusalem' where id = $1", [org]);
+      await q("update public.organizations set timezone = $2 where id = $1", [org, ZONE]);
       await q(
         "update public.subscriptions set feature_overrides = coalesce(feature_overrides, '{}'::jsonb) || '{\"quotes\": true, \"sms\": true, \"quote_reminders\": true}'::jsonb where organization_id = $1",
         [org],
@@ -149,7 +154,7 @@ describe("automatic quote reminders (QUO-18)", () => {
           )
         ).id,
     );
-    today = await asAdmin(async (q) => (await one<{ d: string }>(q, "select ((now() at time zone 'Asia/Jerusalem')::date)::text as d")).d);
+    today = await asAdmin(async (q) => (await one<{ d: string }>(q, `select ((now() at time zone '${ZONE}')::date)::text as d`)).d);
   });
   beforeEach(() => asAdmin((q) => q("update app.jobs set status = 'done', lease_id = null, locked_until = null where status in ('queued', 'failed', 'running')")));
 
