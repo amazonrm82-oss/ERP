@@ -615,8 +615,8 @@ and build this CRM here instead. The old code is preserved on the branch
   business's terms, period, a link. Tables `public.report_schedules` / `report_schedule_recipients` (owners/admins of a writable
   business manage; a member sees and leaves what they receive; 20 schedules, 20 recipients; audited); page `/o/[org]/reports/scheduled`.
   Pinned by md5 in test 284. The advisor's finding on `app.report_schedule_sends` is expected.
-  In use (USR-09 invitation emails, owner 16 November 2026, answer (387) א; migrations 021290 and 021291 (021291 waits to be pasted
-  by hand); an independent review and a delta review): the OPS-04 worker (same pass) claims `invite.send` (payload `{invitation_id,
+  In use (USR-09 invitation emails, owner 16 November 2026, answer (387) א; migrations 021290 and 021291 (021291 pasted by hand,
+  md5 checked 16 November 2026); an independent review and a delta review): the OPS-04 worker (same pass) claims `invite.send` (payload `{invitation_id,
   requested_by}` only, never a token), queued by `public.invitation_email_queue` (definer: `create_invitation`'s rights; caps through
   `app.invitation_email_limits` under locks requester, address, business, invitation: 3 per address per business day, 100 per business
   a day, 100 per requesting person in 24 hours, 5 per address in 24 hours across all businesses; `unavailable` while no worker asked
