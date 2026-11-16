@@ -201,6 +201,8 @@ const RERUN = [
   migrationFile("_quote_links_many.sql"),
   // RPT-03 redefines app.job_kinds() and app.job_payload_ok() last (report.send)
   migrationFile("_scheduled_reports.sql"),
+  // USR-09 redefines app.job_kinds() and app.job_payload_ok() last (invite.send)
+  migrationFile("_staff_invite_email.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

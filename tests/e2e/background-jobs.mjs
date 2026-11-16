@@ -255,6 +255,8 @@ try {
     await owner.goto(`${orgUrl}/settings/users`);
     await owner.getByLabel("אימייל").fill(memberEmail);
     await owner.getByLabel("תפקיד").selectOption("member");
+    // USR-09: the copied-link path (the email box is ticked by default)
+    await owner.getByLabel("שליחת ההזמנה במייל מהמערכת").uncheck();
     await owner.getByRole("button", { name: "יצירת קישור הזמנה" }).click();
     const inviteLink = await owner.getByLabel("קישור ההזמנה").inputValue();
     const member = await newPage();

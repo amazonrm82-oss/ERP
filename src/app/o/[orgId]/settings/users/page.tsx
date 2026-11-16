@@ -5,6 +5,8 @@ import { getMemberPermissions } from "@/features/permissions/queries";
 import { PrivacyOfficerForm } from "@/features/privacy-officer/components/privacy-officer-form";
 import { NO_OFFICER, officerCandidates, officerName, PRIVACY_OFFICER_EXPLAIN } from "@/features/privacy-officer/officer";
 import { getPrivacyOfficerId } from "@/features/privacy-officer/queries";
+import { getInvitationEmailStatuses } from "@/features/invitations/email-queries";
+import { invitationEmailLine } from "@/features/invitations/email-status";
 import { InviteForm } from "@/features/settings/components/invite-form";
 import { MembersList } from "@/features/settings/components/members-list";
 import { PendingInvitations } from "@/features/settings/components/pending-invitations";
@@ -41,6 +43,8 @@ export default async function UsersSettingsPage({ params }: Props) {
     getPrivacyOfficerId(orgId),
   ]);
   const officer = officerName(officerId, members);
+  // USR-09: when each pending invitation was last sent by email (owners and admins; counts and times only)
+  const emailed = isAdmin && invitations.length > 0 ? await getInvitationEmailStatuses(orgId) : new Map();
   const permissionCounts = Object.fromEntries([...permissions].map(([userId, keys]) => [userId, keys.length]));
   const absences = Object.fromEntries(
     [...away.values()].map((a) => [a.userId, { label: `${absenceLabel(a.kind)} עד ${shortDay(a.endsOn)}`, deputyName: a.deputyId ? (a.deputyName ?? "משתמש") : null }]),
@@ -75,6 +79,8 @@ export default async function UsersSettingsPage({ params }: Props) {
               email: invitation.email,
               role: invitation.role,
               expiresText: formatDate(invitation.expiresAt),
+              emailLine: invitationEmailLine(emailed.get(invitation.id) ?? null),
+              emailed: emailed.has(invitation.id),
             }))}
           />
         </Card>

@@ -4794,6 +4794,10 @@ export type Database = {
       // USR-11 / WAB-03 (service_role only): the daily summary's composer (the worker) and its one-click stop link
       digest_job_compose: { Args: { p_job: string; p_lease: string }; Returns: Json };
       scheduled_report_compose: { Args: { p_job: string; p_lease: string }; Returns: Json };
+      // USR-09
+      invitation_job_compose: { Args: { p_job: string; p_lease: string }; Returns: Json };
+      invitation_email_queue: { Args: { p_org: string; p_invitation: string }; Returns: Json };
+      invitation_email_status: { Args: { p_org: string }; Returns: Json };
       scheduled_report_create: {
         Args: { p_org: string; p_report: string; p_period: string | null; p_frequency: string; p_weekday: number | null; p_send_at: string; p_recipients: string[] };
         Returns: string;

@@ -5,6 +5,7 @@ import { BACKGROUND_RUN_BUDGET_MS } from "@/features/background/rules";
 import { backgroundJobsReady, createBackgroundTokenSource, createUserClient } from "@/features/background/user-token";
 import { createDigestHandler } from "@/features/digest/send-handler";
 import { createReportHandler } from "@/features/report-schedules/send-handler";
+import { createInvitationHandler } from "@/features/invitations/send-handler";
 import { AGREEMENT_VERSION } from "@/features/legal/agreement";
 import { downloadEmailAttachment } from "@/features/messaging/email-attachments-server";
 import { createSendHandler } from "@/features/messaging/send-handler";
@@ -47,7 +48,7 @@ export function jobTimeLeftMs(now: number, claimedAt: number, routeStartedAt: nu
  * The background job worker (OPS-04), route POST /api/jobs/run. Called by the database (app.wake_job_worker, through
  * pg_net, every minute while work is due), never by a user: it carries the push dispatcher's shared secret, checked
  * timing-safe before anything else. With the service role it calls only public.claim_jobs(), public.finish_job() and,
- * for message.send, public.job_message_may_send() and, for a composing SMS provider (InforU, SMS-05), public.sms_job_compose() and public.sms_quota_return() (owner (326) ב), and for the composing email provider (Resend, EML-01, owner (195) א) public.email_job_compose() and public.email_quota_return(), for digest.send (USR-11 / WAB-03) only public.digest_job_compose(), for report.send (RPT-03) only public.scheduled_report_compose(), reading Storage only at the paths the composer answered (email-attachments-server.ts); for import.run and export.run (IMP-04, owner (155) א, (160) א) only
+ * for message.send, public.job_message_may_send() and, for a composing SMS provider (InforU, SMS-05), public.sms_job_compose() and public.sms_quota_return() (owner (326) ב), and for the composing email provider (Resend, EML-01, owner (195) א) public.email_job_compose() and public.email_quota_return(), for digest.send (USR-11 / WAB-03) only public.digest_job_compose(), for report.send (RPT-03) only public.scheduled_report_compose(), for invite.send (USR-09) only public.invitation_job_compose(), reading Storage only at the paths the composer answered (email-attachments-server.ts); for import.run and export.run (IMP-04, owner (155) א, (160) א) only
  * public.background_job_begin(), background_job_progress() and background_job_end(), and, through the token source it hands
  * this client to (src/features/background/user-token.ts), background_job_token() before every signing of the person's token. No table is read or written with
  * the service role (CLAUDE.md hard rule 5, wave 3 use (1)): a background job's own work is done with a short-lived token
@@ -130,6 +131,19 @@ export async function runJobsRoute(request: Request): Promise<Response> {
           siteOrigin,
           compose: async (job) => {
             const { data, error } = await supabase.rpc("scheduled_report_compose", { p_job: job.id, p_lease: job.lease });
+            if (error) throw new Error("compose failed");
+            return data;
+          },
+        })
+      : null,
+    // USR-09 (owner (387) א): a staff invitation email, the fixed text; the composer re-checks the invitation, the business
+    // and the person who asked, and mints the link's new token (only its SHA-256 is stored)
+    "invite.send": providers.email
+      ? createInvitationHandler({
+          provider: providers.email,
+          siteOrigin,
+          compose: async (job) => {
+            const { data, error } = await supabase.rpc("invitation_job_compose", { p_job: job.id, p_lease: job.lease });
             if (error) throw new Error("compose failed");
             return data;
           },

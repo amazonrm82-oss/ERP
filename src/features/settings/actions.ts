@@ -9,15 +9,11 @@ import { fail, formValues, invalid, ok, type ActionResult, type FormState } from
 import type { MembershipStatus } from "@/lib/database.types";
 import { dbErrorMessage, isOwnRoleRefusal, NOT_FOUND_OR_FORBIDDEN, OWN_ROLE_OWNER_MESSAGE } from "@/lib/errors";
 import { isUuid, paths } from "@/lib/paths";
-import { siteOrigin } from "@/lib/site-origin";
 import { pick } from "@/lib/validation";
 
-import { getViewSeatUsage } from "./plan-usage";
-import { NO_VIEW_SEAT_LEFT, viewSeatsLeft } from "./view-seats";
 import {
   addTeamMemberSchema,
   changeRoleSchema,
-  inviteSchema,
   ORGANIZATION_FIELD_NAMES,
   teamNameSchema,
   transferOwnershipSchema,
@@ -66,45 +62,8 @@ export async function updateOrganizationAction(orgId: string, _prev: FormState, 
 // Users and invitations
 // ---------------------------------------------------------------------------
 
-/**
- * Creates an invitation and returns its link. No email is sent yet (no email
- * provider is chosen); the admin copies the link or shares it on WhatsApp.
- * The raw token exists only in this response; the database keeps its hash.
- */
-export async function inviteUserAction(
-  orgId: string,
-  _prev: FormState<{ link: string; email: string }>,
-  formData: FormData,
-): Promise<FormState<{ link: string; email: string }>> {
-  const context = await actionContext(orgId);
-  if (!context.ok) {
-    return context;
-  }
-  const parsed = inviteSchema.safeParse(pick(formData, ["email", "role"]));
-  if (!parsed.success) {
-    return invalid(parsed.error, formData);
-  }
-
-  // PRM-02: a viewer invitation only while a view seat is free (open viewer invitations count too)
-  if (parsed.data.role === "viewer") {
-    const seats = await getViewSeatUsage(orgId);
-    if (seats && viewSeatsLeft(seats) === 0) {
-      return fail(NO_VIEW_SEAT_LEFT, { values: formValues(formData) });
-    }
-  }
-
-  const { data: token, error } = await context.supabase.rpc("create_invitation", {
-    p_organization_id: orgId,
-    p_email: parsed.data.email,
-    p_role: parsed.data.role,
-  });
-  if (error || !token) {
-    return fail(dbErrorMessage(error, "לא הצלחנו ליצור את ההזמנה. נסו שוב."), { values: formValues(formData) });
-  }
-
-  revalidatePath(paths.settingsUsers(orgId));
-  return ok({ link: `${await siteOrigin()}${paths.invite(token)}`, email: parsed.data.email });
-}
+// USR-09: inviting (one or several addresses, by email or a link to copy) is inviteUsersAction in
+// src/features/invitations/email-actions.ts.
 
 export async function revokeInvitationAction(orgId: string, invitationId: string): Promise<ActionResult> {
   const context = await actionContext(orgId, invitationId);

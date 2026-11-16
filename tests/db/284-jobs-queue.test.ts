@@ -757,9 +757,10 @@ describe("background job queue (OPS-04)", () => {
   // November 2026 (test 372; queued only while a worker asked for it; its functions are pinned below).
   // RPT-03: report.send, owner's answer (386) א, 16 November 2026 (test 377; queued only while a worker asked for it; its
   // functions are pinned below).
-  it("(55) א: the job kinds are exactly {message.send, import.run, export.run, digest.send, report.send}", async () => {
+  // USR-09: invite.send, owner's answer (387) א, 16 November 2026 (test 378; its functions are pinned below).
+  it("(55) א: the job kinds are exactly {message.send, import.run, export.run, digest.send, report.send, invite.send}", async () => {
     const kinds = await asAdmin(async (q) => (await q<{ k: string[] }>("select app.job_kinds() as k")).rows[0].k);
-    expect(kinds).toEqual(["message.send", "import.run", "export.run", "digest.send", "report.send"]);
+    expect(kinds).toEqual(["message.send", "import.run", "export.run", "digest.send", "report.send", "invite.send"]);
   });
 
   // USR-11 / WAB-03 (owner (267) א, (375) ב): the daily summary's worker path, pinned like the queue's own functions (body,
@@ -823,6 +824,34 @@ describe("background job queue (OPS-04)", () => {
       "app.scheduled_report_period": "5c090efde9c5b52e9e5d0e41b78d5740",
       "app.scheduled_report_user_may": "32c6084be210c72237a10a56fdc2deaa",
       "public.scheduled_report_compose": "d13ac17d3c59a141dce844d2a96eea58",
+    });
+  });
+
+  // USR-09 (owner (387) א): the invitation email's path, pinned like the summary's. A change needs a fresh independent
+  // review (ids only in the queue, never the token; who may invite today; the token minted on the live lease, hash only).
+  // Rechecked after the independent review (16 November 2026): a send log never counted down (no cascade from the invitation;
+  // per address, business and requesting person), the latest send's state and whether its link was minted.
+  // Delta review: at most 5 emails to one address in 24 hours across businesses (address lock between the requester's and
+  // the business's), and a business name with a link, an @ or a :// sent as the neutral word.
+  it("USR-09: the invite.send functions are the reviewed ones", async () => {
+    const rows = await asAdmin(
+      async (q) =>
+        (
+          await q<{ name: string; md5: string }>(
+            `select n.nspname || '.' || p.proname as name,
+                    md5(p.prosrc || '|' || p.prosecdef::text || '|' || coalesce(p.proconfig::text, '') || '|' || pg_get_function_identity_arguments(p.oid)) as md5
+               from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where (n.nspname, p.proname) in (('public', 'invitation_job_compose'), ('public', 'invitation_email_queue'),
+                                               ('public', 'invitation_email_status'), ('app', 'invitation_email_limits'))
+              order by 1`,
+          )
+        ).rows,
+    );
+    expect(Object.fromEntries(rows.map((r) => [r.name, r.md5]))).toEqual({
+      "app.invitation_email_limits": "531729baab16571182beb22574802c23",
+      "public.invitation_email_queue": "88f3b4fdad05598a4e8012ae6da40250",
+      "public.invitation_email_status": "1d0945cbbe84bffee900bd8f91214e36",
+      "public.invitation_job_compose": "4f0cec5df21692055df1aabd21be16c1",
     });
   });
 

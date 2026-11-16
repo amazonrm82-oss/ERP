@@ -7,7 +7,8 @@
 // provider (src/features/digest/send-handler.ts); until a worker asks for it app.queue_daily_digests queues nothing.
 // RPT-03 (owner (386) א): report.send, a scheduled report email with a link only (src/features/report-schedules/send-handler.ts),
 // registered beside digest.send while the email channel has a provider.
-export const JOB_KINDS = ["message.send", "import.run", "export.run", "digest.send", "report.send"] as const;
+// USR-09 (owner (387) א): invite.send, a staff invitation email (src/features/invitations/send-handler.ts), in the same pass.
+export const JOB_KINDS = ["message.send", "import.run", "export.run", "digest.send", "report.send", "invite.send"] as const;
 export type JobKind = (typeof JOB_KINDS)[number];
 
 export function isJobKind(value: unknown): value is JobKind {

@@ -528,6 +528,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   // BIZ-05
   "prefill_form:field": "אחד השדות שנבחרו אינו זמין בטופס כזה, או שנבחר פעמיים. בחרו שדות פעילים של סוג הרשומה, כל שדה פעם אחת.",
   "prefill_form:sensitive": "שדה שסומן כמידע רגיש לא נכנס לטופס השלמת פרטים. הסירו אותו מהטופס, או בטלו את הסימון שלו בהגדרות השדות.",
+  // USR-09: a staff invitation by email
+  "invitation_email:not_pending": "ההזמנה כבר לא ממתינה (התקבלה, בוטלה או פג תוקפה). צרו הזמנה חדשה.",
   // RPT-03: a report sent by email on a schedule
   "report_schedule:report": "אי אפשר לתזמן את הדוח הזה. בחרו דוח מהרשימה.",
   "report_schedule:period": "בחרו תקופה לדוח.",

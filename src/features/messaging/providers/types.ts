@@ -53,7 +53,9 @@ export type OutgoingMessage = {
   // adapter gets the code and the phone from public.sms_sender_code_issue, its own approved path, not built yet)
   // USR-11 / WAB-03: "user" = the daily summary to the business's own person (recordId = the user id; emailContent is built by
   // src/features/digest/send-handler.ts from public.digest_job_compose)
-  recordType: "lead" | "contact" | "sender_check" | "user";
+  // USR-09: "invitation" = a staff invitation (recordId = the invitation's id; emailContent is built by
+  // src/features/invitations/send-handler.ts from public.invitation_job_compose)
+  recordType: "lead" | "contact" | "sender_check" | "user" | "invitation";
   recordId: string;
   // EML-02: an email a person sent from a record's card: the template, the deal it was sent from (the record is then the
   // deal's contact), the record files and the content-library files to attach (told apart by their own payload keys) and
