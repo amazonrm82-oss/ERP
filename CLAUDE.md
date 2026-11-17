@@ -634,6 +634,27 @@ and build this CRM here instead. The old code is preserved on the branch
   `app.run_staff_mail_purge` (pg_cron `crm-staff-mail-purge` 02:47 UTC, a no-op until pasted). Pinned by md5 in test 284; `app.job_kinds`
   and `app.job_payload_ok` were last redefined in 021290. The advisor's findings on `invitation_email_queue`, `invitation_email_status`
   and `app.invitation_email_sends` are expected.
+  In use (DOC-07 invoice.issue, owner 16 November 2026, answers (394) א and (398) א; migrations 021296 and 021297; an independent
+  review and four delta reviews): the OPS-04 worker (same route and secret) claims `invoice.issue` (payload `{request_id}` only) and
+  calls with the service key only `public.invoice_issue_claim()` and `public.invoice_issue_record()` (both service_role, the live
+  lease only; job row then request row, every path). A person starts a request through `public.invoice_issue_begin` (invoker; the
+  source read under RLS by `app.invoice_source`, a cancelled order refused, `invoice:order_cancelled`; definer `app.invoice_issue_open`
+  computes the totals in the database and keeps one request per idempotency key in `app.invoice_issue_requests`, no grants). The
+  provider layer `src/features/invoicing/providers/` has only the fake adapter (`INVOICE_PROVIDER`, refused on a Vercel production or
+  preview deployment, and in the database only while `app.settings` `invoice_provider_fake` is 'on', never set by a migration); the
+  request id is the provider's idempotency key, a late (closed or stale) request's call only looks the document up (`findDocument`).
+  Only the server records a provider's answer. A document that may exist at the provider (a last-try failure, a dead job, a final
+  refusal after an earlier try, a late lookup that cannot answer) ends `unrecorded`/`check_provider`, tells the requester and the active
+  owners and admins once (`app.invoice_issue_late_notice`, no customer data) and is listed by `public.invoice_issue_requests_open`
+  until someone closes it as `checked` (the requester may close their own, lead's choice); a found document that cannot be recorded
+  tells `cannot_record`; pg_cron `crm-invoice-issue-stale` (hourly :29, `app.invoice_issue_mark_stale`). `app.invoice_issue_open` and
+  `app.invoice_customer` (definers) are granted to authenticated only for their invoker wrappers (`invoice_issue_begin`,
+  `invoice_issue_customer`) and judge the ids they are given by business only, not by the caller's read rights; accepted because
+  schema app is not in the API (as `app.statement_link_issue`). Settings `public.invoice_provider_settings` (021296; owners/admins
+  through `invoice_provider_connect|disconnect|check_recorded`; PRM-01 key `issue_documents`, `app.can_issue_documents`). 23 functions
+  pinned by md5 in test 381; `app.job_kinds` and `app.job_payload_ok` were last redefined in 021297. Accepted (review): a job the claim
+  refused on its first try can raise a needless "check at the provider" notice, never a silent one. The advisor's findings on the six
+  staff definers and `app.invoice_issue_requests` are expected.
   In use (OPS-04, owner 26 October 2026, answer (א) and wave 3 use (1); conditions of 2 November 2026, answers (52)-(55); migration
    `_jobs_queue.sql`): the background job worker (`src/features/jobs/run-server.ts`, route `POST /api/jobs/run`, public prefix in
    `src/lib/supabase/proxy.ts`), woken by `app.wake_job_worker()` (pg_cron `crm-jobs-wake`, pg_net; `app.settings` `jobs_run_url`,
