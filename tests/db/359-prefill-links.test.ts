@@ -372,6 +372,42 @@ describe("prefill links (BIZ-05)", () => {
     expect(JSON.stringify(counters)).not.toContain(ip);
   });
 
+  // RVW-109: a sent link's "done" answer is counted by the same two limits as every other answer
+  it("a sent link's done answer is limited like any other: 60 per sender and 120 per link", async () => {
+    const form = await template(admin, ["first_name"]);
+    const token = await create(member, form, "contact", await contact(member.id));
+    expect((await submit(token, { first_name: "נועה" })).status).toBe("saved");
+    const ip = sender(8888);
+    for (let i = 0; i < 60; i++) expect((await page(token, ip)).status).toBe("done");
+    expect(await page(token, ip)).toEqual({ rate_limited: true });
+    expect(await submit(token, { first_name: "שוב" }, ip)).toEqual({ rate_limited: true });
+    // another sender still gets "done", until the link's own window is full
+    expect((await page(token)).status).toBe("done");
+    await asAdmin((q) => q("update app.prefill_links set window_count = 120, window_started_at = now() where token_hash = $1", [sha256(token)]));
+    expect(await page(token)).toEqual({ rate_limited: true });
+    expect(await submit(token, { first_name: "שוב" })).toEqual({ rate_limited: true });
+  });
+
+  // RVW-115: "today" for a birth date is the business's own day
+  it("judges a birth date against today in the business's time zone", async () => {
+    const form = await template(admin, ["birth_date"]);
+    const todayIn = (zone: string) =>
+      asAdmin(async (q) => (await one<{ d: string }>(q, "select to_char((now() at time zone $1)::date, 'YYYY-MM-DD') as d", [zone])).d);
+    // Kiritimati (UTC+14) is always a calendar day ahead of Pago Pago (UTC-11)
+    const ahead = await todayIn("Pacific/Kiritimati");
+    try {
+      await asAdmin((q) => q("update public.organizations set timezone = 'Pacific/Kiritimati' where id = $1", [org]));
+      const t1 = await create(member, form, "contact", await contact(member.id));
+      expect(await submit(t1, { birth_date: ahead })).toEqual({ status: "saved", skipped: [] });
+      await asAdmin((q) => q("update public.organizations set timezone = 'Pacific/Pago_Pago' where id = $1", [org]));
+      const t2 = await create(member, form, "contact", await contact(member.id));
+      expect(await submit(t2, { birth_date: ahead })).toEqual({ status: "invalid", error: "invalid birth date" });
+      expect(await submit(t2, { birth_date: await todayIn("Pacific/Pago_Pago") })).toEqual({ status: "saved", skipped: [] });
+    } finally {
+      await asAdmin((q) => q("update public.organizations set timezone = 'Asia/Jerusalem' where id = $1", [org]));
+    }
+  });
+
   it("a business that cannot write answers not found on the page, the submit and the done page", async () => {
     const form = await template(admin, ["first_name"]);
     const open = await create(member, form, "contact", await contact(member.id));
