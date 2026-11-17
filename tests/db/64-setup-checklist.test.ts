@@ -921,6 +921,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_invoice_provider_settings.sql",
       // DOC-07 redefines app.job_kinds() and app.job_payload_ok() of _staff_invite_email.sql last (invoice.issue)
       "_invoice_issue.sql",
+      // RVW-110 redefines app.email_compose_core() of _quote_message_send.sql last (no file once the sender left)
+      "_email_sender_gone_files.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

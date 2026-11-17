@@ -30,9 +30,13 @@ type Answer = Record<string, unknown>;
 // member, else the business's name (the rep lookup's condition and its fallback only).
 // Then the delta review of 111cbb39: two comment lines about the quote's link changed (since 021285 it is added beside the earlier
 // links); no statement changed.
+// Then 021299 (RVW-110, weekly review of 17 November 2026): a card send with files is refused ('attachment_changed') unless its
+// sender is an active member now (v_sender_active from the existing membership read); one variable and one check added, every
+// other line 021283's (one exact replacement). Rechecked: the file rules of 021198's header, the reply-to of (8) ב, the
+// automation path (no files) unchanged. Needs the lead's independent review before merge.
 const REVIEWED_MD5: Record<string, string> = {
   "email_job_compose(uuid,uuid,text)": "c5c2ae88f99865569bd24ddf80c2168f",
-  "app.email_compose_core(uuid,uuid,text)": "3c289d281bfa3bffe525f357e316dbd5",
+  "app.email_compose_core(uuid,uuid,text)": "1ed1daca23535f4cb9607754565fd16c",
   "app.email_usage_give_back(uuid)": "c952eaea4bb85cf196cf49280e8b7816",
   "email_quota_return(uuid,uuid)": "9a75bbbe4baa464daf175f376f2be501",
 };
@@ -269,6 +273,29 @@ describe("the email composer (EML-01, Resend)", () => {
     const subject = await template(org, { type: "requested_document", subject: "ההצעה {קישור להצעה}", body: "שלום" });
     job = await prepared(org, { channel: "email", message_type: "requested_document", template_id: subject, lead_id: lead });
     expect(await compose(job)).toEqual({ refused: "unfilled_field" });
+  });
+
+  // RVW-110: a person suspended or removed since the send never sends a file, even one of their own private note
+  it("sends no file once the sender is no longer an active member", async () => {
+    const lead = await insertLead(owner.id, org, { full_name: "נגה", email: "noga@example.test", owner_id: owner.id });
+    const t = await template(org, { type: "requested_document", body: "שלום {שם פרטי}" });
+    const leaver = await addMember(org, owner.id, "member", "ecompose-leaver-files");
+    const note = await asAdmin(
+      async (q) =>
+        (await q<{ id: string }>("insert into public.activities (organization_id, lead_id, type, body, created_by, is_private) values ($1, $2, 'note', 'פרטי', $3, true) returning id", [org, lead, leaver.id]))
+          .rows[0].id,
+    );
+    const own = await recordFile(org, "lead_id", lead, 1000, note);
+    const plain = await recordFile(org, "lead_id", lead);
+    const send = (files: string[]) => prepared(org, { channel: "email", message_type: "requested_document", template_id: t, lead_id: lead, reply_to_user_id: leaver.id, file_ids: files });
+    // while active, the author's own private-note file goes
+    expect(((await compose(await send([own]))).attachments as unknown[]).length).toBe(1);
+    const jobs = [await send([own]), await send([plain])];
+    const bare = await prepared(org, { channel: "email", message_type: "requested_document", template_id: t, lead_id: lead, reply_to_user_id: leaver.id });
+    await asAdmin((q) => q("update public.memberships set status = 'suspended' where organization_id = $1 and user_id = $2", [org, leaver.id]));
+    for (const job of jobs) expect(await compose(job)).toEqual({ refused: "attachment_changed" });
+    // an email without files still goes, without a reply-to
+    expect(await compose(bare)).toMatchObject({ to: "noga@example.test", reply_to: null, attachments: [] });
   });
 
   it("judges every file again on the send day", async () => {
