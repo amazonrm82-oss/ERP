@@ -31,7 +31,11 @@ describe("audit log labels (RVW-50 א)", () => {
   });
 
   it("says what a link entry and a removal did", () => {
-    expect(auditEntryNote("quote_link", { link: "created" })).toBe("נוצר קישור חדש ללקוח (קישור קודם, אם היה, הפסיק לעבוד)");
+    // RVW-112: a quote's new link ends none of the earlier ones (owner (385) ב); an order's still replaces its one link
+    expect(auditEntryNote("quote_link", { link: "created" })).toBe("נוצר קישור נוסף ללקוח (הקישורים הקודמים ממשיכים לעבוד)");
+    expect(auditEntryNote("quote_link", { link: "created", via: "message", job_id: "x" })).toBe("נשלח ללקוח קישור נוסף בהודעה (הקישורים הקודמים ממשיכים לעבוד)");
+    expect(auditEntryNote("quote_link", { link: "revoked" })).toBe("כל הקישורים ללקוח בוטלו");
+    expect(auditEntryNote("order_link", { link: "created" })).toBe("נוצר קישור חדש ללקוח (קישור קודם, אם היה, הפסיק לעבוד)");
     expect(auditEntryNote("order_link", { link: "revoked" })).toBe("הקישור ללקוח בוטל");
     expect(auditEntryNote("order_link", { link: "other" })).toBeNull();
     expect(auditEntryNote("person_erase", { reason: " בקשה בטלפון ", counts: { leads: 1 } })).toBe("סיבה: בקשה בטלפון");

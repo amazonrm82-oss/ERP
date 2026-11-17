@@ -51,7 +51,15 @@ export function auditEntryNote(action: string, changes: Json, terms: OrgTerms = 
     if (changes.link === "revoked") return "הקישור לבקשות פרטיות בוטל";
     return null;
   }
-  if (action === "quote_link" || action === "order_link") {
+  // RVW-112: since owner (385) ב a quote holds several live links; a new one (from the screen, or in a message) ends none,
+  // and "revoke" ends all of them. An order still has one link, replaced by a new one.
+  if (action === "quote_link") {
+    if (changes.link === "created" && changes.via === "message") return "נשלח ללקוח קישור נוסף בהודעה (הקישורים הקודמים ממשיכים לעבוד)";
+    if (changes.link === "created") return "נוצר קישור נוסף ללקוח (הקישורים הקודמים ממשיכים לעבוד)";
+    if (changes.link === "revoked") return "כל הקישורים ללקוח בוטלו";
+    return null;
+  }
+  if (action === "order_link") {
     if (changes.link === "created") return "נוצר קישור חדש ללקוח (קישור קודם, אם היה, הפסיק לעבוד)";
     if (changes.link === "revoked") return "הקישור ללקוח בוטל";
     return null;
