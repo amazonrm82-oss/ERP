@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { contentSecurityPolicy, isEmbeddablePublicPath, makeNonce } from "@/lib/csp";
+import { contentSecurityPolicy, isEmbeddablePublicPath, makeNonce, NOT_EMBEDDABLE_PUBLIC_PREFIXES } from "@/lib/csp";
 
 import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match";
 
@@ -73,10 +73,11 @@ describe("content security policy (FXS-05)", () => {
       expect(h["X-Frame-Options"], path).toBeUndefined();
       expect(isEmbeddablePublicPath(path), path).toBe(true);
     }
-    expect(headersFor("/f/statement/abc")).toMatchObject({ "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" });
-    // CNS-09 / CNS-10
-    expect(headersFor("/f/prefs/abc")).toMatchObject({ "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" });
-    expect(headersFor("/f/unsub/abc")).toMatchObject({ "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" });
+    // RVW-111: every page that is never framed also sends no referrer (its address holds a secret token)
+    for (const prefix of NOT_EMBEDDABLE_PUBLIC_PREFIXES) {
+      const path = `${prefix}abc`;
+      expect(headersFor(path), path).toMatchObject({ "Content-Security-Policy": "frame-ancestors 'none'", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" });
+    }
   });
 
   it("development keeps eval for React's error stacks", () => {

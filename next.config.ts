@@ -49,9 +49,10 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // CNS-09 / CNS-10 (preferences, unsubscribe), SGN-02 (signing) and LIB-02 (a tracked library link): like the statement
-        // page, never framed, no referrer
-        source: "/f/:page(prefs|unsub|sign|lib|digest-stop)/:path*",
+        // CNS-09 / CNS-10 (preferences, unsubscribe), SGN-02 (signing), LIB-02 (a tracked library link), BIZ-05 (the prefill
+        // form, RVW-111), USR-11 (the summary's stop link) and BIZ-03's page before a link (the scan route sets it too): like
+        // the statement page, never framed, no referrer. Every prefix of NOT_EMBEDDABLE_PUBLIC_PREFIXES (tests/unit/csp.test.ts).
+        source: "/f/:page(q|prefs|unsub|sign|lib|fill|digest-stop)/:path*",
         headers: [
           { key: "Referrer-Policy", value: "no-referrer" },
           { key: "X-Content-Type-Options", value: "nosniff" },
