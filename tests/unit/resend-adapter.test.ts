@@ -202,13 +202,11 @@ describe("EML-01: the files are read only at the composer's paths", () => {
 
   it("downloads base64, and answers null on a refused path or a Storage error", async () => {
     const download = vi.fn(async () => ({ data: new Blob([Buffer.from("PDF")]), error: null }));
-    const client = { storage: { from: vi.fn(() => ({ download })) } };
-    expect(await downloadEmailAttachment(client, ref, ORG)).toBe(Buffer.from("PDF").toString("base64"));
-    expect(client.storage.from).toHaveBeenCalledWith("record-files");
+    expect(await downloadEmailAttachment(download, ref, ORG)).toBe(Buffer.from("PDF").toString("base64"));
     expect(download).toHaveBeenCalledWith(`${ORG}/${FILE}`);
-    expect(await downloadEmailAttachment(client, { ...ref, bucket: "job-files" }, ORG)).toBeNull();
+    expect(await downloadEmailAttachment(download, { ...ref, bucket: "job-files" }, ORG)).toBeNull();
     expect(download).toHaveBeenCalledTimes(1);
-    const failing = { storage: { from: () => ({ download: async () => ({ data: null, error: new Error("x") }) }) } };
+    const failing = async () => ({ data: null, error: new Error("x") });
     expect(await downloadEmailAttachment(failing, ref, ORG)).toBeNull();
   });
 });

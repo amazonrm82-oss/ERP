@@ -106,8 +106,82 @@ describe("OPS-04: the worker route", () => {
     // RPT-03 (owner (386) א): the scheduled report's composer, scheduled_report_compose; USR-09 (owner (387) א): invitation_job_compose
     // DOC-07 (owner (398) א): the invoice issue's claim and record, invoice_issue_claim and invoice_issue_record
     expect(rpcs).toEqual(["background_job_begin", "background_job_end", "background_job_progress", "claim_jobs", "digest_job_compose", "email_job_compose", "email_quota_return", "finish_job", "invitation_job_compose", "invoice_issue_claim", "invoice_issue_record", "job_message_may_send", "scheduled_report_compose", "sms_job_compose", "sms_quota_return"]);
-    expect(code).not.toMatch(/\.from\(|\.storage\b|\.schema\(/);
+    // RVW-104: Storage only in the one line that binds the attachment reader to record-files (EML-01, owner (195) א)
+    const storageLine = "supabase.storage.from(EMAIL_ATTACHMENT_BUCKET).download(path)";
+    expect(code.split(storageLine)).toHaveLength(2);
+    expect(code.replace(storageLine, "")).not.toMatch(/\.from\(|\.storage\b|\.schema\(/);
     expect(read("src/app/api/jobs/run/route.ts")).toContain("runJobsRoute");
+  });
+
+  // RVW-104: the attachment downloader holds no client: it gets a reader of one bucket and reads only checked paths
+  it("keeps the email attachment downloader to the record-files reader it is handed", () => {
+    const code = stripComments(read("src/features/messaging/email-attachments-server.ts"));
+    expect(code).not.toMatch(/\.storage\b|\.rpc\(|\.schema\(|@supabase|lib\/supabase|createClient|createServiceClient|SUPABASE_/);
+    expect(code.replace(/Buffer\.from\(/g, "")).not.toMatch(/\.from\(/);
+    expect(code).toContain('export const EMAIL_ATTACHMENT_BUCKET = "record-files";');
+    expect(code).toContain("const PATH = new RegExp(`^(${UUID})/${UUID}$`);");
+    expect(code).toContain("if (!attachmentRefAllowed(ref, organizationId)) return null;");
+  });
+});
+
+/**
+ * RVW-104: a service client never leaves the allow-listed file that made it, except into the closed list below (each a
+ * documented use of CLAUDE.md hard rule 5). Every file that calls createServiceClient() is scanned with its comments
+ * removed: an occurrence of the client's name that is not a member access (`x.rpc`, `x?.storage`), a null check (`!x`)
+ * or the declaration counts as handing it on, and must be listed here with the function it goes to.
+ */
+const SERVICE_CLIENT_HANDOVERS: Record<string, string[]> = {
+  // IMP-04 (owner (160) א): the token source signs only after background_job_token, with the worker's client
+  "src/features/jobs/run-server.ts": ["createBackgroundTokenSource(supabase, job)", "createBackgroundTokenSource(supabase, job)"],
+  // the lead intake: readPublicForm is in public-form.ts, itself on the allow-list
+  "src/features/intake/public-form.ts": ["readPublicForm(service, token"],
+  "src/features/intake/server.ts": ["readPublicForm(service, token)"],
+};
+
+const stripComments = (code: string) => code.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
+
+function serviceClientHandovers(file: string): string[] {
+  // string contents removed too ("service key not configured" is no handover)
+  const code = stripComments(read(file)).replace(/"(?:[^"\\\n]|\\.)*"/g, '""');
+  const names = new Set([...code.matchAll(/(?:const|let)\s+(\w+)\s*=\s*createServiceClient\(/g)].map((m) => m[1]));
+  const found: string[] = [];
+  for (const name of names) {
+    for (const m of code.matchAll(new RegExp(`(?<![!\\w./"'])${name}\\b(?!\\s*(?:\\?\\.|\\.|=\\s*createServiceClient|\\s*:\\s*[A-Z]))`, "g"))) {
+      const line = code.slice(0, m.index).split("\n").length - 1;
+      found.push(code.split("\n")[line].trim());
+    }
+  }
+  return found;
+}
+
+describe("RVW-104: the service client is not handed to other files", () => {
+  const files = (dir: string): string[] =>
+    readdirSync(join(root, dir), { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? files(join(dir, e.name)) : /\.tsx?$/.test(e.name) ? [join(dir, e.name)] : [],
+    );
+  const makers = files("src").filter((f) => f !== join("src", "lib", "supabase", "service.ts") && read(f).includes("createServiceClient("));
+
+  it("finds the makers", () => {
+    expect(makers).toContain(join("src", "features", "jobs", "run-server.ts"));
+    expect(makers.length).toBeGreaterThan(30);
+  });
+
+  it("hands a service client on only to the listed functions", () => {
+    for (const file of makers) {
+      const handed = serviceClientHandovers(file);
+      const allowed = SERVICE_CLIENT_HANDOVERS[file.split("\\").join("/")] ?? [];
+      expect(handed.length, `${file}: ${handed.join(" | ")}`).toBe(allowed.length);
+      for (const [i, line] of handed.entries()) expect(line, file).toContain(allowed[i]);
+    }
+  });
+
+  it("would catch a client passed to a helper", () => {
+    expect(serviceClientHandovers).toBeTypeOf("function");
+    const sample = "const supabase = createServiceClient();\nif (!supabase) return;\nawait supabase.rpc('x');\nhelper(supabase, 1);";
+    const names = [...sample.matchAll(/(?:const|let)\s+(\w+)\s*=\s*createServiceClient\(/g)].map((m) => m[1]);
+    expect(names).toEqual(["supabase"]);
+    const hits = [...sample.matchAll(new RegExp(`(?<![!\\w./"'])supabase\\b(?!\\s*(?:\\?\\.|\\.|=\\s*createServiceClient|\\s*:\\s*[A-Z]))`, "g"))];
+    expect(hits).toHaveLength(1);
   });
 });
 

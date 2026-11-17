@@ -9,7 +9,7 @@ import { createInvitationHandler } from "@/features/invitations/send-handler";
 import { createInvoiceIssueHandler } from "@/features/invoicing/issue-handler";
 import { invoiceProviderFor } from "@/features/invoicing/providers/select";
 import { AGREEMENT_VERSION } from "@/features/legal/agreement";
-import { downloadEmailAttachment } from "@/features/messaging/email-attachments-server";
+import { downloadEmailAttachment, EMAIL_ATTACHMENT_BUCKET } from "@/features/messaging/email-attachments-server";
 import { createSendHandler } from "@/features/messaging/send-handler";
 import { messagingProviders } from "@/features/messaging/providers/select";
 import type { Json } from "@/lib/database.types";
@@ -54,7 +54,7 @@ export function jobTimeLeftMs(now: number, claimedAt: number, routeStartedAt: nu
  * for message.send, public.job_message_may_send() and, for a composing SMS provider (InforU, SMS-05), public.sms_job_compose() and public.sms_quota_return() (owner (326) ב), and for the composing email provider (Resend, EML-01, owner (195) א) public.email_job_compose() and public.email_quota_return(), for digest.send (USR-11 / WAB-03) only public.digest_job_compose(), for report.send (RPT-03) only public.scheduled_report_compose(), for invite.send (USR-09) only public.invitation_job_compose(), for invoice.issue (DOC-07, owner (398) א) only public.invoice_issue_claim() and public.invoice_issue_record(), reading Storage only at the paths the composer answered (email-attachments-server.ts); for import.run and export.run (IMP-04, owner (155) א, (160) א) only
  * public.background_job_begin(), background_job_progress() and background_job_end(), and, through the token source it hands
  * this client to (src/features/background/user-token.ts), background_job_token() before every signing of the person's token. No table is read or written with
- * the service role (CLAUDE.md hard rule 5, wave 3 use (1)): a background job's own work is done with a short-lived token
+ * the service role, and Storage is read only in the one line that hands the attachment downloader a reader of record-files (CLAUDE.md hard rule 5, wave 3 use (1)): a background job's own work is done with a short-lived token
  * of the person who ordered it (src/features/background/user-token.ts), made only from the claims begin answered.
  * Only kinds with a ready handler are claimed: message.send only with a provider configured for a channel, the two
  * background kinds only when the signer is set up (backgroundJobsReady).
@@ -103,8 +103,10 @@ export async function runJobsRoute(request: Request): Promise<Response> {
             if (error) throw new Error("quota return failed");
             return data;
           },
-          // owner (195) א: the files only at the paths the composer answered, of the job's own business, bucket record-files
-          loadAttachment: (ref, job, timeoutMs) => downloadEmailAttachment(supabase, ref, job.organization_id, timeoutMs),
+          // owner (195) א: the files only at the paths the composer answered, of the job's own business, bucket record-files.
+          // RVW-104: the client stays here; the downloader gets only a reader bound to that one bucket.
+          loadAttachment: (ref, job, timeoutMs) =>
+            downloadEmailAttachment((path) => supabase.storage.from(EMAIL_ATTACHMENT_BUCKET).download(path), ref, job.organization_id, timeoutMs),
           timeLeftMs: (job) => jobTimeLeftMs(Date.now(), claimedAt.get(job.id) ?? routeStartedAt, routeStartedAt),
         })
       : null,
