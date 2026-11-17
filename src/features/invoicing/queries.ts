@@ -203,7 +203,8 @@ export type CreditRoom = {
   pendingAgorot: number;
   leftAgorot: number;
   /** DOC-14: the credit requests that still reserve an amount (ended ones an owner or admin may release) */
-  reserving: { id: string; status: string; code: string | null; totalAgorot: number | null; createdAt: string }[];
+  /** atProvider: the provider issued it (it is closed by recording it by hand, never released) */
+  reserving: { id: string; status: string; code: string | null; totalAgorot: number | null; createdAt: string; atProvider: boolean }[];
   /** owner (411) ב: the original's lines mix exempt and taxable ones (a partial credit is made of chosen lines) */
   mixed: boolean;
   /** owner (411) ב: the original's lines, with what is left of each (in the original's price mode) */
@@ -258,7 +259,7 @@ export async function getCreditRoom(orgId: string, documentId: string): Promise<
           if (!item || typeof item !== "object" || Array.isArray(item)) return [];
           const r = item as Record<string, unknown>;
           if (typeof r.id !== "string" || typeof r.status !== "string" || typeof r.created_at !== "string") return [];
-          return [{ id: r.id, status: r.status, code: typeof r.code === "string" ? r.code : null, totalAgorot: typeof r.total_agorot === "number" ? r.total_agorot : null, createdAt: r.created_at }];
+          return [{ id: r.id, status: r.status, code: typeof r.code === "string" ? r.code : null, totalAgorot: typeof r.total_agorot === "number" ? r.total_agorot : null, createdAt: r.created_at, atProvider: r.at_provider === true }];
         })
       : [],
     back: parent?.deal_id ? { kind: "deal", id: parent.deal_id } : parent?.contact_id ? { kind: "contact", id: parent.contact_id } : null,

@@ -77,7 +77,11 @@ export default async function CreditDocumentPage({ params }: Props) {
                       {" · "}
                       <span className="text-ink-soft">{formatDate(zoneDate(new Date(request.createdAt), timeZone))} {zoneTime(new Date(request.createdAt), timeZone)}</span>
                     </span>
-                    {access.canManage && request.status !== "pending" ? <ReleaseCreditButton orgId={orgId} documentId={documentId} requestId={request.id} /> : null}
+                    {request.atProvider ? (
+                      <span className="text-ink-soft">הופקה אצל הספק ולא נרשמה: רשמו אותה ידנית כחשבונית זיכוי על המסמך הזה, עם המספר שלה אצל הספק</span>
+                    ) : access.canManage && request.status !== "pending" ? (
+                      <ReleaseCreditButton orgId={orgId} documentId={documentId} requestId={request.id} />
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -89,7 +93,7 @@ export default async function CreditDocumentPage({ params }: Props) {
         <CardHeader id="credit-new" title="זיכוי חדש" />
         <CardBody>
           {room.creditable ? (
-            <CreditForm orgId={orgId} documentId={documentId} idempotencyKey={randomUUID()} leftAgorot={room.leftAgorot} mixed={room.mixed && room.gross !== null} lines={room.lines} />
+            <CreditForm orgId={orgId} documentId={documentId} idempotencyKey={randomUUID()} leftAgorot={room.leftAgorot} mixed={room.mixed} gross={room.gross} lines={room.lines} />
           ) : (
             <FormNotice message={creditBlockedText(room.code)} />
           )}

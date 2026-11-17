@@ -25,12 +25,21 @@
 --          that RESERVE their amount (app.invoice_credit_reserves).
 -- A credit request reserves its amount only while it may still exist at the provider and is not recorded: pending; or ended
 -- after a try may have reached the provider (unrecorded / stale with any code, the worker's late lookup still possible).
--- It stops reserving when it is known never issued (failed; closed or marked stale before any try of its job was claimed,
--- whose claim then answers `finished`; a late lookup that answered not_at_provider, stamped provider_absent_at by the
--- record), when it is recorded (document_id, or the same provider document recorded by hand: an active credit invoice of the
--- same original with the provider's number), or when an owner/admin releases it after checking at the provider
--- (public.invoice_credit_release, credit_released_at). Only owners and admins mark a credit request `checked`
--- (public.invoice_issue_close, hint invoice_credit:check_admin); issue requests keep 021297's rule.
+-- It stops reserving when it is known never issued, stamped once in provider_absent_at (never read from the job's live
+-- attempts): by public.invoice_issue_close when it closes a request whose job was never claimed, by the claim when it answers
+-- `finished` on its first try for a request closed or marked stale before, and by the record when a late lookup answers
+-- not_at_provider; or failed; or when it is recorded (document_id, or the same provider document recorded by hand: an active
+-- credit invoice of the same original with the provider's number); or when an owner/admin closes it as `checked` (only for
+-- one with no provider document: public.invoice_issue_close, hint invoice_credit:check_admin for anyone else; issue requests
+-- keep 021297's rule), or releases it after checking at the provider (public.invoice_credit_release: an ended request the
+-- provider did NOT issue (no provider_document_id; hint invoice_credit:release); stamps credit_released_at / _by only, why it
+-- ended stays). A credit the provider issued keeps counting even when cancelled here by hand (it exists at the provider).
+-- A credit recorded by hand against an original the provider issued is refused above what is left (amount - counted credits
+-- - reservations, a reservation of the same provider number left out; hint invoice_credit:hand_over, its DETAIL what is left
+-- in agorot for the message; owner (412) א), judged under the per-original lock in trigger accounting_documents_credit_lock.
+-- The reason: U+2028/U+2029 and runs of white space fold into one space; control, bidi and zero-width characters
+-- (app.document_invisible_class, U+FEFF) are refused. credit_reason is also erased directly when the erasure erases the
+-- document's audit entries (trigger audit_log_credit_reason_erase), whatever its lines were.
 -- Judged under a lock per original, taken by app.invoice_credit_open and by trigger accounting_documents_credit_lock on every
 -- insert of a credit invoice that names an original (by hand too), so a credit is never judged beside a racing one.
 -- VAT: a recorded credit without a VAT split (recorded by hand) counts the original's VAT share of its amount (half up).
@@ -57,6 +66,7 @@
 
 alter table app.invoice_issue_requests add column if not exists provider_absent_at timestamptz;
 alter table app.invoice_issue_requests add column if not exists credit_released_at timestamptz;
+alter table app.invoice_issue_requests add column if not exists credit_released_by uuid;
 
 -- owner (409) ב: the credit's reason, kept on the recorded credit invoice (server only: no client insert or update grant;
 -- frozen; a privacy erasure replaces it with the neutral text)
@@ -106,6 +116,36 @@ begin
 end;
 $$;
 revoke all on function app.accounting_document_lines_credit_reason_erase() from public, anon, authenticated, service_role;
+
+-- ... and directly when the erasure erases the document's audit entries (also when its lines were already neutral): the reason
+-- becomes the neutral text, and the entry that change writes is erased at once
+create or replace function app.audit_log_credit_reason_erase() returns trigger
+language plpgsql security definer
+set search_path = ''
+as $$
+declare
+  v_was text := current_setting('app.document_server', true);
+begin
+  if exists (select 1 from public.accounting_documents d
+              where d.organization_id = new.organization_id and d.id = new.entity_id and d.credit_reason is not null
+                and d.credit_reason <> 'הסיבה נמחקה (מחיקת פרטיות)') then
+    perform set_config('app.document_server', 'erase', true);
+    update public.accounting_documents d set credit_reason = 'הסיבה נמחקה (מחיקת פרטיות)'
+     where d.organization_id = new.organization_id and d.id = new.entity_id;
+    perform set_config('app.document_server', coalesce(v_was, ''), true);
+    update public.audit_log a set changes = '{"erased": true}'::jsonb
+     where a.organization_id = new.organization_id and a.entity_type = 'accounting_documents' and a.entity_id = new.entity_id
+       and a.action <> 'erase' and a.changes ? 'credit_reason';
+  end if;
+  return null;
+end;
+$$;
+revoke all on function app.audit_log_credit_reason_erase() from public, anon, authenticated, service_role;
+
+create or replace trigger audit_log_credit_reason_erase after update of changes on public.audit_log
+  for each row when (new.entity_type = 'accounting_documents' and new.entity_id is not null
+                     and new.changes = '{"erased": true}'::jsonb and old.changes is distinct from new.changes)
+  execute function app.audit_log_credit_reason_erase();
 
 create or replace trigger accounting_document_lines_credit_reason_erase
   after update of description on public.accounting_document_lines
@@ -160,8 +200,9 @@ $$;
 revoke all on function app.invoice_credit_check(uuid) from public, anon;
 grant execute on function app.invoice_credit_check(uuid) to authenticated;
 
--- Whether a credit request still reserves its amount (see the header); p_attempts = its job's attempts (null = no job)
-create or replace function app.invoice_credit_reserves(p_req app.invoice_issue_requests, p_attempts integer) returns boolean
+-- Whether a credit request still reserves its amount (see the header). Never read from the job's live attempts: "never sent"
+-- is stamped once (provider_absent_at) by the close, the claim or the record, at the moment it is known
+create or replace function app.invoice_credit_reserves(p_req app.invoice_issue_requests) returns boolean
 language sql stable security definer
 set search_path = ''
 as $$
@@ -176,14 +217,12 @@ as $$
           where d.organization_id = p_req.organization_id and d.doc_type = 'credit_invoice' and d.status = 'active'
             and d.original_document_id::text = p_req.payload ->> 'original_document_id'
             and (d.provider_document_id = p_req.provider_document_id or d.number = p_req.number))
-       -- closed or marked stale before any try of its job was claimed: its claim answers `finished`, nothing is sent
-       when p_req.error_code in ('closed', 'stale') and coalesce(p_attempts, 0) = 0 then false
        -- someone (an owner or admin, for a credit) checked at the provider
        when p_req.status = 'unrecorded' and p_req.error_code = 'checked' then false
        else true
      end
 $$;
-revoke all on function app.invoice_credit_reserves(app.invoice_issue_requests, integer) from public, anon, authenticated, service_role;
+revoke all on function app.invoice_credit_reserves(app.invoice_issue_requests) from public, anon, authenticated, service_role;
 
 -- The credit's lines: one taxable line and one exempt line whose app.document_totals (net prices) is exactly the amount, with
 -- the aimed VAT, else the nearest lower VAT the amount can carry at the rate. Answers {lines, totals}.
@@ -241,12 +280,51 @@ revoke all on function app.invoice_credit_lines(bigint, bigint, integer, text) f
 
 -- One credit of an original at a time: the lock app.invoice_credit_open judges what is left under, taken by every insert of a
 -- credit invoice that names an original (by hand, or the worker's record)
-create or replace function app.accounting_documents_credit_lock() returns trigger
-language plpgsql security invoker
+-- What a hand-recorded credit of a provider's original may still take: its amount - the credits that count
+-- (app.invoice_credit_room_of's rule; keep in step) - the reserving requests, except a request the provider already issued
+-- under this very number (recording that one by hand is how it is closed)
+create or replace function app.invoice_credit_hand_room(p_org uuid, p_document uuid, p_number text) returns bigint
+language sql stable security definer
 set search_path = ''
 as $$
+  select d.amount_agorot
+         - coalesce((select sum(c.amount_agorot) from public.accounting_documents c
+                      where c.organization_id = p_org and c.original_document_id = p_document and c.doc_type = 'credit_invoice'
+                        and (c.status = 'active' or c.provider_document_id is not null)), 0)
+         - coalesce((select sum((r.payload -> 'totals' ->> 'total_agorot')::bigint) from app.invoice_issue_requests r
+                      where r.organization_id = p_org and r.payload ->> 'doc_type' = 'credit_invoice'
+                        and r.payload ->> 'original_document_id' = p_document::text
+                        and app.invoice_credit_reserves(r)
+                        and not (r.provider_document_id is not null and r.number is not distinct from p_number)), 0)
+    from public.accounting_documents d where d.organization_id = p_org and d.id = p_document
+$$;
+revoke all on function app.invoice_credit_hand_room(uuid, uuid, text) from public, anon, authenticated, service_role;
+
+-- The per-original lock on every credit invoice that names an original; a credit recorded by hand (no provider id) against an
+-- original the provider issued is refused above what is left (owner (412) א; hint invoice_credit:hand_over, DETAIL = what is left in agorot).
+-- Definer, so the reservations are read; the outsider guard lets RLS answer a person who may not record documents.
+create or replace function app.accounting_documents_credit_lock() returns trigger
+language plpgsql security definer
+set search_path = ''
+as $$
+declare
+  v_room bigint;
 begin
   perform pg_advisory_xact_lock(hashtextextended('invoice_credit:' || new.organization_id::text || ':' || new.original_document_id::text, 0));
+  if auth.uid() is not null and not (app.can_record_documents(new.organization_id) and app.org_writable(new.organization_id)) then
+    return new;
+  end if;
+  if new.provider_document_id is null
+     and exists (select 1 from public.accounting_documents o
+                  where o.organization_id = new.organization_id and o.id = new.original_document_id
+                    and o.provider_document_id is not null) then
+    v_room := app.invoice_credit_hand_room(new.organization_id, new.original_document_id, new.number);
+    if new.amount_agorot > coalesce(v_room, 0) then
+      -- owner (412) א: the message names what is left (agorot in the detail)
+      raise exception 'a credit recorded by hand is never more than what is left of the original' using errcode = 'P0001',
+        hint = 'invoice_credit:hand_over', detail = greatest(coalesce(v_room, 0), 0)::text;
+    end if;
+  end if;
   return new;
 end;
 $$;
@@ -294,15 +372,15 @@ begin
     into v_credited, v_credited_vat
     from public.accounting_documents d
    where d.organization_id = p_org and d.original_document_id = p_document and d.doc_type = 'credit_invoice'
-     and d.status = 'active';
+     -- a provider's credit cancelled here by hand still exists at the provider: it keeps counting
+     and (d.status = 'active' or d.provider_document_id is not null);
   select coalesce(sum((r.payload -> 'totals' ->> 'total_agorot')::bigint), 0),
          coalesce(sum((r.payload -> 'totals' ->> 'vat_agorot')::bigint), 0)
     into v_flight, v_flight_vat
     from app.invoice_issue_requests r
-    left join app.jobs j on j.id = r.job_id
    where r.organization_id = p_org and r.payload ->> 'doc_type' = 'credit_invoice'
      and r.payload ->> 'original_document_id' = p_document::text
-     and app.invoice_credit_reserves(r, j.attempts);
+     and app.invoice_credit_reserves(r);
   -- owner (411) ב: the original's lines, what is left of each (its credit lines that name it on active credit invoices, and
   -- the lines of the requests that reserve), and the price mode its lines give back its stored totals in (null = neither)
   select coalesce(jsonb_agg(jsonb_build_object(
@@ -331,15 +409,15 @@ begin
              - coalesce((select sum(cl.total_agorot) from public.accounting_document_lines cl
                           join public.accounting_documents cd on cd.organization_id = cl.organization_id and cd.id = cl.document_id
                          where cl.organization_id = p_org and cl.credited_line_id = l.id
-                           and cd.doc_type = 'credit_invoice' and cd.status = 'active'), 0)
+                           and cd.doc_type = 'credit_invoice'
+                           and (cd.status = 'active' or cd.provider_document_id is not null)), 0)
              - coalesce((select sum(round((x ->> 'quantity')::numeric * (x ->> 'unit_price_agorot')::numeric)
                                     - coalesce((x ->> 'discount_agorot')::numeric, 0))
                           from app.invoice_issue_requests r
-                          left join app.jobs j on j.id = r.job_id
                           cross join lateral jsonb_array_elements(r.payload -> 'lines') x
                          where r.organization_id = p_org and r.payload ->> 'doc_type' = 'credit_invoice'
                            and r.payload ->> 'original_document_id' = p_document::text
-                           and app.invoice_credit_reserves(r, j.attempts)
+                           and app.invoice_credit_reserves(r)
                            and x ->> 'original_line_id' = l.id::text), 0)::bigint, 0))
            order by l.position), '[]'::jsonb)
     into v_lines
@@ -368,13 +446,13 @@ begin
     -- the requests that reserve an amount, newest first (the page offers owners and admins to release an ended one)
     'reserving', coalesce((
       select jsonb_agg(jsonb_build_object('id', x.id, 'status', x.status, 'code', x.error_code, 'number', x.number,
+                                          'at_provider', x.provider_document_id is not null,
                                           'total_agorot', (x.payload -> 'totals' ->> 'total_agorot')::bigint,
                                           'created_at', x.created_at) order by x.created_at desc)
         from (select r.* from app.invoice_issue_requests r
-                left join app.jobs j on j.id = r.job_id
                where r.organization_id = p_org and r.payload ->> 'doc_type' = 'credit_invoice'
                  and r.payload ->> 'original_document_id' = p_document::text
-                 and app.invoice_credit_reserves(r, j.attempts)
+                 and app.invoice_credit_reserves(r)
                order by r.created_at desc
                limit 20) x), '[]'::jsonb));
 end;
@@ -467,8 +545,11 @@ begin
     raise exception 'a credit is an object with its reason' using errcode = '22023';
   end if;
   -- one line: runs of white space (line breaks too) fold into one space
-  v_reason := btrim(regexp_replace(coalesce(p_credit ->> 'reason', ''), '[[:space:]]+', ' ', 'g'));
-  if v_reason = '' or char_length(v_reason) > 500 or v_reason ~ '[[:cntrl:]]' then
+  v_reason := btrim(regexp_replace(translate(coalesce(p_credit ->> 'reason', ''), chr(8232) || chr(8233), '  '),
+                                    '[[:space:]]+', ' ', 'g'));
+  -- no control, direction or zero-width characters (app.document_invisible_class, as other free text; and U+FEFF)
+  if v_reason = '' or char_length(v_reason) > 500 or v_reason ~ '[[:cntrl:]]' or v_reason ~ app.document_invisible_class()
+     or strpos(v_reason, chr(65279)) > 0 then
     raise exception 'a credit needs its reason, up to 500 characters' using errcode = 'P0001', hint = 'invoice_credit:reason';
   end if;
 
@@ -710,6 +791,11 @@ begin
   v_late := v_req.status in ('unrecorded', 'stale') and v_req.error_code in ('closed', 'stale')
             and v_req.provider_document_id is null and v_req.document_id is null and v_job.attempts > 1;
   if v_req.status <> 'pending' and not v_late then
+    -- DOC-14: closed or marked stale before its first try: never sent to the provider (a credit stops reserving)
+    if v_req.status in ('unrecorded', 'stale') and v_req.error_code in ('closed', 'stale') and v_job.attempts <= 1
+       and v_req.provider_document_id is null and v_req.document_id is null and v_req.provider_absent_at is null then
+      update app.invoice_issue_requests r set provider_absent_at = now() where r.id = v_req.id;
+    end if;
     return jsonb_build_object('refused', 'finished', 'status', v_req.status);
   end if;
   if v_late then
@@ -1061,7 +1147,11 @@ begin
   end if;
   if v_req.status in ('pending', 'stale') then
     update app.invoice_issue_requests r
-       set status = 'unrecorded', error_code = 'closed', closed_by = auth.uid(), finished_at = now()
+       set status = 'unrecorded', error_code = 'closed', closed_by = auth.uid(), finished_at = now(),
+           -- DOC-14: no try of its job was ever claimed, so nothing reached the provider (its claim will answer finished)
+           provider_absent_at = case when r.provider_document_id is null
+                                      and coalesce((select j.attempts from app.jobs j where j.id = r.job_id), 0) = 0
+                                     then now() else r.provider_absent_at end
      where r.id = v_req.id;
     return jsonb_build_object('status', 'unrecorded', 'code', 'closed');
   end if;
@@ -1101,20 +1191,19 @@ begin
   if not found then
     raise exception 'no such request' using errcode = 'P0001', hint = 'invoice:request';
   end if;
-  if v_req.status in ('pending', 'issued', 'failed') or v_req.document_id is not null then
-    raise exception 'only an ended credit request without a recorded document is released' using errcode = 'P0001',
+  -- one the provider issued (provider_document_id) exists there: it is closed by recording it by hand, never released
+  if v_req.status in ('pending', 'issued', 'failed') or v_req.document_id is not null or v_req.provider_document_id is not null then
+    raise exception 'only an ended credit request the provider did not issue is released' using errcode = 'P0001',
       hint = 'invoice_credit:release';
   end if;
   if exists (select 1 from app.jobs j where j.id = v_req.job_id and j.status = 'running' and j.locked_until > now()) then
     raise exception 'the provider is being asked right now' using errcode = 'P0001', hint = 'invoice:busy';
   end if;
+  -- why it ended stays as it is; only the release is stamped
   if v_req.credit_released_at is null then
-    update app.invoice_issue_requests r
-       set status = 'unrecorded', error_code = 'checked', closed_by = auth.uid(), finished_at = coalesce(r.finished_at, now()),
-           credit_released_at = now()
-     where r.id = v_req.id;
+    update app.invoice_issue_requests r set credit_released_at = now(), credit_released_by = auth.uid() where r.id = v_req.id;
   end if;
-  return jsonb_build_object('status', 'unrecorded', 'code', 'checked');
+  return jsonb_build_object('status', v_req.status, 'code', v_req.error_code, 'released', true);
 end;
 $$;
 revoke all on function public.invoice_credit_release(uuid, uuid) from public, anon;
