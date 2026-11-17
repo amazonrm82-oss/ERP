@@ -25,7 +25,21 @@ export type InvoiceCustomer = {
   isBusiness: boolean;
 };
 
+/** Owner (410) ב: our product as the provider keeps it (DOC-13); nothing of a customer. */
+export type InvoiceProduct = {
+  /** Our id ("product:<id>"): the provider keeps it so the next document finds the same product */
+  externalRef: string;
+  name: string;
+  sku: string | null;
+  unit: string | null;
+  priceAgorot: number;
+  priceIncludesVat: boolean;
+  vatExempt: boolean;
+};
+
 export type InvoiceLine = {
+  /** Owner (410) ב: the provider's product id, when the line came from one of our products (made by upsertProduct) */
+  providerProductId?: string | null;
   description: string;
   quantity: number;
   unitPriceAgorot: number;
@@ -128,6 +142,8 @@ export interface InvoiceProvider {
   checkConnection(): Promise<ProviderResult<object>>;
   /** DOC-13: the customer at the provider, made or updated; its id there */
   upsertCustomer(customer: InvoiceCustomer): Promise<ProviderResult<{ providerCustomerId: string }>>;
+  /** DOC-13 (owner (410) ב): the product at the provider, made or updated with our details; its id there */
+  upsertProduct(product: InvoiceProduct): Promise<ProviderResult<{ providerProductId: string }>>;
   issueDocument(request: IssueRequest): Promise<ProviderResult<{ document: ProviderDocument }>>;
   getDocument(providerDocumentId: string): Promise<ProviderResult<{ document: ProviderDocument }>>;
   /**

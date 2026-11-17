@@ -2717,6 +2717,8 @@ export type PaymentCreditCompanyRow = {
 // accounting_documents). Never deleted; cancelled with a reason.
 export type AccountingDocumentRow = {
   id: string;
+  // DOC-14 (owner (409) ב): a credit invoice's reason, written by the provider layer (server only)
+  credit_reason: string | null;
   organization_id: string;
   deal_id: string | null;
   contact_id: string | null;
@@ -2768,6 +2770,8 @@ export type AccountingDocumentLineRow = {
   document_id: string;
   position: number;
   product_id: string | null;
+  // DOC-14 (owner (411) ב): on a credit invoice's line, the original's line it credits (server only)
+  credited_line_id: string | null;
   description: string;
   quantity: number;
   unit_price_agorot: number;
@@ -4630,6 +4634,7 @@ export type Database = {
       // DOC-14 (migration invoice_credit): a credit invoice through the provider, and what is left to credit
       invoice_credit_begin: { Args: { p_org: string; p_key: string; p_document: string; p_credit: Json }; Returns: Json };
       invoice_credit_room: { Args: { p_org: string; p_document: string }; Returns: Json };
+      invoice_credit_release: { Args: { p_org: string; p_request: string }; Returns: Json };
       // COL-01: the collection screen's open debt documents (invoker; BAL-01's rights, BAL-03's partial rule)
       collection_documents: {
         Args: {

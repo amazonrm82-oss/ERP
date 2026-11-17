@@ -34,10 +34,25 @@ export const issueTakesDueDate = (type: IssuableDocumentType) => type === "tax_i
 export const ISSUE_LINES_MAX = 200;
 
 /** One line as the form edits it (texts, as typed). */
-export type IssueLineDraft = { description: string; quantity: string; unitPrice: string; discount: string; vatExempt: boolean };
+export type IssueLineDraft = {
+  description: string;
+  quantity: string;
+  unitPrice: string;
+  discount: string;
+  vatExempt: boolean;
+  /** owner (410) ב: the product the source line came from (goes to the provider as its product) */
+  productId?: string | null;
+};
 
 /** One line as the database takes it. */
-export type IssueLine = { description: string; quantity: number; unit_price_agorot: number; discount_agorot: number; vat_exempt: boolean };
+export type IssueLine = {
+  description: string;
+  quantity: number;
+  unit_price_agorot: number;
+  discount_agorot: number;
+  vat_exempt: boolean;
+  product_id?: string;
+};
 
 export const EMPTY_ISSUE_LINE: IssueLineDraft = { description: "", quantity: "1", unitPrice: "", discount: "", vatExempt: false };
 
@@ -53,7 +68,8 @@ export function issueLineFrom(draft: IssueLineDraft): IssueLine | null {
   if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1_000_000 || Math.round(quantity * 1000) !== quantity * 1000) return null;
   if (unit === null || unit < 0 || discount === null || discount < 0) return null;
   if (documentLineTotal({ quantity, unitPriceAgorot: unit, discountAgorot: discount }) < 0) return null;
-  return { description, quantity, unit_price_agorot: unit, discount_agorot: discount, vat_exempt: draft.vatExempt };
+  const line: IssueLine = { description, quantity, unit_price_agorot: unit, discount_agorot: discount, vat_exempt: draft.vatExempt };
+  return draft.productId ? { ...line, product_id: draft.productId } : line;
 }
 
 /** The form's hidden `lines` field: every row valid, 1..200 rows; null = the message to show. */
@@ -82,6 +98,7 @@ const issueDraftSchema = z.object({
   unitPrice: z.string().max(40),
   discount: z.string().max(40),
   vatExempt: z.boolean(),
+  productId: z.guid().nullable().optional(),
 });
 
 export const issueFormSchema = z

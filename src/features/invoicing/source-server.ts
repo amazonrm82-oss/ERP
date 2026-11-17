@@ -30,6 +30,7 @@ type SourceLine = {
   discount_bp: number | null;
   discount_agorot: number | null;
   vat_exempt: boolean;
+  product_id?: string | null;
 };
 
 const draftOf = (line: SourceLine): IssueLineDraft => ({
@@ -41,6 +42,7 @@ const draftOf = (line: SourceLine): IssueLineDraft => ({
     return discount > 0 ? agorotText(discount) : "";
   })(),
   vatExempt: line.vat_exempt,
+  productId: line.product_id ?? null,
 });
 
 const KIND_TITLE: Record<IssueSourceKind, string> = { deal: "עסקה", contact: "איש קשר", quote: "הצעת מחיר", order: "הזמנה" };
@@ -73,7 +75,7 @@ export async function getIssueSource(orgId: string, kind: IssueSourceKind, id: s
     const rows = must(
       await supabase
         .from("deal_lines")
-        .select("description, quantity, unit_price_agorot, discount_bp, discount_agorot, vat_exempt, price_includes_vat")
+        .select("description, quantity, unit_price_agorot, discount_bp, discount_agorot, vat_exempt, price_includes_vat, product_id")
         .eq("organization_id", orgId)
         .eq("deal_id", id)
         .order("position")
@@ -98,7 +100,7 @@ export async function getIssueSource(orgId: string, kind: IssueSourceKind, id: s
       const rows = must(
         await supabase
           .from("quote_lines")
-          .select("kind, name, description, quantity, unit_price_agorot, discount_bp, discount_agorot, vat_exempt, is_optional, optional_selected")
+          .select("kind, name, description, quantity, unit_price_agorot, discount_bp, discount_agorot, vat_exempt, is_optional, optional_selected, product_id")
           .eq("organization_id", orgId)
           .eq("quote_id", id)
           .order("position")
@@ -112,7 +114,7 @@ export async function getIssueSource(orgId: string, kind: IssueSourceKind, id: s
       const rows = must(
         await supabase
           .from("order_lines")
-          .select("kind, name, quantity, unit_price_agorot, discount_bp, discount_agorot, vat_exempt")
+          .select("kind, name, quantity, unit_price_agorot, discount_bp, discount_agorot, vat_exempt, product_id")
           .eq("organization_id", orgId)
           .eq("order_id", id)
           .order("position")

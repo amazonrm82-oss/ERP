@@ -78,13 +78,13 @@ const creditBeginSchema = z.object({
 export async function beginCredit(
   supabase: SupabaseClient<Database>,
   orgId: string,
-  input: { key: string; documentId: string; reason: string; amountAgorot: number | null },
+  input: { key: string; documentId: string; reason: string; amountAgorot: number | null; lines?: { line_id: string; amount_agorot: number | null }[] },
 ): Promise<CreditOutcome> {
   const { data, error } = await supabase.rpc("invoice_credit_begin", {
     p_org: orgId,
     p_key: input.key,
     p_document: input.documentId,
-    p_credit: { reason: input.reason, amount_agorot: input.amountAgorot },
+    p_credit: input.lines ? { reason: input.reason, lines: input.lines } : { reason: input.reason, amount_agorot: input.amountAgorot },
   });
   if (error) return { status: "error", error };
   const parsed = creditBeginSchema.safeParse(data);

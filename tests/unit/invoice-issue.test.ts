@@ -11,7 +11,7 @@ import {
   sourceLineDiscount,
 } from "@/features/invoicing/issue";
 import { createInvoiceIssueHandler, providerRequest } from "@/features/invoicing/issue-handler";
-import { clearFakeInvoices, createFakeInvoiceProvider, fakeCustomers, fakeCustomerUpserts, fakeIssueCalls, fakeLookupCalls } from "@/features/invoicing/providers/fake";
+import { clearFakeInvoices, createFakeInvoiceProvider, fakeCustomers, fakeCustomerUpserts, fakeIssueCalls, fakeLookupCalls, fakeProducts, fakeProductUpserts } from "@/features/invoicing/providers/fake";
 import { canIssueDocuments } from "@/features/permissions/keys";
 
 // DOC-07 / DOC-08 / DOC-17: the issue form's rules (the database judges again, migration invoice_issue).
@@ -289,6 +289,74 @@ describe("DOC-13: the customer at the provider", () => {
     });
     await handler(job);
     expect(fakeCustomerUpserts()).toBe(0);
+  });
+});
+
+describe("products at the provider (owner (410) ב)", () => {
+  const stored = {
+    doc_type: "tax_invoice" as const,
+    doc_date: "2026-11-16",
+    due_date: null,
+    locale: "he" as const,
+    send_email: false,
+    customer: { external_ref: "contact:7", name: "דנה", tax_id: null, address: null, email: null, is_business: false },
+    lines: [
+      { description: "מוצר", quantity: 1, unit_price_agorot: 100, discount_agorot: 0, vat_exempt: false, product_id: "p-1" },
+      { description: "חופשי", quantity: 1, unit_price_agorot: 50, discount_agorot: 0, vat_exempt: false },
+    ],
+    totals: { net_agorot: 150, vat_agorot: 27, total_agorot: 177, rate_bp: 1800, prices_include_vat: false },
+  };
+  const product = { external_ref: "product:p-1", name: "מוצר", sku: "S1", unit: "יחידה", price_agorot: 100, price_includes_vat: false, vat_exempt: false };
+  const job = { id: "job-p", lease: "lease-p", kind: "invoice.issue" as const, organization_id: "org-1", payload: { request_id: "req-p" }, attempt: 1 };
+  const kept = { id: "fake_customer_x", current: true };
+
+  it("a stale or missing product is made with our details first; its id goes on the line and to the record", async () => {
+    clearFakeInvoices();
+    const base = createFakeInvoiceProvider();
+    const seen: unknown[] = [];
+    const sent: Record<string, unknown>[] = [];
+    const handler = createInvoiceIssueHandler({
+      provider: { ...base, issueDocument: async (r) => (seen.push(r.lines.map((l) => l.providerProductId ?? null)), base.issueDocument(r)) },
+      calls: {
+        claim: async () => ({ request_id: "req-p", provider: "fake", request: stored, provider_customer: kept, provider_products: [{ product_id: "p-1", product, kept: { id: "old", current: false } }] }),
+        record: async (_j, r) => (sent.push(r), { status: "issued" }),
+      },
+    });
+    expect(await handler(job)).toEqual({ status: "done" });
+    const held = fakeProducts().get("product:p-1");
+    expect(held?.product).toMatchObject({ name: "מוצר", sku: "S1", unit: "יחידה" });
+    expect(seen).toEqual([[held?.id, null]]);
+    expect(sent[0]).toMatchObject({ ok: true, provider_product_ids: { "p-1": held?.id } });
+  });
+
+  it("a current product is used as kept, without a call", async () => {
+    clearFakeInvoices();
+    const sent: Record<string, unknown>[] = [];
+    const handler = createInvoiceIssueHandler({
+      provider: createFakeInvoiceProvider(),
+      calls: {
+        claim: async () => ({ request_id: "req-p", provider: "fake", request: stored, provider_customer: kept, provider_products: [{ product_id: "p-1", product, kept: { id: "kept_p", current: true } }] }),
+        record: async (_j, r) => (sent.push(r), { status: "issued" }),
+      },
+    });
+    await handler(job);
+    expect(fakeProductUpserts()).toBe(0);
+    expect(sent[0]).not.toHaveProperty("provider_product_ids");
+  });
+
+  it("a failed product call is a failed try like a customer's, and the customer id got in it is still kept", async () => {
+    clearFakeInvoices();
+    const sent: Record<string, unknown>[] = [];
+    const handler = createInvoiceIssueHandler({
+      provider: createFakeInvoiceProvider({ failProduct: () => ({ ok: false, kind: "refused", code: "bad_product" }) }),
+      calls: {
+        claim: async () => ({ request_id: "req-p", provider: "fake", request: stored, provider_customer: null, provider_products: [{ product_id: "p-1", product, kept: null }] }),
+        record: async (_j, r) => (sent.push(r), { status: "failed" }),
+      },
+    });
+    expect(await handler(job)).toEqual({ status: "done" });
+    expect(sent).toEqual([{ ok: false, code: "product_bad_product", final: true, provider_customer_id: expect.stringMatching(/^fake_customer_/) }]);
+    expect(fakeIssueCalls()).toBe(0);
   });
 });
 

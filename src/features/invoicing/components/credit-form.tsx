@@ -2,21 +2,25 @@
 
 import { useActionState, useState } from "react";
 
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { FormError } from "@/components/ui/feedback";
-import { TextareaField, TextField } from "@/components/ui/field";
+import { TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { FormGuard } from "@/components/ui/unsaved-changes";
 import type { FormState } from "@/lib/action-result";
 import { formatMoney } from "@/lib/format";
 
-import { creditAmount, CREDIT_REASON_MAX } from "../credit";
-import { creditDocumentAction } from "../credit-actions";
+import { creditAmount, CREDIT_REASON_MAX, parseCreditLines, type CreditLineDraft } from "../credit";
+import { creditDocumentAction, releaseCreditRequestAction } from "../credit-actions";
 
 type Props = {
   orgId: string;
   documentId: string;
   idempotencyKey: string;
   leftAgorot: number;
+  /** owner (411) ב: the original mixes exempt and taxable lines: a partial credit is made of chosen lines */
+  mixed: boolean;
+  lines: { id: string; description: string; vatExempt: boolean; leftAgorot: number }[];
 };
 
 /**
@@ -24,13 +28,25 @@ type Props = {
  * the button queues one request with its key (DOC-09): a second press reaches the same request. The database works out the
  * VAT share and refuses more than what is left.
  */
-export function CreditForm({ orgId, documentId, idempotencyKey, leftAgorot }: Props) {
+export function CreditForm({ orgId, documentId, idempotencyKey, leftAgorot, mixed, lines }: Props) {
   const [state, formAction] = useActionState<FormState, FormData>(creditDocumentAction.bind(null, orgId, documentId), null);
   const values = state && !state.ok ? state.values : undefined;
   const errors = state && !state.ok ? (state.fieldErrors ?? {}) : {};
-  const [mode, setMode] = useState<"full" | "partial">(values?.mode === "partial" ? "partial" : "full");
+  const partialMode = mixed ? "lines" : "partial";
+  const [mode, setMode] = useState<"full" | "partial" | "lines">(values?.mode === partialMode ? partialMode : "full");
   const [amount, setAmount] = useState(values?.amount ?? "");
-  const checked = mode === "partial" && amount.trim() !== "" ? creditAmount("partial", amount, leftAgorot) : null;
+  const [picks, setPicks] = useState<CreditLineDraft[]>(() => lines.map((line) => ({ lineId: line.id, chosen: false, amount: "" })));
+  const leftByLine = new Map(lines.map((line) => [line.id, line.leftAgorot]));
+  const checked =
+    mode === "partial" && amount.trim() !== ""
+      ? creditAmount("partial", amount, leftAgorot)
+      : mode === "lines"
+        ? (() => {
+            const result = parseCreditLines(JSON.stringify(picks), leftByLine);
+            return result.ok ? null : { ok: false as const, message: result.message };
+          })()
+        : null;
+  const pick = (index: number, patch: Partial<CreditLineDraft>) => setPicks((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   return (
     <form action={formAction} className="space-y-5">
       <FormGuard state={state} />
@@ -44,10 +60,47 @@ export function CreditForm({ orgId, documentId, idempotencyKey, leftAgorot }: Pr
           </span>
         </label>
         <label className="flex items-start gap-2.5 text-md">
-          <input type="radio" name="mode" value="partial" checked={mode === "partial"} onChange={() => setMode("partial")} className="mt-1 size-4 accent-accent" />
-          <span>זיכוי חלקי</span>
+          <input type="radio" name="mode" value={partialMode} checked={mode === partialMode} onChange={() => setMode(partialMode)} className="mt-1 size-4 accent-accent" />
+          <span>{mixed ? "זיכוי חלקי לפי שורות" : "זיכוי חלקי"}</span>
         </label>
       </fieldset>
+      <input type="hidden" name="lines" value={JSON.stringify(picks)} />
+      {mode === "lines" ? (
+        <fieldset className="space-y-3">
+          <legend className="text-md font-medium">השורות לזיכוי</legend>
+          <p className="text-sm text-ink-soft">{'במסמך יש שורות פטורות ממע"מ ושורות חייבות, לכן זיכוי חלקי נעשה לפי שורות. המע"מ מחושב לפי השורות שבוחרים.'}</p>
+          {lines.map((line, index) => (
+            <div key={line.id} className="space-y-2 rounded-lg border border-line p-3">
+              <label className="flex items-start gap-2.5 text-md">
+                <input
+                  type="checkbox"
+                  checked={picks[index]?.chosen ?? false}
+                  disabled={line.leftAgorot <= 0}
+                  onChange={(event) => pick(index, { chosen: event.target.checked })}
+                  className="mt-1 size-4 accent-accent"
+                />
+                <span className="min-w-0 break-words">
+                  {line.description}
+                  {line.vatExempt ? ' (פטור ממע"מ)' : ""}
+                  {" · נשאר "}
+                  <span className="tabular-nums">{formatMoney(line.leftAgorot)}</span>
+                </span>
+              </label>
+              {picks[index]?.chosen ? (
+                <TextField
+                  label="סכום לזיכוי בשורה (₪)"
+                  dir="ltr"
+                  inputMode="decimal"
+                  value={picks[index].amount}
+                  onChange={(event) => pick(index, { amount: event.target.value })}
+                  hint={`ריק: כל מה שנשאר (${formatMoney(line.leftAgorot)})`}
+                />
+              ) : null}
+            </div>
+          ))}
+          {checked && !checked.ok ? <p className="text-sm text-danger">{checked.message}</p> : null}
+        </fieldset>
+      ) : null}
       {mode === "partial" ? (
         <TextField
           label={'סכום הזיכוי כולל מע"מ (₪)'}
@@ -63,7 +116,7 @@ export function CreditForm({ orgId, documentId, idempotencyKey, leftAgorot }: Pr
       ) : (
         <input type="hidden" name="amount" value="" />
       )}
-      <TextareaField
+      <TextField
         label="סיבת הזיכוי"
         name="reason"
         required
@@ -78,5 +131,20 @@ export function CreditForm({ orgId, documentId, idempotencyKey, leftAgorot }: Pr
         הפקת חשבונית זיכוי
       </SubmitButton>
     </form>
+  );
+}
+
+/** DOC-14: an owner or admin releases an ended credit request that still holds its amount, after checking at the provider. */
+export function ReleaseCreditButton({ orgId, documentId, requestId }: { orgId: string; documentId: string; requestId: string }) {
+  return (
+    <ConfirmButton
+      variant="secondary"
+      title="לשחרר את בקשת הזיכוי?"
+      description="משחררים אחרי שבדקתם אצל הספק שהזיכוי לא הופק שם, או שרשמתם אותו ידנית. אחרי השחרור הסכום שלה זמין שוב לזיכוי, והמערכת לא תפנה לספק שוב בבקשה הזאת."
+      confirmLabel="שחרור"
+      action={() => releaseCreditRequestAction(orgId, documentId, requestId)}
+    >
+      שחרור
+    </ConfirmButton>
   );
 }

@@ -12,8 +12,26 @@ import { ISSUABLE_DOCUMENT_TYPES, type CreditRequest, type InvoiceProvider, type
 export const PROVIDER_TIMEOUT_MS = 10_000;
 
 const linesSchema = z.array(
-  z.object({ description: z.string(), quantity: z.number(), unit_price_agorot: z.number(), discount_agorot: z.number(), vat_exempt: z.boolean() }),
+  z.object({
+    description: z.string(),
+    quantity: z.number(),
+    unit_price_agorot: z.number(),
+    discount_agorot: z.number(),
+    vat_exempt: z.boolean(),
+    // owner (410) ב: the product the line came from (a product of this business)
+    product_id: z.string().nullable().optional(),
+  }),
 );
+
+const productSchema = z.object({
+  external_ref: z.string(),
+  name: z.string(),
+  sku: z.string().nullable(),
+  unit: z.string().nullable(),
+  price_agorot: z.number(),
+  price_includes_vat: z.boolean(),
+  vat_exempt: z.boolean(),
+});
 const totalsSchema = z.object({
   net_agorot: z.number(),
   vat_agorot: z.number(),
@@ -62,13 +80,17 @@ const claimSchema = z.union([
     late: z.boolean().optional(),
     // DOC-13: the provider's customer id kept for this customer, and whether it was made with the details sent now
     provider_customer: z.object({ id: z.string(), current: z.boolean() }).nullable().optional(),
+    // owner (410) ב: the products the lines name, our details, and the provider's kept id with whether it is current
+    provider_products: z
+      .array(z.object({ product_id: z.string(), product: productSchema, kept: z.object({ id: z.string(), current: z.boolean() }).nullable() }))
+      .optional(),
   }),
 ]);
 
 const recordSchema = z.object({ status: z.enum(["issued", "unrecorded", "failed", "pending", "stale"]) }).passthrough();
 
 /** The provider's request, from the database's stored request (never from the browser). */
-export function providerRequest(requestId: string, stored: z.infer<typeof issueRequestSchema>): IssueRequest {
+export function providerRequest(requestId: string, stored: z.infer<typeof issueRequestSchema>, productIds?: ReadonlyMap<string, string>): IssueRequest {
   return {
     idempotencyKey: requestId,
     type: stored.doc_type,
@@ -85,6 +107,7 @@ export function providerRequest(requestId: string, stored: z.infer<typeof issueR
       isBusiness: stored.customer.is_business,
     },
     lines: stored.lines.map((line) => ({
+      ...(line.product_id && productIds?.has(line.product_id) ? { providerProductId: productIds.get(line.product_id) } : {}),
       description: line.description,
       quantity: line.quantity,
       unitPriceAgorot: line.unit_price_agorot,
@@ -182,14 +205,45 @@ export function createInvoiceIssueHandler(deps: { calls: InvoiceIssueCalls; prov
         if (upserted === "timeout" || upserted === "unreachable" || !upserted.ok) {
           // nothing was issued in this try; the record's rules decide as for any provider failure (the queue tries again on
           // a retryable one, with the same key)
-          const failure =
-            upserted === "timeout" || upserted === "unreachable"
-              ? { ok: false, code: `customer_${upserted}`, final: false }
-              : { ok: false, code: `customer_${upserted.code}`.slice(0, 64), final: upserted.kind !== "retry" };
-          return finish(await deps.calls.record(job, failure));
+          return finish(await deps.calls.record(job, upsertFailure("customer", upserted)));
         }
         providerCustomerId = upserted.providerCustomerId;
         customerKept = upserted.providerCustomerId;
+      }
+    }
+
+    // owner (410) ב: each product a line names, made or updated with OUR details when nothing is kept or the kept id is
+    // stale; a failure is a failed try like the customer's (an id already got in this try is still kept)
+    const productIds = new Map<string, string>();
+    const productsKept: Record<string, string> = {};
+    if (!late && stored.doc_type !== "credit_invoice") {
+      for (const item of answer.provider_products ?? []) {
+        if (item.kept && item.kept.current) {
+          productIds.set(item.product_id, item.kept.id);
+          continue;
+        }
+        let upserted: Awaited<ReturnType<InvoiceProvider["upsertProduct"]>> | "timeout" | "unreachable";
+        try {
+          upserted = await withTimeout(
+            deps.provider.upsertProduct({
+              externalRef: item.product.external_ref,
+              name: item.product.name,
+              sku: item.product.sku,
+              unit: item.product.unit,
+              priceAgorot: item.product.price_agorot,
+              priceIncludesVat: item.product.price_includes_vat,
+              vatExempt: item.product.vat_exempt,
+            }),
+            timeoutMs,
+          );
+        } catch {
+          upserted = "unreachable";
+        }
+        if (upserted === "timeout" || upserted === "unreachable" || !upserted.ok) {
+          return finish(await deps.calls.record(job, withKept(upsertFailure("product", upserted), customerKept, productsKept)));
+        }
+        productIds.set(item.product_id, upserted.providerProductId);
+        productsKept[item.product_id] = upserted.providerProductId;
       }
     }
 
@@ -197,7 +251,7 @@ export function createInvoiceIssueHandler(deps: { calls: InvoiceIssueCalls; prov
       ? deps.provider.findDocument(answer.request_id)
       : stored.doc_type === "credit_invoice"
         ? deps.provider.creditDocument(providerCreditRequest(answer.request_id, stored))
-        : deps.provider.issueDocument({ ...providerRequest(answer.request_id, stored), providerCustomerId });
+        : deps.provider.issueDocument({ ...providerRequest(answer.request_id, stored, productIds), providerCustomerId });
     let issued: Awaited<ReturnType<InvoiceProvider["issueDocument"]>> | "timeout" | "unreachable";
     try {
       issued = await withTimeout(call, timeoutMs);
@@ -219,8 +273,24 @@ export function createInvoiceIssueHandler(deps: { calls: InvoiceIssueCalls; prov
           : late && issued.code === "not_found"
             ? { ok: false, code: "not_at_provider", final: true }
             : { ok: false, code: issued.code, final: issued.kind !== "retry" };
-    const result = customerKept === null ? answered : { ...answered, provider_customer_id: customerKept };
+    const result = withKept(answered, customerKept, productsKept);
     return finish(await deps.calls.record(job, result));
+  };
+}
+
+/** A failed customer or product upsert, as the record takes a provider failure (nothing was issued in this try). */
+function upsertFailure(what: "customer" | "product", upserted: "timeout" | "unreachable" | { ok: false; kind: "retry" | "refused" | "auth"; code: string }): Record<string, unknown> {
+  return typeof upserted === "string"
+    ? { ok: false, code: `${what}_${upserted}`, final: false }
+    : { ok: false, code: `${what}_${upserted.code}`.slice(0, 64), final: upserted.kind !== "retry" };
+}
+
+/** The answer with the provider ids this try got (the record keeps them whatever the document's outcome). */
+function withKept(answer: Record<string, unknown>, customer: string | null, products: Record<string, string>): Record<string, unknown> {
+  return {
+    ...answer,
+    ...(customer === null ? {} : { provider_customer_id: customer }),
+    ...(Object.keys(products).length === 0 ? {} : { provider_product_ids: products }),
   };
 }
 

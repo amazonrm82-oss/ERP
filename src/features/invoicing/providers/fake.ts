@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import type { AllocationFailureCode, AllocationOutcome, CreditRequest, InvoiceCustomer, InvoiceProvider, IssueRequest, ProviderDocument, ProviderFailure } from "./types";
+import type { AllocationFailureCode, AllocationOutcome, CreditRequest, InvoiceCustomer, InvoiceProduct, InvoiceProvider, IssueRequest, ProviderDocument, ProviderFailure } from "./types";
 
 /**
  * DOC-06: the fake invoice provider (owner (270) (1) א: build behind a fake provider, hidden on the live site until a real
@@ -18,6 +18,8 @@ type FakeOptions = {
   fail?: (request: IssueRequest | CreditRequest) => ProviderFailure | null;
   /** Tests (DOC-13): answer a failure instead of making or updating the customer */
   failCustomer?: (customer: InvoiceCustomer) => ProviderFailure | null;
+  /** Tests (owner (410) ב): answer a failure instead of making or updating the product */
+  failProduct?: (product: InvoiceProduct) => ProviderFailure | null;
   /** Tests (DOC-10): the allocation number is refused on this request, with this code */
   allocationFailure?: (request: IssueRequest) => AllocationFailureCode | null;
   /** Tests (DOC-10): the provider says this request needs no allocation number (it judged the threshold) */
@@ -30,6 +32,8 @@ let calls = 0;
 let lookups = 0;
 let upserts = 0;
 const customers = new Map<string, { id: string; customer: InvoiceCustomer }>();
+const products = new Map<string, { id: string; product: InvoiceProduct }>();
+let productUpserts = 0;
 
 const digest = (key: string) => createHash("sha256").update(`fake-invoice:${key}`, "utf8").digest("hex");
 /** 9 digits that never start with 0 */
@@ -55,6 +59,16 @@ export function fakeCustomers(): ReadonlyMap<string, { id: string; customer: Inv
   return customers;
 }
 
+/** Tests (owner (410) ב): the products the fake holds, by our ref, with the details it was last sent */
+export function fakeProducts(): ReadonlyMap<string, { id: string; product: InvoiceProduct }> {
+  return products;
+}
+
+/** Tests (owner (410) ב): how many times upsertProduct reached the fake */
+export function fakeProductUpserts(): number {
+  return productUpserts;
+}
+
 /** Tests (DOC-13): how many times upsertCustomer reached the fake */
 export function fakeCustomerUpserts(): number {
   return upserts;
@@ -64,6 +78,8 @@ export function clearFakeInvoices(): void {
   issued.clear();
   byId.clear();
   customers.clear();
+  products.clear();
+  productUpserts = 0;
   calls = 0;
   lookups = 0;
   upserts = 0;
@@ -89,6 +105,14 @@ export function createFakeInvoiceProvider(options: FakeOptions = {}): InvoicePro
       const id = `fake_customer_${digest(customer.externalRef).slice(0, 16)}`;
       customers.set(customer.externalRef, { id, customer: { ...customer } });
       return { ok: true, providerCustomerId: id };
+    },
+    async upsertProduct(product) {
+      productUpserts += 1;
+      const failure = options.failProduct?.(product);
+      if (failure) return failure;
+      const id = `fake_product_${digest(product.externalRef).slice(0, 16)}`;
+      products.set(product.externalRef, { id, product: { ...product } });
+      return { ok: true, providerProductId: id };
     },
     async issueDocument(request) {
       calls += 1;

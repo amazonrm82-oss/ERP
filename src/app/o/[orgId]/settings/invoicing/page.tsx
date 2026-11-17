@@ -56,7 +56,12 @@ export default async function InvoicingSettingsPage({ params }: Props) {
                     {request.status === "stale" ? " (ישנה)" : ""}
                     {request.status === "check" ? " (לבדוק אצל הספק)" : ""}
                   </span>
-                  <CloseIssueRequestButton orgId={orgId} requestId={request.id} check={request.status === "check"} />
+                  {/* DOC-14: a credit request that may exist at the provider is closed as checked by owners and admins only */}
+                  {request.status === "check" && request.docType === "credit_invoice" && !access.canManage ? (
+                    <span className="text-ink-soft">בעלים או מנהל מערכת סוגרים אותה</span>
+                  ) : (
+                    <CloseIssueRequestButton orgId={orgId} requestId={request.id} check={request.status === "check"} />
+                  )}
                 </li>
               ))}
             </ul>

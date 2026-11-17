@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { creditAmount, creditBackLabel, creditBlockedText, creditFormSchema } from "@/features/invoicing/credit";
+import { creditAmount, creditBackLabel, creditBlockedText, creditFormSchema, parseCreditLines } from "@/features/invoicing/credit";
 import { createInvoiceIssueHandler, requestSchema } from "@/features/invoicing/issue-handler";
 import { clearFakeInvoices, createFakeInvoiceProvider, fakeCustomerUpserts, fakeIssueCalls, fakeIssuedDocuments, fakeLookupCalls } from "@/features/invoicing/providers/fake";
 import { canIssueCredits, canIssueDocuments } from "@/features/permissions/keys";
@@ -30,7 +30,10 @@ describe("the credit form", () => {
     expect(creditFormSchema.safeParse(base).success).toBe(true);
     expect(creditFormSchema.safeParse({ ...base, reason: "  " }).success).toBe(false);
     expect(creditFormSchema.safeParse({ ...base, reason: "x".repeat(501) }).success).toBe(false);
-    expect(creditFormSchema.safeParse({ ...base, reason: "שורה\nשנייה" }).success).toBe(false);
+    expect(creditFormSchema.safeParse({ ...base, reason: "a\u0007b" }).success).toBe(false);
+    // one line: line breaks fold into one space (as app.invoice_credit_open)
+    const folded = creditFormSchema.safeParse({ ...base, reason: " שורה\n\nשנייה  " });
+    expect(folded.success && folded.data.reason).toBe("שורה שנייה");
     expect(creditFormSchema.safeParse({ ...base, mode: "most" }).success).toBe(false);
   });
 
@@ -51,16 +54,35 @@ describe("the credit form", () => {
   });
 });
 
+describe("line credits of a mixed original (owner (411) ב)", () => {
+  const a = "7f9c1c6e-6c1e-4f2a-9a55-6c0a3c2b1d10";
+  const b = "8f9c1c6e-6c1e-4f2a-9a55-6c0a3c2b1d11";
+  it("takes the ticked lines, an empty amount as all that is left, and refuses nothing ticked or more than is left", () => {
+    const left = new Map([[a, 5000], [b, 4000]]);
+    expect(parseCreditLines(JSON.stringify([{ lineId: a, chosen: true, amount: "" }, { lineId: b, chosen: true, amount: "15" }]), left)).toEqual({
+      ok: true,
+      lines: [{ line_id: a, amount_agorot: null }, { line_id: b, amount_agorot: 1500 }],
+    });
+    expect(parseCreditLines(JSON.stringify([{ lineId: a, chosen: false, amount: "" }]), left).ok).toBe(false);
+    expect(parseCreditLines(JSON.stringify([{ lineId: b, chosen: true, amount: "40.01" }]), left).ok).toBe(false);
+    expect(parseCreditLines(JSON.stringify([{ lineId: b, chosen: true, amount: "0" }]), left).ok).toBe(false);
+    expect(parseCreditLines("not json", left).ok).toBe(false);
+    expect(parseCreditLines(JSON.stringify([{ lineId: "x", chosen: true, amount: "" }]), left).ok).toBe(false);
+  });
+});
+
 describe("who credits", () => {
-  it("owners and admins always; managers and members only with issue_credits; issuing alone does not credit", () => {
+  it("owners and admins always; managers and members only with BOTH issue_documents and issue_credits (owner (408) ד)", () => {
     expect(canIssueCredits("owner", [])).toBe(true);
     expect(canIssueCredits("admin", [])).toBe(true);
     expect(canIssueCredits("manager", [])).toBe(false);
     expect(canIssueCredits("member", ["issue_documents"])).toBe(false);
     expect(canIssueDocuments("member", ["issue_documents"])).toBe(true);
-    expect(canIssueCredits("member", ["issue_credits"])).toBe(true);
-    expect(canIssueCredits("viewer", ["issue_credits"])).toBe(false);
-    expect(canIssueCredits(null, ["issue_credits"])).toBe(false);
+    expect(canIssueCredits("member", ["issue_credits"])).toBe(false);
+    expect(canIssueCredits("member", ["issue_documents", "issue_credits"])).toBe(true);
+    expect(canIssueCredits("manager", ["issue_documents", "issue_credits"])).toBe(true);
+    expect(canIssueCredits("viewer", ["issue_documents", "issue_credits"])).toBe(false);
+    expect(canIssueCredits(null, ["issue_documents", "issue_credits"])).toBe(false);
   });
 });
 
