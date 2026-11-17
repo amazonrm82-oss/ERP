@@ -45,9 +45,39 @@ export function signupClickHref(source: string): string {
   return `${SIGNUP_CLICK_PATH}?${LANDING_SOURCE_PARAM}=${encodeURIComponent(source)}`;
 }
 
-/** Where /go/signup sends the visitor: the sign-up page, with the source for the sign-up count. */
-export function signupHrefWithSource(source: string | null): string {
-  return source ? `${paths.signup}?${LANDING_SOURCE_PARAM}=${encodeURIComponent(source)}` : paths.signup;
+/** Where /go/signup sends the visitor: the sign-up page, with the source for the sign-up count and (WEB-02) the chosen plan. */
+export function signupHrefWithSource(source: string | null, plan: string | null = null): string {
+  const params = new URLSearchParams();
+  if (source) params.set(LANDING_SOURCE_PARAM, source);
+  if (plan) params.set(SIGNUP_PLAN_PARAM, plan);
+  const query = params.toString();
+  return query ? `${paths.signup}?${query}` : paths.signup;
+}
+
+/**
+ * WEB-02: the plan a price card's sign-up button carries, as the query parameter on /go/signup and /signup and the sign-up
+ * form's hidden field. Only its shape is judged here; the sign-up page shows it only while the plan is available, and the
+ * database honours it at business creation only while the plan is available (public.create_organization).
+ */
+export const SIGNUP_PLAN_PARAM = "plan";
+export const SIGNUP_PLAN_FIELD = "signup_plan";
+
+const PLAN_KEY_SHAPE = /^[a-z][a-z0-9_]{0,39}$/;
+
+/** A plan key in its closed shape (first value of a repeated parameter); null for anything else. */
+export function signupPlanKey(raw: unknown): string | null {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return typeof value === "string" && PLAN_KEY_SHAPE.test(value) ? value : null;
+}
+
+/** A sign-up link with the price card's plan added (WEB-02), keeping its other parameters. */
+export function signupHrefWithPlan(href: string, plan: string): string {
+  const key = signupPlanKey(plan);
+  if (!key) return href;
+  const [path, query = ""] = href.split("?", 2);
+  const params = new URLSearchParams(query);
+  params.set(SIGNUP_PLAN_PARAM, key);
+  return `${path}?${params.toString()}`;
 }
 
 /**
@@ -128,4 +158,18 @@ export function notAVisit(headers: Headers): boolean {
   }
   const ua = headers.get("user-agent");
   return isPreviewBot(ua) || isCrawler(ua);
+}
+
+/**
+ * WEB-02: the plan a sign-up page shows and carries: only a key of a plan that is available right now (from the price list's
+ * cached public.plans_public answer). A coming-soon, hidden or unknown key, or no answer, is ignored silently (null).
+ */
+export function availableSignupPlan(
+  plans: readonly { key: string; name: string; availability: string }[] | null,
+  raw: unknown,
+): { key: string; name: string } | null {
+  const key = signupPlanKey(raw);
+  if (!key || !plans) return null;
+  const plan = plans.find((p) => p.key === key && p.availability === "available");
+  return plan ? { key: plan.key, name: plan.name } : null;
 }

@@ -6,6 +6,7 @@ import { Input, Select } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
 import { ORG_STATUS_LABELS } from "@/features/platform/labels";
 import { listPlans, listPlatformOrgs, ORGS_PAGE_SIZE, platformReady } from "@/features/platform/queries";
+import { parseSignupOrigin, signupPlanText, signupSourceText } from "@/features/platform/signup-origin";
 import { formatDate, formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
 import { firstParam } from "@/lib/search";
@@ -68,10 +69,10 @@ export default async function AdminOrgsPage({ searchParams }: Props) {
         </button>
       </form>
       <div role="region" aria-label="ארגונים" tabIndex={0} className="overflow-x-auto rounded-lg border border-line bg-surface">
-        <table className="w-full min-w-[50rem] text-md">
+        <table className="w-full min-w-[56rem] text-md">
           <thead>
             <tr className="border-b border-line text-sm text-ink-soft">
-              {["ארגון", "בעלים", "מצב", "חבילה", "משתמשים", "רשומות", "הצטרף", "התחיל לעבוד"].map((h) => (
+              {["ארגון", "בעלים", "מצב", "חבילה", "משתמשים", "רשומות", "הצטרף", "מקור הרשמה", "התחיל לעבוד"].map((h) => (
                 <th key={h} scope="col" className="px-4 py-2.5 text-start font-medium">
                   {h}
                 </th>
@@ -94,6 +95,9 @@ export default async function AdminOrgsPage({ searchParams }: Props) {
                 <td className="px-4 py-2.5 tabular-nums">{formatNumber(Number(r.members ?? 0))}</td>
                 <td className="px-4 py-2.5 tabular-nums">{formatNumber(Number(r.records ?? 0))}</td>
                 <td className="px-4 py-2.5">{formatDate(String(r.created_at))}</td>
+                <td className="px-4 py-2.5">
+                  <SignupOriginCell row={r} plans={plans} />
+                </td>
                 <td className="px-4 py-2.5">{r.activated_at ? formatDate(String(r.activated_at)) : "עדיין לא"}</td>
               </tr>
             ))}
@@ -110,6 +114,18 @@ export default async function AdminOrgsPage({ searchParams }: Props) {
           {page < pages ? <Link href={pageHref(page + 1)} className={buttonClasses("ghost", "sm")}>הבא</Link> : null}
         </nav>
       ) : null}
+    </>
+  );
+}
+
+/** WEB-02: the sign-up source, and the plan chosen on the price list under it when there was one. */
+function SignupOriginCell({ row, plans }: { row: Record<string, unknown>; plans: readonly { key: string; name_he: string }[] }) {
+  const origin = parseSignupOrigin(row.signup_source, row.signup_plan);
+  const plan = signupPlanText(origin.planKey, plans);
+  return (
+    <>
+      <bdi>{signupSourceText(origin.source)}</bdi>
+      {plan ? <span className="block text-sm text-ink-soft">נבחרה: {plan}</span> : null}
     </>
   );
 }

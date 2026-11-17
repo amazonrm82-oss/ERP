@@ -8,7 +8,7 @@ import { FormError, FormNotice } from "@/components/ui/feedback";
 import { TextField } from "@/components/ui/field";
 import { SubmitButton } from "@/components/ui/submit-button";
 import type { FormState } from "@/lib/action-result";
-import { LANDING_SOURCE_FIELD } from "@/features/landing/measure";
+import { LANDING_SOURCE_FIELD, SIGNUP_PLAN_FIELD } from "@/features/landing/measure";
 import { paths } from "@/lib/paths";
 
 import { resendConfirmationAction, signUpAction } from "../actions";
@@ -17,7 +17,17 @@ import { PASSWORD_MIN } from "../schema";
 import { TURNSTILE_ACTIONS } from "../turnstile";
 import { TurnstileWidget } from "./turnstile-widget";
 
-export function SignupForm({ next, turnstileSiteKey, landingSource = null }: { next: string; turnstileSiteKey?: string | null; landingSource?: string | null }) {
+export function SignupForm({
+  next,
+  turnstileSiteKey,
+  landingSource = null,
+  signupPlan = null,
+}: {
+  next: string;
+  turnstileSiteKey?: string | null;
+  landingSource?: string | null;
+  signupPlan?: string | null;
+}) {
   const [state, formAction] = useActionState<FormState, FormData>(signUpAction, null);
   const failure = state && !state.ok ? state : null;
   // the address the confirmation went to, and whether the form is shown again to fix it (FXU-05)
@@ -55,6 +65,7 @@ export function SignupForm({ next, turnstileSiteKey, landingSource = null }: { n
       >
         <input type="hidden" name="next" value={next} />
         {landingSource ? <input type="hidden" name={LANDING_SOURCE_FIELD} value={landingSource} /> : null}
+        {signupPlan ? <input type="hidden" name={SIGNUP_PLAN_FIELD} value={signupPlan} /> : null}
         <FormError message={failure?.message} />
         <TextField
           label="שם מלא"

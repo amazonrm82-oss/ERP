@@ -129,7 +129,10 @@ describe("LND-14 no cookie, no storage, no client script", () => {
     const sections = read("src/features/landing/components/sections.tsx");
     expect(sections).toMatch(/if \(href\.startsWith\(SIGNUP_CLICK_PATH\)\) \{\s*return \(\s*<a href=\{href\} rel="nofollow"/);
     const nofollow = '<a href={signupHref} rel={signupHref.startsWith(SIGNUP_CLICK_PATH) ? "nofollow" : undefined}';
-    expect(read("src/features/landing/components/price-cards.tsx")).toContain(nofollow);
+    // WEB-02: a price card's link carries its plan; still a plain <a> with nofollow on the counting link
+    expect(read("src/features/landing/components/price-cards.tsx")).toContain(
+      '<a href={signupHrefWithPlan(signupHref, plan.key)} rel={signupHref.startsWith(SIGNUP_CLICK_PATH) ? "nofollow" : undefined}',
+    );
     expect(read("src/features/landing/components/pricing-section.tsx")).toContain(nofollow);
     expect(read("src/app/robots.ts")).toContain('"/go/"');
   });

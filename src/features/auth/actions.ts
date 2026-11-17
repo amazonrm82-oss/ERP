@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { carriedSource, isNewSignupAccount, LANDING_SOURCE_FIELD } from "@/features/landing/measure";
+import { carriedSource, isNewSignupAccount, LANDING_SOURCE_FIELD, SIGNUP_PLAN_FIELD, signupPlanKey } from "@/features/landing/measure";
 import { recordLandingEvent } from "@/features/landing/measure-server";
 import { LEGAL_VERSION } from "@/features/legal/documents";
 import { fail, invalid, formValues, type FormState } from "@/lib/action-result";
@@ -169,13 +169,26 @@ export async function signUpAction(_prev: FormState, formData: FormData): Promis
   const captcha = await verifyTurnstile(formData, TURNSTILE_ACTIONS.signUp);
   if (!captcha.ok) return fail(captcha.message, { values: formValues(formData) });
 
+  // LND-14 / WEB-02: the source carried from the landing page and the plan of the price card (never for an invitation)
+  const invited = next.startsWith("/invite/");
+  const landingSource = invited ? null : carriedSource(formData.get(LANDING_SOURCE_FIELD));
+  const signupPlan = invited ? null : signupPlanKey(formData.get(SIGNUP_PLAN_FIELD));
+
   const { data, error } = await forwardedSignUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
       // full_name is copied to profiles.full_name by the handle_new_user trigger;
       // terms_* record which version of the terms the user agreed to by signing up
-      data: { full_name: parsed.data.full_name, terms_version: LEGAL_VERSION, terms_accepted_at: new Date().toISOString() },
+      // WEB-02: the plan and the source ride in the person's own metadata to their first business (no cookie, nothing in the
+      // confirmation link); public.create_organization honours the plan only while it is available, and folds the source again
+      data: {
+        full_name: parsed.data.full_name,
+        terms_version: LEGAL_VERSION,
+        terms_accepted_at: new Date().toISOString(),
+        ...(signupPlan ? { signup_plan: signupPlan } : {}),
+        ...(landingSource ? { signup_source: landingSource } : {}),
+      },
       emailRedirectTo: `${await siteOrigin()}${callback}`,
     },
   });
@@ -191,7 +204,6 @@ export async function signUpAction(_prev: FormState, formData: FormData): Promis
 
   // LND-14: a NEW account (made by Auth within the last minute, with an identity) for a visitor who came through the landing
   // page's sign-up button (the source it carried; an invitation never carries one). Counted before the email is confirmed.
-  const landingSource = next.startsWith("/invite/") ? null : carriedSource(formData.get(LANDING_SOURCE_FIELD));
   if (landingSource && isNewSignupAccount(data.user)) await recordLandingEvent("signup", landingSource, new Headers(await headers()));
 
   if (data.session) {

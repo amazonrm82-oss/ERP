@@ -3,7 +3,8 @@ import Link from "next/link";
 
 import { SignupForm } from "@/features/auth/components/signup-form";
 import { turnstileSiteKey } from "@/features/auth/turnstile-server";
-import { carriedSource, LANDING_SOURCE_PARAM } from "@/features/landing/measure";
+import { availableSignupPlan, carriedSource, LANDING_SOURCE_PARAM, SIGNUP_PLAN_PARAM } from "@/features/landing/measure";
+import { readPublicPlans } from "@/features/landing/price-list-server";
 import { paths, safeNextPath } from "@/lib/paths";
 import { publicPageMetadata } from "@/features/seo/page-metadata";
 
@@ -15,7 +16,9 @@ export const metadata: Metadata = publicPageMetadata({
   index: false,
 });
 
-type Props = { searchParams: Promise<{ next?: string | string[]; [LANDING_SOURCE_PARAM]?: string | string[] }> };
+type Props = {
+  searchParams: Promise<{ next?: string | string[]; [LANDING_SOURCE_PARAM]?: string | string[]; [SIGNUP_PLAN_PARAM]?: string | string[] }>;
+};
 
 export default async function SignupPage({ searchParams }: Props) {
   const params = await searchParams;
@@ -26,14 +29,21 @@ export default async function SignupPage({ searchParams }: Props) {
   const invited = next.startsWith("/invite/");
   // LND-14: the source a visitor carried from the landing page's sign-up button (none for an invitation)
   const landingSource = invited ? null : carriedSource(params[LANDING_SOURCE_PARAM]);
+  // WEB-02: a price card's plan, only while it is available (else ignored silently); the database checks it again when the
+  // business is made
+  const plan = invited || !params[SIGNUP_PLAN_PARAM] ? null : availableSignupPlan(await readPublicPlans(), params[SIGNUP_PLAN_PARAM]);
 
   return (
     <>
       <h1 className="text-2xl font-semibold">{invited ? "הוזמנתם להצטרף לעסק" : "יצירת חשבון"}</h1>
       <p className="mt-1 mb-6 text-ink-soft">
-        {invited ? "יוצרים חשבון אישי, ואחרי אימות האימייל מצטרפים לעסק שהזמין אתכם." : "14 ימי ניסיון, בלי כרטיס אשראי."}
+        {invited
+          ? "יוצרים חשבון אישי, ואחרי אימות האימייל מצטרפים לעסק שהזמין אתכם."
+          : plan
+            ? `חבילה ${plan.name}: 14 ימי ניסיון, בלי כרטיס אשראי.`
+            : "14 ימי ניסיון, בלי כרטיס אשראי."}
       </p>
-      <SignupForm next={next} turnstileSiteKey={turnstileSiteKey()} landingSource={landingSource} />
+      <SignupForm next={next} turnstileSiteKey={turnstileSiteKey()} landingSource={landingSource} signupPlan={plan?.key ?? null} />
       <p className="mt-6 text-md text-ink-soft">
         כבר יש לכם חשבון?{" "}
         <Link href={loginHref} className="font-medium text-accent underline underline-offset-4 hover:text-accent-strong">

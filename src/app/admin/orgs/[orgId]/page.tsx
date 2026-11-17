@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { openSupportAction, setOrgStatusAction, setOverridesAction, setQrExternalBlockAction, updateSubscriptionAction } from "@/features/platform/actions";
 import { PlatformForm } from "@/features/platform/components/platform-form";
 import { activationText } from "@/features/platform/activation";
+import { parseSignupOrigin, signupPlanText, signupSourceText } from "@/features/platform/signup-origin";
 import { ACTION_LABELS, canDo, ORG_STATUS_LABELS } from "@/features/platform/labels";
 import { getPlatformOrg, getQrExternalBlock, listPlans, listPlatformLog, platformReady } from "@/features/platform/queries";
 import { ROLE_LABELS } from "@/features/shell/labels";
@@ -41,6 +42,10 @@ export default async function AdminOrgPage({ params }: { params: Promise<{ orgId
   const limits = effectiveLimits(plan.limits, sub.limit_overrides) as Obj;
   const supportUntil = str(data.support_until) || null;
   const activation = (data.activation ?? null) as Obj | null;
+  // WEB-02: where the business signed up from and the plan chosen on the price list (null = nothing carried)
+  const signup = (data.signup ?? null) as Obj | null;
+  const origin = parseSignupOrigin(signup?.source, signup?.plan_key);
+  const chosenPlan = signupPlanText(origin.planKey, plans);
 
   return (
     <>
@@ -76,6 +81,12 @@ export default async function AdminOrgPage({ params }: { params: Promise<{ orgId
               <dd>
                 {formatNumber(Number(counts.forms ?? 0))} / {formatNumber(Number(counts.pipelines ?? 0))}
               </dd>
+              <dt className="text-ink-soft">מקור הרשמה</dt>
+              <dd>
+                <bdi>{signupSourceText(origin.source)}</bdi>
+              </dd>
+              <dt className="text-ink-soft">חבילה שנבחרה במחירון</dt>
+              <dd>{chosenPlan ?? "לא נבחרה"}</dd>
               <dt className="text-ink-soft">התחיל לעבוד</dt>
               <dd>{activation ? activationText(str(activation.activated_at), str(activation.lead_created_at), str(org.created_at)) : "עדיין לא. אין ליד אמיתי שקיבל מענה בתוך 24 שעות"}</dd>
               <dt className="text-ink-soft">כניסה אחרונה</dt>

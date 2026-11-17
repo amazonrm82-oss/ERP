@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { formatNumber } from "@/lib/format";
 import { paths } from "@/lib/paths";
 
-import { SIGNUP_CLICK_PATH } from "../measure";
+import { SIGNUP_CLICK_PATH, signupHrefWithPlan } from "../measure";
 import type { PlanCardData, PlanLine } from "../pricing";
 import { WAITLIST_CONSENT_TEXT, WAITLIST_HONEYPOT, WAITLIST_TEXTS } from "../waitlist";
 import styles from "./landing.module.css";
@@ -150,7 +150,7 @@ function Card({ plan, cycle, signupHref }: { plan: PlanCardData; cycle: Cycle; s
               </button>
             )
           ) : (
-            <a href={signupHref} rel={signupHref.startsWith(SIGNUP_CLICK_PATH) ? "nofollow" : undefined} className={`${styles.btn} ${plan.highlighted ? styles.primary : styles.ghost}`}>
+            <a href={signupHrefWithPlan(signupHref, plan.key)} rel={signupHref.startsWith(SIGNUP_CLICK_PATH) ? "nofollow" : undefined} className={`${styles.btn} ${plan.highlighted ? styles.primary : styles.ghost}`}>
               {plan.highlighted ? "הרשמה לתקופת ניסיון" : "הרשמה"}
               <span className="sr-only"> לחבילה {plan.name}</span>
             </a>
