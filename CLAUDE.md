@@ -243,7 +243,9 @@ and build this CRM here instead. The old code is preserved on the branch
   minutes, 10 submissions per link in 10 minutes; OPS-02 shared guard first. Never framed, no-referrer, always light, preview bots read
   nothing, no cookies. A merge moves the duplicate's links (accepted, as LIB-02). `app.scheduled_no_activity`, `app.automation_run_facts`,
   `app.automation_event_still_holds`, `app.sample_untouched` (a sample record with a link is kept), `app.plan_key_defaults` and
-  `public.plans_public` (test 344's pin rechecked) were last redefined in 021263/021266; tests 64 and 88 end with `_prefill_entry_rules.sql`.
+  `public.plans_public` (test 344's pin rechecked) were redefined in 021263/021266 (the last two again in 021284); since 021298
+  (RVW-109, RVW-115) the "done" answer of a sent link counts in both limits and a birth date is judged in the business's zone
+  (`app.prefill_link_take`, `public.prefill_public_submit` last redefined there); tests 64 and 88 end with `_prefill_entry_rules.sql`.
   In the eslint allow-list. The advisor's findings on the three staff definers and the two app tables are expected.
   In use (FXS-12, owner 12 November 2026, answer (281) א; no migration; an independent review and a delta review): the sign-in
   forwarding client (`src/lib/supabase/auth-forwarding-server.ts`, server-only, the ONLY reader of `SUPABASE_SECRET_KEY`, which the owner
@@ -568,7 +570,14 @@ and build this CRM here instead. The old code is preserved on the branch
    active non-viewer member, else none. Owner (7) ב: a 401/403 from Resend ends the job at once, not sent, code `key_refused`, the count
    given back, one error log line `email.key_refused`; `public.platform_email_health()` (platform owner/support, aal2, counts only,
    index `app.jobs_key_refused_idx`) feeds a warning card on the admin dashboard. `app.email_compose_core` was last redefined in 021278 (then 021279, 021283).
-   Addresses, text and keys never logged. Pinned by md5 in test 367 (email-compose).
+   Addresses, text and keys never logged. Pinned by md5 in test 367 (email-compose). Since RVW-104 the worker reads Storage objects of
+   `record-files` only at the paths the composer answered, through a reader bound to that bucket in `run-server.ts`;
+   `email-attachments-server.ts` holds no client, and the unit scan in `tests/unit/jobs-queue.test.ts` (`SERVICE_CLIENT_HANDOVERS`)
+   refuses a service client, or its Storage or schema object, handed out of any file. Since 021299 (RVW-110) a card email with files is
+   refused (`attachment_changed`) unless the sender is still an active member who reads the record (`app.user_can_read_record`, or a
+   deputy's reading); `app.email_compose_core` was last redefined there (test 367's pin rechecked); tests 64 and 88 end with
+   `_email_sender_gone_files.sql`. The SMS composer (021247) and this email composer are THE FUTURE SENDER that the earlier
+   "THE FUTURE SENDER" sentences of this rule name (RVW-117); only the MNY-06 monthly email is still unbuilt.
    Card sends since 021279 (owner, 15 November 2026, after the live test): a card offers only templates whose fields a card can fill
    (`app.card_message_fields`, `app.card_unfillable_fields(type, subject, body)`; refused otherwise with hint
    `record_message:unfillable_field`, also for automation steps), `{שם הנציג}` is the sender or, for an automation, the record (deal) owner
@@ -601,7 +610,7 @@ and build this CRM here instead. The old code is preserved on the branch
    scope `digest`, 4,096 buckets) and 30 per link in 10 minutes), which sets `digest_settings.enabled=false` and server-only
    `stopped_by_link_at`, shown in the person's notification settings where it is switched on again. OPS-02 guard first; never framed,
    no-referrer, preview bots read nothing, no cookies. Eight digest functions are pinned by md5 in test 284; `public.plans_public` (test
-   344's pin), `app.job_kinds`, `app.job_payload_ok` and `app.plan_key_defaults` were last redefined in 021281. Expired tokens and old
+   344's pin) and `app.plan_key_defaults` were last redefined in 021284, `app.job_kinds` and `app.job_payload_ok` in 021297. Expired tokens and old
    once-a-day rows are removed by the pasted `app.digest_cleanup_rows` through `app.run_digest_cleanup` (pg_cron `crm-digest-cleanup`,
    a no-op until pasted). In the eslint allow-list. The advisor's findings on `app.digest_stop_tokens`, `app.digest_stop_counts` and
    `app.digest_sends` are expected.
@@ -613,8 +622,8 @@ and build this CRM here instead. The old code is preserved on the branch
   has no FK to the schedule, so a delete never lowers a count. It runs in the digest's staff pass while the email channel has a
   provider, and calls with the service key only `public.scheduled_report_compose()` (service_role, live lease; re-checks the open
   business, the schedule and its switch, `app.scheduled_report_available` (plan keys, leads module), an active membership still a
-  recipient, `app.scheduled_report_user_may` (restricted reports to owners/admins/managers, cost reports `categories`, `campaign_roi`,
-  `profit` only with `app.can_view_costs`'s rule) and the day; answers the sign-in email, the business display name, its term keys,
+  recipient, `app.scheduled_report_user_may` (restricted reports (punch_cards, recurring_billing, debt_aging, collection and the three
+  cost reports `categories`, `campaign_roi`, `profit`) go to owners, admins and managers by role only; a PRM-01 grant adds nothing, RVW-106) and the day; answers the sign-in email, the business display name, its term keys,
   the report key, the period and dates, never a number). Email `src/features/report-schedules/email.ts` (DRAFT): name in the
   business's terms, period, a link. Tables `public.report_schedules` / `report_schedule_recipients` (owners/admins of a writable
   business manage; a member sees and leaves what they receive; 20 schedules, 20 recipients; audited); page `/o/[org]/reports/scheduled`.
@@ -1560,8 +1569,8 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   its contact (trigger `leads_library_links_convert`, `app.convert_library_links`; a lead merge sends them to the kept lead's contact,
   `app.merge_library_links`); `app.import_record_worked` counts library links, messages and prefill links; a documented recurring cycle
   never returns to `due` while it holds a document (hint `recurring_cycle:due_document`); `app.recurring_billing_rep` takes the first usable
-  of deal, contact and company owner; `app.lead_retention_candidates` keeps a lead with a `library_viewed` or `prefill_submitted` entry or a
-  queued review request since the cutoff. All five were last redefined in 021268; tests 64 and 88 end with `_review_1113_database.sql`.
+  of deal, contact and company owner; `app.lead_retention_candidates` keeps a lead with a `library_viewed` or `prefill_submitted` entry since the
+  cutoff. All five were last redefined in 021268; tests 64 and 88 end with `_review_1113_database.sql`.
 - Recurring billing (SUB-01..05, migrations 021253-021260, one design split in eight parts so each fits one apply call; owner (269) ג, (352)-(357); an independent review and two delta reviews;
   plan key `recurring_billing` pro and business; rights `app.can_record_payments`): tables `recurring_billings`, `_lines`, `_cycles`,
   `_events`; pg_cron `crm-recurring-billings` makes a cycle, a task for the rep and a draft order (owner (352) ב; the order's owner only

@@ -41,7 +41,9 @@ import { getSupabaseEnv } from "@/lib/env";
  *   public.background_job_progress() and public.background_job_end(); the work itself
  *   runs under a short token for the ordering person, never with the service key; and,
  *   while the email channel has a provider, digest.send (USR-11 / WAB-03, owner (267) א, (375) ב), for which it calls
- *   only public.digest_job_compose() (the daily summary's counts under the recipient's own read rules);
+ *   only public.digest_job_compose() (the daily summary's counts under the recipient's own read rules), report.send
+ *   (public.scheduled_report_compose(), RPT-03), invite.send (public.invitation_job_compose(), USR-09) and invoice.issue
+ *   (public.invoice_issue_claim() and public.invoice_issue_record(), DOC-07);
  * - InforU's delivery reports and replies (src/features/inforu-callbacks/webhook-server.ts,
  *   routes /api/sms/inforu/status/<secret> and /api/sms/inforu/inbound/<secret>; SMS-05,
  *   owner (318) א, wave 3 use (2)): the client is made only after the secret in the path

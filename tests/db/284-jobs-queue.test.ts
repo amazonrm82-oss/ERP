@@ -61,8 +61,8 @@ const REVIEWED_MD5 = {
 // RVW-89 (021267, weekly review of 13 November 2026): the refusal notice's condition widens from 'too_long' to the business's
 // own setup ('too_long', 'unfilled_field', 'feature_off', 'link_blocked', 'link_invalid'; still provider null and outcome
 // 'failed') and passes the job's own code as the reason; every other line unchanged (rechecked by its writer against
-// 021220's body: same early returns, the call still in its own exception block, the messages insert untouched; needs the
-// lead's independent review before merge)
+// 021220's body: same early returns, the call still in its own exception block, the messages insert untouched; independent
+// review done, BACKLOG 13 November 2026)
 const REVIEWED_RECORD_MESSAGE_MD5 = "b199d6f71298fe017d030ecc19b0fb75";
 
 type Claimed = { id: string; lease: string; kind: string; organization_id: string; payload: Record<string, unknown>; attempt: number };
