@@ -32,15 +32,16 @@
 -- credit invoice of the same original with the provider's number); or when an owner/admin closes it as `checked` (only for
 -- one with no provider document: public.invoice_issue_close, hint invoice_credit:check_admin for anyone else; issue requests
 -- keep 021297's rule), or releases it after checking at the provider (public.invoice_credit_release: an ended request the
--- provider did NOT issue (no provider_document_id; hint invoice_credit:release); stamps credit_released_at / _by only, why it
--- ended stays). A credit the provider issued keeps counting even when cancelled here by hand (it exists at the provider).
+-- provider did NOT issue (no provider_document_id; hint invoice_credit:release) and whose job can no longer run (queued,
+-- running, or failed below the last try = hint invoice_credit:release_wait); stamps credit_released_at / _by only, why it
+-- ended stays; a released request leaves the open-requests list). A credit the provider issued keeps counting even when cancelled here by hand (it exists at the provider).
 -- A credit recorded by hand against an original the provider issued is refused above what is left (amount - counted credits
 -- - reservations, a reservation of the same provider number left out; hint invoice_credit:hand_over, its DETAIL what is left
--- in agorot for the message; owner (412) א), judged under the per-original lock in trigger accounting_documents_credit_lock.
+-- in agorot for the message; owner (412) א), judged under the per-original lock in trigger accounting_documents_zz_credit_lock.
 -- The reason: U+2028/U+2029 and runs of white space fold into one space; control, bidi and zero-width characters
 -- (app.document_invisible_class, U+FEFF) are refused. credit_reason is also erased directly when the erasure erases the
 -- document's audit entries (trigger audit_log_credit_reason_erase), whatever its lines were.
--- Judged under a lock per original, taken by app.invoice_credit_open and by trigger accounting_documents_credit_lock on every
+-- Judged under a lock per original, taken by app.invoice_credit_open and by trigger accounting_documents_zz_credit_lock on every
 -- insert of a credit invoice that names an original (by hand too), so a credit is never judged beside a racing one.
 -- VAT: a recorded credit without a VAT split (recorded by hand) counts the original's VAT share of its amount (half up).
 -- Full = all that is left; partial = 1..left agorot. The VAT aimed at is the original's share of the amount (half up), the
@@ -302,7 +303,10 @@ revoke all on function app.invoice_credit_hand_room(uuid, uuid, text) from publi
 
 -- The per-original lock on every credit invoice that names an original; a credit recorded by hand (no provider id) against an
 -- original the provider issued is refused above what is left (owner (412) א; hint invoice_credit:hand_over, DETAIL = what is left in agorot).
--- Definer, so the reservations are read; the outsider guard lets RLS answer a person who may not record documents.
+-- Definer, so the reservations are read; the outsider guard first lets RLS answer a person who may not record documents, and
+-- the lock is taken only after it. The trigger is named to fire after accounting_documents_source (invoker), which refuses an
+-- original the caller does not read (document:original) before anything here is judged, so nothing of an unreadable original
+-- (its existence, what is left) is told.
 create or replace function app.accounting_documents_credit_lock() returns trigger
 language plpgsql security definer
 set search_path = ''
@@ -310,10 +314,10 @@ as $$
 declare
   v_room bigint;
 begin
-  perform pg_advisory_xact_lock(hashtextextended('invoice_credit:' || new.organization_id::text || ':' || new.original_document_id::text, 0));
   if auth.uid() is not null and not (app.can_record_documents(new.organization_id) and app.org_writable(new.organization_id)) then
     return new;
   end if;
+  perform pg_advisory_xact_lock(hashtextextended('invoice_credit:' || new.organization_id::text || ':' || new.original_document_id::text, 0));
   if new.provider_document_id is null
      and exists (select 1 from public.accounting_documents o
                   where o.organization_id = new.organization_id and o.id = new.original_document_id
@@ -330,7 +334,7 @@ end;
 $$;
 revoke all on function app.accounting_documents_credit_lock() from public, anon, authenticated, service_role;
 
-create or replace trigger accounting_documents_credit_lock before insert on public.accounting_documents
+create or replace trigger accounting_documents_zz_credit_lock before insert on public.accounting_documents
   for each row when (new.doc_type = 'credit_invoice' and new.original_document_id is not null)
   execute function app.accounting_documents_credit_lock();
 
@@ -447,6 +451,11 @@ begin
     'reserving', coalesce((
       select jsonb_agg(jsonb_build_object('id', x.id, 'status', x.status, 'code', x.error_code, 'number', x.number,
                                           'at_provider', x.provider_document_id is not null,
+                                          -- its job can still run: not released yet (public.invoice_credit_release's rule)
+                                          'job_waiting', exists (select 1 from app.jobs j
+                                                                  where j.id = x.job_id
+                                                                    and (j.status in ('queued', 'running')
+                                                                         or (j.status = 'failed' and j.attempts < app.job_max_attempts()))),
                                           'total_agorot', (x.payload -> 'totals' ->> 'total_agorot')::bigint,
                                           'created_at', x.created_at) order by x.created_at desc)
         from (select r.* from app.invoice_issue_requests r
@@ -1196,8 +1205,12 @@ begin
     raise exception 'only an ended credit request the provider did not issue is released' using errcode = 'P0001',
       hint = 'invoice_credit:release';
   end if;
-  if exists (select 1 from app.jobs j where j.id = v_req.job_id and j.status = 'running' and j.locked_until > now()) then
-    raise exception 'the provider is being asked right now' using errcode = 'P0001', hint = 'invoice:busy';
+  -- its job can still run (a late lookup may yet find and record it): released only once that is over, or a second credit could
+  -- use the room the first one still takes
+  if exists (select 1 from app.jobs j
+              where j.id = v_req.job_id
+                and (j.status in ('queued', 'running') or (j.status = 'failed' and j.attempts < app.job_max_attempts()))) then
+    raise exception 'the provider is still being checked for this credit' using errcode = 'P0001', hint = 'invoice_credit:release_wait';
   end if;
   -- why it ended stays as it is; only the release is stamped
   if v_req.credit_released_at is null then
@@ -1208,3 +1221,41 @@ end;
 $$;
 revoke all on function public.invoice_credit_release(uuid, uuid) from public, anon;
 grant execute on function public.invoice_credit_release(uuid, uuid) to authenticated;
+
+-- ----------------------------------------------------------------------------
+-- The open requests: 021297's body, without a released credit request (DOC-14)
+-- ----------------------------------------------------------------------------
+create or replace function public.invoice_issue_requests_open(p_org uuid) returns jsonb
+language plpgsql stable security definer
+set search_path = ''
+as $$
+declare
+  v_admin boolean;
+begin
+  if auth.uid() is null or app.membership_role(p_org) is null then
+    raise exception 'only members see the requests' using errcode = '42501';
+  end if;
+  v_admin := app.is_admin(p_org);
+  return coalesce((
+    select jsonb_agg(jsonb_build_object(
+             'id', r.id, 'status', case when r.status = 'unrecorded' then 'check' else r.status end, 'code', r.error_code,
+             'created_at', r.created_at, 'doc_type', r.payload ->> 'doc_type',
+             'total_agorot', (r.payload -> 'totals' ->> 'total_agorot')::bigint, 'source_kind', r.source ->> 'kind',
+             'mine', r.requested_by = auth.uid(),
+             'requester', (select p.full_name from public.profiles p where p.id = r.requested_by))
+           order by r.created_at desc)
+      from (select * from app.invoice_issue_requests r
+             where r.organization_id = p_org
+               and (r.status in ('pending', 'stale')
+                    or (r.status = 'unrecorded' and r.document_id is null and r.provider_document_id is null
+                        and r.error_code is not null and r.error_code not in ('closed', 'checked')))
+               and (v_admin or r.requested_by = auth.uid())
+               -- DOC-14: a credit request an owner or admin released after checking at the provider is no longer open
+               and r.credit_released_at is null
+             order by r.created_at desc
+             limit 100) r), '[]'::jsonb);
+end;
+$$;
+revoke all on function public.invoice_issue_requests_open(uuid) from public, anon;
+grant execute on function public.invoice_issue_requests_open(uuid) to authenticated;
+

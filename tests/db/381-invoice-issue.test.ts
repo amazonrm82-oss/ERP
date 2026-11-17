@@ -20,7 +20,9 @@ const REVIEWED_MD5: Record<string, string> = {
   // delta review of 267cfe82 (was 1cb8fa29…): definer; a hand credit of a provider's original is refused above what is left
   // (app.invoice_credit_hand_room, hint invoice_credit:hand_over), outsider guard first; owner (412) א: the DETAIL carries
   // what is left in agorot
-  "app.accounting_documents_credit_lock": "86780cf267b47c9677d2841042e43e14",
+  // third review (was 86780cf2…): the lock only after the outsider guard; the trigger (renamed accounting_documents_zz_credit_lock)
+  // fires after accounting_documents_source, which refuses an unreadable original first
+  "app.accounting_documents_credit_lock": "6f633478679cd3ffd0bdc8b790f5e61c",
   "app.accounting_documents_credit_reason": "ab5c28b9476756c4c045404d2b518dc7",
   // owner (408) ד (was 8b90bf6b4eabb74269b2438e4de4957b): anyone but owners and admins needs issue_documents AND issue_credits
   "app.can_issue_credits": "43cebed0ebd2a6d289451249fd7c4ff1",
@@ -41,7 +43,8 @@ const REVIEWED_MD5: Record<string, string> = {
   "app.invoice_credit_open": "98d8923b38f373fd8ba01a5ea842f1b6",
   "app.invoice_credit_reserves": "deaa443c18de692195c57f0b31fbc3ca",
   // owner (411) ב (was 10e21d5f…): also answers mixed, the lines' price mode and what is left of each line
-  "app.invoice_credit_room_of": "d9124584c2571ccf9e547c8973082887",
+  // third review (was d9124584…): the reserving rows say whether their job can still run (job_waiting)
+  "app.invoice_credit_room_of": "d18755928b5e6d940ff7d5f79b2613b0",
   "app.invoice_customer": "ed6e671201d300d02e7c3b2698a950c5",
   // DOC-13 (migration invoice_provider_customers): the hash of the customer block a request sends
   "app.invoice_customer_details_hash": "507dba4f9b7ffb23d2de9363fe9ca3ab",
@@ -70,7 +73,8 @@ const REVIEWED_MD5: Record<string, string> = {
   "app.merge_invoice_issue_requests": "1cd6caad6241cf0e7e225ae508862f6e",
   "public.invoice_credit_begin": "b078292f9cd4aac6ec416ee597fe0d7e",
   // delta review (was 89d27137…): refuses a request the provider issued; stamps credit_released_at / _by only
-  "public.invoice_credit_release": "2db840dc527bbb97ef7b4412c1b2f767",
+  // third review (was 2db840dc…): refused while the request's job can still run (invoice_credit:release_wait)
+  "public.invoice_credit_release": "155a8e54dff3e432ce39f93fc5864dd2",
   "public.invoice_credit_room": "076ecc3dec87cf5571b7d6e89fad3e8f",
   "public.invoice_issue_begin": "613ffef8dbbadc4447794a7bc92b8446",
   // DOC-13 (migration invoice_provider_customers, 17 November 2026): 021297's body, the last return also answers
@@ -107,7 +111,9 @@ const REVIEWED_MD5: Record<string, string> = {
   // `provider_product_ids`, writes each line's product_id and a credit line's credited_line_id, and the credit's
   // credit_reason. Nothing else changed.
   "public.invoice_issue_record": "af44afdf4b8cb59a6c1d1c51896bdf45",
-  "public.invoice_issue_requests_open": "a3568e808238728700c48a0fc061a4be",
+  // DOC-14 third review (migration invoice_credit; was a3568e808238728700c48a0fc061a4be): 021297's body without a released
+  // credit request (credit_released_at). Nothing else changed.
+  "public.invoice_issue_requests_open": "ea7683d93eec4d906b6d4ec61610d484",
   "public.invoice_issue_state": "61f1e0d0216e257a93d4b0b5f5cd7ee0",
   "public.invoice_provider_check_recorded": "47a98ea21aa0dcd33f782fe6d1fce73e",
   "public.invoice_provider_connect": "c5c9188e98b96be21d420dad3b1a7a12",
@@ -1606,6 +1612,59 @@ describe("issuing through the invoice provider", () => {
         expect((await room(admin, original.id)).reserving).toEqual([expect.objectContaining({ id: r.request_id, at_provider: true })]);
       });
 
+      it("the provider's credit recorded by hand at its full amount, with its provider number, is allowed and stops reserving", async () => {
+        const original = await issued();
+        const total = original.request.totals.total_agorot;
+        const r = await creditBegin(admin, original.id, { reason: "ביטול", amount_agorot: null });
+        const job = await claimJob(r.request_id as string);
+        await claimOf(job);
+        const out = creditResult();
+        await asAdmin((q) => q("update app.invoice_issue_requests set status = 'unrecorded', error_code = 'org_not_writable', provider_document_id = $2, number = $3, finished_at = now() where id = $1", [r.request_id, out.provider_document_id, out.number]));
+        await asService((q) => q("select public.finish_job($1, $2, true)", [job.id, job.lease]));
+        expect(await room(admin, original.id)).toMatchObject({ pending_agorot: total, left_agorot: 0 });
+        // another number above nothing left is refused; the provider's own number takes its reservation's place
+        const hand = (number: string, amount: number) =>
+          run(owner, (q) => q("insert into public.accounting_documents (organization_id, deal_id, contact_id, doc_type, number, amount_agorot, original_document_id) values ($1, $2, $3, 'credit_invoice', $4, $5, $6)", [org, deal, person, number, amount, original.id]));
+        expect(await pgError(hand(`HX-${randomUUID().slice(0, 8)}`, 1))).toMatchObject({ hint: "invoice_credit:hand_over", detail: "0" });
+        await hand(out.number, total);
+        expect(await room(admin, original.id)).toMatchObject({ credited_agorot: total, pending_agorot: 0, left_agorot: 0, reserving: [] });
+      });
+
+      it("a hand credit of exactly the amount left beside a reservation is allowed, one agora more is not", async () => {
+        const original = await issued();
+        const total = original.request.totals.total_agorot;
+        await creditBegin(admin, original.id, { reason: "בהמתנה", amount_agorot: 2500 });
+        const hand = (amount: number) =>
+          run(owner, (q) => q("insert into public.accounting_documents (organization_id, deal_id, contact_id, doc_type, number, amount_agorot, original_document_id) values ($1, $2, $3, 'credit_invoice', $4, $5, $6)", [org, deal, person, `HE-${randomUUID().slice(0, 8)}`, amount, original.id]));
+        expect(await pgError(hand(total - 2500 + 1))).toMatchObject({ hint: "invoice_credit:hand_over", detail: String(total - 2500) });
+        await hand(total - 2500);
+        expect(await room(admin, original.id)).toMatchObject({ credited_agorot: total - 2500, pending_agorot: 2500, left_agorot: 0 });
+      });
+
+      it("a recorder who does not read the original learns nothing of it (refused as an unreadable original)", async () => {
+        const original = await issued();
+        await creditBegin(admin, original.id, { reason: "בהמתנה", amount_agorot: 2500 });
+        const recorder = await addMember(org, owner.id, "member", "inv-recorder-own");
+        await run(owner, (q) => q("select public.set_member_permissions($1, $2, $3)", [org, recorder.id, ["documents"]]));
+        await run(owner, (q) => q("update public.organizations set record_visibility = 'own' where id = $1", [org]));
+        try {
+          const mine = await run(recorder, async (q) => (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name) values ($1, 'שלי') returning id", [org])).id);
+          expect(await run(recorder, (q) => count(q, "select 1 from public.accounting_documents where id = $1", [original.id]))).toBe(0);
+          const error = await pgError(
+            run(recorder, (q) => q("insert into public.accounting_documents (organization_id, contact_id, doc_type, number, amount_agorot, original_document_id) values ($1, $2, 'credit_invoice', $3, 999999, $4)", [org, mine, `HR-${randomUUID().slice(0, 8)}`, original.id])),
+          );
+          // the same answer as a missing original: no hand_over, no remainder
+          expect(error).toMatchObject({ hint: "document:original" });
+          expect((error as { detail?: string }).detail ?? null).toBeNull();
+          const missing = await pgError(
+            run(recorder, (q) => q("insert into public.accounting_documents (organization_id, contact_id, doc_type, number, amount_agorot, original_document_id) values ($1, $2, 'credit_invoice', $3, 999999, $4)", [org, mine, `HM-${randomUUID().slice(0, 8)}`, randomUUID()])),
+          );
+          expect({ code: missing.code, hint: missing.hint }).toEqual({ code: error.code, hint: error.hint });
+        } finally {
+          await run(owner, (q) => q("update public.organizations set record_visibility = 'org' where id = $1", [org]));
+        }
+      });
+
       it("a provider's credit cancelled here by hand still counts (it exists at the provider)", async () => {
         const original = await issued();
         const r = await creditBegin(admin, original.id, { reason: "טעות", amount_agorot: 600 });
@@ -1647,6 +1706,7 @@ describe("issuing through the invoice provider", () => {
         expect(await record(job, { ok: false, code: "timeout", final: false })).toMatchObject({ status: "unrecorded", code: "retries_spent" });
         await asService((q) => q("select public.finish_job($1, $2, true)", [job.id, job.lease]));
         expect(await reserved(original.id)).toBe(1000);
+        expect((await listed(admin)).map((x) => x.id)).toContain(r.request_id);
         // the requester (not an owner or admin) cannot free it
         expect((await pgError(close(creditor, r.request_id))).hint).toBe("invoice_credit:check_admin");
         expect((await pgError(release(creditor, r.request_id))).code).toBe("42501");
@@ -1657,6 +1717,8 @@ describe("issuing through the invoice provider", () => {
         expect(await asAdmin(async (q) => (await one<Record<string, unknown>>(q, "select error_code, credit_released_by from app.invoice_issue_requests where id = $1", [r.request_id])))).toEqual({ error_code: "retries_spent", credit_released_by: admin.id });
         // releasing twice changes nothing
         expect(await release(admin, r.request_id)).toEqual({ status: "unrecorded", code: "retries_spent", released: true });
+        // a released request leaves the list of requests to check at the provider
+        expect((await listed(admin)).map((x) => x.id)).not.toContain(r.request_id);
       });
 
       it("an owner or admin releases a credit closed after a try whose lookup never came; pending or recorded ones are not released", async () => {
@@ -1666,6 +1728,13 @@ describe("issuing through the invoice provider", () => {
         await timedOut(r.request_id);
         await close(admin, r.request_id);
         expect(await reserved(original.id)).toBe(500);
+        // its job can still run (a late lookup may yet record it): not released while it can, and the page says so
+        expect((await pgError(release(owner, r.request_id))).hint).toBe("invoice_credit:release_wait");
+        expect((await room(admin, original.id)).reserving).toEqual([expect.objectContaining({ id: r.request_id, job_waiting: true })]);
+        expect(await reserved(original.id)).toBe(500);
+        // the lookup never came: its job died
+        await asAdmin((q) => q("update app.jobs set status = 'dead', finished_at = now() where id = (select job_id from app.invoice_issue_requests where id = $1)", [r.request_id]));
+        expect((await room(admin, original.id)).reserving).toEqual([expect.objectContaining({ id: r.request_id, job_waiting: false })]);
         expect(await release(owner, r.request_id)).toEqual({ status: "unrecorded", code: "closed", released: true });
         expect(await reserved(original.id)).toBe(0);
         // an issue request is not a credit request

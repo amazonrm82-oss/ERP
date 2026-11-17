@@ -79,6 +79,8 @@ export default async function CreditDocumentPage({ params }: Props) {
                     </span>
                     {request.atProvider ? (
                       <span className="text-ink-soft">הופקה אצל הספק ולא נרשמה: רשמו אותה ידנית כחשבונית זיכוי על המסמך הזה, עם המספר שלה אצל הספק</span>
+                    ) : request.status !== "pending" && request.jobWaiting ? (
+                      <span className="text-ink-soft">המערכת עדיין בודקת את הזיכוי אצל הספק. אפשר לשחרר אחרי שהבדיקה תסתיים.</span>
                     ) : access.canManage && request.status !== "pending" ? (
                       <ReleaseCreditButton orgId={orgId} documentId={documentId} requestId={request.id} />
                     ) : null}
