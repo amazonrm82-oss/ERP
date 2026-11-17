@@ -126,29 +126,51 @@ describe("OPS-04: the worker route", () => {
 
 /**
  * RVW-104: a service client never leaves the allow-listed file that made it, except into the closed list below (each a
- * documented use of CLAUDE.md hard rule 5). Every file that calls createServiceClient() is scanned with its comments
- * removed: an occurrence of the client's name that is not a member access (`x.rpc`, `x?.storage`), a null check (`!x`)
- * or the declaration counts as handing it on, and must be listed here with the function it goes to.
+ * documented use of CLAUDE.md hard rule 5). Every file that calls createServiceClient() is scanned with its comments and
+ * string contents removed (`serviceClientHandovers`, run on fixture strings below). It reports:
+ * - a createServiceClient() call that is not the right-hand side of a const/let (a type annotation allowed): handed on
+ *   at birth (`helper(createServiceClient())`, `return createServiceClient()`);
+ * - an occurrence of the client's name that is not a member access, a null check (`!x`) or its declaration
+ *   (`helper(supabase)`, `cond ? supabase : x`, `{ supabase }`);
+ * - `<name>.schema` anywhere, and `<name>.storage` unless it is used on the spot as `.storage.from(…).<method>(`, so a
+ *   storage object or a bucket object is never handed on (`helper(supabase.storage)`, `x(supabase.storage.from("b"))`).
+ * Every reported line must be listed here with the function it goes to.
  */
 const SERVICE_CLIENT_HANDOVERS: Record<string, string[]> = {
   // IMP-04 (owner (160) א): the token source signs only after background_job_token, with the worker's client
   "src/features/jobs/run-server.ts": ["createBackgroundTokenSource(supabase, job)", "createBackgroundTokenSource(supabase, job)"],
-  // the lead intake: readPublicForm is in public-form.ts, itself on the allow-list
-  "src/features/intake/public-form.ts": ["readPublicForm(service, token"],
+  // the lead intake: readPublicForm is in public-form.ts, itself on the allow-list (its parameter has the same name)
+  "src/features/intake/public-form.ts": ["service: ServiceClient,", "readPublicForm(service, token"],
   "src/features/intake/server.ts": ["readPublicForm(service, token)"],
 };
 
 const stripComments = (code: string) => code.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
 
-function serviceClientHandovers(file: string): string[] {
+/** The lines of a source text that hand a service client on (see above). Pure: the tests below feed it fixture strings. */
+function serviceClientHandovers(source: string): string[] {
   // string contents removed too ("service key not configured" is no handover)
-  const code = stripComments(read(file)).replace(/"(?:[^"\\\n]|\\.)*"/g, '""');
-  const names = new Set([...code.matchAll(/(?:const|let)\s+(\w+)\s*=\s*createServiceClient\(/g)].map((m) => m[1]));
+  const code = stripComments(source).replace(/"(?:[^"\\\n]|\\.)*"/g, '""').replace(/'(?:[^'\\\n]|\\.)*'/g, "''");
+  const lines = code.split("\n");
+  const lineOf = (index: number) => lines[code.slice(0, index).split("\n").length - 1].trim();
+  const declaration = /(?:const|let)\s+(\w+)\s*(?::[^=\n]+)?=\s*createServiceClient\(/g;
+  const declared = new Set<number>();
+  const names = new Set<string>();
+  for (const m of code.matchAll(declaration)) {
+    names.add(m[1]);
+    declared.add((m.index ?? 0) + m[0].length - "createServiceClient(".length);
+  }
   const found: string[] = [];
+  for (const m of code.matchAll(/\bcreateServiceClient\(/g)) {
+    if (!declared.has(m.index ?? -1)) found.push(lineOf(m.index ?? 0));
+  }
   for (const name of names) {
-    for (const m of code.matchAll(new RegExp(`(?<![!\\w./"'])${name}\\b(?!\\s*(?:\\?\\.|\\.|=\\s*createServiceClient|\\s*:\\s*[A-Z]))`, "g"))) {
-      const line = code.slice(0, m.index).split("\n").length - 1;
-      found.push(code.split("\n")[line].trim());
+    const bare = new RegExp(`(?<![!\\w./"'])${name}\\b(?!\\s*(?:\\?\\.|\\.|(?::[^=\\n]+)?=\\s*createServiceClient\\())`, "g");
+    for (const m of code.matchAll(bare)) found.push(lineOf(m.index ?? 0));
+    const member = new RegExp(`\\b${name}\\??\\.(storage|schema)\\b`, "g");
+    for (const m of code.matchAll(member)) {
+      const rest = code.slice((m.index ?? 0) + m[0].length);
+      if (m[1] === "storage" && /^\s*\??\.from\([^()]*\)\s*\??\.\w+\(/.test(rest)) continue;
+      found.push(lineOf(m.index ?? 0));
     }
   }
   return found;
@@ -168,20 +190,34 @@ describe("RVW-104: the service client is not handed to other files", () => {
 
   it("hands a service client on only to the listed functions", () => {
     for (const file of makers) {
-      const handed = serviceClientHandovers(file);
+      const handed = serviceClientHandovers(read(file));
       const allowed = SERVICE_CLIENT_HANDOVERS[file.split("\\").join("/")] ?? [];
       expect(handed.length, `${file}: ${handed.join(" | ")}`).toBe(allowed.length);
       for (const [i, line] of handed.entries()) expect(line, file).toContain(allowed[i]);
     }
   });
 
-  it("would catch a client passed to a helper", () => {
-    expect(serviceClientHandovers).toBeTypeOf("function");
-    const sample = "const supabase = createServiceClient();\nif (!supabase) return;\nawait supabase.rpc('x');\nhelper(supabase, 1);";
-    const names = [...sample.matchAll(/(?:const|let)\s+(\w+)\s*=\s*createServiceClient\(/g)].map((m) => m[1]);
-    expect(names).toEqual(["supabase"]);
-    const hits = [...sample.matchAll(new RegExp(`(?<![!\\w./"'])supabase\\b(?!\\s*(?:\\?\\.|\\.|=\\s*createServiceClient|\\s*:\\s*[A-Z]))`, "g"))];
-    expect(hits).toHaveLength(1);
+  const head = "const supabase = createServiceClient();\nif (!supabase) return;\nawait supabase.rpc(\"x\");\n";
+  it("allows what stays in the file", () => {
+    expect(serviceClientHandovers(head)).toEqual([]);
+    expect(serviceClientHandovers(`${head}await supabase.storage.from(BUCKET).download(path);\nawait supabase?.storage.from("b").upload(p, b, {});`)).toEqual([]);
+    expect(serviceClientHandovers("const supabase: ServiceClient | null = createServiceClient();\nif (!supabase) return;\nsupabase.rpc(\"x\");")).toEqual([]);
+    // comments and strings never count
+    expect(serviceClientHandovers(`${head}// helper(supabase)\nthrow new Error("supabase not configured");`)).toEqual([]);
+  });
+
+  it.each([
+    ["a client passed to a helper", `${head}helper(supabase, 1);`],
+    ["a storage object passed on", `${head}helper(supabase.storage);`],
+    ["a bucket object passed on", `${head}x(supabase.storage.from("b"));`],
+    ["a schema client", `${head}const app = supabase.schema("app");`],
+    ["a client made inside a call", "helper(createServiceClient());"],
+    ["a client returned", "function make() {\n  return createServiceClient();\n}"],
+    ["a typed declaration passed on", "const supabase: ServiceClient | null = createServiceClient();\nhelper(supabase);"],
+    ["a ternary", `${head}const c = cond ? supabase : Fallback;`],
+    ["an object shorthand", `${head}run({ supabase });`],
+  ])("reports %s", (_label, sample) => {
+    expect(serviceClientHandovers(sample)).toHaveLength(1);
   });
 });
 
