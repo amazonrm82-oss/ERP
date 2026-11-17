@@ -3568,7 +3568,14 @@ that back.
   the plan only while `plans.availability = 'available'` (else today's 'pro' trial, silently), the source folded again by
   `app.landing_event_source`; same 14-day 'trialing'. `app.org_signup_origins` (no grants; cascades) keeps source and honoured
   plan, read by `platform_list_orgs` / `platform_org` (last redefined in 021311). The metadata is self-reported, so the panel's
-  "מקור הרשמה" is the visitor's claim. Google sign-in carries neither. The advisor's finding on `app.org_signup_origins` is expected.
+  "מקור הרשמה" is the visitor's claim. The advisor's finding on `app.org_signup_origins` is expected.
+  Since 021312 (owner (402) ב, (403) ב, (404) א; an independent review) `create_organization` (last redefined there) makes an
+  honoured plan whose two prices are 0 (read from `public.plans`, never the metadata) active from the start: org 'active',
+  subscription 'active', no `trial_ends_at` (so BIL-08 never covers it). The Google button carries `src`/`plan` in the OAuth
+  callback query (`oauthCallbackPath`, `src/features/auth/oauth-signup.ts`); `/auth/callback` writes them into the person's own
+  metadata with their own session only for a new account (`isNewSignupAccount`), never for an invitation and never over an existing
+  key (`oauthSignupMetadata`). Google sign-up is still not counted by LND-14 (question 405). Accepted (review): `v_owned` is read
+  without a lock, so two simultaneous first calls can both honour the plan.
 - Column grants (RVW-12, 0073): `contacts`, like `leads` (0038) and `tasks` (0063), has column-level INSERT/UPDATE
   grants; a new column on any of them needs `grant insert, update (col) ... to authenticated`. `last_contacted_at` /
   `first_contacted_at` are server-only. Tasks may link only records the caller can see (0074: `tasks_insert` +
