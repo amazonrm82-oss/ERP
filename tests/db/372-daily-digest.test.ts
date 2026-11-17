@@ -9,10 +9,11 @@ afterAll(closePool);
 // kind), the counts under each recipient's own read rules compared with that person's own screens, the composer's re-checks on
 // the live lease, the plan key (every plan but the free plan) and the one-click stop link.
 
-// Monday 16 November 2026; Jerusalem is UTC+2 in November
-const MONDAY_0730 = "2026-11-16T05:30:00Z";
-const MONDAY_0729 = "2026-11-16T05:29:00Z";
-const MONDAY_1031 = "2026-11-16T08:31:00Z";
+// Monday 18 November 2030 (a far date: a job is never queued before now(), so a past date would move its run time);
+// Jerusalem is UTC+2 in November
+const MONDAY_0730 = "2030-11-18T05:30:00Z";
+const MONDAY_0729 = "2030-11-18T05:29:00Z";
+const MONDAY_1031 = "2030-11-18T08:31:00Z";
 
 type Job = { kind: string; payload: Record<string, string>; next_run_at: string };
 
@@ -154,13 +155,13 @@ describe("the cron queues one job per person and business day", () => {
     const jobs = await jobsOf(org);
     const byUser = Object.fromEntries(jobs.map((j) => [j.payload.user_id, j]));
     expect(Object.keys(byUser).sort()).toEqual([owner.id, manager.id, member.id, viewer.id].sort());
-    expect(byUser[owner.id].payload).toEqual({ user_id: owner.id, organization_id: org, digest_kind: "manager", day: "2026-11-16" });
+    expect(byUser[owner.id].payload).toEqual({ user_id: owner.id, organization_id: org, digest_kind: "manager", day: "2030-11-18" });
     expect(byUser[manager.id].payload.digest_kind).toBe("manager");
     expect(byUser[member.id].payload.digest_kind).toBe("personal");
     expect(byUser[viewer.id].payload.digest_kind).toBe("personal");
     // once per person, business and day
     expect(await queue(MONDAY_0730)).toBe(0);
-    expect(await queue("2026-11-16T06:00:00Z")).toBe(0);
+    expect(await queue("2030-11-18T06:00:00Z")).toBe(0);
     expect((await jobsOf(org)).length).toBe(4);
   });
 
@@ -169,33 +170,33 @@ describe("the cron queues one job per person and business day", () => {
     await asUser(owner.id, (q) => q("update public.digest_settings set send_at = '08:00' where organization_id = $1", [org]));
     await workerSeen(true);
     // Tuesday: 07:30 local for the member, inside 22:00-08:00, so the job runs at 08:00 local (06:00 UTC)
-    await queue("2026-11-17T05:30:00Z");
-    const tuesday = (await jobsOf(org)).filter((j) => j.payload.day === "2026-11-17");
+    await queue("2030-11-19T05:30:00Z");
+    const tuesday = (await jobsOf(org)).filter((j) => j.payload.day === "2030-11-19");
     const mine = tuesday.find((j) => j.payload.user_id === member.id);
-    expect(mine?.next_run_at).toBe("2026-11-17T06:00");
+    expect(mine?.next_run_at).toBe("2030-11-19T06:00");
     const manager0730 = tuesday.find((j) => j.payload.user_id === manager.id);
-    expect(manager0730?.next_run_at).toBe("2026-11-17T05:30");
+    expect(manager0730?.next_run_at).toBe("2030-11-19T05:30");
     // the owner chose 08:00: not yet
     expect(tuesday.find((j) => j.payload.user_id === owner.id)).toBeUndefined();
-    await queue("2026-11-17T06:00:00Z");
-    expect((await jobsOf(org)).filter((j) => j.payload.day === "2026-11-17" && j.payload.user_id === owner.id).length).toBe(1);
+    await queue("2030-11-19T06:00:00Z");
+    expect((await jobsOf(org)).filter((j) => j.payload.day === "2030-11-19" && j.payload.user_id === owner.id).length).toBe(1);
   });
 
   it("skips a rest day, a suspended person and a closed business", async () => {
     await workerSeen(true);
     // Saturday is the business's rest day
-    expect(await queue("2026-11-21T05:30:00Z")).toBe(0);
+    expect(await queue("2030-11-23T05:30:00Z")).toBe(0);
     // a suspended member gets nothing
     await asAdmin((q) => q("update public.memberships set status = 'suspended' where organization_id = $1 and user_id = $2", [org, viewer.id]));
-    await queue("2026-11-18T05:30:00Z");
-    const wednesday = (await jobsOf(org)).filter((j) => j.payload.day === "2026-11-18").map((j) => j.payload.user_id);
+    await queue("2030-11-20T05:30:00Z");
+    const wednesday = (await jobsOf(org)).filter((j) => j.payload.day === "2030-11-20").map((j) => j.payload.user_id);
     expect(wednesday).not.toContain(viewer.id);
     expect(wednesday).toContain(member.id);
     // a closed business gets nothing
     const status = await asAdmin(async (q) => (await q<{ status: string }>("select status from public.organizations where id = $1", [org])).rows[0].status);
     await asAdmin((q) => q("update public.organizations set status = 'suspended' where id = $1", [org]));
     try {
-      expect(await queue("2026-11-19T05:30:00Z")).toBe(0);
+      expect(await queue("2030-11-21T05:30:00Z")).toBe(0);
     } finally {
       await asAdmin((q) => q("update public.organizations set status = $1 where id = $2", [status, org]));
     }
