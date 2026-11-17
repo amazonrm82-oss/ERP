@@ -84,3 +84,13 @@ export function deletionDayText(iso: string | null | undefined, timeZone: string
     return new Intl.DateTimeFormat("he-IL", { dateStyle: "long" }).format(at);
   }
 }
+
+/**
+ * RVW-113: what the owner reads when Supabase Auth could not send the code. The request is cancelled at once; only when the
+ * cancel was confirmed does the text say so, else the open request is still on the page with its "ביטול הבקשה" button.
+ */
+export function codeNotSentText(rateLimited: boolean, cancelled: boolean): string {
+  const first = rateLimited ? "קוד נשלח לפני רגע. חכו דקה ובקשו שוב." : "לא הצלחנו לשלוח את הקוד לאימייל שלכם.";
+  if (cancelled) return `${first} הבקשה בוטלה, והעסק ממשיך לפעול כרגיל.${rateLimited ? "" : " נסו שוב בעוד כמה דקות."}`;
+  return `${first} לחצו "ביטול הבקשה" בדף הזה. העסק ממשיך לפעול כרגיל.`;
+}

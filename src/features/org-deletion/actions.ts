@@ -9,7 +9,7 @@ import { dbErrorMessage, GENERIC_ERROR } from "@/lib/errors";
 import { pick } from "@/lib/validation";
 
 import { orgDeletionPath } from "./paths";
-import { codeSchema, confirmReasonText, typedNameSchema } from "./texts";
+import { codeNotSentText, codeSchema, confirmReasonText, typedNameSchema } from "./texts";
 
 const requestAnswer = z.object({ ok: z.literal(true), expires_at: z.string() });
 const confirmAnswer = z.object({ ok: z.boolean(), reason: z.string().optional() });
@@ -34,12 +34,14 @@ export async function requestOrgDeletionAction(orgId: string, _prev: FormState, 
 
   const sent = await supabase.auth.reauthenticate().catch(() => ({ error: { code: "network" } as { code?: string } }));
   if (sent.error) {
-    await supabase.rpc("org_deletion_cancel", { p_org: orgId });
-    return fail(
-      sent.error.code === "over_email_send_rate_limit"
-        ? "קוד נשלח לפני רגע. חכו דקה ובקשו שוב. הבקשה בוטלה, והעסק ממשיך לפעול כרגיל."
-        : "לא הצלחנו לשלוח את הקוד לאימייל שלכם. הבקשה בוטלה, והעסק ממשיך לפעול כרגיל. נסו שוב בעוד כמה דקות.",
+    // RVW-113: the cancel's own answer decides what the owner is told
+    const cancel = await supabase.rpc("org_deletion_cancel", { p_org: orgId }).then(
+      (answer) => answer,
+      () => ({ data: null, error: { code: "network" } }),
     );
+    const cancelled = !cancel.error && z.object({ ok: z.literal(true) }).safeParse(cancel.data).success;
+    revalidatePath(orgDeletionPath(orgId));
+    return fail(codeNotSentText(sent.error.code === "over_email_send_rate_limit", cancelled));
   }
   revalidatePath(orgDeletionPath(orgId));
   return { ok: true, message: "שלחנו קוד לאימייל שלכם. הקלידו אותו כאן כדי לאשר את המחיקה." };

@@ -8,6 +8,7 @@ import { ACTION_LABELS } from "@/features/audit/labels";
 import { notificationHref } from "@/features/notifications/links";
 import { orgDeletionPath } from "@/features/org-deletion/paths";
 import {
+  codeNotSentText,
   codeSchema,
   confirmReasonText,
   CONFIRM_REASON_TEXT,
@@ -81,5 +82,18 @@ describe("the deletion's words", () => {
     expect(actions.startsWith('"use server"')).toBe(true);
     expect(actions).toContain("supabase.auth.reauthenticate()");
     expect(actions).not.toMatch(/supabase\/service|SECRET_KEY|SERVICE_ROLE/);
+  });
+
+  // RVW-113: a failed cancel is never reported as a cancel
+  it("says the request was cancelled only when the cancel answered ok", () => {
+    expect(codeNotSentText(false, true)).toBe("לא הצלחנו לשלוח את הקוד לאימייל שלכם. הבקשה בוטלה, והעסק ממשיך לפעול כרגיל. נסו שוב בעוד כמה דקות.");
+    expect(codeNotSentText(true, true)).toBe("קוד נשלח לפני רגע. חכו דקה ובקשו שוב. הבקשה בוטלה, והעסק ממשיך לפעול כרגיל.");
+    for (const rate of [false, true]) {
+      expect(codeNotSentText(rate, false)).not.toContain("בוטלה");
+      expect(codeNotSentText(rate, false)).toContain('"ביטול הבקשה"');
+    }
+    const actions = readFileSync(join(__dirname, "../../src/features/org-deletion/actions.ts"), "utf8");
+    expect(actions).toMatch(/const cancel = await supabase\.rpc\("org_deletion_cancel"/);
+    expect(actions).toContain("codeNotSentText(sent.error.code === \"over_email_send_rate_limit\", cancelled)");
   });
 });
