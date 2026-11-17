@@ -124,7 +124,13 @@ and build this CRM here instead. The old code is preserved on the branch
    fields of available and coming-soon plans, cached an hour like the subprocessors page (a second anon function beside `health_check`;
    test 01 names it). In-person signing (SGN-07): a rep's own session may trigger the signed-PDF writer, under SGN-02's conditions (191):
    the session is checked first, only someone who may send the document, and the signing is recorded with the rep's identity and device.
-   Built, no service-key use yet (AUT-08, SPD-04; migrations 021224, 021225; owner (80) א, (120) ג, (259) א, (261) א, (280) ג;
+   Owner, 18 November 2026, answers (414) א, (418) ב, (419) א (approved, not built yet; each needs its own "In use" line once built,
+  database tests and an independent review): a public document page under this rule's approved secret-link pattern (DOC-15; the
+  customer opens a sent accounting document from a wa.me link or our email's link); one OPS-04 job kind for the new sign-up SERVICE
+  emails only (WEB-05: welcome, trial ending; no tips or marketing), under answer (55)'s conditions; subscription billing against a
+  fake clearing provider (BIL-02..07): an OPS-04 job kind for the daily charge and the clearing provider's signed webhook, under
+  (394)'s conditions. Neither the clearing provider nor the invoicing provider is chosen.
+  Built, no service-key use yet (AUT-08, SPD-04; migrations 021224, 021225; owner (80) א, (120) ג, (259) א, (261) א, (280) ג;
   four independent reviews): automation step `send_email` (`app.automation_send_email`, EML-02's rules; one per rule, record and
   business day; no attachments; button presses count in the person's 30 emails an hour with card sends; a session's step takes the
   person locks `record_email:<user>` then `record_sms:<user>` first, every path, so no cycle) and the instant reply to a web-form
