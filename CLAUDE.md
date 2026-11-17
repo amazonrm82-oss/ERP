@@ -238,7 +238,9 @@ and build this CRM here instead. The old code is preserved on the branch
   narrows an open link and never widens it) through `public.prefill_link_create` (`app.can_write`, writable, `app.can_edit_record`,
   100 per person an hour, audited without the token), `public.prefill_link_revoke` and `public.prefill_links_for_record`. One
   not-found rule `app.prefill_link_usable` (unknown or revoked token, expired, business not writable (`app.org_writable`), public pages
-  closed, no key, template off, record binned, gone or a converted lead); a submitted link answers `{status:'done'}` until it expires.
+  closed, no key, template off, record binned or gone; since 021302 (owner (401) א) a converting lead's links move to its contact by trigger
+  `leads_prefill_links_convert` (`app.convert_prefill_links`, the LIB-02 pattern; a `cf:` key is kept only when the contact field has the
+  same key and type, `app.prefill_link_fields` last redefined there; a merge sends them on, `app.merge_prefill_links`); a submitted link answers `{status:'done'}` until it expires.
   Limits after the lookup: 120 per link and 60 per sender (keyed IP hash scope `prefill`, re-scoped per link, 1,024 buckets) in 10
   minutes, 10 submissions per link in 10 minutes; OPS-02 shared guard first. Never framed, no-referrer, always light, preview bots read
   nothing, no cookies. A merge moves the duplicate's links (accepted, as LIB-02). `app.scheduled_no_activity`, `app.automation_run_facts`,
@@ -575,7 +577,7 @@ and build this CRM here instead. The old code is preserved on the branch
    `email-attachments-server.ts` holds no client, and the unit scan in `tests/unit/jobs-queue.test.ts` (`SERVICE_CLIENT_HANDOVERS`)
    refuses a service client, or its Storage or schema object, handed out of any file. Since 021299 (RVW-110) a card email with files is
    refused (`attachment_changed`) unless the sender is still an active member who reads the record (`app.user_can_read_record`, or a
-   deputy's reading); `app.email_compose_core` was last redefined there (test 367's pin rechecked); tests 64 and 88 end with
+   deputy's reading); `app.email_compose_core` was redefined there and again in 021300 (test 367's pin rechecked); tests 64 and 88 end with
    `_email_sender_gone_files.sql`. The SMS composer (021247) and this email composer are THE FUTURE SENDER that the earlier
    "THE FUTURE SENDER" sentences of this rule name (RVW-117); only the MNY-06 monthly email is still unbuilt.
    Card sends since 021279 (owner, 15 November 2026, after the live test): a card offers only templates whose fields a card can fill
@@ -661,7 +663,11 @@ and build this CRM here instead. The old code is preserved on the branch
   `invoice_issue_customer`) and judge the ids they are given by business only, not by the caller's read rights; accepted because
   schema app is not in the API (as `app.statement_link_issue`). Settings `public.invoice_provider_settings` (021296; owners/admins
   through `invoice_provider_connect|disconnect|check_recorded`; PRM-01 key `issue_documents`, `app.can_issue_documents`). 23 functions
-  pinned by md5 in test 381; `app.job_kinds` and `app.job_payload_ok` were last redefined in 021297. Accepted (review): a job the claim
+  pinned by md5 in test 381 (`public.invoice_issue_record` last redefined in 021310, DOC-10: the provider's allocation outcome through the
+  contract, the system never computes the threshold; an unreadable outcome = failed `other`; server-only `accounting_documents.allocation_failed_at`
+  / `allocation_error_code`, frozen once written, constraint `accounting_documents_allocation_failure_shape`, trigger
+  `accounting_documents_allocation_failure` (hints `document:provider|frozen`); codes `app.allocation_failure_codes()` = `ALLOCATION_FAILURE_CODES`,
+  labels in `src/features/documents/allocation.ts`; a later fill by DOC-11 is a follow-up); `app.job_kinds` and `app.job_payload_ok` were last redefined in 021297. Accepted (review): a job the claim
   refused on its first try can raise a needless "check at the provider" notice, never a silent one. The advisor's findings on the six
   staff definers and `app.invoice_issue_requests` are expected.
   In use (OPS-04, owner 26 October 2026, answer (א) and wave 3 use (1); conditions of 2 November 2026, answers (52)-(55); migration
@@ -702,7 +708,10 @@ and build this CRM here instead. The old code is preserved on the branch
    `claim_jobs`, `finish_job`, `job_message_may_send` and `app.jobs_record_message` are pinned by md5 in test 284, with the
    trigger list of `app.jobs`; a change needs a fresh review.
    Since MSG-06/MSG-05 (owner 4 and 8 November 2026, answers (119)-(125), (133)-(136); migrations 021172-021175, two independent
-   reviews) `job_message_may_send` (last redefined in 021175), after every earlier check, also applies the business's sending
+   reviews) `job_message_may_send` (redefined in 021175, 021204, 021225, last in 021300: owner (399) א, a business in ADM-03's deletion
+   wait (`app.org_deletion_waiting`) has its message jobs wait uncounted (`waiting:org_deletion`, 15 minutes) instead of being refused, and
+   trigger `org_deletions_release_jobs` frees them when the deletion is cancelled; the composers answer `paused` for it; test 284's pin
+   rechecked), after every earlier check, also applies the business's sending
    hours, the per-minute rates and the marketing caps, and so it also writes: `app.message_send_rate`, `app.message_system_rate`,
    `app.message_usage_days`, `app.message_cap_holds`, `app.message_cap_notices`, `app.jobs.usage_counted|cap_wait`, and through
    `app.message_cap_notify` one more public table, `public.notifications` (`system` notices with counts only). It moves other due jobs
@@ -2084,7 +2093,10 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   `app.plan_key_defaults` and `public.plans_public` (test 344's pin) were last redefined in 021284. Links (385 ב): `app.quote_link_tokens`
   (one row per issued link, SHA-256 only, made_by screen|message|reminder|migrated, no grants) through `app.quote_link_token_issue`, at
   most 10 live (an 11th ends first a surely undelivered link, then a superseded attempt, then the oldest); `app.quote_links` keeps one
-  row per quote (newest live hash, null while none is live; view counters per quote); revoke ends all. Every token lookup
+  row per quote (newest live hash, null while none is live; view counters per quote); revoke ends all and, since 021301 (owner (400) א), also stops the reminders (`app.quote_links.reminders_stopped_at`; `app.send_quote_reminders`
+  skips the quote, a waiting reminder is refused `reminders_stopped`; cleared by a person's send from the screen or a new link; every revoke is
+  audited with `reminders_stopped`; `public.quote_link_revoke`, `quote_link_create`, `app.quote_message_enqueue`, `app.send_quote_reminders`,
+  `app.quote_message_refusal` last redefined there). Every token lookup
   (`quote_public`, `_version`, `_answer`, `_pdf`, `_question`, `app.quote_signed_pdf_token_quote`, `link_preview_public`; test 253's pin
   rechecked) looks among live links (`token_hash is not null`) under the `quote_links` row lock. THE FUTURE SENDERS are the existing
   composers; no new service-key use. Tests 64 and 88 end with `_quote_message_send.sql`, `_quote_reminders.sql`, `_quote_links_many.sql`.
@@ -2755,7 +2767,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   refused while the account's email is changing (keep Supabase's "Secure email change" ON). Then 30 days: `app.org_deletion_pending`
   makes `app.org_writable`, `app.org_takes_leads` and `app.org_public_pages_open` false (status untouched; the privacy-request page stays
   open through `app.org_public_pages_open_base`), the policies that refuse writes while closed use `app.org_write_blocked` (021274),
-  `transfer_ownership` refuses (hint `org_deletion:read_only`); `public.org_deletion_cancel` (owner) undoes it at once;
+  `transfer_ownership` refuses (hint `org_deletion:read_only`); `public.org_deletion_cancel` (owner) undoes it at once (customer messages that came due meanwhile waited and go out then, owner (399) א);
   `org_deletion_status` feeds the banner and `/settings/delete-business`. pg_cron `crm-org-deletions` (02:13 UTC,
   `app.run_org_deletions`) runs the pasted `app.org_deletion_purge(org)` for a due request (021193's removal as a function: files
   queued for the cleanup, then the cascade; accounts and profiles stay) and `app.purge_old_org_deletion_code_tries`. Kept as history:
