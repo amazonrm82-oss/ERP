@@ -11,10 +11,13 @@
 --   * accounting_documents.allocation_failed_at / allocation_error_code: server only (no client grant; a person's insert or
 --     change through any path is refused, trigger accounting_documents_allocation_failure); both or neither; only on a tax
 --     invoice or a tax invoice-receipt without an allocation number; the code from app.allocation_failure_codes() =
---     ALLOCATION_FAILURE_CODES (unit test reads this file). A server write that later fills the number clears them.
+--     ALLOCATION_FAILURE_CODES (unit test reads this file). Frozen once written, for every writer: a number the provider
+--     gets later (DOC-11's sync) is a follow-up, and needs its own rule here.
 --   * public.invoice_issue_record (021297's body; DOC-07's every rule kept) reads the new `allocation` object of the worker's
 --     answer, or, from a worker built before DOC-10, the old allocation_number / allocation_failure keys (free words become
---     'other'); a provider that says "allocated" with a number that is not digits marks the document 'invalid_number'; a
+--     'other'); an outcome it cannot read (an unknown status, a missing or bad field) never refuses the answer, since the
+--     provider has already issued the document: it marks it 'other'; a provider that says "allocated" with a number that is
+--     not digits marks the document 'invalid_number'; a
 --     receipt or a proforma keeps neither. The request row keeps the code in allocation_failure. Re-pinned in test 381.
 -- Safe to run twice.
 
@@ -39,17 +42,15 @@ alter table public.accounting_documents add constraint accounting_documents_allo
                                          'business_not_authorized', 'invalid_number', 'other')))) not valid;
 alter table public.accounting_documents validate constraint accounting_documents_allocation_failure_shape;
 
--- the mark is the provider layer's (no session); a person never writes it, whatever the path
+-- the mark is the provider layer's (no session) and is written with the document only: a person never writes it, and
+-- nobody changes it afterwards
 create or replace function app.accounting_documents_allocation_failure() returns trigger
 language plpgsql security invoker
 set search_path = ''
 as $$
 begin
-  if auth.uid() is null then
-    return new;
-  end if;
   if tg_op = 'INSERT' then
-    if new.allocation_failed_at is not null or new.allocation_error_code is not null then
+    if auth.uid() is not null and (new.allocation_failed_at is not null or new.allocation_error_code is not null) then
       raise exception 'only the provider layer marks an allocation failure' using errcode = 'P0001', hint = 'document:provider';
     end if;
   elsif row(new.allocation_failed_at, new.allocation_error_code) is distinct from row(old.allocation_failed_at, old.allocation_error_code) then
@@ -171,11 +172,16 @@ begin
   -- worker built before DOC-10 sends allocation_number / allocation_failure (the provider's words, kept as 'other')
   v_alloc := p_result -> 'allocation';
   if v_alloc is not null and jsonb_typeof(v_alloc) <> 'null' then
-    if jsonb_typeof(v_alloc) <> 'object' or coalesce(v_alloc ->> 'status', '') not in ('allocated', 'failed', 'not_needed') then
-      raise exception 'the allocation is a number, a failure or not needed' using errcode = '22023';
+    -- an outcome that cannot be read is never refused (the provider already issued the document): marked 'other'
+    if jsonb_typeof(v_alloc) <> 'object' or coalesce(v_alloc ->> 'status', '') not in ('allocated', 'failed', 'not_needed')
+       or (v_alloc ->> 'status' = 'allocated' and jsonb_typeof(v_alloc -> 'number') is distinct from 'string')
+       or (v_alloc ->> 'status' = 'failed' and jsonb_typeof(v_alloc -> 'code') is distinct from 'string') then
+      v_allocation := null;
+      v_failure := 'other';
+    else
+      v_allocation := case when v_alloc ->> 'status' = 'allocated' then btrim(v_alloc ->> 'number') end;
+      v_failure := case when v_alloc ->> 'status' = 'failed' then v_alloc ->> 'code' end;
     end if;
-    v_allocation := case when v_alloc ->> 'status' = 'allocated' then coalesce(btrim(v_alloc ->> 'number'), '') end;
-    v_failure := case when v_alloc ->> 'status' = 'failed' then coalesce(v_alloc ->> 'code', '') end;
   else
     v_allocation := nullif(btrim(coalesce(p_result ->> 'allocation_number', '')), '');
     v_failure := nullif(btrim(coalesce(p_result ->> 'allocation_failure', '')), '');

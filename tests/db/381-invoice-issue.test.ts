@@ -34,8 +34,10 @@ const REVIEWED_MD5: Record<string, string> = {
   // `allocation` object or the old keys, codes from app.allocation_failure_codes(), 'invalid_number' for a number that is
   // not digits, the mark written on the recorded document). Rechecked: lease and request locks, every refusal and retry
   // branch, the late lookup, the server-only insert with the claims set aside and restored, the audit actor, the deadlock
-  // re-raise, unchanged; no amount is compared for the allocation.
-  "public.invoice_issue_record": "fd1b3cd95119aa4bffb8cf7f96d246d8",
+  // re-raise, unchanged; no amount is compared for the allocation. After the review of 5f84845c: an outcome that cannot be
+  // read (an unknown status, a missing or non-string number or code, not an object) no longer raises 22023, since the
+  // provider already issued the document; it is recorded and marked 'other' (tax invoices only). Nothing else changed.
+  "public.invoice_issue_record": "2107bb86f74cdc70719a4592f647f191",
   "public.invoice_issue_requests_open": "a3568e808238728700c48a0fc061a4be",
   "public.invoice_issue_state": "61f1e0d0216e257a93d4b0b5f5cd7ee0",
   "public.invoice_provider_check_recorded": "47a98ea21aa0dcd33f782fe6d1fce73e",
@@ -326,17 +328,43 @@ describe("issuing through the invoice provider", () => {
       expect(await allocationOf(receipt.document)).toEqual({ allocation_number: null, allocation_error_code: null, marked: false });
     });
 
-    it("DOC-10: a worker built before DOC-10 still records (allocation_number, or its words as 'other'); a bad outcome is refused", async () => {
+    it("DOC-10: a worker built before DOC-10 still records (allocation_number, or its words as 'other')", async () => {
       const r = await begin(issuer, randomUUID(), "deal", deal);
       const { allocation_number: _drop, ...rest } = result();
       void _drop;
       const done = await work(r.request_id as string, { ...rest, allocation_number: null, allocation_failure: "שגיאה אצל הספק" });
       expect(await allocationOf(done.document_id)).toEqual({ allocation_number: null, allocation_error_code: "other", marked: true });
-      const bad = await begin(issuer, randomUUID(), "deal", deal);
-      const job = await claimJob(bad.request_id as string);
-      await claimOf(job);
-      expect((await pgError(record(job, { ok: true, ...result(), allocation: { status: "maybe" } }))).code).toBe("22023");
-      await asService((q) => q("select public.finish_job($1, $2, false, null, false, false)", [job.id, job.lease]));
+    });
+
+    it("DOC-10: an outcome that cannot be read never refuses the issued document: it is recorded and marked 'other'", async () => {
+      for (const allocation of [
+        { status: "pending" },
+        { status: "allocated" },
+        { status: "allocated", number: 123456789 },
+        { status: "failed" },
+        { status: "failed", code: 7 },
+        "allocated",
+        ["allocated"],
+      ]) {
+        const issued = await issueWith(allocation);
+        expect(await allocationOf(issued.document), JSON.stringify(allocation)).toEqual({ allocation_number: null, allocation_error_code: "other", marked: true });
+        expect(await requestFailure(issued.request)).toBe("other");
+      }
+      // a type that carries no allocation number is never marked
+      const proforma = await issueWith({ status: "pending" }, doc({ doc_type: "proforma" }));
+      expect(await allocationOf(proforma.document)).toEqual({ allocation_number: null, allocation_error_code: null, marked: false });
+    });
+
+    it("DOC-10: the codes of app.allocation_failure_codes() are the codes the constraint allows", async () => {
+      const codes = await asAdmin(async (q) => (await one<{ c: string[] }>(q, "select app.allocation_failure_codes() as c")).c);
+      const def = await asAdmin(async (q) =>
+        (await one<{ d: string }>(q, "select pg_get_constraintdef(oid) as d from pg_constraint where conname = 'accounting_documents_allocation_failure_shape' and conrelid = 'public.accounting_documents'::regclass")).d,
+      );
+      const listed = /allocation_error_code\s*=\s*ANY\s*\(\s*ARRAY\[([^\]]+)\]/i.exec(def);
+      expect(listed, def).not.toBeNull();
+      const allowed = [...(listed?.[1] ?? "").matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+      expect([...allowed].sort()).toEqual([...codes].sort());
+      expect(codes.length).toBeGreaterThan(0);
     });
 
     it("DOC-10: the mark is the server's: a person can neither write it nor change it; readers of the document see it", async () => {
@@ -362,17 +390,19 @@ describe("issuing through the invoice provider", () => {
       for (const reader of [owner, admin, issuer]) {
         expect((await run(reader, (q) => one<{ c: string | null }>(q, "select allocation_error_code as c from public.accounting_documents where id = $1", [failed.document])))?.c).toBe("customer_tax_id");
       }
-      // the shape holds for every writer: a code outside the list, a mark on a receipt, a mark beside a number
-      for (const sql of [
-        "update public.accounting_documents set allocation_error_code = 'nope' where id = $1",
-        "update public.accounting_documents set allocation_failed_at = null where id = $1",
-        "update public.accounting_documents set allocation_number = '1' where id = $1",
+      // the shape holds for every writer: a number beside the mark, a code outside the list, a mark on a receipt, half a mark
+      expect((await pgError(asAdmin((q) => q("update public.accounting_documents set allocation_number = '1' where id = $1", [failed.document])))).code).toBe("23514");
+      for (const [type, code, at] of [
+        ["tax_invoice", "nope", "now()"],
+        ["receipt", "other", "now()"],
+        ["tax_invoice", "other", "null"],
       ]) {
-        expect((await pgError(asAdmin((q) => q(sql, [failed.document])))).code).toBe("23514");
+        const insertMark = `insert into public.accounting_documents (organization_id, contact_id, doc_type, number, amount_agorot, allocation_error_code, allocation_failed_at) values ($1, $2, '${type}', 'S-${type}-${code}-${at}', 100, '${code}', ${at})`;
+        expect((await pgError(asAdmin((q) => q(insertMark, [org, person])))).code, insertMark).toBe("23514");
       }
-      // the server fills a number that arrived later and clears the mark in the same write
-      await asAdmin((q) => q("update public.accounting_documents set allocation_number = '555', allocation_error_code = null, allocation_failed_at = null where id = $1", [failed.document]));
-      expect(await allocationOf(failed.document)).toEqual({ allocation_number: "555", allocation_error_code: null, marked: false });
+      // frozen once written, for the server too (a number the provider gets later is a follow-up)
+      expect((await pgError(asAdmin((q) => q("update public.accounting_documents set allocation_number = '555', allocation_error_code = null, allocation_failed_at = null where id = $1", [failed.document])))).hint).toBe("document:frozen");
+      expect(await allocationOf(failed.document)).toEqual({ allocation_number: null, allocation_error_code: "customer_tax_id", marked: true });
     });
 
     it("a number recorded by hand before stays on the request as unrecorded; nothing is recorded twice", async () => {
