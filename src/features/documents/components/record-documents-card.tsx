@@ -156,6 +156,12 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
                     </p>
                     <DocumentDetailsLine doc={doc} quoteLabel={doc.quoteId ? (quoteLabels.get(doc.quoteId) ?? null) : null} originalLabel={doc.originalDocumentId ? (titles.get(doc.originalDocumentId) ?? null) : null} />
                     <DocumentLinesList lines={lines.get(doc.id) ?? []} />
+                    {/* DOC-14: the credit's reason, as it was sent to the provider */}
+                    {doc.creditReason ? (
+                      <p className="text-sm break-words text-ink-soft">
+                        סיבת הזיכוי: <bdi>{doc.creditReason}</bdi>
+                      </p>
+                    ) : null}
                     {doc.cancelled ? (
                       <p className="text-sm break-words text-ink-soft">
                         בוטל{doc.cancelledAt ? ` ב-${formatDate(doc.cancelledAt)}` : ""}

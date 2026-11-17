@@ -16,8 +16,14 @@
 -- * public.invoice_issue_record (021310's body) keeps `provider_customer_id` from the worker's answer (ok or not: an upsert
 --   that worked is kept even when the document then failed) through app.invoice_provider_customer_keep, which never raises
 --   and skips an erased request, a customer that is gone, or an id that is not a provider code.
--- Products: the provider contract (src/features/invoicing/providers/types.ts) has no product call, so no product is made at
--- the provider; documents go with their lines' texts and prices (a follow-up once a real provider's contract needs it).
+-- Products (owner (410) ב): the same for each product a line names (app.invoice_provider_products: business, provider,
+-- product; ids and a hash of our details, cascades with the product). public.invoice_issue_begin's lines may carry the
+-- product they came from (app.invoice_issue_open, 021297's body plus that: a product of this business, kept in the stored
+-- request); the claim answers `provider_products` [{product_id, product, kept}] (app.invoice_provider_products_of); the
+-- worker calls the provider's upsertProduct with our details for every product with no kept id or a stale one and passes
+-- the provider's product id on its lines; a failed product upsert is a failed try, as a customer's; the record keeps
+-- `provider_product_ids` {product_id: id} (app.invoice_provider_products_keep, never raises) and writes each recorded line's
+-- product_id. A credit asks nothing about products (the provider's original holds them).
 -- The queue still holds the request id only; no new job kind, no new service-key function. Safe to run twice.
 
 create table if not exists app.invoice_provider_customers (
@@ -131,8 +137,316 @@ end;
 $$;
 revoke all on function app.invoice_provider_customer_keep(app.invoice_issue_requests, text) from public, anon, authenticated, service_role;
 
+
 -- ----------------------------------------------------------------------------
--- The worker's claim: 021297's body, plus `provider_customer` (DOC-13)
+-- Products at the provider (owner (410) ב): made or updated before issuing, their ids kept here; Mexuz wins
+-- ----------------------------------------------------------------------------
+create table if not exists app.invoice_provider_products (
+  id                    uuid primary key default gen_random_uuid(),
+  organization_id       uuid not null references public.organizations (id) on delete cascade,
+  provider              text not null check (provider ~ '^[a-z][a-z0-9_]{1,39}$'),
+  product_id            uuid not null,
+  provider_product_id   text not null check (provider_product_id ~ '^[A-Za-z0-9_.:-]{1,200}$'),
+  details_sha256        text not null check (details_sha256 ~ '^[0-9a-f]{64}$'),
+  created_at            timestamptz not null default now(),
+  updated_at            timestamptz not null default now(),
+  unique (organization_id, id),
+  constraint invoice_provider_products_once unique (organization_id, provider, product_id),
+  constraint invoice_provider_products_product_fk foreign key (organization_id, product_id)
+    references public.products (organization_id, id) on delete cascade
+);
+create index if not exists invoice_provider_products_product_idx on app.invoice_provider_products (organization_id, product_id);
+alter table app.invoice_provider_products enable row level security;
+revoke all on app.invoice_provider_products from public, anon, authenticated, service_role;
+
+-- Our product as the provider gets it: name, SKU, unit, price and VAT kind (nothing of a customer)
+create or replace function app.invoice_product_details(p_org uuid, p_product uuid) returns jsonb
+language sql stable security definer
+set search_path = ''
+as $$
+  select jsonb_build_object('external_ref', 'product:' || p.id::text, 'name', p.name, 'sku', nullif(btrim(p.sku), ''),
+                            'unit', (select u.name from public.product_units u where u.organization_id = p.organization_id and u.id = p.unit_id),
+                            'price_agorot', p.price_agorot, 'price_includes_vat', p.price_includes_vat,
+                            'vat_exempt', p.vat_kind <> 'taxable')
+    from public.products p where p.organization_id = p_org and p.id = p_product
+$$;
+revoke all on function app.invoice_product_details(uuid, uuid) from public, anon, authenticated, service_role;
+
+-- For each product the request's lines name: {product_id, product (our details), kept: {id, current} | null}
+create or replace function app.invoice_provider_products_of(p_req app.invoice_issue_requests) returns jsonb
+language plpgsql stable security definer
+set search_path = ''
+as $$
+declare
+  v_out jsonb := '[]'::jsonb;
+  v_product uuid;
+  v_details jsonb;
+  v_row app.invoice_provider_products;
+begin
+  if p_req.customer_erased_at is not null or jsonb_typeof(p_req.payload -> 'lines') is distinct from 'array' then
+    return v_out;
+  end if;
+  for v_product in
+    select distinct (x ->> 'product_id')::uuid from jsonb_array_elements(p_req.payload -> 'lines') x
+     where jsonb_typeof(x) = 'object'
+       and x ->> 'product_id' ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+  loop
+    v_details := app.invoice_product_details(p_req.organization_id, v_product);
+    if v_details is null then
+      continue;
+    end if;
+    v_row := null;
+    select * into v_row from app.invoice_provider_products k
+     where k.organization_id = p_req.organization_id and k.provider = p_req.provider and k.product_id = v_product;
+    v_out := v_out || jsonb_build_array(jsonb_build_object(
+      'product_id', v_product, 'product', v_details,
+      'kept', case when v_row.id is null then null
+                   else jsonb_build_object('id', v_row.provider_product_id,
+                                           'current', v_row.details_sha256 = app.invoice_customer_details_hash(v_details)) end));
+  end loop;
+  return v_out;
+end;
+$$;
+revoke all on function app.invoice_provider_products_of(app.invoice_issue_requests) from public, anon, authenticated, service_role;
+
+-- Keeps {product_id: provider_product_id} the worker got, with the hash of our details now; never raises (but a deadlock)
+create or replace function app.invoice_provider_products_keep(p_req app.invoice_issue_requests, p_ids jsonb) returns void
+language plpgsql volatile security definer
+set search_path = ''
+as $$
+declare
+  v_key text;
+  v_value jsonb;
+  v_details jsonb;
+begin
+  if p_ids is null or jsonb_typeof(p_ids) <> 'object' then
+    return;
+  end if;
+  for v_key, v_value in select e.key, e.value from jsonb_each(p_ids) e limit 200 loop
+    begin
+      if v_key !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+         or jsonb_typeof(v_value) <> 'string' or (v_value #>> '{}') !~ '^[A-Za-z0-9_.:-]{1,200}$'
+         -- only a product this request's lines name
+         or not exists (select 1 from jsonb_array_elements(p_req.payload -> 'lines') x
+                         where jsonb_typeof(x) = 'object' and lower(x ->> 'product_id') = lower(v_key)) then
+        continue;
+      end if;
+      v_details := app.invoice_product_details(p_req.organization_id, v_key::uuid);
+      if v_details is null then
+        continue;
+      end if;
+      insert into app.invoice_provider_products (organization_id, provider, product_id, provider_product_id, details_sha256)
+      values (p_req.organization_id, p_req.provider, v_key::uuid, v_value #>> '{}', app.invoice_customer_details_hash(v_details))
+      on conflict (organization_id, provider, product_id)
+      do update set provider_product_id = excluded.provider_product_id, details_sha256 = excluded.details_sha256, updated_at = now();
+    exception when others then
+      if sqlstate in ('40P01', '40001') then
+        raise;
+      end if;
+    end;
+  end loop;
+end;
+$$;
+revoke all on function app.invoice_provider_products_keep(app.invoice_issue_requests, jsonb) from public, anon, authenticated, service_role;
+
+-- ----------------------------------------------------------------------------
+-- Begin: 021297's body, plus a line's optional product (owner (410) ב), kept in the stored request
+-- ----------------------------------------------------------------------------
+create or replace function app.invoice_issue_open(p_org uuid, p_key uuid, p_source jsonb, p_doc jsonb) returns jsonb
+language plpgsql volatile security definer
+set search_path = ''
+as $$
+declare
+  v_provider text;
+  v_known app.invoice_issue_requests;
+  v_type text;
+  v_today date;
+  v_date date;
+  v_due date;
+  v_gross boolean;
+  v_rate integer;
+  v_lines jsonb := '[]'::jsonb;
+  v_line jsonb;
+  v_desc text;
+  v_qty numeric;
+  v_price numeric;
+  v_discount numeric;
+  v_exempt boolean;
+  v_totals jsonb;
+  v_customer jsonb;
+  v_payload jsonb;
+  v_id uuid;
+  v_settings public.invoice_provider_settings;
+  v_reuse app.invoice_issue_requests;
+  v_product uuid;
+begin
+  perform app.invoice_issuer_check(p_org);
+  if p_key is null then
+    raise exception 'a request needs its key' using errcode = '22023';
+  end if;
+
+  -- DOC-09: one request per key; the same key again answers the first request, whatever else was sent
+  perform pg_advisory_xact_lock(hashtextextended('invoice_issue:' || p_org::text || ':' || p_key::text, 0));
+  select * into v_known from app.invoice_issue_requests r where r.organization_id = p_org and r.idempotency_key = p_key;
+  if found then
+    if v_known.requested_by is distinct from auth.uid() then
+      raise exception 'this request is someone else''s' using errcode = 'P0001', hint = 'invoice:request';
+    end if;
+    return jsonb_build_object('status', v_known.status, 'request_id', v_known.id, 'provider', v_known.provider,
+                              'document_id', v_known.document_id, 'number', v_known.number, 'code', v_known.error_code,
+                              'request', v_known.payload);
+  end if;
+
+  v_provider := app.invoice_provider_of(p_org);
+  if v_provider is null then
+    raise exception 'the business has no connected invoice provider' using errcode = 'P0001', hint = 'invoice:not_connected';
+  end if;
+  if not app.invoice_provider_usable(v_provider) then
+    raise exception 'this provider is not offered' using errcode = 'P0001', hint = 'invoice:provider';
+  end if;
+  select * into v_settings from public.invoice_provider_settings s where s.organization_id = p_org;
+
+  if p_doc is null or jsonb_typeof(p_doc) <> 'object' or jsonb_typeof(p_doc -> 'lines') is distinct from 'array' then
+    raise exception 'a document is an object with its lines' using errcode = '22023';
+  end if;
+  v_type := p_doc ->> 'doc_type';
+  if v_type is null or v_type not in ('tax_invoice', 'tax_invoice_receipt', 'receipt', 'proforma') then
+    raise exception 'this type is not issued here' using errcode = 'P0001', hint = 'invoice:type';
+  end if;
+  if v_type in ('tax_invoice', 'tax_invoice_receipt') and app.org_charges_vat(p_org) is false then
+    raise exception 'a business that charges no VAT issues no tax invoice' using errcode = 'P0001', hint = 'invoice:type_exempt';
+  end if;
+
+  -- a reload: the same person, source and type, with their own request of the last 15 minutes still pending, gets it back
+  perform pg_advisory_xact_lock(hashtextextended('invoice_issue_source:' || p_org::text || ':' || auth.uid()::text || ':'
+                                                 || coalesce(p_source ->> 'kind', '') || ':' || coalesce(p_source ->> 'id', ''), 0));
+  select * into v_reuse from app.invoice_issue_requests r
+   where r.organization_id = p_org and r.requested_by = auth.uid() and r.status = 'pending'
+     and r.created_at > now() - interval '15 minutes'
+     and r.source ->> 'kind' = p_source ->> 'kind' and r.source ->> 'id' = p_source ->> 'id'
+     and r.payload ->> 'doc_type' = v_type
+   order by r.created_at desc
+   limit 1;
+  if found then
+    return jsonb_build_object('status', 'pending', 'request_id', v_reuse.id, 'provider', v_reuse.provider, 'reused', true,
+                              'request', v_reuse.payload);
+  end if;
+  v_today := (now() at time zone coalesce((select o.timezone from public.organizations o where o.id = p_org), 'Asia/Jerusalem'))::date;
+  begin
+    v_date := coalesce((p_doc ->> 'doc_date')::date, v_today);
+    v_due := (p_doc ->> 'due_date')::date;
+  exception when others then
+    raise exception 'a date is YYYY-MM-DD' using errcode = 'P0001', hint = 'invoice:date';
+  end;
+  if v_date > v_today or v_date < v_today - 365 then
+    raise exception 'the document''s date is today or up to a year back' using errcode = 'P0001', hint = 'invoice:date';
+  end if;
+  if v_due is not null and (v_type not in ('tax_invoice', 'proforma') or v_due < v_date or v_due > v_date + 366) then
+    raise exception 'a due date belongs on a tax invoice or a proforma, on or after its date' using errcode = 'P0001', hint = 'invoice:due_date';
+  end if;
+  begin
+    v_gross := coalesce((p_doc ->> 'prices_include_vat')::boolean, false);
+  exception when others then
+    raise exception 'prices include VAT or not' using errcode = 'P0001', hint = 'invoice:lines';
+  end;
+
+  if jsonb_array_length(p_doc -> 'lines') = 0 or jsonb_array_length(p_doc -> 'lines') > 200 then
+    raise exception 'a document has 1 to 200 lines' using errcode = 'P0001', hint = 'invoice:lines';
+  end if;
+  for v_line in select x from jsonb_array_elements(p_doc -> 'lines') x loop
+    begin
+      if jsonb_typeof(v_line) <> 'object' then
+        raise exception 'a line is an object';
+      end if;
+      v_desc := btrim(coalesce(v_line ->> 'description', ''));
+      v_qty := (v_line ->> 'quantity')::numeric;
+      v_price := (v_line ->> 'unit_price_agorot')::numeric;
+      v_discount := coalesce((v_line ->> 'discount_agorot')::numeric, 0);
+      v_exempt := coalesce((v_line ->> 'vat_exempt')::boolean, false);
+      -- DOC-13 (owner (410) ב): the line's product, when it came from one (a product of this business)
+      v_product := nullif(v_line ->> 'product_id', '')::uuid;
+    exception when others then
+      raise exception 'a line is description, quantity, price' using errcode = 'P0001', hint = 'invoice:lines';
+    end;
+    if v_desc = '' or char_length(v_desc) > 500 or v_desc ~ '[[:cntrl:]]'
+       or v_qty is null or v_qty <= 0 or v_qty > 1000000 or v_qty <> round(v_qty, 3)
+       or v_price is null or v_price < 0 or v_price > 1000000000000 or v_price <> trunc(v_price)
+       or v_discount < 0 or v_discount <> trunc(v_discount) then
+      raise exception 'a line is description, quantity, price' using errcode = 'P0001', hint = 'invoice:lines';
+    end if;
+    if v_product is not null
+       and not exists (select 1 from public.products p where p.organization_id = p_org and p.id = v_product) then
+      raise exception 'a line''s product is a product of this business' using errcode = 'P0001', hint = 'invoice:lines';
+    end if;
+    v_lines := v_lines || jsonb_build_array(jsonb_build_object(
+      'description', v_desc, 'quantity', v_qty, 'unit_price_agorot', v_price::bigint,
+      'discount_agorot', v_discount::bigint, 'vat_exempt', v_exempt)
+      || case when v_product is not null then jsonb_build_object('product_id', v_product) else '{}'::jsonb end);
+  end loop;
+
+  v_rate := app.org_document_vat_rate(p_org, v_date);
+  if v_rate is null then
+    raise exception 'set the business''s VAT status first' using errcode = 'P0001', hint = 'invoice:vat_unknown';
+  end if;
+  -- a receipt is the money received: its typed amounts are what was paid, no VAT added or split (TAX-01)
+  if v_type = 'receipt' then
+    v_rate := 0;
+  end if;
+  begin
+    v_totals := app.document_totals(v_lines, v_rate, v_gross);
+  exception when sqlstate '22023' then
+    raise exception 'a line is description, quantity, price' using errcode = 'P0001', hint = 'invoice:lines';
+  end;
+  if (v_totals ->> 'total_agorot')::bigint <= 0 or (v_totals ->> 'total_agorot')::bigint > 1000000000000 then
+    raise exception 'the document''s total is above zero' using errcode = 'P0001', hint = 'invoice:total';
+  end if;
+
+  -- every id the source names is of this business (app.invoice_source read them under the caller's RLS; checked again here)
+  if (p_source ->> 'deal_id' is not null
+        and not exists (select 1 from public.deals d where d.organization_id = p_org and d.id = (p_source ->> 'deal_id')::uuid))
+     or (p_source ->> 'contact_id' is not null
+        and not exists (select 1 from public.contacts c where c.organization_id = p_org and c.id = (p_source ->> 'contact_id')::uuid))
+     or (p_source ->> 'company_id' is not null
+        and not exists (select 1 from public.companies co where co.organization_id = p_org and co.id = (p_source ->> 'company_id')::uuid))
+     or (p_source ->> 'order_id' is not null
+        and not exists (select 1 from public.orders o where o.organization_id = p_org and o.id = (p_source ->> 'order_id')::uuid))
+     or (p_source ->> 'quote_id' is not null
+        and not exists (select 1 from public.quotes q where q.organization_id = p_org and q.id = (p_source ->> 'quote_id')::uuid)) then
+    raise exception 'the source is not found' using errcode = 'P0001', hint = 'invoice:source';
+  end if;
+
+  -- DOC-08
+  v_customer := app.invoice_customer(p_org, (p_source ->> 'contact_id')::uuid, (p_source ->> 'company_id')::uuid);
+  if jsonb_array_length(v_customer -> 'problems') > 0 then
+    return jsonb_build_object('status', 'blocked', 'problems', v_customer -> 'problems');
+  end if;
+  -- a document belongs to a deal or a contact (DOC-01)
+  if p_source ->> 'deal_id' is null and p_source ->> 'contact_id' is null then
+    raise exception 'a document belongs to a deal or a contact' using errcode = 'P0001', hint = 'invoice:parent';
+  end if;
+
+  v_payload := jsonb_build_object(
+    'doc_type', v_type, 'doc_date', v_date, 'due_date', v_due,
+    'locale', v_settings.locale, 'send_email', v_settings.provider_sends_email,
+    'customer', v_customer - 'problems', 'lines', v_lines,
+    'totals', jsonb_build_object(
+      'net_agorot', (v_totals ->> 'net_total_agorot')::bigint, 'vat_agorot', (v_totals ->> 'vat_agorot')::bigint,
+      'total_agorot', (v_totals ->> 'total_agorot')::bigint, 'rate_bp', v_rate, 'prices_include_vat', v_gross));
+  insert into app.invoice_issue_requests (organization_id, idempotency_key, requested_by, provider, source, payload)
+  values (p_org, p_key, auth.uid(), v_provider, p_source, v_payload)
+  returning id into v_id;
+  -- owner (398) א: the provider is asked by the background worker; the queue holds the request's id only
+  update app.invoice_issue_requests r
+     set job_id = app.enqueue_job(p_org, 'invoice.issue', jsonb_build_object('request_id', v_id::text), now())
+   where r.id = v_id;
+  return jsonb_build_object('status', 'pending', 'request_id', v_id, 'provider', v_provider, 'request', v_payload);
+end;
+$$;
+revoke all on function app.invoice_issue_open(uuid, uuid, jsonb, jsonb) from public, anon;
+grant execute on function app.invoice_issue_open(uuid, uuid, jsonb, jsonb) to authenticated;
+
+-- ----------------------------------------------------------------------------
+-- The worker's claim: 021297's body, plus `provider_customer` and `provider_products` (DOC-13)
 -- ----------------------------------------------------------------------------
 create or replace function public.invoice_issue_claim(p_job uuid, p_lease uuid) returns jsonb
 language plpgsql volatile security definer
@@ -210,7 +524,9 @@ begin
   end if;
   -- DOC-13: the provider's customer id kept for this customer, and whether the details it was made with are the ones sent now
   return jsonb_build_object('request_id', v_req.id, 'provider', v_req.provider, 'request', v_req.payload,
-                            'provider_customer', app.invoice_provider_customer_of(v_req));
+                            'provider_customer', app.invoice_provider_customer_of(v_req),
+                            -- owner (410) ב: the products the lines name, our details, and the provider's kept ids
+                            'provider_products', app.invoice_provider_products_of(v_req));
 end;
 $$;
 revoke all on function public.invoice_issue_claim(uuid, uuid) from public, anon, authenticated;
@@ -262,6 +578,10 @@ begin
   -- (whatever the provider answered about the document next; never raises)
   if jsonb_typeof(p_result -> 'provider_customer_id') = 'string' then
     perform app.invoice_provider_customer_keep(v_req, p_result ->> 'provider_customer_id');
+  end if;
+  -- owner (410) ב: the provider's product ids the worker got, {product_id: id}
+  if jsonb_typeof(p_result -> 'provider_product_ids') = 'object' then
+    perform app.invoice_provider_products_keep(v_req, p_result -> 'provider_product_ids');
   end if;
   -- a request closed by hand or marked stale after an earlier try (its late call is a LOOKUP only, never a new issue): what
   -- the provider holds is still kept (recorded when the business can record), never lost; any other ended request answers
@@ -408,9 +728,13 @@ begin
        case when v_receipt then null else (v_totals ->> 'rate_bp')::integer end,
        v_req.provider, v_doc_id, v_req.requested_by)
     returning id into v_id;
+    -- owner (410) ב: a line keeps the product it came from (a product of this business, checked when begun)
     insert into public.accounting_document_lines
-      (organization_id, document_id, position, description, quantity, unit_price_agorot, discount_agorot, vat_exempt, created_by)
-    select v_req.organization_id, v_id, x.n::integer, x.line ->> 'description', (x.line ->> 'quantity')::numeric,
+      (organization_id, document_id, position, product_id, description, quantity, unit_price_agorot, discount_agorot, vat_exempt,
+       created_by)
+    select v_req.organization_id, v_id, x.n::integer,
+           (select p.id from public.products p where p.organization_id = v_req.organization_id and p.id::text = x.line ->> 'product_id'),
+           x.line ->> 'description', (x.line ->> 'quantity')::numeric,
            (x.line ->> 'unit_price_agorot')::bigint, (x.line ->> 'discount_agorot')::bigint,
            (x.line ->> 'vat_exempt')::boolean, v_req.requested_by
       from jsonb_array_elements(v_payload -> 'lines') with ordinality as x(line, n);

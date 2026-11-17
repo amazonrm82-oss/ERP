@@ -202,6 +202,14 @@ export type CreditRoom = {
   creditedAgorot: number;
   pendingAgorot: number;
   leftAgorot: number;
+  /** DOC-14: the credit requests that still reserve an amount (ended ones an owner or admin may release) */
+  reserving: { id: string; status: string; code: string | null; totalAgorot: number | null; createdAt: string }[];
+  /** owner (411) ב: the original's lines mix exempt and taxable ones (a partial credit is made of chosen lines) */
+  mixed: boolean;
+  /** owner (411) ב: the original's lines, with what is left of each (in the original's price mode) */
+  lines: { id: string; description: string; vatExempt: boolean; totalAgorot: number; leftAgorot: number }[];
+  /** the original's lines are prices with VAT (null = they do not give back its totals) */
+  gross: boolean | null;
   /** The record the original belongs to (its deal, else its contact), for the way back */
   back: { kind: "deal" | "contact"; id: string } | null;
 };
@@ -235,6 +243,24 @@ export async function getCreditRoom(orgId: string, documentId: string): Promise<
     creditedAgorot: num("credited_agorot"),
     pendingAgorot: num("pending_agorot"),
     leftAgorot: num("left_agorot"),
+    mixed: row.mixed === true,
+    gross: typeof row.gross === "boolean" ? row.gross : null,
+    lines: Array.isArray(row.lines)
+      ? row.lines.flatMap((item) => {
+          if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+          const r = item as Record<string, unknown>;
+          if (typeof r.id !== "string" || typeof r.description !== "string") return [];
+          return [{ id: r.id, description: r.description, vatExempt: r.vat_exempt === true, totalAgorot: typeof r.total_agorot === "number" ? r.total_agorot : 0, leftAgorot: typeof r.left_agorot === "number" ? r.left_agorot : 0 }];
+        })
+      : [],
+    reserving: Array.isArray(row.reserving)
+      ? row.reserving.flatMap((item) => {
+          if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+          const r = item as Record<string, unknown>;
+          if (typeof r.id !== "string" || typeof r.status !== "string" || typeof r.created_at !== "string") return [];
+          return [{ id: r.id, status: r.status, code: typeof r.code === "string" ? r.code : null, totalAgorot: typeof r.total_agorot === "number" ? r.total_agorot : null, createdAt: r.created_at }];
+        })
+      : [],
     back: parent?.deal_id ? { kind: "deal", id: parent.deal_id } : parent?.contact_id ? { kind: "contact", id: parent.contact_id } : null,
   };
 }

@@ -57,12 +57,14 @@ export type AccountingDocument = {
   vatRateBp: number | null;
   quoteId: string | null;
   originalDocumentId: string | null;
+  // DOC-14 (owner (409) ב): a credit invoice issued through the provider keeps its reason (server only)
+  creditReason: string | null;
 };
 
 export type DocumentsSubject = MoneySubject;
 
 const RECORD_COLUMNS =
-  "id, doc_type, number, doc_date, amount_agorot, proforma_id, due_date, status, cancel_reason, cancelled_at, cancelled_by, created_by, created_at, provider, allocation_number, allocation_error_code, net_agorot, vat_agorot, vat_rate_bp, quote_id, original_document_id";
+  "id, doc_type, number, doc_date, amount_agorot, proforma_id, due_date, status, cancel_reason, cancelled_at, cancelled_by, created_by, created_at, provider, allocation_number, allocation_error_code, net_agorot, vat_agorot, vat_rate_bp, quote_id, original_document_id, credit_reason";
 
 type RecordRow = {
   id: string;
@@ -86,6 +88,7 @@ type RecordRow = {
   vat_rate_bp: number | null;
   quote_id: string | null;
   original_document_id: string | null;
+  credit_reason: string | null;
 };
 
 const num = (value: number | null) => (value === null ? null : Number(value));
@@ -113,6 +116,7 @@ function documentFromRow(row: RecordRow, docType: DocumentType): AccountingDocum
     vatRateBp: row.vat_rate_bp,
     quoteId: row.quote_id,
     originalDocumentId: row.original_document_id,
+    creditReason: row.credit_reason,
   };
 }
 
