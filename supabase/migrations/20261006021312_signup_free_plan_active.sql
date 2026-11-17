@@ -12,8 +12,9 @@
 -- * Answer (403) ב, in the same change: the plan and the source may also arrive through Google sign-in. The auth callback
 --   writes them into the person's own metadata with their own session, for a brand-new account only and never over a value
 --   already there. This function stays the only trust point and reads them exactly as before.
--- public.create_organization is redefined from 021311 with every line kept but the subscription insert and the two new
--- declarations. Same signature and grants. Safe to run twice.
+-- public.create_organization is redefined from 021311 with every line kept but: the new declaration v_free, the metadata
+-- read moved above the organizations insert (unchanged), the v_free judgment, the organizations insert's status and the
+-- subscription insert's status and trial end. Same signature and grants. Safe to run twice.
 
 create or replace function public.create_organization(
   p_name      text,
