@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { SignupForm } from "@/features/auth/components/signup-form";
 import { turnstileSiteKey } from "@/features/auth/turnstile-server";
-import { availableSignupPlan, carriedSource, LANDING_SOURCE_PARAM, SIGNUP_PLAN_PARAM } from "@/features/landing/measure";
+import { availableSignupPlan, carriedSource, LANDING_SOURCE_PARAM, SIGNUP_PLAN_PARAM, signupPlanKey } from "@/features/landing/measure";
 import { readPublicPlans } from "@/features/landing/price-list-server";
 import { paths, safeNextPath } from "@/lib/paths";
 import { publicPageMetadata } from "@/features/seo/page-metadata";
@@ -31,7 +31,10 @@ export default async function SignupPage({ searchParams }: Props) {
   const landingSource = invited ? null : carriedSource(params[LANDING_SOURCE_PARAM]);
   // WEB-02: a price card's plan, only while it is available (else ignored silently); the database checks it again when the
   // business is made
-  const plan = invited || !params[SIGNUP_PLAN_PARAM] ? null : availableSignupPlan(await readPublicPlans(), params[SIGNUP_PLAN_PARAM]);
+  const plans = invited || !params[SIGNUP_PLAN_PARAM] ? null : await readPublicPlans();
+  const plan = invited ? null : availableSignupPlan(plans, params[SIGNUP_PLAN_PARAM]);
+  // when the price list could not be read, a well-formed key is still carried (no "חבילה X" line): the database decides
+  const carriedPlan = invited ? null : plan ? plan.key : plans === null ? signupPlanKey(params[SIGNUP_PLAN_PARAM]) : null;
 
   return (
     <>
@@ -43,7 +46,7 @@ export default async function SignupPage({ searchParams }: Props) {
             ? `חבילה ${plan.name}: 14 ימי ניסיון, בלי כרטיס אשראי.`
             : "14 ימי ניסיון, בלי כרטיס אשראי."}
       </p>
-      <SignupForm next={next} turnstileSiteKey={turnstileSiteKey()} landingSource={landingSource} signupPlan={plan?.key ?? null} />
+      <SignupForm next={next} turnstileSiteKey={turnstileSiteKey()} landingSource={landingSource} signupPlan={carriedPlan} />
       <p className="mt-6 text-md text-ink-soft">
         כבר יש לכם חשבון?{" "}
         <Link href={loginHref} className="font-medium text-accent underline underline-offset-4 hover:text-accent-strong">

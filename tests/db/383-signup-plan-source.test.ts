@@ -56,6 +56,9 @@ describe("sign-up plan and source (WEB-02)", () => {
   });
 
   it("a coming-soon, hidden or unknown plan is ignored silently (pro trial), the source still kept", async () => {
+    // the proof needs a real hidden and a real coming-soon plan in the build
+    expect(hidden).not.toBeNull();
+    expect(comingSoon).not.toBeNull();
     for (const plan of [comingSoon, hidden, "no_such_plan", "PRO", 7].filter((p) => p !== null)) {
       const user = await userWithMeta("web02-bad", { signup_plan: plan, signup_source: "google" });
       const org = await createOrg(user.id);
