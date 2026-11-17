@@ -56,7 +56,10 @@ export function auditEntryNote(action: string, changes: Json, terms: OrgTerms = 
   if (action === "quote_link") {
     if (changes.link === "created" && changes.via === "message") return "נשלח ללקוח קישור נוסף בהודעה (הקישורים הקודמים ממשיכים לעבוד)";
     if (changes.link === "created") return "נוצר קישור נוסף ללקוח (הקישורים הקודמים ממשיכים לעבוד)";
+    // owner (400) א: the revoke also stops the quote's automatic reminders; with no live link only the stop is logged
+    if (changes.link === "revoked" && changes.reminders_stopped === true) return "כל הקישורים ללקוח בוטלו, והתזכורות האוטומטיות להצעה נעצרו";
     if (changes.link === "revoked") return "כל הקישורים ללקוח בוטלו";
+    if (changes.reminders_stopped === true) return "התזכורות האוטומטיות להצעה נעצרו (לא היה קישור פעיל לבטל)";
     return null;
   }
   if (action === "order_link") {

@@ -251,8 +251,14 @@ describe("the customer's link to a quote (QUO-08)", () => {
     await notFound(second);
     expect(await status(member, org, quote)).toEqual({ active: false, created_at: null, live: 0 });
     expect(await revoke(member, org, quote)).toBe(false);
-    const audit = await asAdmin((q) => q<{ changes: { link: string } }>("select changes from public.audit_log where entity_id = $1 and action = 'quote_link' order by id", [quote]));
-    expect(audit.rows.map((r) => r.changes.link)).toEqual(["created", "created", "revoked"]);
+    const audit = await asAdmin((q) => q<{ changes: Record<string, unknown> }>("select changes from public.audit_log where entity_id = $1 and action = 'quote_link' order by id", [quote]));
+    // owner (400) א: every revoke also stops the reminders and says so; the second, with no live link, logs only the stop
+    expect(audit.rows.map((r) => r.changes)).toEqual([
+      { link: "created" },
+      { link: "created" },
+      { link: "revoked", reminders_stopped: true },
+      { reminders_stopped: true },
+    ]);
   });
 
   it("a cancelled or expired quote shows its status page; not found for a deleted customer, a business without quotes or with its pages closed", async () => {

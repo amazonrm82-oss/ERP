@@ -356,7 +356,10 @@ describe("prefill links (BIZ-05)", () => {
     await field("shoe", "text", {}, org, "lead");
     await field("shoe", "text", {}, org, "contact");
     await field("hobby", "text", {}, org, "lead");
-    const form = await template(admin, ["full_name", "phone", "email", "cf:shoe", "cf:hobby"], "lead");
+    // review: the same key on both types, of different types, is another field: never carried
+    await field("size", "text", {}, org, "lead");
+    await field("size", "number", {}, org, "contact");
+    const form = await template(admin, ["full_name", "phone", "email", "cf:shoe", "cf:hobby", "cf:size"], "lead");
     const l = await lead(member.id);
     const open = await create(member, form, "lead", l);
     const used = await create(member, form, "lead", l);
@@ -369,14 +372,16 @@ describe("prefill links (BIZ-05)", () => {
       )).rows,
     );
     expect(links).toEqual([
-      { lead_id: null, contact_id: converted.contact_id, fields: ["full_name", "phone", "email", "cf:shoe", "cf:hobby"], submitted: false },
-      { lead_id: null, contact_id: converted.contact_id, fields: ["full_name", "phone", "email", "cf:shoe", "cf:hobby"], submitted: true },
+      { lead_id: null, contact_id: converted.contact_id, fields: ["full_name", "phone", "email", "cf:shoe", "cf:hobby", "cf:size"], submitted: false },
+      { lead_id: null, contact_id: converted.contact_id, fields: ["full_name", "phone", "email", "cf:shoe", "cf:hobby", "cf:size"], submitted: true },
     ]);
-    // the open link shows only the keys the contact has: full_name and the lead-only custom field are left out
+    // the open link shows only the keys the contact has with the same type: full_name, the lead-only custom field and the
+    // shared key of another type are left out, and refused if sent
     const shown = await page(open);
     expect(shown.status).toBe("open");
     expect(shown.fields?.map((f) => f.key)).toEqual(["phone", "email", "cf:shoe"]);
     expect((await submit(open, { full_name: "שם אחר" })).status).toBe("invalid");
+    expect((await submit(open, { "cf:size": 7 })).status).toBe("invalid");
     expect(await submit(open, { "cf:shoe": "42" })).toEqual({ status: "saved", skipped: [] });
     expect((await contactRow(converted.contact_id)).custom_fields).toMatchObject({ shoe: "42" });
     // the sent one still answers "done", now through the contact

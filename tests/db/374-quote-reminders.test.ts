@@ -330,6 +330,17 @@ describe("automatic quote reminders (QUO-18)", () => {
     await asAdmin((q) => q("update app.quote_links set reminders_stopped_at = null where quote_id = $1", [d.quote]));
     await revoke(d.quote);
     expect(await stopped(d.quote)).toBe(true);
+    // review: every revoke is in the log; with no live link the entry carries only the stop
+    const logged = await asAdmin(async (q) =>
+      (await q<{ changes: Record<string, unknown> }>("select changes from public.audit_log where action = 'quote_link' and entity_id = $1 and changes ? 'reminders_stopped' order by created_at", [d.quote])).rows.map((r) => r.changes),
+    );
+    expect(logged).toEqual([{ reminders_stopped: true }]);
+    // the first revoke of c found no live link, the second ended the link the person's message carried
+    expect(
+      await asAdmin(async (q) =>
+        (await q<{ changes: Record<string, unknown> }>("select changes from public.audit_log where action = 'quote_link' and entity_id = $1 and changes ? 'reminders_stopped' order by created_at, id", [c.quote])).rows.map((r) => r.changes),
+      ),
+    ).toEqual([{ reminders_stopped: true }, { link: "revoked", reminders_stopped: true }]);
     // nobody but the server reads or writes the stop
     expect((await pgError(asUser(owner.id, (q) => q("select reminders_stopped_at from app.quote_links")))).code).toBe("42501");
   });

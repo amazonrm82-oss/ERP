@@ -8,7 +8,8 @@
 -- * app.quote_message_refusal (021284's body): a reminder job queued before the revoke is refused at compose time,
 --   'reminders_stopped' (a person's send is never judged by it);
 -- * public.quote_link_revoke (021285's body): stamps reminders_stopped_at = now() (making the row when the quote never had
---   a link), under the same row lock;
+--   a link), under the same row lock, and writes one audit entry `quote_link` every time: {link: revoked,
+--   reminders_stopped: true} when it ended live links, else {reminders_stopped: true};
 -- * the stop ends when a person sends the quote again from the screen (app.quote_message_enqueue, 021283's body, after the
 --   job is queued) or makes a new link from the screen (public.quote_link_create, 021285's body): the stamp is cleared.
 -- A reminder stage whose job was refused this way counts as tried (app.quote_reminders keeps 'queued'), as any refused
@@ -42,9 +43,13 @@ begin
      set token_hash = null, created_at = null, window_started_at = null, window_count = 0
    where l.organization_id = p_org and l.quote_id = p_quote and l.token_hash is not null;
   get diagnostics v_count = row_count;
+  -- review: the stop is always in the log, also when no link was live (the entry then carries only the marker)
   if v_count > 0 then
     insert into public.audit_log (organization_id, actor_id, action, entity_type, entity_id, changes)
-    values (p_org, auth.uid(), 'quote_link', 'quotes', p_quote, jsonb_build_object('link', 'revoked'));
+    values (p_org, auth.uid(), 'quote_link', 'quotes', p_quote, jsonb_build_object('link', 'revoked', 'reminders_stopped', true));
+  else
+    insert into public.audit_log (organization_id, actor_id, action, entity_type, entity_id, changes)
+    values (p_org, auth.uid(), 'quote_link', 'quotes', p_quote, jsonb_build_object('reminders_stopped', true));
   end if;
   return v_count > 0;
 end;

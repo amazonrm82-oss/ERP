@@ -35,6 +35,8 @@ describe("audit log labels (RVW-50 א)", () => {
     expect(auditEntryNote("quote_link", { link: "created" })).toBe("נוצר קישור נוסף ללקוח (הקישורים הקודמים ממשיכים לעבוד)");
     expect(auditEntryNote("quote_link", { link: "created", via: "message", job_id: "x" })).toBe("נשלח ללקוח קישור נוסף בהודעה (הקישורים הקודמים ממשיכים לעבוד)");
     expect(auditEntryNote("quote_link", { link: "revoked" })).toBe("כל הקישורים ללקוח בוטלו");
+    expect(auditEntryNote("quote_link", { link: "revoked", reminders_stopped: true })).toBe("כל הקישורים ללקוח בוטלו, והתזכורות האוטומטיות להצעה נעצרו");
+    expect(auditEntryNote("quote_link", { reminders_stopped: true })).toBe("התזכורות האוטומטיות להצעה נעצרו (לא היה קישור פעיל לבטל)");
     expect(auditEntryNote("order_link", { link: "created" })).toBe("נוצר קישור חדש ללקוח (קישור קודם, אם היה, הפסיק לעבוד)");
     expect(auditEntryNote("order_link", { link: "revoked" })).toBe("הקישור ללקוח בוטל");
     expect(auditEntryNote("order_link", { link: "other" })).toBeNull();
