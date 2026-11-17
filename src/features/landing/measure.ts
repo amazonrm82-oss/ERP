@@ -165,11 +165,12 @@ export function notAVisit(headers: Headers): boolean {
  * cached public.plans_public answer). A coming-soon, hidden or unknown key, or no answer, is ignored silently (null).
  */
 export function availableSignupPlan(
-  plans: readonly { key: string; name: string; availability: string }[] | null,
+  plans: readonly { key: string; name: string; availability: string; priceMonthlyAgorot?: number; priceAnnualAgorot?: number }[] | null,
   raw: unknown,
-): { key: string; name: string } | null {
+): { key: string; name: string; free: boolean } | null {
   const key = signupPlanKey(raw);
   if (!key || !plans) return null;
   const plan = plans.find((p) => p.key === key && p.availability === "available");
-  return plan ? { key: plan.key, name: plan.name } : null;
+  // WEB-02 (402) ב: both prices zero = the business starts active with no trial (the database decides it again at creation)
+  return plan ? { key: plan.key, name: plan.name, free: plan.priceMonthlyAgorot === 0 && plan.priceAnnualAgorot === 0 } : null;
 }

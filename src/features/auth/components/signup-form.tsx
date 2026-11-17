@@ -50,7 +50,7 @@ export function SignupForm({
     <>
       {GOOGLE_ENABLED ? (
         <div className="mb-4 space-y-4">
-          <GoogleButton next={next} />
+          <GoogleButton next={next} landingSource={landingSource} signupPlan={signupPlan} />
           <p className="text-center text-sm text-ink-soft">או עם אימייל וסיסמה</p>
         </div>
       ) : null}

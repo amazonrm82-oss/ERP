@@ -5,11 +5,14 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 
+import { oauthCallbackPath } from "../oauth-signup";
+
 // Shown only once Google sign-in is set up in Supabase (Authentication -> Providers -> Google)
 // and NEXT_PUBLIC_AUTH_GOOGLE=on is set in Vercel.
 export const GOOGLE_ENABLED = process.env.NEXT_PUBLIC_AUTH_GOOGLE === "on";
 
-export function GoogleButton({ next }: { next: string }) {
+// WEB-02 (403) ב: on the sign-up page the price card's plan and the landing source ride in the callback's query
+export function GoogleButton({ next, landingSource = null, signupPlan = null }: { next: string; landingSource?: string | null; signupPlan?: string | null }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   if (!GOOGLE_ENABLED) return null;
@@ -23,7 +26,7 @@ export function GoogleButton({ next }: { next: string }) {
         onClick={async () => {
           setBusy(true);
           setError(null);
-          const callback = `${window.location.origin}/auth/callback${next === "/" ? "" : `?next=${encodeURIComponent(next)}`}`;
+          const callback = `${window.location.origin}${oauthCallbackPath(next, landingSource, signupPlan)}`;
           const { error: oauthError } = await createClient().auth.signInWithOAuth({ provider: "google", options: { redirectTo: callback } });
           if (oauthError) {
             setBusy(false);

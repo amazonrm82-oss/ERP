@@ -1,7 +1,10 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { oauthSignupMetadata } from "@/features/auth/oauth-signup";
+import { LANDING_SOURCE_PARAM, SIGNUP_PLAN_PARAM } from "@/features/landing/measure";
 import { getSupabaseEnv } from "@/lib/env";
+import { serverLog } from "@/lib/log-server";
 import { paths, safeNextPath } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
 
@@ -27,9 +30,11 @@ export async function GET(request: NextRequest) {
   const type = searchParams.get("type");
 
   let succeeded = false;
+  let codeUser: Parameters<typeof oauthSignupMetadata>[1] = null;
   if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     succeeded = !error;
+    codeUser = error ? null : data.user;
   } else if (tokenHash && isOtpType(type)) {
     const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
     succeeded = !error;
@@ -39,6 +44,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(failure);
   }
   const next = safeNextPath(searchParams.get("next"));
+  // WEB-02 (403) ב: Google sign-up from the price list. The plan and the source the button put in this query go into the
+  // person's OWN metadata with their own session, only for a brand-new account, never for an invitation, never over a value
+  // already set; public.create_organization judges them again. A failed write only loses the choice (today's trial).
+  const signupMeta = oauthSignupMetadata(
+    { next, source: searchParams.get(LANDING_SOURCE_PARAM), plan: searchParams.get(SIGNUP_PLAN_PARAM) },
+    codeUser,
+  );
+  if (signupMeta) {
+    const { error: metaError } = await supabase.auth.updateUser({ data: signupMeta });
+    if (metaError) await serverLog("warn", "auth.signup_meta_failed", { code: metaError.code ?? "none", status: String(metaError.status ?? 0) });
+  }
   // a session from a link (USR-10's one-time sign-in link, Google) is aal1 like a password sign-in: when the account has an
   // authenticator the code comes next, as signInAction does (the pages and the database refuse aal1 there anyway)
   // (asked on the same client, which holds the new session; the rule of owesSecondStep() in src/lib/auth.ts)

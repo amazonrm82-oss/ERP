@@ -43,7 +43,9 @@ export default async function SignupPage({ searchParams }: Props) {
         {invited
           ? "יוצרים חשבון אישי, ואחרי אימות האימייל מצטרפים לעסק שהזמין אתכם."
           : plan
-            ? `חבילה ${plan.name}: 14 ימי ניסיון, בלי כרטיס אשראי.`
+            ? plan.free
+              ? `חבילה ${plan.name}: ללא תשלום, בלי כרטיס אשראי.`
+              : `חבילה ${plan.name}: 14 ימי ניסיון, בלי כרטיס אשראי.`
             : "14 ימי ניסיון, בלי כרטיס אשראי."}
       </p>
       <SignupForm next={next} turnstileSiteKey={turnstileSiteKey()} landingSource={landingSource} signupPlan={carriedPlan} />
