@@ -61,10 +61,10 @@ export async function getQuoteMessageSetup(orgId: string, quote: Quote, hasValid
   const email = contact.email?.trim();
   if (email && /^[^@\s]+@[^@\s]+$/.test(email)) options.push({ channel: "email", address: email, templates: pick("email") });
   if (sms && contact.phone_e164?.trim()) options.push({ channel: "sms", address: contact.phone?.trim() || contact.phone_e164, templates: pick("sms") });
-  // the list is a nicety: a failed read shows the dialog without it
-  const queued = queue.error ? [] : queuedQuoteMessages(queue.data);
+  // RVW-114 (FXC-05): a failed read is an error, never an empty history or a missing business phone
+  const queued = queuedQuoteMessages(must(queue, "quote message queue"));
   const names = await getUserNames(queued.map((q) => q.senderId));
-  const orgPhone = org.error ? null : (org.data?.phone ?? null);
+  const orgPhone = must(org, "quote message business phone")?.phone ?? null;
   return {
     options,
     queued: queued.map((q) => ({ ...q, senderName: q.senderId ? (names.get(q.senderId) ?? null) : null })),

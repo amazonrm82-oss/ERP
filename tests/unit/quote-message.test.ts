@@ -100,3 +100,12 @@ describe("automatic quote reminders (QUO-18, owner (381)-(384))", () => {
     expect(quoteReminderSchema.parse({})).toEqual({ quote_customer_reminder: false });
   });
 });
+
+describe("RVW-114: the quote's send dialog never swallows a failed read", () => {
+  it("reads the queue and the business phone through must()", () => {
+    const code = readFileSync(join(process.cwd(), "src", "features", "quote-message", "queries.ts"), "utf8");
+    expect(code).toContain('must(queue, "quote message queue")');
+    expect(code).toContain('must(org, "quote message business phone")');
+    expect(code).not.toMatch(/\.error \?/);
+  });
+});
