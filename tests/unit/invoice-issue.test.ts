@@ -11,7 +11,7 @@ import {
   sourceLineDiscount,
 } from "@/features/invoicing/issue";
 import { createInvoiceIssueHandler, providerRequest } from "@/features/invoicing/issue-handler";
-import { clearFakeInvoices, createFakeInvoiceProvider, fakeIssueCalls, fakeLookupCalls } from "@/features/invoicing/providers/fake";
+import { clearFakeInvoices, createFakeInvoiceProvider, fakeCustomers, fakeCustomerUpserts, fakeIssueCalls, fakeLookupCalls } from "@/features/invoicing/providers/fake";
 import { canIssueDocuments } from "@/features/permissions/keys";
 
 // DOC-07 / DOC-08 / DOC-17: the issue form's rules (the database judges again, migration invoice_issue).
@@ -170,7 +170,8 @@ describe("the invoice.issue job handler (owner (398) א)", () => {
       createInvoiceIssueHandler({
         provider: { ...createFakeInvoiceProvider(), issueDocument: async () => ({ ok: false as const, kind, code: "busy" }) },
         calls: {
-          claim: async () => ({ request_id: "req-1", provider: "fake", request: stored }),
+          // DOC-13: a customer kept with these details, so nothing but the document is asked
+          claim: async () => ({ request_id: "req-1", provider: "fake", request: stored, provider_customer: { id: "fake_customer_x", current: true } }),
           record: async (_j, r) => (results.push(r), { status: kind === "retry" ? "pending" : "failed" }),
         },
       });
@@ -188,6 +189,106 @@ describe("the invoice.issue job handler (owner (398) א)", () => {
     });
     expect(await handler(job)).toMatchObject({ status: "failed", final: true });
     expect(sent).toEqual([{ ok: false, code: "provider_changed", final: true }]);
+  });
+});
+
+describe("DOC-13: the customer at the provider", () => {
+  const stored = {
+    doc_type: "tax_invoice" as const,
+    doc_date: "2026-11-16",
+    due_date: null,
+    locale: "he" as const,
+    send_email: false,
+    customer: { external_ref: "contact:7", name: "דנה לוי", tax_id: null, address: "הרצל 1", email: "d@example.com", is_business: false },
+    lines: [{ description: "x", quantity: 1, unit_price_agorot: 100, discount_agorot: 0, vat_exempt: false }],
+    totals: { net_agorot: 100, vat_agorot: 18, total_agorot: 118, rate_bp: 1800, prices_include_vat: false },
+  };
+  const job = { id: "job-c", lease: "lease-c", kind: "invoice.issue" as const, organization_id: "org-1", payload: { request_id: "req-c" }, attempt: 1 };
+  const spy = () => {
+    const base = createFakeInvoiceProvider();
+    const issuedWith: (string | null | undefined)[] = [];
+    return {
+      issuedWith,
+      provider: {
+        ...base,
+        issueDocument: async (request: Parameters<typeof base.issueDocument>[0]) => (issuedWith.push(request.providerCustomerId), base.issueDocument(request)),
+      },
+    };
+  };
+
+  it("nothing kept: the customer is made with our details first, and its id goes to the document and to the record", async () => {
+    clearFakeInvoices();
+    const { provider, issuedWith } = spy();
+    const sent: Record<string, unknown>[] = [];
+    const handler = createInvoiceIssueHandler({
+      provider,
+      calls: { claim: async () => ({ request_id: "req-c", provider: "fake", request: stored, provider_customer: null }), record: async (_j, r) => (sent.push(r), { status: "issued" }) },
+    });
+    expect(await handler(job)).toEqual({ status: "done" });
+    expect(fakeCustomerUpserts()).toBe(1);
+    const held = fakeCustomers().get("contact:7");
+    expect(held?.customer).toMatchObject({ name: "דנה לוי", address: "הרצל 1", email: "d@example.com" });
+    expect(issuedWith).toEqual([held?.id]);
+    expect(sent[0]).toMatchObject({ ok: true, provider_customer_id: held?.id });
+  });
+
+  it("kept with the same details: no customer call, the kept id is used and nothing new is kept", async () => {
+    clearFakeInvoices();
+    const { provider, issuedWith } = spy();
+    const sent: Record<string, unknown>[] = [];
+    const handler = createInvoiceIssueHandler({
+      provider,
+      calls: {
+        claim: async () => ({ request_id: "req-c", provider: "fake", request: stored, provider_customer: { id: "fake_customer_kept", current: true } }),
+        record: async (_j, r) => (sent.push(r), { status: "issued" }),
+      },
+    });
+    await handler(job);
+    expect(fakeCustomerUpserts()).toBe(0);
+    expect(issuedWith).toEqual(["fake_customer_kept"]);
+    expect(sent[0]).not.toHaveProperty("provider_customer_id");
+  });
+
+  it("kept with other details: our details are sent again (Mexuz wins)", async () => {
+    clearFakeInvoices();
+    const { provider } = spy();
+    const handler = createInvoiceIssueHandler({
+      provider,
+      calls: {
+        claim: async () => ({ request_id: "req-c", provider: "fake", request: stored, provider_customer: { id: "fake_customer_old", current: false } }),
+        record: async () => ({ status: "issued" }),
+      },
+    });
+    await handler(job);
+    expect(fakeCustomerUpserts()).toBe(1);
+    expect(fakeCustomers().get("contact:7")?.customer.name).toBe("דנה לוי");
+  });
+
+  it("the customer call fails: no document is asked; a retryable failure is tried again, a refusal is final", async () => {
+    for (const kind of ["retry", "refused"] as const) {
+      clearFakeInvoices();
+      const sent: Record<string, unknown>[] = [];
+      const handler = createInvoiceIssueHandler({
+        provider: createFakeInvoiceProvider({ failCustomer: () => ({ ok: false, kind, code: "bad_customer" }) }),
+        calls: {
+          claim: async () => ({ request_id: "req-c", provider: "fake", request: stored }),
+          record: async (_j, r) => (sent.push(r), { status: kind === "retry" ? "pending" : "failed" }),
+        },
+      });
+      expect(await handler(job)).toEqual(kind === "retry" ? { status: "failed", error: "provider retry" } : { status: "done" });
+      expect(sent).toEqual([{ ok: false, code: "customer_bad_customer", final: kind !== "retry" }]);
+      expect(fakeIssueCalls()).toBe(0);
+    }
+  });
+
+  it("a late lookup asks nothing about the customer", async () => {
+    clearFakeInvoices();
+    const handler = createInvoiceIssueHandler({
+      provider: createFakeInvoiceProvider(),
+      calls: { claim: async () => ({ request_id: "req-c", provider: "fake", request: stored, late: true }), record: async () => ({ status: "unrecorded" }) },
+    });
+    await handler(job);
+    expect(fakeCustomerUpserts()).toBe(0);
   });
 });
 

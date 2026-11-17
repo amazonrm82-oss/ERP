@@ -15,12 +15,17 @@ type U = { id: string; email: string };
 const REVIEWED_MD5: Record<string, string> = {
   "app.can_issue_documents": "0c0c9283979082f055a3ad3f6dd9bfb2",
   "app.invoice_customer": "ed6e671201d300d02e7c3b2698a950c5",
+  // DOC-13 (migration invoice_provider_customers): the hash of the customer block a request sends
+  "app.invoice_customer_details_hash": "507dba4f9b7ffb23d2de9363fe9ca3ab",
   "app.invoice_issue_late_notice": "3090ce52d01375b74fe5bf366f167d09",
   "app.invoice_issue_mark_stale": "e07b2752013f0150e394ae229b03a566",
   "app.invoice_issue_open": "23c6faeec798694d0fbd551aa9d17a8d",
   "app.invoice_issue_payload_erased": "e96968aa5ab2447b37def9ae07090871",
   "app.invoice_issue_requests_erase": "3b197f71c7ec0490fa4203b05d02d040",
   "app.invoice_issuer_check": "dad7cda653a2bdae7589597f920fa405",
+  // DOC-13: the kept provider customer id, read for the claim and written from the record (ids and a hash only; never raises)
+  "app.invoice_provider_customer_keep": "6a54fb7313d1ce347e33b1577953ccfe",
+  "app.invoice_provider_customer_of": "e2b869a9db1037aa532ea7c94d4c4332",
   "app.invoice_provider_of": "64b18ad8214c63840c0689ad3ad4d3de",
   "app.invoice_provider_usable": "6caf3afd4259a3055e8aa1fd6ab43356",
   "app.invoice_source": "ba98c89124588ce8250c141a9d02bd6a",
@@ -28,7 +33,10 @@ const REVIEWED_MD5: Record<string, string> = {
   "app.job_payload_ok": "7e63dd97ead04e0002f172c5912e6144",
   "app.merge_invoice_issue_requests": "1cd6caad6241cf0e7e225ae508862f6e",
   "public.invoice_issue_begin": "613ffef8dbbadc4447794a7bc92b8446",
-  "public.invoice_issue_claim": "e07a0e1396cfbee899a9d7a3d2fb61f4",
+  // DOC-13 (migration invoice_provider_customers, 17 November 2026): 021297's body, the last return also answers
+  // `provider_customer` (app.invoice_provider_customer_of: the kept id and whether its details are the ones sent now). Was
+  // e07a0e1396cfbee899a9d7a3d2fb61f4; every refusal, the late branch and the lease check are unchanged.
+  "public.invoice_issue_claim": "62e2cfc8d9d4e69f16c5e6692cbfc737",
   "public.invoice_issue_close": "a666cd68ecd81f94257111bc67cb5741",
   // DOC-10 (migration allocation_failure, 17 November 2026): 021297's body plus the provider's allocation outcome (the
   // `allocation` object or the old keys, codes from app.allocation_failure_codes(), 'invalid_number' for a number that is
@@ -37,7 +45,10 @@ const REVIEWED_MD5: Record<string, string> = {
   // re-raise, unchanged; no amount is compared for the allocation. After the review of 5f84845c: an outcome that cannot be
   // read (an unknown status, a missing or non-string number or code, not an object) no longer raises 22023, since the
   // provider already issued the document; it is recorded and marked 'other' (tax invoices only). Nothing else changed.
-  "public.invoice_issue_record": "2107bb86f74cdc70719a4592f647f191",
+  // DOC-13 (migration invoice_provider_customers): 021310's body plus one step after the answer's shape check: a string
+  // `provider_customer_id` is kept through app.invoice_provider_customer_keep (never raises but a deadlock). Was
+  // 2107bb86f74cdc70719a4592f647f191; nothing else changed.
+  "public.invoice_issue_record": "cde0ccba2afe470ad8917b102423684e",
   "public.invoice_issue_requests_open": "a3568e808238728700c48a0fc061a4be",
   "public.invoice_issue_state": "61f1e0d0216e257a93d4b0b5f5cd7ee0",
   "public.invoice_provider_check_recorded": "47a98ea21aa0dcd33f782fe6d1fce73e",
@@ -818,7 +829,8 @@ describe("issuing through the invoice provider", () => {
                                                  ('app', 'job_kinds'), ('public', 'invoice_issue_state'),
                                                  ('public', 'invoice_issue_requests_open'), ('public', 'invoice_provider_connect'),
                                                  ('public', 'invoice_provider_disconnect'), ('public', 'invoice_provider_check_recorded'),
-                                                 ('app', 'can_issue_documents'))
+                                                 ('app', 'can_issue_documents'), ('app', 'invoice_provider_customer_of'),
+                                                 ('app', 'invoice_provider_customer_keep'), ('app', 'invoice_customer_details_hash'))
                 order by 1`,
             )
           ).rows,
@@ -1039,6 +1051,85 @@ describe("issuing through the invoice provider", () => {
       for (const u of [owner, issuer]) {
         expect((await pgError(run(u, (q) => q("select 1 from app.invoice_issue_requests")))).code).toBe("42501");
       }
+    });
+  });
+
+  // DOC-13 (migration invoice_provider_customers): the provider's customer id is kept per business, provider and customer,
+  // with the hash of the details it was made with; the claim says whether it is still current
+  describe("the customer at the provider (DOC-13)", () => {
+    const kept = (contact: string) =>
+      asAdmin((q) => q<Record<string, unknown>>("select provider, provider_customer_id, details_sha256 from app.invoice_provider_customers where organization_id = $1 and contact_id = $2", [org, contact]).then((r) => r.rows));
+    const claimOnly = async (request: string) => {
+      const job = await claimJob(request);
+      const claim = await claimOf(job);
+      return { job, claim };
+    };
+
+    it("nothing kept: the claim answers none; the id the worker got is kept, and the next claim reuses it while the details are the same", async () => {
+      const first = await begin(issuer, randomUUID(), "contact", person);
+      const a = await claimOnly(first.request_id as string);
+      expect(a.claim.provider_customer ?? null).toBeNull();
+      const done = await record(a.job, { ok: true, ...result(), provider_customer_id: "fake_customer_abc" });
+      expect(done.status).toBe("issued");
+      await asService((q) => q("select public.finish_job($1, $2, true)", [a.job.id, a.job.lease]));
+      expect(await kept(person)).toEqual([expect.objectContaining({ provider: "fake", provider_customer_id: "fake_customer_abc" })]);
+
+      const second = await begin(issuer, randomUUID(), "contact", person, doc({ doc_type: "receipt" }));
+      const b = await claimOnly(second.request_id as string);
+      expect(b.claim.provider_customer).toEqual({ id: "fake_customer_abc", current: true });
+      await record(b.job, { ok: true, ...result() });
+      await asService((q) => q("select public.finish_job($1, $2, true)", [b.job.id, b.job.lease]));
+      expect(await kept(person)).toHaveLength(1);
+
+      // our details changed: still the same id, but not current, so the worker sends them again
+      await run(owner, (q) => q("update public.contacts set email = 'dana.new@example.com' where id = $1", [person]));
+      const third = await begin(issuer, randomUUID(), "contact", person, doc({ doc_type: "proforma" }));
+      const c = await claimOnly(third.request_id as string);
+      expect(c.claim.provider_customer).toEqual({ id: "fake_customer_abc", current: false });
+      // a failed document still keeps the customer the provider made or updated
+      expect((await record(c.job, { ok: false, code: "bad", final: true, provider_customer_id: "fake_customer_abc" })).status).toBe("failed");
+      await asService((q) => q("select public.finish_job($1, $2, true)", [c.job.id, c.job.lease]));
+      const after = await kept(person);
+      expect(after).toHaveLength(1);
+      const fourth = await begin(issuer, randomUUID(), "contact", person, doc({ doc_type: "receipt" }));
+      const d = await claimOnly(fourth.request_id as string);
+      expect(d.claim.provider_customer).toEqual({ id: "fake_customer_abc", current: true });
+      await record(d.job, { ok: false, code: "bad", final: true });
+      await asService((q) => q("select public.finish_job($1, $2, true)", [d.job.id, d.job.lease]));
+    });
+
+    it("a company customer is kept by the company; an id that is not a provider code is not kept", async () => {
+      await run(owner, (q) => q("update public.companies set tax_id = '514713288', address_line = 'הברזל 3', city = 'תל אביב' where id = $1", [company]));
+      const r = await begin(owner, randomUUID(), "deal", companyDeal);
+      const job = await claimJob(r.request_id as string);
+      await claimOf(job);
+      await record(job, { ok: false, code: "x", final: false, provider_customer_id: "bad id with spaces" });
+      expect(await asAdmin((q) => count(q, "select 1 from app.invoice_provider_customers where organization_id = $1 and company_id = $2", [org, company]))).toBe(0);
+      await record(job, { ok: true, ...result(), provider_customer_id: "fake_customer_co" });
+      await asService((q) => q("select public.finish_job($1, $2, true)", [job.id, job.lease]));
+      // the customer of a deal with a company is its contact first (app.invoice_customer: contact:<id>)
+      const ref = (r.request as { customer: { external_ref: string } }).customer.external_ref;
+      const [kind, id] = ref.split(":");
+      expect(await asAdmin((q) => count(q, `select 1 from app.invoice_provider_customers where organization_id = $1 and ${kind}_id = $2 and provider_customer_id = 'fake_customer_co'`, [org, id]))).toBe(1);
+    });
+
+    it("no person reads or writes the kept ids", async () => {
+      for (const u of [owner, admin, issuer]) {
+        expect((await pgError(run(u, (q) => q("select 1 from app.invoice_provider_customers")))).code).toBe("42501");
+      }
+      expect((await pgError(asService((q) => q("select 1 from app.invoice_provider_customers")))).code).toBe("42501");
+    });
+
+    it("the kept id goes with its contact when the contact is purged", async () => {
+      const temp = await run(owner, async (q) => (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'זמני', $2) returning id", [org, owner.id])).id);
+      const r = await begin(issuer, randomUUID(), "contact", temp, doc({ doc_type: "receipt" }));
+      const job = await claimJob(r.request_id as string);
+      await claimOf(job);
+      await record(job, { ok: false, code: "x", final: true, provider_customer_id: "fake_customer_tmp" });
+      await asService((q) => q("select public.finish_job($1, $2, true)", [job.id, job.lease]));
+      expect(await kept(temp)).toHaveLength(1);
+      await asAdmin((q) => q("delete from public.contacts where id = $1", [temp]));
+      expect(await asAdmin((q) => count(q, "select 1 from app.invoice_provider_customers where provider_customer_id = 'fake_customer_tmp'"))).toBe(0);
     });
   });
 });

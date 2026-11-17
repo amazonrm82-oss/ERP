@@ -39,7 +39,14 @@ export const requestSchema = z.object({
 
 const claimSchema = z.union([
   z.object({ refused: z.string().regex(/^[a-z_:]{1,40}$/) }).passthrough(),
-  z.object({ request_id: z.string(), provider: z.string(), request: requestSchema, late: z.boolean().optional() }),
+  z.object({
+    request_id: z.string(),
+    provider: z.string(),
+    request: requestSchema,
+    late: z.boolean().optional(),
+    // DOC-13: the provider's customer id kept for this customer, and whether it was made with the details sent now
+    provider_customer: z.object({ id: z.string(), current: z.boolean() }).nullable().optional(),
+  }),
 ]);
 
 const recordSchema = z.object({ status: z.enum(["issued", "unrecorded", "failed", "pending", "stale"]) }).passthrough();
@@ -111,17 +118,50 @@ export function createInvoiceIssueHandler(deps: { calls: InvoiceIssueCalls; prov
     // a request closed or marked stale after an earlier try: LOOKUP ONLY, never a new issue (the same key finds what an
     // earlier try may have made; not found = nothing reached the provider, the closed request stays final)
     const late = answer.late === true;
+    const timeoutMs = deps.timeoutMs ?? PROVIDER_TIMEOUT_MS;
+
+    // DOC-13: the customer at the provider, made or updated with OUR details whenever nothing is kept for them or the kept id
+    // was made with other details (Mexuz is the source); the id it answers is kept by the record, also when the document
+    // then fails. A lookup (late) asks nothing about the customer.
+    let providerCustomerId: string | null = null;
+    let customerKept: string | null = null;
+    if (!late) {
+      const kept = answer.provider_customer ?? null;
+      if (kept && kept.current) {
+        providerCustomerId = kept.id;
+      } else {
+        const request = providerRequest(answer.request_id, answer.request);
+        let upserted: Awaited<ReturnType<InvoiceProvider["upsertCustomer"]>> | "timeout" | "unreachable";
+        try {
+          upserted = await withTimeout(deps.provider.upsertCustomer(request.customer), timeoutMs);
+        } catch {
+          upserted = "unreachable";
+        }
+        if (upserted === "timeout" || upserted === "unreachable" || !upserted.ok) {
+          // nothing was issued in this try; the record's rules decide as for any provider failure (the queue tries again on
+          // a retryable one, with the same key)
+          const failure =
+            upserted === "timeout" || upserted === "unreachable"
+              ? { ok: false, code: `customer_${upserted}`, final: false }
+              : { ok: false, code: `customer_${upserted.code}`.slice(0, 64), final: upserted.kind !== "retry" };
+          return finish(await deps.calls.record(job, failure));
+        }
+        providerCustomerId = upserted.providerCustomerId;
+        customerKept = upserted.providerCustomerId;
+      }
+    }
+
     const call = late
       ? deps.provider.findDocument(answer.request_id)
-      : deps.provider.issueDocument(providerRequest(answer.request_id, answer.request));
+      : deps.provider.issueDocument({ ...providerRequest(answer.request_id, answer.request), providerCustomerId });
     let issued: Awaited<ReturnType<InvoiceProvider["issueDocument"]>> | "timeout" | "unreachable";
     try {
-      issued = await withTimeout(call, deps.timeoutMs ?? PROVIDER_TIMEOUT_MS);
+      issued = await withTimeout(call, timeoutMs);
     } catch {
       // the adapter threw (no connection): nothing is known to have happened, as after a timeout; told apart in the code only
       issued = "unreachable";
     }
-    const result: Record<string, unknown> =
+    const answered: Record<string, unknown> =
       issued === "timeout" || issued === "unreachable"
         ? { ok: false, code: issued, final: false }
         : issued.ok
@@ -135,12 +175,18 @@ export function createInvoiceIssueHandler(deps: { calls: InvoiceIssueCalls; prov
           : late && issued.code === "not_found"
             ? { ok: false, code: "not_at_provider", final: true }
             : { ok: false, code: issued.code, final: issued.kind !== "retry" };
-    const recorded = recordSchema.safeParse(await deps.calls.record(job, result));
-    if (!recorded.success) return { status: "failed", error: "record answered an unexpected shape" };
-    const status = recorded.data.status;
-    if (status === "stale") return { status: "failed", error: "stale lease" };
-    // nothing is known to have happened at the provider: the queue tries again with the same key
-    if (status === "pending") return { status: "failed", error: "provider retry" };
-    return { status: "done" };
+    const result = customerKept === null ? answered : { ...answered, provider_customer_id: customerKept };
+    return finish(await deps.calls.record(job, result));
   };
+}
+
+/** The job's outcome from the record's answer. */
+function finish(answer: unknown): Awaited<ReturnType<JobHandler>> {
+  const recorded = recordSchema.safeParse(answer);
+  if (!recorded.success) return { status: "failed", error: "record answered an unexpected shape" };
+  const status = recorded.data.status;
+  if (status === "stale") return { status: "failed", error: "stale lease" };
+  // nothing is known to have happened at the provider: the queue tries again with the same key
+  if (status === "pending") return { status: "failed", error: "provider retry" };
+  return { status: "done" };
 }

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import type { AllocationFailureCode, AllocationOutcome, CreditRequest, InvoiceProvider, IssueRequest, ProviderDocument, ProviderFailure } from "./types";
+import type { AllocationFailureCode, AllocationOutcome, CreditRequest, InvoiceCustomer, InvoiceProvider, IssueRequest, ProviderDocument, ProviderFailure } from "./types";
 
 /**
  * DOC-06: the fake invoice provider (owner (270) (1) א: build behind a fake provider, hidden on the live site until a real
@@ -16,6 +16,8 @@ export const FAKE_PROVIDER = "fake";
 type FakeOptions = {
   /** Tests: answer a failure instead of issuing (nothing is kept) */
   fail?: (request: IssueRequest | CreditRequest) => ProviderFailure | null;
+  /** Tests (DOC-13): answer a failure instead of making or updating the customer */
+  failCustomer?: (customer: InvoiceCustomer) => ProviderFailure | null;
   /** Tests (DOC-10): the allocation number is refused on this request, with this code */
   allocationFailure?: (request: IssueRequest) => AllocationFailureCode | null;
   /** Tests (DOC-10): the provider says this request needs no allocation number (it judged the threshold) */
@@ -26,6 +28,8 @@ const issued = new Map<string, ProviderDocument>();
 const byId = new Map<string, ProviderDocument>();
 let calls = 0;
 let lookups = 0;
+let upserts = 0;
+const customers = new Map<string, { id: string; customer: InvoiceCustomer }>();
 
 const digest = (key: string) => createHash("sha256").update(`fake-invoice:${key}`, "utf8").digest("hex");
 /** 9 digits that never start with 0 */
@@ -46,11 +50,23 @@ export function fakeLookupCalls(): number {
   return lookups;
 }
 
+/** Tests (DOC-13): the customers the fake holds, by our ref, with the details it was last sent */
+export function fakeCustomers(): ReadonlyMap<string, { id: string; customer: InvoiceCustomer }> {
+  return customers;
+}
+
+/** Tests (DOC-13): how many times upsertCustomer reached the fake */
+export function fakeCustomerUpserts(): number {
+  return upserts;
+}
+
 export function clearFakeInvoices(): void {
   issued.clear();
   byId.clear();
+  customers.clear();
   calls = 0;
   lookups = 0;
+  upserts = 0;
 }
 
 function keep(key: string, document: ProviderDocument): ProviderDocument {
@@ -66,7 +82,13 @@ export function createFakeInvoiceProvider(options: FakeOptions = {}): InvoicePro
       return { ok: true };
     },
     async upsertCustomer(customer) {
-      return { ok: true, providerCustomerId: `fake_customer_${digest(customer.externalRef).slice(0, 16)}` };
+      upserts += 1;
+      const failure = options.failCustomer?.(customer);
+      if (failure) return failure;
+      // one customer per ref; our details replace what the fake held (Mexuz is the source)
+      const id = `fake_customer_${digest(customer.externalRef).slice(0, 16)}`;
+      customers.set(customer.externalRef, { id, customer: { ...customer } });
+      return { ok: true, providerCustomerId: id };
     },
     async issueDocument(request) {
       calls += 1;
@@ -113,7 +135,10 @@ export function createFakeInvoiceProvider(options: FakeOptions = {}): InvoicePro
       if (failure) return failure;
       const known = issued.get(request.idempotencyKey);
       if (known) return { ok: true, document: known };
-      if (!byId.has(request.originalProviderDocumentId)) return { ok: false, kind: "refused", code: "original_not_found" };
+      // an original this process made, or one of the fake's own ids (made before a restart: the fake keeps no store)
+      if (!byId.has(request.originalProviderDocumentId) && !/^fake_doc_[0-9a-f]{24}$/.test(request.originalProviderDocumentId)) {
+        return { ok: false, kind: "refused", code: "original_not_found" };
+      }
       const hex = digest(request.idempotencyKey);
       return {
         ok: true,

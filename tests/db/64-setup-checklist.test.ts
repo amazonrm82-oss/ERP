@@ -933,6 +933,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_prefill_links_convert.sql",
       // DOC-10 redefines public.invoice_issue_record() of _invoice_issue.sql last (the allocation outcome)
       "_allocation_failure.sql",
+      // DOC-13 redefines public.invoice_issue_claim() and public.invoice_issue_record() of _allocation_failure.sql last
+      "_invoice_provider_customers.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

@@ -55,6 +55,11 @@ export type IssueRequest = {
   /** The provider emails the document to the customer (DOC-05 default, DOC-15). */
   sendEmail: boolean;
   customer: InvoiceCustomer;
+  /**
+   * DOC-13: the customer's id at the provider, from an earlier upsertCustomer made with these same details; null = the
+   * provider finds the customer by `customer.externalRef` (the worker upserts first whenever the details changed).
+   */
+  providerCustomerId?: string | null;
   lines: InvoiceLine[];
   totals: InvoiceTotals;
 };
