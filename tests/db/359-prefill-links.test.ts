@@ -338,7 +338,7 @@ describe("prefill links (BIZ-05)", () => {
     expect(await to(lone)).toEqual([admin.id]);
   });
 
-  it("leads: a lead link; a converted lead answers not found", async () => {
+  it("leads: a lead link; a lead marked converted without a contact answers not found", async () => {
     const form = await template(admin, ["full_name", "company_name"], "lead");
     const l = await lead(member.id);
     const token = await create(member, form, "lead", l);
@@ -350,6 +350,65 @@ describe("prefill links (BIZ-05)", () => {
     await asAdmin((q) => q("update public.leads set converted_at = now() where id = $1", [l2]));
     expect((await pgError(page(t2))).code).toBe("P0002");
     expect((await pgError(create(member, form, "lead", l2))).hint).toBe("prefill_link:record");
+  });
+
+  it("owner (401) א: a converted lead's links move to its new contact and keep working, judged by the contact's fields", async () => {
+    await field("shoe", "text", {}, org, "lead");
+    await field("shoe", "text", {}, org, "contact");
+    await field("hobby", "text", {}, org, "lead");
+    const form = await template(admin, ["full_name", "phone", "email", "cf:shoe", "cf:hobby"], "lead");
+    const l = await lead(member.id);
+    const open = await create(member, form, "lead", l);
+    const used = await create(member, form, "lead", l);
+    expect(await submit(used, { email: "first@example.test" })).toMatchObject({ status: "saved" });
+    const converted = await asUser(member.id, async (q) => (await one<{ r: { contact_id: string } }>(q, "select public.convert_lead($1) as r", [l])).r);
+    const links = await asAdmin(async (q) =>
+      (await q<{ lead_id: string | null; contact_id: string | null; fields: string[]; submitted: boolean }>(
+        "select lead_id, contact_id, fields, submitted_at is not null as submitted from app.prefill_links where token_hash = any($1) order by submitted_at nulls first",
+        [[sha256(open), sha256(used)]],
+      )).rows,
+    );
+    expect(links).toEqual([
+      { lead_id: null, contact_id: converted.contact_id, fields: ["full_name", "phone", "email", "cf:shoe", "cf:hobby"], submitted: false },
+      { lead_id: null, contact_id: converted.contact_id, fields: ["full_name", "phone", "email", "cf:shoe", "cf:hobby"], submitted: true },
+    ]);
+    // the open link shows only the keys the contact has: full_name and the lead-only custom field are left out
+    const shown = await page(open);
+    expect(shown.status).toBe("open");
+    expect(shown.fields?.map((f) => f.key)).toEqual(["phone", "email", "cf:shoe"]);
+    expect((await submit(open, { full_name: "שם אחר" })).status).toBe("invalid");
+    expect(await submit(open, { "cf:shoe": "42" })).toEqual({ status: "saved", skipped: [] });
+    expect((await contactRow(converted.contact_id)).custom_fields).toMatchObject({ shoe: "42" });
+    // the sent one still answers "done", now through the contact
+    expect(await page(used)).toMatchObject({ status: "done" });
+    // the contact's card lists them
+    const listed = await asUser(member.id, async (q) =>
+      (await one<{ r: unknown[] }>(q, "select public.prefill_links_for_record($1, 'contact', $2) as r", [org, converted.contact_id])).r,
+    );
+    expect(listed.length).toBe(2);
+  });
+
+  it("owner (401) א: a lead merge moves the duplicate's links to the kept lead, and on to its contact when it is converted", async () => {
+    const form = await template(admin, ["phone"], "lead");
+    const where = (token: string) =>
+      asAdmin(async (q) => one<{ lead_id: string | null; contact_id: string | null }>(q, "select lead_id, contact_id from app.prefill_links where token_hash = $1", [sha256(token)]));
+    const merge = (keep: string, dup: string) => asUser(owner.id, (q) => q("select public.merge_records($1, 'lead', $2, $3, '{}')", [org, keep, dup]));
+
+    const keepA = await lead(member.id);
+    const dupA = await lead(member.id);
+    const tokenA = await create(member, form, "lead", dupA);
+    await merge(keepA, dupA);
+    expect(await where(tokenA)).toEqual({ lead_id: keepA, contact_id: null });
+    expect((await page(tokenA)).status).toBe("open");
+
+    const keepB = await lead(member.id);
+    const dupB = await lead(member.id);
+    const tokenB = await create(member, form, "lead", dupB);
+    const contactB = await contact(member.id);
+    await asAdmin((q) => q("update public.leads set converted_at = now(), converted_contact_id = $2 where id = $1", [keepB, contactB]));
+    await merge(keepB, dupB);
+    expect(await where(tokenB)).toEqual({ lead_id: null, contact_id: contactB });
+    expect((await page(tokenB)).status).toBe("open");
   });
 
   it("limits: 60 per sender and 120 per link in 10 minutes, 10 submissions per link", async () => {

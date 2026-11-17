@@ -213,6 +213,8 @@ const RERUN = [
   migrationFile("_org_deletion_messages_wait.sql"),
   // owner (400) א redefines the quote link and reminder functions last (a revoke stops the reminders)
   migrationFile("_quote_revoke_stops_reminders.sql"),
+  // owner (401) א redefines app.merge_prefill_links() last (a converted lead's links move)
+  migrationFile("_prefill_links_convert.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its
