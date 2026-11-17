@@ -1,8 +1,9 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { oauthSignupMetadata } from "@/features/auth/oauth-signup";
+import { oauthSignupCountedSource, oauthSignupMetadata } from "@/features/auth/oauth-signup";
 import { LANDING_SOURCE_PARAM, SIGNUP_PLAN_PARAM } from "@/features/landing/measure";
+import { recordLandingEvent } from "@/features/landing/measure-server";
 import { getSupabaseEnv } from "@/lib/env";
 import { serverLog } from "@/lib/log-server";
 import { paths, safeNextPath } from "@/lib/paths";
@@ -55,6 +56,10 @@ export async function GET(request: NextRequest) {
     const { error: metaError } = await supabase.auth.updateUser({ data: signupMeta });
     if (metaError) await serverLog("warn", "auth.signup_meta_failed", { code: metaError.code ?? "none", status: String(metaError.status ?? 0) });
   }
+  // WEB-02 (405) א: a Google sign-up from the landing page is counted as an LND-14 "signup", by the email action's rule
+  // (a brand-new account carrying the source, never an invitation); counting never throws or changes the answer
+  const countedSource = oauthSignupCountedSource({ next, source: searchParams.get(LANDING_SOURCE_PARAM) }, codeUser);
+  if (countedSource) await recordLandingEvent("signup", countedSource, request.headers);
   // a session from a link (USR-10's one-time sign-in link, Google) is aal1 like a password sign-in: when the account has an
   // authenticator the code comes next, as signInAction does (the pages and the database refuse aal1 there anyway)
   // (asked on the same client, which holds the new session; the rule of owesSecondStep() in src/lib/auth.ts)

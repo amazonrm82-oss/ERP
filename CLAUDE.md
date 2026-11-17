@@ -339,7 +339,8 @@ and build this CRM here instead. The old code is preserved on the branch
   per-day advisory lock, then other; direct and other never held) from the page `/` (inside `after()`), the redirect link
   `GET /go/signup` (counts, then 303 to `/signup?src=…`; exact public path in proxy.ts, OPS-02 list, disallowed in robots.txt, links
   `rel="nofollow"`) and the sign-up action, only for an account Auth made within the last minute with an identity
-  (`isNewSignupAccount`), for a visitor carrying the source (never an invitation, never Google sign-in). Daily counters only in
+  (`isNewSignupAccount`), for a visitor carrying the source (never an invitation), and since owner (405) א the Google sign-up's
+  `/auth/callback` by the same rule (`oauthSignupCountedSource`). Daily counters only in
   `app.landing_event_days` (no grants, never a row per visitor); per sender and kind 30/10/5 in 10 minutes (keyed IP hash scope
   `landing` of `publicSenderAddress()`, only one of 4,096 bucket numbers in `app.landing_event_counts`), then silently not counted; no
   hash = not counted. Router prefetches, Purpose/Sec-Purpose prefetch, preview bots, a closed list of crawlers, uptime monitors and
@@ -3574,7 +3575,8 @@ that back.
   subscription 'active', no `trial_ends_at` (so BIL-08 never covers it). The Google button carries `src`/`plan` in the OAuth
   callback query (`oauthCallbackPath`, `src/features/auth/oauth-signup.ts`); `/auth/callback` writes them into the person's own
   metadata with their own session only for a new account (`isNewSignupAccount`), never for an invitation and never over an existing
-  key (`oauthSignupMetadata`). Google sign-up is still not counted by LND-14 (question 405). Accepted (review): `v_owned` is read
+  key (`oauthSignupMetadata`), and counts it as an LND-14 "signup" by the action's rule (owner (405) א). The zero-price sign-up line
+  "חבילה X: ללא תשלום, בלי כרטיס אשראי." stays (406 א); the terms' "14 trial days" goes to the lawyer (407 א). Accepted (review): `v_owned` is read
   without a lock, so two simultaneous first calls can both honour the plan.
 - Column grants (RVW-12, 0073): `contacts`, like `leads` (0038) and `tasks` (0063), has column-level INSERT/UPDATE
   grants; a new column on any of them needs `grant insert, update (col) ... to authenticated`. `last_contacted_at` /

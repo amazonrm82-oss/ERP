@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { availableSignupPlan, signupHrefWithPlan, signupHrefWithSource, signupPlanKey } from "@/features/landing/measure";
-import { oauthCallbackPath, oauthSignupMetadata } from "@/features/auth/oauth-signup";
+import { oauthCallbackPath, oauthSignupCountedSource, oauthSignupMetadata } from "@/features/auth/oauth-signup";
 import { parseSignupOrigin, signupPlanText, signupSourceText } from "@/features/platform/signup-origin";
 
 // WEB-02: the price card's plan travels /go/signup -> /signup -> the sign-up form -> the person's own Auth metadata.
@@ -109,6 +109,18 @@ describe("Google sign-up carries the plan and the source (WEB-02, (403) ב)", ()
     expect(oauthSignupMetadata({ next: "/", source: null, plan: null }, fresh, now)).toBeNull();
     expect(oauthSignupMetadata(params, { ...fresh, user_metadata: { signup_plan: "pro" } }, now)).toEqual({ signup_source: "facebook" });
     expect(oauthSignupMetadata(params, { ...fresh, user_metadata: { signup_plan: "pro", signup_source: "x" } }, now)).toBeNull();
+  });
+
+  it("counts a Google sign-up as an LND-14 signup only for a new account with a source, never an invitation ((405) א)", () => {
+    expect(oauthSignupCountedSource({ next: "/", source: "facebook" }, fresh, now)).toBe("facebook");
+    expect(oauthSignupCountedSource({ next: "/", source: "direct" }, fresh, now)).toBe("direct");
+    expect(oauthSignupCountedSource({ next: "/", source: null }, fresh, now)).toBeNull();
+    expect(oauthSignupCountedSource({ next: "/", source: "Bad Source" }, fresh, now)).toBeNull();
+    expect(oauthSignupCountedSource({ next: "/invite/abc", source: "facebook" }, fresh, now)).toBeNull();
+    expect(oauthSignupCountedSource({ next: "/", source: "facebook" }, { ...fresh, created_at: "2026-11-01T00:00:00Z" }, now)).toBeNull();
+    expect(oauthSignupCountedSource({ next: "/", source: "facebook" }, null, now)).toBeNull();
+    const route = readFileSync("src/app/auth/callback/route.ts", "utf8");
+    expect(route).toMatch(/if \(countedSource\) await recordLandingEvent\("signup", countedSource, request\.headers\)/);
   });
 
   it("the callback writes with the person's own session and never a cookie; the button passes the query", () => {

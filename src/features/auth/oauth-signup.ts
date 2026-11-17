@@ -53,3 +53,17 @@ export function oauthSignupMetadata(
   if (src && !(SIGNUP_META_SOURCE in meta)) data[SIGNUP_META_SOURCE] = src;
   return Object.keys(data).length > 0 ? data : null;
 }
+
+/**
+ * WEB-02 answer (405) א: the folded landing source a Google sign-up is counted under as an LND-14 "signup", or null for no
+ * count. The same rule as the email sign-up action: a brand-new account (isNewSignupAccount) carrying a well-formed source,
+ * never an invitation.
+ */
+export function oauthSignupCountedSource(
+  params: { next: string; source: string | null },
+  user: CallbackUser,
+  now: Date = new Date(),
+): string | null {
+  if (isInvitation(params.next) || !user || !isNewSignupAccount(user, now)) return null;
+  return carriedSource(params.source);
+}
