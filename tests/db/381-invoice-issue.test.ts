@@ -13,14 +13,22 @@ type U = { id: string; email: string };
 // recorded once with the provider's id.
 
 const REVIEWED_MD5: Record<string, string> = {
+  // DOC-14 (migration invoice_credit, 17 November 2026): who credits (owners, admins, the `issue_credits` grant), what is
+  // left of an original under its lock, and the credit request on DOC-07's path (the same job kind, ids only in the queue)
+  "app.can_issue_credits": "8b90bf6b4eabb74269b2438e4de4957b",
   "app.can_issue_documents": "0c0c9283979082f055a3ad3f6dd9bfb2",
+  "app.invoice_credit_check": "99ca3d8cdab23c0ec8804b35c5c21255",
+  "app.invoice_credit_open": "30dbdb567034fbe57f36883552038771",
+  "app.invoice_credit_room_of": "29da47b25ec0a8b536d64b6eb81792c0",
   "app.invoice_customer": "ed6e671201d300d02e7c3b2698a950c5",
   // DOC-13 (migration invoice_provider_customers): the hash of the customer block a request sends
   "app.invoice_customer_details_hash": "507dba4f9b7ffb23d2de9363fe9ca3ab",
   "app.invoice_issue_late_notice": "3090ce52d01375b74fe5bf366f167d09",
   "app.invoice_issue_mark_stale": "e07b2752013f0150e394ae229b03a566",
   "app.invoice_issue_open": "23c6faeec798694d0fbd551aa9d17a8d",
-  "app.invoice_issue_payload_erased": "e96968aa5ab2447b37def9ae07090871",
+  // DOC-14: 021297's body, plus a credit's `reason` emptied ("הסיבה נמחקה (מחיקת פרטיות)"). Was
+  // e96968aa5ab2447b37def9ae07090871; the customer block and the line texts as before.
+  "app.invoice_issue_payload_erased": "761192b039364ceeb9e5f43e1dd2f8aa",
   "app.invoice_issue_requests_erase": "3b197f71c7ec0490fa4203b05d02d040",
   "app.invoice_issuer_check": "dad7cda653a2bdae7589597f920fa405",
   // DOC-13: the kept provider customer id, read for the claim and written from the record (ids and a hash only; never raises)
@@ -32,11 +40,16 @@ const REVIEWED_MD5: Record<string, string> = {
   "app.job_kinds": "c14758df00a669161454c6cb830bb315",
   "app.job_payload_ok": "7e63dd97ead04e0002f172c5912e6144",
   "app.merge_invoice_issue_requests": "1cd6caad6241cf0e7e225ae508862f6e",
+  "public.invoice_credit_begin": "b078292f9cd4aac6ec416ee597fe0d7e",
+  "public.invoice_credit_room": "076ecc3dec87cf5571b7d6e89fad3e8f",
   "public.invoice_issue_begin": "613ffef8dbbadc4447794a7bc92b8446",
   // DOC-13 (migration invoice_provider_customers, 17 November 2026): 021297's body, the last return also answers
   // `provider_customer` (app.invoice_provider_customer_of: the kept id and whether its details are the ones sent now). Was
   // e07a0e1396cfbee899a9d7a3d2fb61f4; every refusal, the late branch and the lease check are unchanged.
-  "public.invoice_issue_claim": "62e2cfc8d9d4e69f16c5e6692cbfc737",
+  // "public.invoice_issue_claim": "62e2cfc8d9d4e69f16c5e6692cbfc737" (DOC-13), then DOC-14 (migration invoice_credit): one
+  // more refusal before the provider checks: a credit whose original is no longer an active tax invoice of the request's
+  // provider with the stored provider id (invoice_credit:original). Nothing else changed.
+  "public.invoice_issue_claim": "26a83db611a347f5e529ad93b99511bc",
   "public.invoice_issue_close": "a666cd68ecd81f94257111bc67cb5741",
   // DOC-10 (migration allocation_failure, 17 November 2026): 021297's body plus the provider's allocation outcome (the
   // `allocation` object or the old keys, codes from app.allocation_failure_codes(), 'invalid_number' for a number that is
@@ -48,7 +61,10 @@ const REVIEWED_MD5: Record<string, string> = {
   // DOC-13 (migration invoice_provider_customers): 021310's body plus one step after the answer's shape check: a string
   // `provider_customer_id` is kept through app.invoice_provider_customer_keep (never raises but a deadlock). Was
   // 2107bb86f74cdc70719a4592f647f191; nothing else changed.
-  "public.invoice_issue_record": "cde0ccba2afe470ad8917b102423684e",
+  // "public.invoice_issue_record": "cde0ccba2afe470ad8917b102423684e" (DOC-13), then DOC-14 (migration invoice_credit): the
+  // insert also names original_document_id, for a credit invoice only (from the stored request; DOC-02's trigger judges it
+  // again). Nothing else changed.
+  "public.invoice_issue_record": "86da6343a1b9648268a1a06664f44cc7",
   "public.invoice_issue_requests_open": "a3568e808238728700c48a0fc061a4be",
   "public.invoice_issue_state": "61f1e0d0216e257a93d4b0b5f5cd7ee0",
   "public.invoice_provider_check_recorded": "47a98ea21aa0dcd33f782fe6d1fce73e",
@@ -830,7 +846,10 @@ describe("issuing through the invoice provider", () => {
                                                  ('public', 'invoice_issue_requests_open'), ('public', 'invoice_provider_connect'),
                                                  ('public', 'invoice_provider_disconnect'), ('public', 'invoice_provider_check_recorded'),
                                                  ('app', 'can_issue_documents'), ('app', 'invoice_provider_customer_of'),
-                                                 ('app', 'invoice_provider_customer_keep'), ('app', 'invoice_customer_details_hash'))
+                                                 ('app', 'invoice_provider_customer_keep'), ('app', 'invoice_customer_details_hash'),
+                                                 ('app', 'can_issue_credits'), ('app', 'invoice_credit_check'),
+                                                 ('app', 'invoice_credit_room_of'), ('app', 'invoice_credit_open'),
+                                                 ('public', 'invoice_credit_begin'), ('public', 'invoice_credit_room'))
                 order by 1`,
             )
           ).rows,
@@ -1130,6 +1149,143 @@ describe("issuing through the invoice provider", () => {
       expect(await kept(temp)).toHaveLength(1);
       await asAdmin((q) => q("delete from public.contacts where id = $1", [temp]));
       expect(await asAdmin((q) => count(q, "select 1 from app.invoice_provider_customers where provider_customer_id = 'fake_customer_tmp'"))).toBe(0);
+    });
+  });
+
+  // DOC-14 (migration invoice_credit): a credit invoice through the provider, full or partial, only for owners, admins and
+  // the `issue_credits` grant, always with a reason, never more than what is left; the same request path as DOC-07
+  describe("credit invoices (DOC-14)", () => {
+    let creditor: U;
+    const creditBegin = (u: U, documentId: string, credit: Record<string, unknown>, key = randomUUID()) =>
+      run(u, async (q) => (await one<{ r: Record<string, unknown> }>(q, "select public.invoice_credit_begin($1, $2, $3, $4) as r", [org, key, documentId, JSON.stringify(credit)])).r);
+    const room = (u: U, documentId: string) =>
+      run(u, async (q) => (await one<{ r: Record<string, unknown> }>(q, "select public.invoice_credit_room($1, $2) as r", [org, documentId])).r);
+    const issued = async (d: Record<string, unknown> = doc()) => {
+      const r = await begin(owner, randomUUID(), "deal", deal, d);
+      const done = await work(r.request_id as string);
+      expect(done.status).toBe("issued");
+      return { id: done.document_id as string, request: r.request as { totals: Record<string, number> } };
+    };
+    const creditResult = () => ({ provider_document_id: `fake_doc_c${++seq}`, number: `7000${seq}`, allocation: { status: "not_needed" } });
+    const docRow = (id: unknown) =>
+      asAdmin((q) => one<Record<string, unknown>>(q, "select doc_type, amount_agorot, net_agorot, vat_agorot, original_document_id, deal_id, contact_id, provider, created_by, allocation_number, allocation_error_code from public.accounting_documents where id = $1", [id]));
+
+    beforeAll(async () => {
+      creditor = await addMember(org, owner.id, "member", "inv-creditor");
+      await run(owner, (q) => q("select public.set_member_permissions($1, $2, $3)", [org, creditor.id, ["issue_credits"]]));
+    });
+
+    it("only owners, admins and the issue_credits grant credit; issuing alone does not", async () => {
+      const original = await issued();
+      for (const u of [manager, member, issuer, viewer, outsider]) {
+        expect((await pgError(creditBegin(u, original.id, { reason: "טעות" }))).code, u.email).toBe("42501");
+      }
+      expect((await room(creditor, original.id)).creditable).toBe(true);
+      const r = await creditBegin(creditor, original.id, { reason: "החזרה", amount_agorot: 100 });
+      expect(r.status).toBe("pending");
+      expect((await pgError(run(member, (q) => q("select public.invoice_credit_room($1, $2)", [org, original.id]))))).toMatchObject({ code: "42501" });
+    });
+
+    it("a reason is required (1..500, no control characters); an amount is whole agorot from 1 to what is left", async () => {
+      const original = await issued();
+      for (const reason of ["", "   ", "x".repeat(501), "שורה\nשנייה"]) {
+        expect((await pgError(creditBegin(admin, original.id, { reason }))).hint).toBe("invoice_credit:reason");
+      }
+      expect((await pgError(creditBegin(admin, original.id, {}))).hint).toBe("invoice_credit:reason");
+      const total = original.request.totals.total_agorot;
+      for (const amount_agorot of [0, -5, total + 1, "abc", 1.5]) {
+        expect((await pgError(creditBegin(admin, original.id, { reason: "טעות", amount_agorot }))).hint, String(amount_agorot)).toBe("invoice_credit:amount");
+      }
+    });
+
+    it("partial then full: the VAT is the original's share, the last credit takes the VAT left, and nothing is left after", async () => {
+      const original = await issued();
+      const { total_agorot: total, vat_agorot: vat, net_agorot: net } = original.request.totals;
+      const part = await creditBegin(admin, original.id, { reason: "הנחה בדיעבד", amount_agorot: 1000 });
+      const partTotals = (part.request as { totals: Record<string, number> }).totals;
+      const share = Math.floor((2 * 1000 * vat + total) / (2 * total));
+      expect(partTotals).toMatchObject({ total_agorot: 1000, vat_agorot: share, net_agorot: 1000 - share, rate_bp: 1800 });
+      expect(part.request).toMatchObject({ doc_type: "credit_invoice", original_document_id: original.id, reason: "הנחה בדיעבד" });
+      // a pending credit already counts against what is left
+      expect(await room(admin, original.id)).toMatchObject({ creditable: true, pending_agorot: 1000, left_agorot: total - 1000 });
+      expect((await pgError(creditBegin(admin, original.id, { reason: "עוד", amount_agorot: total - 999 }))).hint).toBe("invoice_credit:amount");
+
+      // the worker: no customer step for a credit, the credit invoice recorded with its original
+      const job = await claimJob(part.request_id as string);
+      const claim = await claimOf(job);
+      expect(claim.provider_customer ?? null).toBeNull();
+      expect((claim.request as Record<string, unknown>).original_provider_document_id).toBeTruthy();
+      const done = await record(job, { ok: true, ...creditResult() });
+      await asService((q) => q("select public.finish_job($1, $2, true)", [job.id, job.lease]));
+      expect(done.status).toBe("issued");
+      expect(await docRow(done.document_id)).toMatchObject({
+        doc_type: "credit_invoice",
+        amount_agorot: "1000",
+        vat_agorot: String(share),
+        original_document_id: original.id,
+        deal_id: deal,
+        contact_id: person,
+        provider: "fake",
+        created_by: admin.id,
+        allocation_number: null,
+        allocation_error_code: null,
+      });
+      expect(await room(admin, original.id)).toMatchObject({ credited_agorot: 1000, pending_agorot: 0, left_agorot: total - 1000 });
+
+      const full = await creditBegin(creditor, original.id, { reason: "ביטול העסקה", amount_agorot: null });
+      expect((full.request as { totals: Record<string, number> }).totals).toMatchObject({ total_agorot: total - 1000, vat_agorot: vat - share, net_agorot: net - (1000 - share) });
+      expect((full.request as { lines: unknown[] }).lines).toHaveLength(1);
+      expect((await pgError(creditBegin(admin, original.id, { reason: "שוב" }))).hint).toBe("invoice_credit:nothing_left");
+      expect(await room(admin, original.id)).toMatchObject({ creditable: false, code: "nothing_left", left_agorot: 0 });
+      // a credit the provider refused frees its amount again
+      const job2 = await claimJob(full.request_id as string);
+      await claimOf(job2);
+      expect((await record(job2, { ok: false, code: "refused", final: true })).status).toBe("failed");
+      await asService((q) => q("select public.finish_job($1, $2, true)", [job2.id, job2.lease]));
+      expect(await room(admin, original.id)).toMatchObject({ creditable: true, left_agorot: total - 1000 });
+    });
+
+    it("a full first credit copies the original's lines; the same key answers the same request", async () => {
+      const original = await issued();
+      const key = randomUUID();
+      const r = await creditBegin(owner, original.id, { reason: "החזרת סחורה" }, key);
+      const request = r.request as { lines: { description: string }[]; totals: Record<string, number> };
+      expect(request.lines.map((l) => l.description)).toEqual(lines.map((l) => l.description));
+      expect(request.totals).toMatchObject({
+        total_agorot: original.request.totals.total_agorot,
+        vat_agorot: original.request.totals.vat_agorot,
+        net_agorot: original.request.totals.net_agorot,
+      });
+      const again = await creditBegin(owner, original.id, { reason: "אחר", amount_agorot: 5 }, key);
+      expect(again.request_id).toBe(r.request_id);
+      expect((await pgError(creditBegin(admin, original.id, { reason: "אחר" }, key))).hint).toBe("invoice:request");
+    });
+
+    it("an original cancelled after begin is refused by the claim; a hand-recorded or other-type document is not credited here", async () => {
+      const original = await issued();
+      const r = await creditBegin(admin, original.id, { reason: "טעות", amount_agorot: 500 });
+      await run(owner, (q) => q("update public.accounting_documents set status = 'cancelled', cancel_reason = 'בוטל' where id = $1", [original.id]));
+      const out = await work(r.request_id as string, creditResult());
+      expect(out).toMatchObject({ refused: "invoice_credit:original", status: "failed" });
+      expect((await pgError(creditBegin(admin, original.id, { reason: "טעות" }))).hint).toBe("invoice_credit:original");
+
+      const hand = await run(owner, async (q) =>
+        (await one<{ id: string }>(q, "insert into public.accounting_documents (organization_id, contact_id, doc_type, number, amount_agorot) values ($1, $2, 'tax_invoice', $3, 11800) returning id", [org, person, `H-${randomUUID().slice(0, 8)}`])).id,
+      );
+      expect(await room(admin, hand)).toMatchObject({ creditable: false, code: "not_issued_here" });
+      expect((await pgError(creditBegin(admin, hand, { reason: "טעות" }))).hint).toBe("invoice_credit:original");
+      const receipt = await issued(doc({ doc_type: "receipt" }));
+      expect(await room(admin, receipt.id)).toMatchObject({ creditable: false, code: "type" });
+      // another business's document is not found
+      expect((await pgError(run(outsider, (q) => q("select public.invoice_credit_room($1, $2)", [otherOrg, original.id])))).hint).toBe("invoice_credit:original");
+    });
+
+    it("an erased request loses a credit's reason too", async () => {
+      const erased = await asAdmin(async (q) =>
+        (await one<{ r: Record<string, unknown> }>(q, "select app.invoice_issue_payload_erased($1) as r", [JSON.stringify({ doc_type: "credit_invoice", reason: "דנה ביקשה", lines: [{ description: "x" }] })])).r,
+      );
+      expect(erased.reason).toBe("הסיבה נמחקה (מחיקת פרטיות)");
+      expect((erased.lines as { description: string }[])[0].description).toBe("הפריט נמחק (מחיקת פרטיות)");
     });
   });
 });

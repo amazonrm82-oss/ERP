@@ -2,7 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 
-import { canIssueDocuments } from "@/features/permissions/keys";
+import { canIssueCredits, canIssueDocuments } from "@/features/permissions/keys";
 import { getMyPermissions } from "@/features/permissions/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { orgHasFeature } from "@/features/settings/queries";
@@ -68,11 +68,13 @@ export type InvoicingAccess = {
   canManage: boolean;
   /** DOC-17: may issue now (and the business is connected to the offered provider) */
   canIssue: boolean;
+  /** DOC-14: may credit a provider's document now (owners, admins, the `issue_credits` grant; connected) */
+  canCredit: boolean;
   /** The business is connected to the provider this deployment offers */
   connected: boolean;
 };
 
-const HIDDEN: InvoicingAccess = { offered: null, inPlan: false, canManage: false, canIssue: false, connected: false };
+const HIDDEN: InvoicingAccess = { offered: null, inPlan: false, canManage: false, canIssue: false, canCredit: false, connected: false };
 
 export const getInvoicingAccess = cache(async (orgId: string): Promise<InvoicingAccess> => {
   const offered = invoiceProviderName();
@@ -86,6 +88,7 @@ export const getInvoicingAccess = cache(async (orgId: string): Promise<Invoicing
     inPlan,
     canManage: context.canWrite && isAdminRole(context.role),
     canIssue: connected && context.canWrite && canIssueDocuments(context.role, granted),
+    canCredit: connected && context.canWrite && canIssueCredits(context.role, granted),
     connected,
   };
 });
@@ -187,4 +190,51 @@ export async function getIssuedDocumentAllocation(
     "issued document allocation",
   );
   return row ? { allocationNumber: row.allocation_number, allocationErrorCode: row.allocation_error_code } : null;
+}
+
+export type CreditRoom = {
+  creditable: boolean;
+  code: string | null;
+  docType: string;
+  number: string;
+  docDate: string | null;
+  amountAgorot: number;
+  creditedAgorot: number;
+  pendingAgorot: number;
+  leftAgorot: number;
+  /** The record the original belongs to (its deal, else its contact), for the way back */
+  back: { kind: "deal" | "contact"; id: string } | null;
+};
+
+/**
+ * DOC-14: what is left to credit of one document (public.invoice_credit_room, the user's session: RLS reads the original).
+ * null = not found, not readable, or the person may not credit.
+ */
+export async function getCreditRoom(orgId: string, documentId: string): Promise<CreditRoom | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("invoice_credit_room", { p_org: orgId, p_document: documentId });
+  if (error) {
+    if (error.code === "42501" || error.hint === "invoice_credit:original" || error.hint === "feature:documents") return null;
+    throw new Error(`invoice_credit_room: ${error.message}`);
+  }
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const row = data as Record<string, unknown>;
+  const num = (key: string) => (typeof row[key] === "number" ? (row[key] as number) : 0);
+  if (typeof row.doc_type !== "string" || typeof row.number !== "string") return null;
+  const parent = must(
+    await supabase.from("accounting_documents").select("deal_id, contact_id").eq("organization_id", orgId).eq("id", documentId).maybeSingle(),
+    "credit original",
+  );
+  return {
+    creditable: row.creditable === true,
+    code: typeof row.code === "string" ? row.code : null,
+    docType: row.doc_type,
+    number: row.number,
+    docDate: typeof row.doc_date === "string" ? row.doc_date : null,
+    amountAgorot: num("amount_agorot"),
+    creditedAgorot: num("credited_agorot"),
+    pendingAgorot: num("pending_agorot"),
+    leftAgorot: num("left_agorot"),
+    back: parent?.deal_id ? { kind: "deal", id: parent.deal_id } : parent?.contact_id ? { kind: "contact", id: parent.contact_id } : null,
+  };
 }

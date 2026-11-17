@@ -58,3 +58,36 @@ export async function beginIssue(supabase: SupabaseClient<Database>, orgId: stri
   if (answer.status === "blocked") return { status: "blocked", problems: answer.problems };
   return { status: "queued", requestId: answer.request_id, reused: answer.reused === true };
 }
+
+export type CreditOutcome =
+  | { status: "queued"; requestId: string }
+  | { status: "failed"; reason: "answer" }
+  | { status: "error"; error: { code?: string; message?: string; hint?: string } };
+
+const creditBeginSchema = z.object({
+  status: z.enum(["pending", "issued", "unrecorded", "failed", "stale"]),
+  request_id: z.string(),
+  provider: z.string(),
+});
+
+/**
+ * DOC-14: a credit invoice against one of the provider's documents, with the person's own session. The database judges the
+ * person (app.can_issue_credits), what is left of the original, the VAT share and the lines, keeps one request per key and
+ * queues the same `invoice.issue` job; the worker calls the provider's creditDocument (issue-handler.ts).
+ */
+export async function beginCredit(
+  supabase: SupabaseClient<Database>,
+  orgId: string,
+  input: { key: string; documentId: string; reason: string; amountAgorot: number | null },
+): Promise<CreditOutcome> {
+  const { data, error } = await supabase.rpc("invoice_credit_begin", {
+    p_org: orgId,
+    p_key: input.key,
+    p_document: input.documentId,
+    p_credit: { reason: input.reason, amount_agorot: input.amountAgorot },
+  });
+  if (error) return { status: "error", error };
+  const parsed = creditBeginSchema.safeParse(data);
+  if (!parsed.success) return { status: "failed", reason: "answer" };
+  return { status: "queued", requestId: parsed.data.request_id };
+}

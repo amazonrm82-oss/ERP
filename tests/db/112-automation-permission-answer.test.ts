@@ -30,13 +30,14 @@ describe("automations permission conditions (PRM-01)", () => {
 
   it("a key whose module is not built yet cannot be granted", async () => {
     // view_costs became grantable with PRD-06 (migration product_costs)
-    for (const key of ["issue_credits", "mass_send"]) {
+    // DOC-14 (migration invoice_credit) made `issue_credits` grantable
+    for (const key of ["mass_send"]) {
       expect((await pgError(grant(member.id, [key]))).hint, key).toBe("permissions:not_built");
     }
     const built = await asAdmin(async (q) => (await q<{ k: string[] }>("select app.member_permission_built_keys() as k")).rows[0].k);
     // DOC-01 (migration accounting_documents) made `documents` grantable, PAY-06 (migration payments) `record_payments`,
     // DOC-17 (migration invoice_provider_settings) `issue_documents`
-    expect([...built].sort()).toEqual(["documents", "edit_catalog", "export", "import", "issue_documents", "manage_automations", "record_payments", "view_costs"]);
+    expect([...built].sort()).toEqual(["documents", "edit_catalog", "export", "import", "issue_credits", "issue_documents", "manage_automations", "record_payments", "view_costs"]);
   });
 
   it("granting and revoking the automations permission are both in the audit log", async () => {

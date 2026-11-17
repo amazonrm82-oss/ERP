@@ -16,7 +16,7 @@ import { HolderFiles } from "@/features/files/components/holder-files";
 import { listHolderFiles } from "@/features/files/holder-queries";
 import type { MoneySubject } from "@/features/payments/money-subject";
 import { getInvoicingAccess } from "@/features/invoicing/queries";
-import { issueDocumentPath } from "@/features/invoicing/paths";
+import { creditDocumentPath, issueDocumentPath } from "@/features/invoicing/paths";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatDate, formatMoney, zoneDate } from "@/lib/format";
 
@@ -228,6 +228,12 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
                     ) : null}
                     {access.canRecord && !doc.cancelled && doc.docType === "tax_invoice" && !doc.proformaId ? (
                       <LinkProformaButton orgId={orgId} page={subject} invoiceId={doc.id} invoiceLabel={label} />
+                    ) : null}
+                    {/* DOC-14: a credit invoice through the provider that issued it, by whoever may credit */}
+                    {invoicing.canCredit && !doc.cancelled && doc.provider !== null && doc.provider === invoicing.offered && (doc.docType === "tax_invoice" || doc.docType === "tax_invoice_receipt") ? (
+                      <Link href={creditDocumentPath(orgId, doc.id)} className={buttonClasses("ghost", "sm")} aria-label={`זיכוי ${label}`}>
+                        זיכוי
+                      </Link>
                     ) : null}
                     {canChangeDoc && !doc.cancelled ? <CancelDocumentButton orgId={orgId} subject={subject} documentId={doc.id} label={label} /> : null}
                   </span>

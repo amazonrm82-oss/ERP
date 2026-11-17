@@ -7,11 +7,23 @@ import { z } from "zod";
 
 import type { ClaimedJob, JobHandler } from "@/features/jobs/registry";
 
-import { ISSUABLE_DOCUMENT_TYPES, type InvoiceProvider, type IssueRequest } from "./providers/types";
+import { ISSUABLE_DOCUMENT_TYPES, type CreditRequest, type InvoiceProvider, type IssueRequest } from "./providers/types";
 
 export const PROVIDER_TIMEOUT_MS = 10_000;
 
-export const requestSchema = z.object({
+const linesSchema = z.array(
+  z.object({ description: z.string(), quantity: z.number(), unit_price_agorot: z.number(), discount_agorot: z.number(), vat_exempt: z.boolean() }),
+);
+const totalsSchema = z.object({
+  net_agorot: z.number(),
+  vat_agorot: z.number(),
+  total_agorot: z.number(),
+  rate_bp: z.number(),
+  prices_include_vat: z.boolean(),
+});
+
+/** DOC-07: a document to issue, as the database stored it. */
+export const issueRequestSchema = z.object({
   doc_type: z.enum(ISSUABLE_DOCUMENT_TYPES),
   doc_date: z.string(),
   due_date: z.string().nullable(),
@@ -25,17 +37,21 @@ export const requestSchema = z.object({
     email: z.string().nullable(),
     is_business: z.boolean(),
   }),
-  lines: z.array(
-    z.object({ description: z.string(), quantity: z.number(), unit_price_agorot: z.number(), discount_agorot: z.number(), vat_exempt: z.boolean() }),
-  ),
-  totals: z.object({
-    net_agorot: z.number(),
-    vat_agorot: z.number(),
-    total_agorot: z.number(),
-    rate_bp: z.number(),
-    prices_include_vat: z.boolean(),
-  }),
+  lines: linesSchema,
+  totals: totalsSchema,
 });
+
+/** DOC-14: a credit invoice against one of our provider's documents, as the database stored it (migration invoice_credit). */
+export const creditRequestSchema = z.object({
+  doc_type: z.literal("credit_invoice"),
+  doc_date: z.string(),
+  original_provider_document_id: z.string(),
+  reason: z.string(),
+  lines: linesSchema,
+  totals: totalsSchema,
+});
+
+export const requestSchema = z.union([issueRequestSchema, creditRequestSchema]);
 
 const claimSchema = z.union([
   z.object({ refused: z.string().regex(/^[a-z_:]{1,40}$/) }).passthrough(),
@@ -52,7 +68,7 @@ const claimSchema = z.union([
 const recordSchema = z.object({ status: z.enum(["issued", "unrecorded", "failed", "pending", "stale"]) }).passthrough();
 
 /** The provider's request, from the database's stored request (never from the browser). */
-export function providerRequest(requestId: string, stored: z.infer<typeof requestSchema>): IssueRequest {
+export function providerRequest(requestId: string, stored: z.infer<typeof issueRequestSchema>): IssueRequest {
   return {
     idempotencyKey: requestId,
     type: stored.doc_type,
@@ -68,6 +84,30 @@ export function providerRequest(requestId: string, stored: z.infer<typeof reques
       email: stored.customer.email,
       isBusiness: stored.customer.is_business,
     },
+    lines: stored.lines.map((line) => ({
+      description: line.description,
+      quantity: line.quantity,
+      unitPriceAgorot: line.unit_price_agorot,
+      discountAgorot: line.discount_agorot,
+      vatExempt: line.vat_exempt,
+    })),
+    totals: {
+      netAgorot: stored.totals.net_agorot,
+      vatAgorot: stored.totals.vat_agorot,
+      totalAgorot: stored.totals.total_agorot,
+      rateBp: stored.totals.rate_bp,
+      pricesIncludeVat: stored.totals.prices_include_vat,
+    },
+  };
+}
+
+/** DOC-14: the provider's credit request, from the stored credit request (never from the browser). */
+export function providerCreditRequest(requestId: string, stored: z.infer<typeof creditRequestSchema>): CreditRequest {
+  return {
+    idempotencyKey: requestId,
+    originalProviderDocumentId: stored.original_provider_document_id,
+    date: stored.doc_date,
+    reason: stored.reason,
     lines: stored.lines.map((line) => ({
       description: line.description,
       quantity: line.quantity,
@@ -123,14 +163,16 @@ export function createInvoiceIssueHandler(deps: { calls: InvoiceIssueCalls; prov
     // DOC-13: the customer at the provider, made or updated with OUR details whenever nothing is kept for them or the kept id
     // was made with other details (Mexuz is the source); the id it answers is kept by the record, also when the document
     // then fails. A lookup (late) asks nothing about the customer.
+    const stored = answer.request;
     let providerCustomerId: string | null = null;
     let customerKept: string | null = null;
-    if (!late) {
+    // a credit names the provider's original, which holds its customer: nothing is asked about the customer
+    if (!late && stored.doc_type !== "credit_invoice") {
       const kept = answer.provider_customer ?? null;
       if (kept && kept.current) {
         providerCustomerId = kept.id;
       } else {
-        const request = providerRequest(answer.request_id, answer.request);
+        const request = providerRequest(answer.request_id, stored);
         let upserted: Awaited<ReturnType<InvoiceProvider["upsertCustomer"]>> | "timeout" | "unreachable";
         try {
           upserted = await withTimeout(deps.provider.upsertCustomer(request.customer), timeoutMs);
@@ -153,7 +195,9 @@ export function createInvoiceIssueHandler(deps: { calls: InvoiceIssueCalls; prov
 
     const call = late
       ? deps.provider.findDocument(answer.request_id)
-      : deps.provider.issueDocument({ ...providerRequest(answer.request_id, answer.request), providerCustomerId });
+      : stored.doc_type === "credit_invoice"
+        ? deps.provider.creditDocument(providerCreditRequest(answer.request_id, stored))
+        : deps.provider.issueDocument({ ...providerRequest(answer.request_id, stored), providerCustomerId });
     let issued: Awaited<ReturnType<InvoiceProvider["issueDocument"]>> | "timeout" | "unreachable";
     try {
       issued = await withTimeout(call, timeoutMs);

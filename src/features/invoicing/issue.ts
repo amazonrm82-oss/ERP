@@ -136,6 +136,7 @@ const ENDED_REASON: Record<string, string> = {
   job_dead: "הניסיונות לפנות לספק נגמרו",
   issued_after_close: "הבקשה נסגרה, אבל ניסיון קודם כבר הפיק את המסמך אצל הספק",
   provider_changed: "ספק החשבוניות של העסק התחלף",
+  "invoice_credit:original": "המסמך המקורי בוטל, או שכבר לא הופק אצל הספק שהעסק מחובר אליו",
 };
 
 export type IssueRequestState = "pending" | "issued" | "unrecorded" | "failed" | "stale";

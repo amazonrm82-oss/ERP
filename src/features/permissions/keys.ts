@@ -66,7 +66,13 @@ export const MEMBER_PERMISSIONS: readonly MemberPermissionInfo[] = [
     // DOC-17 (migration invoice_provider_settings): app.can_issue_documents()
     built: true,
   },
-  { key: "issue_credits", label: "זיכוי", description: "הפקת מסמכי זיכוי.", built: false },
+  {
+    key: "issue_credits",
+    label: "זיכוי",
+    description: "הפקת חשבונית זיכוי, מלאה או חלקית, דרך ספק החשבוניות של העסק, תמיד עם סיבה. בעלים ומנהלי מערכת מזכים תמיד.",
+    // DOC-14 (migration invoice_credit): app.can_issue_credits()
+    built: true,
+  },
   {
     key: "record_payments",
     label: "רישום תשלומים",
@@ -126,6 +132,12 @@ export function canManageAutomations(role: MembershipRole, granted: readonly str
 export function canIssueDocuments(role: MembershipRole | null, granted: readonly string[]): boolean {
   if (role === null) return false;
   return hasPermission(role, granted, "issue_documents");
+}
+
+/** app.can_issue_credits() (DOC-14): owners and admins, or the `issue_credits` grant. Issuing alone does not credit. */
+export function canIssueCredits(role: MembershipRole | null, granted: readonly string[]): boolean {
+  if (role === null) return false;
+  return hasPermission(role, granted, "issue_credits");
 }
 
 /** DOC-01: app.can_record_documents(): owners, admins and managers by role, or the personal key. */

@@ -4627,6 +4627,9 @@ export type Database = {
       invoice_issue_state: { Args: { p_org: string; p_request: string }; Returns: Json };
       invoice_issue_requests_open: { Args: { p_org: string }; Returns: Json };
       invoice_issue_close: { Args: { p_org: string; p_request: string }; Returns: Json };
+      // DOC-14 (migration invoice_credit): a credit invoice through the provider, and what is left to credit
+      invoice_credit_begin: { Args: { p_org: string; p_key: string; p_document: string; p_credit: Json }; Returns: Json };
+      invoice_credit_room: { Args: { p_org: string; p_document: string }; Returns: Json };
       // COL-01: the collection screen's open debt documents (invoker; BAL-01's rights, BAL-03's partial rule)
       collection_documents: {
         Args: {

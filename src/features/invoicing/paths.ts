@@ -14,6 +14,9 @@ export const issueDocumentPath = (orgId: string, kind: IssueSourceKind, id: stri
 export const issueRequestPath = (orgId: string, requestId: string, reused = false) =>
   `/o/${orgId}/documents/issue/${requestId}${reused ? "?reused=1" : ""}`;
 
+/** DOC-14: the credit page of one document the provider issued. */
+export const creditDocumentPath = (orgId: string, documentId: string) => `/o/${orgId}/documents/credit/${documentId}`;
+
 /** Where the person returns after issuing: the source's own page, where the document card lists it. */
 export function issueSourcePath(orgId: string, kind: IssueSourceKind, id: string): string {
   return kind === "quote" ? quotePath(orgId, id) : moneySubjectPath(orgId, { kind, id });

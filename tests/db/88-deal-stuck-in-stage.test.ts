@@ -219,6 +219,8 @@ const RERUN = [
   migrationFile("_allocation_failure.sql"),
   // DOC-13 redefines public.invoice_issue_claim() and public.invoice_issue_record() last (the provider's customer)
   migrationFile("_invoice_provider_customers.sql"),
+  // DOC-14 redefines the claim, the record and app.invoice_issue_payload_erased() last (credit invoices)
+  migrationFile("_invoice_credit.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

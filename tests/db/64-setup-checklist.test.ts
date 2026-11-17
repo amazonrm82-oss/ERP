@@ -935,6 +935,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_allocation_failure.sql",
       // DOC-13 redefines public.invoice_issue_claim() and public.invoice_issue_record() of _allocation_failure.sql last
       "_invoice_provider_customers.sql",
+      // DOC-14 redefines the claim and the record of _invoice_provider_customers.sql, app.invoice_issue_payload_erased() of
+      // _invoice_issue.sql and app.member_permission_built_keys() of _invoice_provider_settings.sql last (issue_credits)
+      "_invoice_credit.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();
