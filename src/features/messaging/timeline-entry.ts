@@ -57,6 +57,8 @@ export const REFUSED: Record<string, string> = {
   // QUO-18: a quote that is no longer on offer (answered, cancelled, expired, a newer version), and closed customer pages
   quote_changed: "לא נשלחה: ההצעה כבר לא פתוחה, או שנשלחה גרסה חדשה שלה.",
   pages_closed: "לא נשלחה: הדפים ללקוחות של העסק סגורים, ולכן הקישור להצעה לא נפתח.",
+  // owner (400) א: "ביטול כל הקישורים" stopped the quote's automatic reminders until the quote is sent again
+  reminders_stopped: "לא נשלחה: התזכורות להצעה נעצרו כשבוטלו כל הקישורים שלה.",
   stage_off: "לא נשלחה: שלב התזכורת כובה.",
   business_off: "לא נשלחה: התזכורות לעסק כבויות.",
   debt_settled: "לא נשלחה: החוב שולם.",

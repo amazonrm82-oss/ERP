@@ -926,6 +926,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // owner (399) א redefines public.job_message_may_send() of _instant_reply.sql and the two composers of
       // _email_sender_gone_files.sql / _quote_message_send.sql last (the deletion wait waits)
       "_org_deletion_messages_wait.sql",
+      // owner (400) א redefines the quote link and reminder functions of _quote_links_many.sql / _quote_reminders.sql /
+      // _quote_message_send.sql last (a revoke stops the reminders)
+      "_quote_revoke_stops_reminders.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

@@ -286,6 +286,54 @@ describe("automatic quote reminders (QUO-18)", () => {
     expect(await stage(e.quote, today)).toBeNull();
   });
 
+  it("owner (400) א: revoking every link stops the reminders until a person sends the quote again or makes a new link", async () => {
+    const stopped = (quote: string) =>
+      asAdmin(async (q) => (await q<{ s: boolean }>("select reminders_stopped_at is not null as s from app.quote_links where quote_id = $1", [quote])).rows[0]?.s ?? false);
+    const revoke = (quote: string) => asUser(member.id, (q) => q("select public.quote_link_revoke($1, $2)", [org, quote]));
+
+    // a reminder queued before the revoke is refused at compose time
+    const a = await newQuote();
+    await arrange(a.quote, { sentOn: await sentForStage(3) });
+    await run();
+    const job = await prepared((await rows(a.quote))[0].job_id as string);
+    await revoke(a.quote);
+    expect(await stopped(a.quote)).toBe(true);
+    expect(await compose("email", job)).toEqual({ refused: "reminders_stopped" });
+
+    // no reminder is queued while stopped; a person's send from the quote screen resumes them
+    const b = await newQuote();
+    await arrange(b.quote, { sentOn: await sentForStage(3) });
+    await revoke(b.quote);
+    await run();
+    expect(await rows(b.quote)).toEqual([]);
+    await personSend(b.quote);
+    expect(await stopped(b.quote)).toBe(false);
+    await run();
+    expect(await rows(b.quote)).toMatchObject([{ outcome: "queued" }]);
+
+    // a person's own send is never stopped by it; a new link from the screen resumes the reminders too
+    const c = await newQuote();
+    await arrange(c.quote, { sentOn: await sentForStage(3) });
+    await revoke(c.quote);
+    const sent = await asUser(member.id, async (q) =>
+      (await one<{ r: { job_id: string } }>(q, "select public.quote_message_send($1, $2, 'email', $3) as r", [org, c.quote, personEmail])).r,
+    );
+    const personal = await prepared(sent.job_id);
+    expect(String((await compose("email", personal)).text)).toMatch(/\/f\/quote\/[A-Za-z0-9_-]{64}/);
+    await revoke(c.quote);
+    expect(await stopped(c.quote)).toBe(true);
+    await asUser(member.id, (q) => q("select public.quote_link_create($1, $2)", [org, c.quote]));
+    expect(await stopped(c.quote)).toBe(false);
+
+    // a quote that never had a link row: the revoke still records the stop
+    const d = await newQuote({ send: false });
+    await asAdmin((q) => q("update app.quote_links set reminders_stopped_at = null where quote_id = $1", [d.quote]));
+    await revoke(d.quote);
+    expect(await stopped(d.quote)).toBe(true);
+    // nobody but the server reads or writes the stop
+    expect((await pgError(asUser(owner.id, (q) => q("select reminders_stopped_at from app.quote_links")))).code).toBe("42501");
+  });
+
   it("goes on the channel the quote was last sent on by a person, else email, else SMS", async () => {
     const a = await newQuote({ send: "sms" });
     await arrange(a.quote, { sentOn: await sentForStage(3) });

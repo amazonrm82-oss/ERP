@@ -93,8 +93,9 @@ export function QuoteLinkCard({ orgId, quoteId, numberDisplay, active, createdTe
               <ConfirmButton
                 size="sm"
                 title="לבטל את הקישור?"
-                // QUO-12 (owner, 19 October 2026): an older version's link still leads to the newest sent version
-                description="הלקוח לא יוכל לפתוח את ההצעה מאף אחד מהקישורים שנשלחו לה. קישורים שנשלחו לגרסאות קודמות של ההצעה עדיין מובילים אליה; כדי לחסום גם אותם, בטלו את הקישור בכל גרסה קודמת."
+                // QUO-12 (owner, 19 October 2026): an older version's link still leads to the newest sent version;
+                // owner (400) א: the revoke also stops the quote's automatic reminders until it is sent again
+                description="הלקוח לא יוכל לפתוח את ההצעה מאף אחד מהקישורים שנשלחו לה. קישורים שנשלחו לגרסאות קודמות של ההצעה עדיין מובילים אליה; כדי לחסום גם אותם, בטלו את הקישור בכל גרסה קודמת. גם התזכורות האוטומטיות ללקוח על ההצעה ייעצרו, עד שתשלחו לו את ההצעה שוב או תיצרו קישור חדש."
                 confirmLabel="ביטול הקישור"
                 action={revokeQuoteLinkAction.bind(null, orgId, quoteId)}
                 onDone={() => router.refresh()}
