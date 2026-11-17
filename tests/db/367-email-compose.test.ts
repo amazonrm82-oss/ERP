@@ -33,10 +33,14 @@ type Answer = Record<string, unknown>;
 // Then 021299 (RVW-110, weekly review of 17 November 2026): a card send with files is refused ('attachment_changed') unless its
 // sender is an active member now (v_sender_active from the existing membership read); one variable and one check added, every
 // other line 021283's (one exact replacement). Rechecked: the file rules of 021198's header, the reply-to of (8) ב, the
-// automation path (no files) unchanged. Needs the lead's independent review before merge.
+// automation path (no files) unchanged. Independent review done on 17 November 2026.
+// Then the review's finding on RVW-110: a send with files also needs the sender to read the record the files are on now
+// (app.user_can_read_record for the sender on the deal, else the lead, else the contact, or app.user_deputy_reads, the
+// record's select rule); two variables and one block added. Rechecked: an email without files and the automation path
+// unchanged, the same refusal code. Needs the lead's independent review of this delta before merge.
 const REVIEWED_MD5: Record<string, string> = {
   "email_job_compose(uuid,uuid,text)": "c5c2ae88f99865569bd24ddf80c2168f",
-  "app.email_compose_core(uuid,uuid,text)": "1ed1daca23535f4cb9607754565fd16c",
+  "app.email_compose_core(uuid,uuid,text)": "547dbfcd9f376c80c4724a8439261697",
   "app.email_usage_give_back(uuid)": "c952eaea4bb85cf196cf49280e8b7816",
   "email_quota_return(uuid,uuid)": "9a75bbbe4baa464daf175f376f2be501",
 };
@@ -296,6 +300,28 @@ describe("the email composer (EML-01, Resend)", () => {
     for (const job of jobs) expect(await compose(job)).toEqual({ refused: "attachment_changed" });
     // an email without files still goes, without a reply-to
     expect(await compose(bare)).toMatchObject({ to: "noga@example.test", reply_to: null, attachments: [] });
+  });
+
+  // RVW-110 (review of 17 November 2026): an active sender who no longer reads the record never sends its files
+  it("sends no file once the sender no longer reads the record", async () => {
+    const reader = await addMember(org, owner.id, "member", "ecompose-reader-files");
+    const lead = await insertLead(owner.id, org, { full_name: "שקד", email: "shaked@example.test", owner_id: reader.id });
+    const t = await template(org, { type: "requested_document", body: "שלום {שם פרטי}" });
+    const file = await recordFile(org, "lead_id", lead);
+    const send = () => prepared(org, { channel: "email", message_type: "requested_document", template_id: t, lead_id: lead, reply_to_user_id: reader.id, file_ids: [file] });
+    const bare = () => prepared(org, { channel: "email", message_type: "requested_document", template_id: t, lead_id: lead, reply_to_user_id: reader.id });
+    await asAdmin((q) => q("update public.organizations set record_visibility = 'own' where id = $1", [org]));
+    try {
+      expect(((await compose(await send())).attachments as unknown[]).length).toBe(1);
+      const job = await send();
+      const plain = await bare();
+      // the record moved to someone else: under "own" the sender reads it no more
+      await asAdmin((q) => q("update public.leads set owner_id = $2 where id = $1", [lead, owner.id]));
+      expect(await compose(job)).toEqual({ refused: "attachment_changed" });
+      expect(await compose(plain)).toMatchObject({ to: "shaked@example.test", attachments: [] });
+    } finally {
+      await asAdmin((q) => q("update public.organizations set record_visibility = 'org' where id = $1", [org]));
+    }
   });
 
   it("judges every file again on the send day", async () => {

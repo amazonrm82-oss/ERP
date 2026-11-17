@@ -5,7 +5,9 @@
 -- sender), but never asked whether that person was still an active member: an email queued by someone suspended or removed
 -- since still went out with its files, a file on that person's private note included. One check is added, right after the
 -- file count: a send with files is refused ('attachment_changed', the existing code, no new Hebrew line) unless the sender
--- is an active member now (v_sender_active, set from the existing membership read). An email without files, and an automation's email (which
+-- is an active member now (v_sender_active, set from the existing membership read) and still reads the record the files
+-- are on (the deal, else the lead, else the contact: app.user_can_read_record for the sender, or app.user_deputy_reads, the
+-- record's select rule; review of 17 November 2026). An email without files, and an automation's email (which
 -- never carries files), are unchanged. Every other line is 021283's body (one exact replacement).
 -- The SMS composer carries no files, so it is unchanged (the review's note about it is consistency only).
 -- Safe to run twice (create or replace, the same revoke).
@@ -63,6 +65,8 @@ declare
   v_deal_contact uuid;
   v_on boolean;
   v_sender_active boolean := false;
+  v_file_owner uuid;
+  v_file_team uuid;
   v_files uuid[] := '{}';
   v_library uuid[] := '{}';
   v_found integer;
@@ -249,6 +253,26 @@ begin
   -- person suspended or removed since never sends a file (a private note's file of theirs included)
   if cardinality(v_files) + cardinality(v_library) > 0 and not v_sender_active then
     return jsonb_build_object('refused', 'attachment_changed');
+  end if;
+  -- and only while that person still reads the record the files are on (the record's select rule for that person:
+  -- app.user_can_read_record, or an HEB-08 deputy's reading), e.g. not after a team change took it out of their sight
+  if cardinality(v_files) + cardinality(v_library) > 0 then
+    if v_deal is not null then
+      select dl.owner_id, dl.team_id into v_file_owner, v_file_team from public.deals dl
+       where dl.organization_id = v_org.id and dl.id = v_deal;
+    elsif v_lead is not null then
+      select l.owner_id, l.team_id into v_file_owner, v_file_team from public.leads l
+       where l.organization_id = v_org.id and l.id = v_lead;
+    else
+      select c.owner_id, c.team_id into v_file_owner, v_file_team from public.contacts c
+       where c.organization_id = v_org.id and c.id = v_contact;
+    end if;
+    if not (coalesce(app.user_can_read_record(v_org.id, v_sender, v_file_owner, v_file_team), false)
+            or coalesce(app.user_deputy_reads(v_org.id, v_sender,
+                                              case when v_deal is not null then 'deal' when v_lead is not null then 'lead' else 'contact' end,
+                                              coalesce(v_deal, v_lead, v_contact)), false)) then
+      return jsonb_build_object('refused', 'attachment_changed');
+    end if;
   end if;
   if cardinality(v_files) > 0 then
     select count(*), coalesce(sum(f.size_bytes), 0),
