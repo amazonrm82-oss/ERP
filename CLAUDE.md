@@ -2387,6 +2387,25 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   Since 021116 (owner (22) א) one rule says "attached", `app.collection_task_attached` (pure, no grants), read by both jobs: the
   reminder job never moves, retitles or re-dates a detached task and makes a new attached one for the stage; a document with no deal,
   contact or company gets no reminder. `app.close_paid_collection_tasks` was last redefined in 021116, `app.send_collection_reminders` in 021135 (HEB-09 line).
+- Payment links (LNK-01, LNK-02, LNK-03 guard; migrations 021294, 021295; owner (270) (1) א, (394) א, (395) א, (396) א; an independent
+  review and two delta reviews): a provider layer in `src/features/payment-links/providers/` (fake only, `PAYMENT_LINKS_PROVIDER`,
+  refused on a Vercel production or preview deployment; no card field anywhere, a unit test refuses one) and `public.payment_links` (one
+  source: a quote, an order, an open document or a contact for a free amount; amount in agorot ILS, 1..36 instalments, last day today..+90
+  in the business zone (default 14), `expires_at` its end; status pending|paid|failed|expired|cancelled; server-only provider id
+  (`fake_<id>`), hosted url, payment, paid_at, title (the source's number, never a name), `closed_reason`, `source_checked_at`). Rights:
+  `app.can_record_payments`, a writable business, keys `payments` + `payment_links` + the source's own key, a source the person reads;
+  reading follows the source; a person only cancels a pending link (anyone who records payments, (395) א); no delete. Invoker trigger
+  `payment_links_a_readable` fires first: an unreadable source = plain 42501, and a document's balance is judged under the caller's RLS
+  (`public.money_allocation_state`, handed to the check tagged with the link id); a different definer view answers only
+  `payment_link:partial`. Definer `app.payment_links_check` (outsider guard on INSERT): the open rule `app.payment_link_source_open`
+  (also the job's), and under a per-business advisory lock the new link plus the source's pending and paid links never pass the quote's
+  or order's total or the document's balance (an order's payments recorded outside links are not subtracted: follow-up); 20 pending per
+  source. `provider = 'fake'` only while `app.settings` key `payment_links_fake` is 'on' (never set by a migration; unset on hosted).
+  pg_cron `crm-payment-link-expiry` (every 15 minutes, `app.close_payment_links(2000, 2000, 30)`): expires due links, then cancels
+  pending links whose source closed (`source_closed`), oldest judged first, skip locked, a time budget. A contact merge moves free links
+  (`app.merge_payment_links`). `app.sample_untouched` and `app.import_record_worked` were last redefined in 021295; tests 64 and 88 end
+  with `_payment_links_work.sql`. No public page of ours and no provider call yet: a real provider is called by the OPS-04 worker
+  through a new job kind ((394) א, ids only, md5 pins, its own In use line), with the LNK-04 webhook (wave 3 use (2)).
 - Cheques (PAY-04, migration 020815; owner 21 October 2026, lead's calls 25 October): each cheque is its own payment (a series
   of up to 36 is N inserts). `payments.cheque_number|cheque_bank|cheque_bank_name|cheque_branch|cheque_due_date|cheque_status|
   cheque_unbounce_reason` (constraints `payments_cheque_values`, `payments_cheque_shape`; banks from `app.cheque_bank_codes()` =
