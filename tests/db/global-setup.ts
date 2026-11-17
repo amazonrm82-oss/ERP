@@ -165,6 +165,9 @@ export default async function setup(): Promise<() => Promise<void>> {
     // The consent hash key, filled in by the owner on every real environment before the first
     // customer (CNS, owner's decision of 13 October 2026). Tests that need it missing remove it.
     await db.query("insert into app.settings (key, value) values ('consent_hash_key', 'test-consent-key') on conflict (key) do update set value = excluded.value");
+    // DOC-05/DOC-07: the fake invoice provider is accepted only while this key is 'on'; no migration sets it, and on the
+    // hosted project it stays unset. Tests that need it off remove it.
+    await db.query("insert into app.settings (key, value) values ('invoice_provider_fake', 'on') on conflict (key) do update set value = excluded.value");
     fresh = await functionBodies(db);
     freshObjects = await schemaObjects(db);
   } finally {

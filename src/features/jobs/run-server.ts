@@ -6,10 +6,13 @@ import { backgroundJobsReady, createBackgroundTokenSource, createUserClient } fr
 import { createDigestHandler } from "@/features/digest/send-handler";
 import { createReportHandler } from "@/features/report-schedules/send-handler";
 import { createInvitationHandler } from "@/features/invitations/send-handler";
+import { createInvoiceIssueHandler } from "@/features/invoicing/issue-handler";
+import { invoiceProviderFor } from "@/features/invoicing/providers/select";
 import { AGREEMENT_VERSION } from "@/features/legal/agreement";
 import { downloadEmailAttachment } from "@/features/messaging/email-attachments-server";
 import { createSendHandler } from "@/features/messaging/send-handler";
 import { messagingProviders } from "@/features/messaging/providers/select";
+import type { Json } from "@/lib/database.types";
 import { logEvent } from "@/lib/log";
 import { requestIdOf } from "@/lib/request-id";
 import { bearerSecretMatches } from "@/lib/shared-secret";
@@ -48,7 +51,7 @@ export function jobTimeLeftMs(now: number, claimedAt: number, routeStartedAt: nu
  * The background job worker (OPS-04), route POST /api/jobs/run. Called by the database (app.wake_job_worker, through
  * pg_net, every minute while work is due), never by a user: it carries the push dispatcher's shared secret, checked
  * timing-safe before anything else. With the service role it calls only public.claim_jobs(), public.finish_job() and,
- * for message.send, public.job_message_may_send() and, for a composing SMS provider (InforU, SMS-05), public.sms_job_compose() and public.sms_quota_return() (owner (326) ב), and for the composing email provider (Resend, EML-01, owner (195) א) public.email_job_compose() and public.email_quota_return(), for digest.send (USR-11 / WAB-03) only public.digest_job_compose(), for report.send (RPT-03) only public.scheduled_report_compose(), for invite.send (USR-09) only public.invitation_job_compose(), reading Storage only at the paths the composer answered (email-attachments-server.ts); for import.run and export.run (IMP-04, owner (155) א, (160) א) only
+ * for message.send, public.job_message_may_send() and, for a composing SMS provider (InforU, SMS-05), public.sms_job_compose() and public.sms_quota_return() (owner (326) ב), and for the composing email provider (Resend, EML-01, owner (195) א) public.email_job_compose() and public.email_quota_return(), for digest.send (USR-11 / WAB-03) only public.digest_job_compose(), for report.send (RPT-03) only public.scheduled_report_compose(), for invite.send (USR-09) only public.invitation_job_compose(), for invoice.issue (DOC-07, owner (398) א) only public.invoice_issue_claim() and public.invoice_issue_record(), reading Storage only at the paths the composer answered (email-attachments-server.ts); for import.run and export.run (IMP-04, owner (155) א, (160) א) only
  * public.background_job_begin(), background_job_progress() and background_job_end(), and, through the token source it hands
  * this client to (src/features/background/user-token.ts), background_job_token() before every signing of the person's token. No table is read or written with
  * the service role (CLAUDE.md hard rule 5, wave 3 use (1)): a background job's own work is done with a short-lived token
@@ -107,6 +110,7 @@ export async function runJobsRoute(request: Request): Promise<Response> {
       : null,
   });
 
+  const invoiceProvider = invoiceProviderFor();
   // USR-11 / WAB-03 (owner (267) א, (375) ב): the daily summary, through the email channel's provider; the composer re-checks
   // the plan key, the person's switch, the membership and the business on the live lease and computes the counts under the
   // recipient's own read rules. Review 8: its own pass after the customer messages, at most DIGEST_BATCH a claim and
@@ -146,6 +150,26 @@ export async function runJobsRoute(request: Request): Promise<Response> {
             const { data, error } = await supabase.rpc("invitation_job_compose", { p_job: job.id, p_lease: job.lease });
             if (error) throw new Error("compose failed");
             return data;
+          },
+        })
+      : null,
+    // DOC-07 (owner (398) א): a document through the invoice provider this deployment offers (only the fake, refused on
+    // Vercel production and preview); the claim re-checks the request, its requester, the provider and the business, and
+    // the record keeps the provider's answer as the server (never a person's session)
+    "invoice.issue": invoiceProvider
+      ? createInvoiceIssueHandler({
+          provider: invoiceProvider,
+          calls: {
+            claim: async (job) => {
+              const { data, error } = await supabase.rpc("invoice_issue_claim", { p_job: job.id, p_lease: job.lease });
+              if (error) throw new Error("claim failed");
+              return data;
+            },
+            record: async (job, result) => {
+              const { data, error } = await supabase.rpc("invoice_issue_record", { p_job: job.id, p_lease: job.lease, p_result: result as Json });
+              if (error) throw new Error("record failed");
+              return data;
+            },
           },
         })
       : null,

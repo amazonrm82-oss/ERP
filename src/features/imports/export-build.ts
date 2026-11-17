@@ -189,6 +189,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "punch_card_alert_settings", file: "punch-card-alert-settings.csv" },
   // MNY-04
   { table: "anomaly_alert_settings", file: "anomaly-alert-settings.csv" },
+  // DOC-05
+  { table: "invoice_provider_settings", file: "invoice-provider-settings.csv" },
   // RET-02
   { table: "review_request_settings", file: "review-request-settings.csv" },
   // HEB-09

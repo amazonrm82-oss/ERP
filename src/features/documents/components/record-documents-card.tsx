@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
+import { buttonClasses } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { AllocateButton, LinkProformaButton } from "@/features/allocations/components/allocation-forms";
 import { AllocationRows } from "@/features/allocations/components/allocation-rows";
@@ -14,6 +15,8 @@ import { getCollectionAccess, listPromises } from "@/features/collection/queries
 import { HolderFiles } from "@/features/files/components/holder-files";
 import { listHolderFiles } from "@/features/files/holder-queries";
 import type { MoneySubject } from "@/features/payments/money-subject";
+import { getInvoicingAccess } from "@/features/invoicing/queries";
+import { issueDocumentPath } from "@/features/invoicing/paths";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatDate, formatMoney, zoneDate } from "@/lib/format";
 
@@ -37,8 +40,8 @@ type Props = { orgId: string; subject: MoneySubject };
 export async function RecordDocumentsCard({ orgId, subject }: Props) {
   const access = await getDocumentsAccess(orgId);
   if (!access.inPlan) return null;
-  const [{ documents, names }, context] = await Promise.all([listRecordDocuments(orgId, subject), getOrgContext(orgId)]);
-  if (documents.length === 0 && !access.canRecord) return null;
+  const [{ documents, names }, context, invoicing] = await Promise.all([listRecordDocuments(orgId, subject), getOrgContext(orgId), getInvoicingAccess(orgId)]);
+  if (documents.length === 0 && !access.canRecord && !invoicing.canIssue) return null;
   const { files, names: uploaders } = await listHolderFiles(
     orgId,
     "document",
@@ -76,7 +79,14 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
         id={titleId}
         title="מסמכים חשבונאיים"
         action={
-          access.canRecord ? <RecordDocumentButton
+          <span className="flex flex-wrap items-center gap-2">
+          {/* DOC-07: issuing through the business's invoice provider, while it is connected and the person may issue */}
+          {invoicing.canIssue ? (
+            <Link href={issueDocumentPath(orgId, subject.kind, subject.id)} className={buttonClasses("secondary", "sm")}>
+              הפקת מסמך
+            </Link>
+          ) : null}
+          {access.canRecord ? <RecordDocumentButton
               orgId={orgId}
               subject={subject}
               today={today}
@@ -84,7 +94,8 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
               // GAP-12: an opening balance is a contact's (or a company's, on its own card), never a deal's or an order's
               canOpening={access.canOpening && subject.kind === "contact"}
               sources={sources}
-            /> : null
+            /> : null}
+          </span>
         }
       />
       <CardBody className="p-0">

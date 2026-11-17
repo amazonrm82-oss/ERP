@@ -39,6 +39,8 @@ import { productListsSettingsPath } from "@/features/products/paths";
 import { siteWidgetSettingsPath } from "@/features/site-widgets/paths";
 import { metaLeadsSettingsPath } from "@/features/meta-leads/paths";
 import { integrationsSettingsPath } from "@/features/integrations/paths";
+import { invoicingSettingsPath } from "@/features/invoicing/paths";
+import { invoiceProviderName } from "@/features/invoicing/providers/select";
 import { qrCodesSettingsPath } from "@/features/qr-codes/paths";
 import { completenessSettingsPath } from "@/features/data-quality/paths";
 import { documentSettingsPath } from "@/features/tax/paths";
@@ -91,6 +93,8 @@ export type SettingsAccess = {
   punchCards?: boolean;
   // ADM-03: only the business's owner asks to delete it
   owner?: boolean;
+  // DOC-05: this deployment offers an invoice provider (INVOICE_PROVIDER); without one the section is hidden
+  invoicing?: boolean;
 };
 
 /**
@@ -103,9 +107,12 @@ export function settingsAccessFor(input: {
   canDelete: boolean;
   priceLists: boolean;
   punchCards?: boolean;
+  invoicing?: boolean;
   granted: readonly string[];
 }): SettingsAccess {
-  const { role, canWrite, canDelete, priceLists, punchCards = false, granted } = input;
+  // DOC-05: read here (server only: every caller is a server component or action), so the settings page, its side list and
+  // the command palette agree without each of them asking
+  const { role, canWrite, canDelete, priceLists, punchCards = false, invoicing = invoiceProviderName() !== null, granted } = input;
   const admin = isAdminRole(role);
   return {
     admin,
@@ -119,6 +126,7 @@ export function settingsAccessFor(input: {
     automations: canManageAutomations(role, granted),
     keptQuotes: admin || role === "manager",
     owner: role === "owner",
+    invoicing,
   };
 }
 
@@ -253,6 +261,10 @@ export function settingsGroups(orgId: string, access: SettingsAccess): SettingsG
         // SPD-07: owners and admins only
         ...(access.admin
           ? [{ href: siteWidgetSettingsPath(orgId), label: "כפתור באתר", description: "כפתור צף לאתר שלכם: WhatsApp, חיוג וטופס קצר שנכנס כליד", icon: ChatIcon }]
+          : []),
+        // DOC-05: owners and admins, while this deployment offers an invoice provider
+        ...(access.admin && access.invoicing
+          ? [{ href: invoicingSettingsPath(orgId), label: "ספק חשבוניות", description: "חיבור לספק החשבוניות של העסק, כדי להפיק חשבוניות וקבלות מהמערכת", icon: FormIcon }]
           : []),
         // INT-01: owners and admins only
         ...(access.admin

@@ -758,9 +758,10 @@ describe("background job queue (OPS-04)", () => {
   // RPT-03: report.send, owner's answer (386) א, 16 November 2026 (test 377; queued only while a worker asked for it; its
   // functions are pinned below).
   // USR-09: invite.send, owner's answer (387) א, 16 November 2026 (test 378; its functions are pinned below).
-  it("(55) א: the job kinds are exactly {message.send, import.run, export.run, digest.send, report.send, invite.send}", async () => {
+  // DOC-07: invoice.issue, owner's answer (398) א, 16 November 2026 (test 381-invoice-issue; its functions are pinned there).
+  it("(55) א: the job kinds are exactly {message.send, import.run, export.run, digest.send, report.send, invite.send, invoice.issue}", async () => {
     const kinds = await asAdmin(async (q) => (await q<{ k: string[] }>("select app.job_kinds() as k")).rows[0].k);
-    expect(kinds).toEqual(["message.send", "import.run", "export.run", "digest.send", "report.send", "invite.send"]);
+    expect(kinds).toEqual(["message.send", "import.run", "export.run", "digest.send", "report.send", "invite.send", "invoice.issue"]);
   });
 
   // USR-11 / WAB-03 (owner (267) א, (375) ב): the daily summary's worker path, pinned like the queue's own functions (body,

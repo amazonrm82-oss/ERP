@@ -59,7 +59,13 @@ export const MEMBER_PERMISSIONS: readonly MemberPermissionInfo[] = [
     description: "רישום חשבוניות וקבלות שהופקו מחוץ למערכת על עסקה או איש קשר, וביטול רישום עם סיבה. בעלים, מנהלי מערכת ומנהלי צוות רושמים תמיד.",
     built: true,
   },
-  { key: "issue_documents", label: "הפקת מסמכים", description: "הפקת חשבוניות וקבלות.", built: false },
+  {
+    key: "issue_documents",
+    label: "הפקת מסמכים",
+    description: "הפקת חשבוניות וקבלות דרך ספק החשבוניות של העסק. בעלים ומנהלי מערכת מפיקים תמיד.",
+    // DOC-17 (migration invoice_provider_settings): app.can_issue_documents()
+    built: true,
+  },
   { key: "issue_credits", label: "זיכוי", description: "הפקת מסמכי זיכוי.", built: false },
   {
     key: "record_payments",
@@ -116,6 +122,12 @@ export function canManageAutomations(role: MembershipRole, granted: readonly str
  * owners, admins and managers by role, or a member holding the view_costs grant. For the screens
  * only: the cost itself comes from public.product_costs, whose RLS applies the same rule.
  */
+/** DOC-17: app.can_issue_documents(): owners and admins by role, or the personal key (managers too only when granted). */
+export function canIssueDocuments(role: MembershipRole | null, granted: readonly string[]): boolean {
+  if (role === null) return false;
+  return hasPermission(role, granted, "issue_documents");
+}
+
 /** DOC-01: app.can_record_documents(): owners, admins and managers by role, or the personal key. */
 export function canRecordDocuments(role: MembershipRole | null, granted: readonly string[]): boolean {
   if (role === null) return false;

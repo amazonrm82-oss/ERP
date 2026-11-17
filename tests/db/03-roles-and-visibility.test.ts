@@ -1307,6 +1307,36 @@ describe("roles and record visibility", () => {
     await asUser(owner.id, (q) => q("update public.anomaly_alert_settings set idle_rep_on = true, lead_drop_percent = 50 where organization_id = $1", [org]));
   });
 
+  it("the invoice provider settings: everyone reads them, only owners and admins of a writable business set the defaults, the connection is the server's, nobody deletes them (DOC-05)", async () => {
+    for (const u of [manager, m1, viewer]) {
+      expect(
+        (await pgError(asUser(u.id, (q) => q("insert into public.invoice_provider_settings (organization_id, locale) values ($1, 'en')", [org])))).code,
+        u.email,
+      ).toBe("42501");
+    }
+    await asUser(admin.id, (q) => q("insert into public.invoice_provider_settings (organization_id, locale) values ($1, 'en')", [org]));
+    for (const u of [owner, admin, manager, m1, viewer]) {
+      const rows = await asUser(u.id, async (q) =>
+        (await q<{ locale: string; status: string }>("select locale, status from public.invoice_provider_settings where organization_id = $1", [org])).rows,
+      );
+      expect(rows, u.email).toEqual([{ locale: "en", status: "disconnected" }]);
+    }
+    for (const u of [manager, m1, viewer]) {
+      expect(await asUser(u.id, async (q) => (await q("update public.invoice_provider_settings set locale = 'he' where organization_id = $1", [org])).rowCount), u.email).toBe(0);
+    }
+    expect(await asUser(owner.id, async (q) => (await q("update public.invoice_provider_settings set default_doc_type = 'receipt' where organization_id = $1", [org])).rowCount)).toBe(1);
+    expect((await pgError(asUser(owner.id, (q) => q("update public.invoice_provider_settings set status = 'connected' where organization_id = $1", [org])))).code).toBe("42501");
+    expect((await pgError(asUser(owner.id, (q) => q("delete from public.invoice_provider_settings where organization_id = $1", [org])))).code).toBe("42501");
+    const status = await asAdmin(async (q) => (await q<{ status: string }>("select status from public.organizations where id = $1", [org])).rows[0].status);
+    await asAdmin((q) => q("update public.organizations set status = 'read_only' where id = $1", [org]));
+    try {
+      expect(await asUser(m1.id, (q) => count(q, "select 1 from public.invoice_provider_settings where organization_id = $1", [org]))).toBe(1);
+      expect(await asUser(owner.id, async (q) => (await q("update public.invoice_provider_settings set locale = 'he' where organization_id = $1", [org])).rowCount)).toBe(0);
+    } finally {
+      await asAdmin((q) => q("update public.organizations set status = $1 where id = $2", [status, org]));
+    }
+  });
+
   it("the daily summary setting: every role keeps its own row, nobody reads or changes another's (USR-11 / WAB-03)", async () => {
     for (const u of [owner, admin, manager, m1, viewer]) {
       await asUser(u.id, (q) => q("insert into public.digest_settings (organization_id, send_at) values ($1, '09:00')", [org]));

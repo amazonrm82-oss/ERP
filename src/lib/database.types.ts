@@ -1091,6 +1091,26 @@ export type PunchCardAlertSettingsRow = {
   updated_at: string;
 };
 
+// DOC-05: the business's invoice provider (server-kept) and its issue defaults (migration invoice_provider_settings).
+export type InvoiceProviderSettingsRow = {
+  id: string;
+  organization_id: string;
+  // server only: the provider code, connected | disconnected, and the last connection check
+  provider: string | null;
+  status: string;
+  connected_at: string | null;
+  connected_by: string | null;
+  last_check_at: string | null;
+  last_check_ok: boolean | null;
+  // tax_invoice | tax_invoice_receipt | receipt | proforma
+  default_doc_type: string;
+  // he | en
+  locale: string;
+  provider_sends_email: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 // MNY-04 (285) ג: a switch and a threshold per anomaly alert (migration anomaly_alert_settings); no row = every alert on.
 export type AnomalyAlertSettingsRow = {
   id: string;
@@ -4016,6 +4036,12 @@ export type Database = {
         { organization_id: string; low_entries?: number; expiry_days?: number; customer_messages?: boolean; notices_to?: string },
         { low_entries?: number; expiry_days?: number; customer_messages?: boolean; notices_to?: string }
       >;
+      // DOC-05: column grants (the defaults); the connection is written only by its functions; no delete
+      invoice_provider_settings: Table<
+        InvoiceProviderSettingsRow,
+        { organization_id: string; default_doc_type?: string; locale?: string; provider_sends_email?: boolean },
+        { default_doc_type?: string; locale?: string; provider_sends_email?: boolean }
+      >;
       // MNY-04 (285) ג: column grants (the switches and the numbers); no delete
       anomaly_alert_settings: Table<AnomalyAlertSettingsRow, { organization_id: string } & AnomalyAlertSettingsValues, AnomalyAlertSettingsValues>;
       // RET-02: column grants (enabled_at is the server's); no delete
@@ -4587,6 +4613,17 @@ export type Database = {
       report_punch_cards: { Args: { p_org: string; p_days?: number }; Returns: Json };
       // MNY-06: what the system did this month, counts only (invoker; owners and admins, {"allowed": false} otherwise)
       report_monthly_summary: { Args: { p_org: string; p_month?: string | null }; Returns: Json };
+      // DOC-05 / DOC-07: the invoice provider connection and issuing through it (migrations invoice_provider_settings, invoice_issue)
+      invoice_provider_connect: { Args: { p_org: string; p_provider: string }; Returns: undefined };
+      invoice_provider_disconnect: { Args: { p_org: string }; Returns: undefined };
+      invoice_provider_check_recorded: { Args: { p_org: string; p_ok: boolean }; Returns: undefined };
+      invoice_issue_customer: { Args: { p_org: string; p_kind: string; p_id: string }; Returns: Json };
+      invoice_issue_begin: { Args: { p_org: string; p_key: string; p_kind: string; p_id: string; p_doc: Json }; Returns: Json };
+      invoice_issue_claim: { Args: { p_job: string; p_lease: string }; Returns: Json };
+      invoice_issue_record: { Args: { p_job: string; p_lease: string; p_result: Json }; Returns: Json };
+      invoice_issue_state: { Args: { p_org: string; p_request: string }; Returns: Json };
+      invoice_issue_requests_open: { Args: { p_org: string }; Returns: Json };
+      invoice_issue_close: { Args: { p_org: string; p_request: string }; Returns: Json };
       // COL-01: the collection screen's open debt documents (invoker; BAL-01's rights, BAL-03's partial rule)
       collection_documents: {
         Args: {
