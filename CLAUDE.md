@@ -3561,6 +3561,14 @@ that back.
 - Entry (LND-01/06/07/08): `/` is the public landing page (`paths.landing`); the business picker is `/app`
   (`paths.home`). The proxy sends a signed-in visitor of `/` to `/app`; the installed app starts at `/app`
   (manifest `id` stays `/`), and the landing page opened inside it goes to `/login`.
+  Sign-up from the price list (WEB-02, migration 021311; lead's choices, questions 402-404; an independent review): an available
+  plan's card links to `/go/signup?src=…&plan=<key>` (LND-14 counts it) and `/signup` carries a well-formed key into the person's
+  OWN Auth metadata (`signup_plan`, `signup_source`; never for an invitation, never a cookie). `public.create_organization` (last
+  redefined in 021311, every line of 007600 kept) reads them only for the person's first own business (no owner membership yet):
+  the plan only while `plans.availability = 'available'` (else today's 'pro' trial, silently), the source folded again by
+  `app.landing_event_source`; same 14-day 'trialing'. `app.org_signup_origins` (no grants; cascades) keeps source and honoured
+  plan, read by `platform_list_orgs` / `platform_org` (last redefined in 021311). The metadata is self-reported, so the panel's
+  "מקור הרשמה" is the visitor's claim. Google sign-in carries neither. The advisor's finding on `app.org_signup_origins` is expected.
 - Column grants (RVW-12, 0073): `contacts`, like `leads` (0038) and `tasks` (0063), has column-level INSERT/UPDATE
   grants; a new column on any of them needs `grant insert, update (col) ... to authenticated`. `last_contacted_at` /
   `first_contacted_at` are server-only. Tasks may link only records the caller can see (0074: `tasks_insert` +
