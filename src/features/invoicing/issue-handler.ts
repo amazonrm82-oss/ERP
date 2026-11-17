@@ -129,8 +129,8 @@ export function createInvoiceIssueHandler(deps: { calls: InvoiceIssueCalls; prov
               ok: true,
               provider_document_id: issued.document.providerDocumentId,
               number: issued.document.number,
-              allocation_number: issued.document.allocationNumber,
-              allocation_failure: issued.document.allocationFailure,
+              // DOC-10: the provider's allocation outcome as it answered it (the database keeps the closed list's codes only)
+              allocation: issued.document.allocation,
             }
           : late && issued.code === "not_found"
             ? { ok: false, code: "not_at_provider", final: true }

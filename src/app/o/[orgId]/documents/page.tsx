@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/ui/feedback";
 import { Input, Select } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
-import { DocumentName, DocumentsTable, documentHome } from "@/features/documents/components/documents-table";
+import { AllocationMissingBadge, DocumentName, DocumentsTable, documentHome } from "@/features/documents/components/documents-table";
 import {
   DOCUMENT_DEFAULT_SORT,
   DOCUMENT_LIST_STATUS_LABELS,
@@ -307,7 +307,8 @@ export default async function DocumentsPage({ params, searchParams }: Props) {
                       {formatDate(`${doc.docDate}T12:00:00Z`)}
                     </p>
                   </div>
-                  <span className="flex items-center gap-2 text-sm">
+                  <span className="flex flex-wrap items-center gap-2 text-sm">
+                    <AllocationMissingBadge doc={doc} />
                     {payStates?.get(doc.id) ? (
                       <PayStateBadge state={payStates.get(doc.id)!.payState} />
                     ) : doc.cancelled ? (

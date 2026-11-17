@@ -1,13 +1,14 @@
 import { createHash } from "node:crypto";
 
-import type { CreditRequest, InvoiceProvider, IssueRequest, ProviderDocument, ProviderFailure } from "./types";
+import type { AllocationFailureCode, AllocationOutcome, CreditRequest, InvoiceProvider, IssueRequest, ProviderDocument, ProviderFailure } from "./types";
 
 /**
  * DOC-06: the fake invoice provider (owner (270) (1) א: build behind a fake provider, hidden on the live site until a real
  * adapter exists). It issues nothing anywhere: it keeps what it "issued" in memory of this server process, so a test or a
  * local run can read it back. Numbers and ids are derived from the request's idempotency key (SHA-256), so the same key
  * always answers the same document, also after the process restarts (DOC-09), and two keys never meet in practice.
- * A tax invoice and a tax invoice-receipt always get an allocation number (spec 6.7: the provider decides the threshold).
+ * A tax invoice and a tax invoice-receipt get an allocation number unless a test asks for a failure (DOC-10), and every other
+ * type answers "not needed" (spec 6.7: the provider decides the threshold, never the system).
  * Chosen only by INVOICE_PROVIDER=fake and never on a production or preview deployment (select.ts).
  */
 export const FAKE_PROVIDER = "fake";
@@ -15,8 +16,10 @@ export const FAKE_PROVIDER = "fake";
 type FakeOptions = {
   /** Tests: answer a failure instead of issuing (nothing is kept) */
   fail?: (request: IssueRequest | CreditRequest) => ProviderFailure | null;
-  /** Tests: the allocation number is refused on this request */
-  allocationFailure?: (request: IssueRequest) => string | null;
+  /** Tests (DOC-10): the allocation number is refused on this request, with this code */
+  allocationFailure?: (request: IssueRequest) => AllocationFailureCode | null;
+  /** Tests (DOC-10): the provider says this request needs no allocation number (it judged the threshold) */
+  allocationNotNeeded?: (request: IssueRequest) => boolean;
 };
 
 const issued = new Map<string, ProviderDocument>();
@@ -72,8 +75,13 @@ export function createFakeInvoiceProvider(options: FakeOptions = {}): InvoicePro
       const known = issued.get(request.idempotencyKey);
       if (known) return { ok: true, document: known };
       const hex = digest(request.idempotencyKey);
-      const allocates = request.type === "tax_invoice" || request.type === "tax_invoice_receipt";
-      const allocationFailure = allocates ? (options.allocationFailure?.(request) ?? null) : null;
+      const allocates = (request.type === "tax_invoice" || request.type === "tax_invoice_receipt") && !options.allocationNotNeeded?.(request);
+      const refusal = allocates ? (options.allocationFailure?.(request) ?? null) : null;
+      const allocation: AllocationOutcome = !allocates
+        ? { status: "not_needed" }
+        : refusal !== null
+          ? { status: "failed", code: refusal }
+          : { status: "allocated", number: digits(hex, 8) };
       return {
         ok: true,
         document: keep(request.idempotencyKey, {
@@ -82,8 +90,7 @@ export function createFakeInvoiceProvider(options: FakeOptions = {}): InvoicePro
           number: digits(hex, 0),
           date: request.date,
           totalAgorot: request.totals.totalAgorot,
-          allocationNumber: allocates && allocationFailure === null ? digits(hex, 8) : null,
-          allocationFailure,
+          allocation,
           customerRef: request.customer.externalRef,
         }),
       };
@@ -116,8 +123,7 @@ export function createFakeInvoiceProvider(options: FakeOptions = {}): InvoicePro
           number: digits(hex, 0),
           date: request.date,
           totalAgorot: request.totals.totalAgorot,
-          allocationNumber: null,
-          allocationFailure: null,
+          allocation: { status: "not_needed" },
           customerRef: byId.get(request.originalProviderDocumentId)?.customerRef ?? null,
         }),
       };

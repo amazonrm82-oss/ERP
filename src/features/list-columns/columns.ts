@@ -168,6 +168,8 @@ const BUILT_IN: Record<ListObject, { columns: CatalogColumn[]; defaults: string[
       { key: "due", label: "מועד תשלום" },
       { key: "recorder", label: "נרשם על ידי" },
       { key: "created", label: "נרשם בתאריך" },
+      // DOC-10
+      { key: "allocation", label: "מספר הקצאה" },
     ],
     defaults: ["type", "customer", "date", "amount", "status"],
   },

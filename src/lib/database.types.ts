@@ -2749,6 +2749,9 @@ export type AccountingDocumentRow = {
   provider_document_id: string | null;
   // DOC-02: the Tax Authority's allocation number (tax invoices only)
   allocation_number: string | null;
+  // DOC-10: the provider did not get an allocation number (server only; both or neither; a closed list of codes)
+  allocation_failed_at: string | null;
+  allocation_error_code: string | null;
   // DOC-02: the VAT split as printed (both or neither; net + vat = amount)
   net_agorot: number | null;
   vat_agorot: number | null;

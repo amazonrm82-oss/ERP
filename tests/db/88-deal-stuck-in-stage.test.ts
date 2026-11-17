@@ -215,6 +215,8 @@ const RERUN = [
   migrationFile("_quote_revoke_stops_reminders.sql"),
   // owner (401) א redefines app.merge_prefill_links() last (a converted lead's links move)
   migrationFile("_prefill_links_convert.sql"),
+  // DOC-10 redefines public.invoice_issue_record() of _invoice_issue.sql last (the allocation outcome)
+  migrationFile("_allocation_failure.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

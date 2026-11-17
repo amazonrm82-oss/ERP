@@ -59,16 +59,41 @@ export type IssueRequest = {
   totals: InvoiceTotals;
 };
 
+/**
+ * DOC-10: why a provider did not get an allocation number, as one code of a CLOSED list (the database keeps only these:
+ * app.allocation_failure_codes(), constraint accounting_documents_allocation_failure_shape). An adapter maps its provider's
+ * own errors onto them; anything it cannot place is "other". "invalid_number" is the system's own: the provider said it got
+ * a number that is not digits.
+ */
+export const ALLOCATION_FAILURE_CODES = [
+  "tax_authority_refused",
+  "tax_authority_unavailable",
+  "customer_tax_id",
+  "business_not_authorized",
+  "invalid_number",
+  "other",
+] as const;
+export type AllocationFailureCode = (typeof ALLOCATION_FAILURE_CODES)[number];
+export const isAllocationFailureCode = (value: unknown): value is AllocationFailureCode =>
+  typeof value === "string" && (ALLOCATION_FAILURE_CODES as readonly string[]).includes(value);
+
+/**
+ * DOC-10: the allocation outcome of an issued document. Whether a document needs a number (the Tax Authority's threshold)
+ * is the provider's call only (spec 6.7): the system never works it out, it keeps what the provider answered.
+ */
+export type AllocationOutcome =
+  | { status: "allocated"; number: string }
+  | { status: "failed"; code: AllocationFailureCode }
+  | { status: "not_needed" };
+
 export type ProviderDocument = {
   providerDocumentId: string;
   type: ProviderDocumentType;
   number: string;
   date: string;
   totalAgorot: number;
-  /** DOC-10: the Tax Authority's allocation number, when the provider got one */
-  allocationNumber: string | null;
-  /** DOC-10: why the provider did not get an allocation number (its words), null when it did or none was needed */
-  allocationFailure: string | null;
+  /** DOC-10: the Tax Authority's allocation number, its failure with a code, or none needed (the provider's word) */
+  allocation: AllocationOutcome;
   /** The customer's ref as we sent it (DOC-11 matching), when the provider keeps it */
   customerRef: string | null;
 };

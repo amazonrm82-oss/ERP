@@ -22,7 +22,7 @@ const one = (field: string, op: string, value?: string): FilterTree => ({ match:
 describe("the documents list", () => {
   it("offers its columns, starts with a short set, and every column sorts", () => {
     const catalog = catalogFor("document", []);
-    expect(catalog.map((c) => c.key)).toEqual(["type", "customer", "date", "amount", "status", "due", "recorder", "created"]);
+    expect(catalog.map((c) => c.key)).toEqual(["type", "customer", "date", "amount", "status", "due", "recorder", "created", "allocation"]);
     expect(resolveColumns("document", null, catalog).map((c) => c.key)).toEqual(["type", "customer", "date", "amount", "status"]);
     for (const key of ["name", ...catalog.map((column) => column.key)]) expect(Object.keys(DOCUMENT_SORT_COLUMNS), key).toContain(key);
   });

@@ -1,8 +1,19 @@
 import { formatMoney } from "@/lib/format";
 
+import { allocationFailureText } from "../allocation";
 import type { AccountingDocument, DocumentLine } from "../queries";
 
-/** DOC-02: the details printed on a document (allocation number, VAT split, source, original), one short line; nothing when empty. */
+/** DOC-10: the mark on a document whose invoice provider did not get an allocation number, with the reason; nothing otherwise. */
+export function AllocationFailureMark({ doc }: { doc: Pick<AccountingDocument, "allocationNumber" | "allocationErrorCode"> }) {
+  const text = allocationFailureText(doc);
+  if (!text) return null;
+  return <p className="text-sm font-medium break-words text-warning">{text}</p>;
+}
+
+/**
+ * DOC-02: the details printed on a document (allocation number, VAT split, source, original), one short line; nothing when
+ * empty. DOC-10: under it, the mark when the provider did not get an allocation number.
+ */
 export function DocumentDetailsLine({ doc, quoteLabel, originalLabel }: { doc: AccountingDocument; quoteLabel: string | null; originalLabel: string | null }) {
   const parts: React.ReactNode[] = [];
   if (doc.allocationNumber) {
@@ -25,16 +36,20 @@ export function DocumentDetailsLine({ doc, quoteLabel, originalLabel }: { doc: A
   }
   if (doc.quoteId) parts.push(<span key="quote">{quoteLabel ? <>הופק מ<bdi>{quoteLabel}</bdi></> : "הופק מהצעת מחיר"}</span>);
   if (doc.originalDocumentId) parts.push(<span key="original">{originalLabel ? <>מזכה את {originalLabel}</> : "מזכה מסמך קודם"}</span>);
-  if (parts.length === 0) return null;
+  const failure = <AllocationFailureMark doc={doc} />;
+  if (parts.length === 0) return failure;
   return (
-    <p className="text-sm break-words text-ink-soft">
-      {parts.map((part, index) => (
-        <span key={index}>
-          {index > 0 ? " · " : ""}
-          {part}
-        </span>
-      ))}
-    </p>
+    <>
+      <p className="text-sm break-words text-ink-soft">
+        {parts.map((part, index) => (
+          <span key={index}>
+            {index > 0 ? " · " : ""}
+            {part}
+          </span>
+        ))}
+      </p>
+      {failure}
+    </>
   );
 }
 

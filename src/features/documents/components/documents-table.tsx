@@ -8,6 +8,7 @@ import { formatDate, formatMoney } from "@/lib/format";
 import { paths } from "@/lib/paths";
 import type { Sort } from "@/lib/sort";
 
+import { allocationFailureText } from "../allocation";
 import { DOCUMENT_PAY_STATE_LABELS, DOCUMENT_PAY_STATE_TONES, type DocumentPayState } from "../pay-state";
 import type { DocumentListItem } from "../queries";
 import { DOCUMENT_TYPE_LABELS, documentTitle, isOpeningBalance } from "../schema";
@@ -40,6 +41,20 @@ export function documentHome(orgId: string, doc: Pick<DocumentListItem, "dealId"
 /** DOC-03: a document's payment state as a chip. */
 export function PayStateBadge({ state }: { state: DocumentPayState }) {
   return <Badge tone={DOCUMENT_PAY_STATE_TONES[state]}>{DOCUMENT_PAY_STATE_LABELS[state]}</Badge>;
+}
+
+/** DOC-10: a short mark beside a document whose provider did not get an allocation number (the reason is in its title). */
+export function AllocationMissingBadge({ doc }: { doc: Pick<DocumentListItem, "allocationNumber" | "allocationErrorCode"> }) {
+  const text = allocationFailureText(doc);
+  if (!text) return null;
+  return (
+    <span title={text}>
+      <Badge tone="warning">
+        <span className="sr-only">{text}</span>
+        <span aria-hidden="true">חסר מספר הקצאה</span>
+      </Badge>
+    </span>
+  );
 }
 
 /** A document's type and number, as the first column and the mobile list show them. */
@@ -99,6 +114,7 @@ export function DocumentsTable({ orgId, documents, columns, catalog, recorderNam
                   <DocumentName doc={doc} />
                 </span>
               )}
+              <AllocationMissingBadge doc={doc} />
             </div>
           );
         }}
@@ -137,6 +153,16 @@ export function DocumentsTable({ orgId, documents, columns, catalog, recorderNam
               return doc.createdBy ? (recorderNames.get(doc.createdBy) ?? null) : null;
             case "created":
               return <span className="text-ink-soft">{day(doc.createdAt)}</span>;
+            case "allocation": {
+              // DOC-10: the number, or the mark with the provider's reason
+              const failure = allocationFailureText(doc);
+              if (failure) return <span className="text-sm break-words text-warning">{failure}</span>;
+              return doc.allocationNumber ? (
+                <bdi dir="ltr" className="tabular-nums">
+                  {doc.allocationNumber}
+                </bdi>
+              ) : null;
+            }
             default:
               return null;
           }

@@ -75,18 +75,23 @@ describe("the fake adapter", () => {
     expect(a.document.providerDocumentId).toMatch(/^fake_doc_[0-9a-f]{24}$/);
   });
 
-  it("a tax invoice gets an allocation number, a receipt or a proforma none; a refused allocation says why", async () => {
-    const provider = createFakeInvoiceProvider({ allocationFailure: (r) => (r.idempotencyKey === "k-no" ? "סירוב רשות המסים" : null) });
+  it("DOC-10: a tax invoice gets an allocation number, a receipt or a proforma none needed; a refused allocation answers its code", async () => {
+    const provider = createFakeInvoiceProvider({
+      allocationFailure: (r) => (r.idempotencyKey === "k-no" ? "tax_authority_refused" : null),
+      allocationNotNeeded: (r) => r.idempotencyKey === "k-small",
+    });
     const invoice = await provider.issueDocument(request("k-inv"));
     const receipt = await provider.issueDocument(request("k-rec", { type: "receipt" }));
     const proforma = await provider.issueDocument(request("k-pro", { type: "proforma" }));
     const refused = await provider.issueDocument(request("k-no", { type: "tax_invoice_receipt" }));
-    if (!invoice.ok || !receipt.ok || !proforma.ok || !refused.ok) throw new Error("issue failed");
-    expect(invoice.document.allocationNumber).toMatch(/^[0-9]{9}$/);
-    expect(receipt.document.allocationNumber).toBeNull();
-    expect(proforma.document.allocationNumber).toBeNull();
-    expect(refused.document.allocationNumber).toBeNull();
-    expect(refused.document.allocationFailure).toBe("סירוב רשות המסים");
+    const small = await provider.issueDocument(request("k-small"));
+    if (!invoice.ok || !receipt.ok || !proforma.ok || !refused.ok || !small.ok) throw new Error("issue failed");
+    expect(invoice.document.allocation).toEqual({ status: "allocated", number: expect.stringMatching(/^[0-9]{9}$/) });
+    expect(receipt.document.allocation).toEqual({ status: "not_needed" });
+    expect(proforma.document.allocation).toEqual({ status: "not_needed" });
+    expect(refused.document.allocation).toEqual({ status: "failed", code: "tax_authority_refused" });
+    // the provider judged the threshold: the system keeps its word
+    expect(small.document.allocation).toEqual({ status: "not_needed" });
   });
 
   it("a failure is answered, never thrown, and keeps nothing", async () => {

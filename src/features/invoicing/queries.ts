@@ -167,3 +167,24 @@ export async function getIssueRequest(orgId: string, requestId: string): Promise
     sourceId: text("source_id"),
   };
 }
+
+/**
+ * DOC-10: the recorded document's allocation number, or the provider's failure to get one, for the request's page. Read with
+ * the user's session (the accounting_documents RLS decides); null when the document is not readable.
+ */
+export async function getIssuedDocumentAllocation(
+  orgId: string,
+  documentId: string,
+): Promise<{ allocationNumber: string | null; allocationErrorCode: string | null } | null> {
+  const supabase = await createClient();
+  const row = must(
+    await supabase
+      .from("accounting_documents")
+      .select("allocation_number, allocation_error_code")
+      .eq("organization_id", orgId)
+      .eq("id", documentId)
+      .maybeSingle(),
+    "issued document allocation",
+  );
+  return row ? { allocationNumber: row.allocation_number, allocationErrorCode: row.allocation_error_code } : null;
+}

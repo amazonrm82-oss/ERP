@@ -23,6 +23,8 @@ export const DOCUMENT_SORT_COLUMNS = {
   due: "due_date",
   recorder: "sort_recorder",
   created: "created_at",
+  // DOC-10
+  allocation: "allocation_number",
 } as const;
 export type DocumentSortKey = keyof typeof DOCUMENT_SORT_COLUMNS;
 export const DOCUMENT_DEFAULT_SORT: Sort<DocumentSortKey> = { key: "date", ascending: false };

@@ -30,7 +30,12 @@ const REVIEWED_MD5: Record<string, string> = {
   "public.invoice_issue_begin": "613ffef8dbbadc4447794a7bc92b8446",
   "public.invoice_issue_claim": "e07a0e1396cfbee899a9d7a3d2fb61f4",
   "public.invoice_issue_close": "a666cd68ecd81f94257111bc67cb5741",
-  "public.invoice_issue_record": "689832c23af98b1f287cea39a2807295",
+  // DOC-10 (migration allocation_failure, 17 November 2026): 021297's body plus the provider's allocation outcome (the
+  // `allocation` object or the old keys, codes from app.allocation_failure_codes(), 'invalid_number' for a number that is
+  // not digits, the mark written on the recorded document). Rechecked: lease and request locks, every refusal and retry
+  // branch, the late lookup, the server-only insert with the claims set aside and restored, the audit actor, the deadlock
+  // re-raise, unchanged; no amount is compared for the allocation.
+  "public.invoice_issue_record": "fd1b3cd95119aa4bffb8cf7f96d246d8",
   "public.invoice_issue_requests_open": "a3568e808238728700c48a0fc061a4be",
   "public.invoice_issue_state": "61f1e0d0216e257a93d4b0b5f5cd7ee0",
   "public.invoice_provider_check_recorded": "47a98ea21aa0dcd33f782fe6d1fce73e",
@@ -279,6 +284,95 @@ describe("issuing through the invoice provider", () => {
         ),
       );
       expect(error.code).toBe("42501");
+    });
+
+    // DOC-10: the provider's allocation outcome (a number, a failure with a code from the closed list, or not needed) is kept as
+    // it answered; the system never decides whether a number was needed
+    const allocationOf = (documentId: unknown) =>
+      asAdmin((q) =>
+        one<Record<string, unknown>>(
+          q,
+          "select allocation_number, allocation_error_code, allocation_failed_at is not null as marked from public.accounting_documents where id = $1",
+          [documentId],
+        ),
+      );
+    const requestFailure = (request: unknown) =>
+      asAdmin(async (q) => (await one<{ f: string | null }>(q, "select allocation_failure as f from app.invoice_issue_requests where id = $1", [request])).f);
+    const issueWith = async (allocation: unknown, d: Record<string, unknown> = doc()) => {
+      const r = await begin(issuer, randomUUID(), "deal", deal, d);
+      const { allocation_number: _drop, ...rest } = result();
+      void _drop;
+      const done = await work(r.request_id as string, { ...rest, allocation });
+      expect(done.status).toBe("issued");
+      return { request: r.request_id, document: done.document_id };
+    };
+
+    it("DOC-10: an allocated number is kept, a failure marks the document with its code, not needed leaves both empty", async () => {
+      const allocated = await issueWith({ status: "allocated", number: "987654321" });
+      expect(await allocationOf(allocated.document)).toEqual({ allocation_number: "987654321", allocation_error_code: null, marked: false });
+      const failed = await issueWith({ status: "failed", code: "tax_authority_unavailable" });
+      expect(await allocationOf(failed.document)).toEqual({ allocation_number: null, allocation_error_code: "tax_authority_unavailable", marked: true });
+      expect(await requestFailure(failed.request)).toBe("tax_authority_unavailable");
+      // the provider said none was needed (its threshold): nothing marked, whatever the amount
+      const notNeeded = await issueWith({ status: "not_needed" });
+      expect(await allocationOf(notNeeded.document)).toEqual({ allocation_number: null, allocation_error_code: null, marked: false });
+      // a code outside the closed list is kept as 'other'; a number that is not digits is marked, never kept
+      const unknown = await issueWith({ status: "failed", code: "סירוב חופשי" });
+      expect((await allocationOf(unknown.document)).allocation_error_code).toBe("other");
+      const garbage = await issueWith({ status: "allocated", number: "12-34" });
+      expect(await allocationOf(garbage.document)).toEqual({ allocation_number: null, allocation_error_code: "invalid_number", marked: true });
+      // a receipt carries neither
+      const receipt = await issueWith({ status: "failed", code: "other" }, doc({ doc_type: "receipt" }));
+      expect(await allocationOf(receipt.document)).toEqual({ allocation_number: null, allocation_error_code: null, marked: false });
+    });
+
+    it("DOC-10: a worker built before DOC-10 still records (allocation_number, or its words as 'other'); a bad outcome is refused", async () => {
+      const r = await begin(issuer, randomUUID(), "deal", deal);
+      const { allocation_number: _drop, ...rest } = result();
+      void _drop;
+      const done = await work(r.request_id as string, { ...rest, allocation_number: null, allocation_failure: "שגיאה אצל הספק" });
+      expect(await allocationOf(done.document_id)).toEqual({ allocation_number: null, allocation_error_code: "other", marked: true });
+      const bad = await begin(issuer, randomUUID(), "deal", deal);
+      const job = await claimJob(bad.request_id as string);
+      await claimOf(job);
+      expect((await pgError(record(job, { ok: true, ...result(), allocation: { status: "maybe" } }))).code).toBe("22023");
+      await asService((q) => q("select public.finish_job($1, $2, false, null, false, false)", [job.id, job.lease]));
+    });
+
+    it("DOC-10: the mark is the server's: a person can neither write it nor change it; readers of the document see it", async () => {
+      const failed = await issueWith({ status: "failed", code: "customer_tax_id" });
+      const insert = await pgError(
+        run(owner, (q) =>
+          q(
+            "insert into public.accounting_documents (organization_id, contact_id, doc_type, number, amount_agorot, allocation_error_code, allocation_failed_at) values ($1, $2, 'tax_invoice', 'M-1', 100, 'other', now())",
+            [org, person],
+          ),
+        ),
+      );
+      expect(insert.code).toBe("42501");
+      expect((await pgError(run(owner, (q) => q("update public.accounting_documents set allocation_error_code = null, allocation_failed_at = null where id = $1", [failed.document])))).code).toBe("42501");
+      // a definer path with a session still cannot change it
+      const frozen = await pgError(
+        asAdmin(async (q) => {
+          await q("select set_config('request.jwt.claim.sub', $1, true), set_config('request.jwt.claims', $2, true)", [owner.id, JSON.stringify({ sub: owner.id, role: "authenticated" })]);
+          await q("update public.accounting_documents set allocation_error_code = 'other' where id = $1", [failed.document]);
+        }),
+      );
+      expect(frozen.hint).toBe("document:frozen");
+      for (const reader of [owner, admin, issuer]) {
+        expect((await run(reader, (q) => one<{ c: string | null }>(q, "select allocation_error_code as c from public.accounting_documents where id = $1", [failed.document])))?.c).toBe("customer_tax_id");
+      }
+      // the shape holds for every writer: a code outside the list, a mark on a receipt, a mark beside a number
+      for (const sql of [
+        "update public.accounting_documents set allocation_error_code = 'nope' where id = $1",
+        "update public.accounting_documents set allocation_failed_at = null where id = $1",
+        "update public.accounting_documents set allocation_number = '1' where id = $1",
+      ]) {
+        expect((await pgError(asAdmin((q) => q(sql, [failed.document])))).code).toBe("23514");
+      }
+      // the server fills a number that arrived later and clears the mark in the same write
+      await asAdmin((q) => q("update public.accounting_documents set allocation_number = '555', allocation_error_code = null, allocation_failed_at = null where id = $1", [failed.document]));
+      expect(await allocationOf(failed.document)).toEqual({ allocation_number: "555", allocation_error_code: null, marked: false });
     });
 
     it("a number recorded by hand before stays on the request as unrecorded; nothing is recorded twice", async () => {

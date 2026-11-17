@@ -931,6 +931,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_quote_revoke_stops_reminders.sql",
       // owner (401) א redefines app.merge_prefill_links() of _prefill_link_public.sql last (a converted lead's links move)
       "_prefill_links_convert.sql",
+      // DOC-10 redefines public.invoice_issue_record() of _invoice_issue.sql last (the allocation outcome)
+      "_allocation_failure.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

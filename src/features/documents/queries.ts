@@ -50,6 +50,8 @@ export type AccountingDocument = {
   // DOC-02 (null on documents recorded before it, or left empty)
   provider: string | null;
   allocationNumber: string | null;
+  // DOC-10: the provider did not get an allocation number (server only; the code from ALLOCATION_FAILURE_CODES)
+  allocationErrorCode: string | null;
   netAgorot: number | null;
   vatAgorot: number | null;
   vatRateBp: number | null;
@@ -60,7 +62,7 @@ export type AccountingDocument = {
 export type DocumentsSubject = MoneySubject;
 
 const RECORD_COLUMNS =
-  "id, doc_type, number, doc_date, amount_agorot, proforma_id, due_date, status, cancel_reason, cancelled_at, cancelled_by, created_by, created_at, provider, allocation_number, net_agorot, vat_agorot, vat_rate_bp, quote_id, original_document_id";
+  "id, doc_type, number, doc_date, amount_agorot, proforma_id, due_date, status, cancel_reason, cancelled_at, cancelled_by, created_by, created_at, provider, allocation_number, allocation_error_code, net_agorot, vat_agorot, vat_rate_bp, quote_id, original_document_id";
 
 type RecordRow = {
   id: string;
@@ -78,6 +80,7 @@ type RecordRow = {
   created_at: string;
   provider: string | null;
   allocation_number: string | null;
+  allocation_error_code: string | null;
   net_agorot: number | null;
   vat_agorot: number | null;
   vat_rate_bp: number | null;
@@ -104,6 +107,7 @@ function documentFromRow(row: RecordRow, docType: DocumentType): AccountingDocum
     createdAt: row.created_at,
     provider: row.provider,
     allocationNumber: row.allocation_number,
+    allocationErrorCode: row.allocation_error_code,
     netAgorot: num(row.net_agorot),
     vatAgorot: num(row.vat_agorot),
     vatRateBp: row.vat_rate_bp,
@@ -245,6 +249,9 @@ export type DocumentListItem = {
   companyId: string | null;
   // the rule of public.sort_customer(accounting_documents): the contact's name, else the deal's, else the company's
   customer: string | null;
+  // DOC-10
+  allocationNumber: string | null;
+  allocationErrorCode: string | null;
 };
 
 /**
@@ -280,7 +287,8 @@ function documentsQuery(supabase: Client, orgId: string, filters: DocumentListFi
   return query;
 }
 
-const LIST_COLUMNS = "id, doc_type, number, doc_date, due_date, amount_agorot, status, created_by, created_at, deal_id, contact_id, company_id";
+const LIST_COLUMNS =
+  "id, doc_type, number, doc_date, due_date, amount_agorot, status, created_by, created_at, deal_id, contact_id, company_id, allocation_number, allocation_error_code";
 type ListRow = {
   id: string;
   doc_type: string;
@@ -294,6 +302,8 @@ type ListRow = {
   deal_id: string | null;
   contact_id: string | null;
   company_id: string | null;
+  allocation_number: string | null;
+  allocation_error_code: string | null;
 };
 
 export async function listDocuments(orgId: string, filters: DocumentListFilters): Promise<{ documents: DocumentListItem[]; hasMore: boolean }> {
@@ -333,6 +343,8 @@ export async function listDocuments(orgId: string, filters: DocumentListFilters)
               contactId: row.contact_id,
               companyId: row.company_id,
               customer: customers(row),
+              allocationNumber: row.allocation_number,
+              allocationErrorCode: row.allocation_error_code,
             },
           ]
         : [],
