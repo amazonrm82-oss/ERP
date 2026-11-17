@@ -671,6 +671,38 @@ and build this CRM here instead. The old code is preserved on the branch
   labels in `src/features/documents/allocation.ts`; a later fill by DOC-11 is a follow-up); `app.job_kinds` and `app.job_payload_ok` were last redefined in 021297. Accepted (review): a job the claim
   refused on its first try can raise a needless "check at the provider" notice, never a silent one. The advisor's findings on the six
   staff definers and `app.invoice_issue_requests` are expected.
+  In use (DOC-13, DOC-14, owner 17 November 2026 answers (408) ד, (409) ב, (410) ב, (411) ב, (412) א; migrations 021313 and 021314,
+  applied by the courier and md5 checked 17 November 2026; an independent review and three delta reviews): the same `invoice.issue`
+  path, no new job kind and no new service-key function (the worker still calls only `public.invoice_issue_claim()` and
+  `public.invoice_issue_record()`). DOC-13: before issuing, the worker makes or updates the customer (`upsertCustomer`) and each product a
+  line names (`upsertProduct`) at the provider with OUR details whenever no provider id is kept or the kept one was made with other
+  details (Mexuz wins); ids in `app.invoice_provider_customers` / `app.invoice_provider_products` (ids and a SHA-256 of the details only,
+  no grants, cascading with the record); the claim answers `provider_customer` / `provider_products`, the record keeps them (never
+  raises) and writes each line's `product_id`; a failed upsert is a failed try (`customer_<code>` / `product_<code>`);
+  `app.invoice_issue_open` takes an optional `product_id` per line. DOC-14: a credit invoice through the provider against an active tax
+  invoice or invoice-receipt the business's current provider issued. `app.can_issue_credits` = owners/admins by role, else BOTH PRM-01
+  keys `issue_documents` and `issue_credits` (built). `public.invoice_credit_begin` / `invoice_credit_room` (invoker, the original read
+  under RLS) over `app.invoice_credit_open` / `app.invoice_credit_room_of` (definer, granted to authenticated only for those wrappers,
+  accepted as `app.invoice_issue_open`). A request reserves its amount only while it may exist at the provider and is not recorded
+  (`app.invoice_credit_reserves`, never reading live job attempts): "never sent" is stamped once in `provider_absent_at` (close of a
+  never-claimed job, a claim answering finished on its first try, a not_at_provider lookup); released also when failed, recorded (by hand
+  with the provider's number too), marked `checked` (owners/admins only, hint `invoice_credit:check_admin`) or released by an owner/admin
+  through `public.invoice_credit_release` (only an ended request the provider did not issue, `invoice_credit:release`, whose job can no
+  longer run, `invoice_credit:release_wait`; stamps `credit_released_at`/`_by` only; leaves `invoice_issue_requests_open`). A provider
+  credit cancelled here keeps counting. A hand credit against a provider-issued original is refused above what is left (hint
+  `invoice_credit:hand_over`, DETAIL = agorot left, `creditHandOverMessage`), judged under the per-original lock in definer trigger
+  `accounting_documents_zz_credit_lock` (after `accounting_documents_source`, lock after the outsider guard), through
+  `app.invoice_credit_hand_room`; an unsplit hand credit counts the original's VAT share. Credit lines give exactly the recorded totals
+  (`app.invoice_credit_lines`); a partial credit of an original mixing exempt and taxable lines is made of chosen lines
+  (`accounting_document_lines.credited_line_id`, server only); when such an original's lines do not give back its totals only a full
+  credit is offered. The reason (1..500, one line, U+2028/9 folded, `app.document_invisible_class` and U+FEFF refused) goes to the
+  provider, the request and `accounting_documents.credit_reason` (server only, frozen by `accounting_documents_credit_reason`, erased by
+  `accounting_document_lines_credit_reason_erase` and by trigger `audit_log_credit_reason_erase` on `audit_log`, AFTER UPDATE OF changes
+  with a WHEN, when a document's audit entries become erased; `app.invoice_issue_payload_erased` empties the request's copy). The claim
+  refuses a credit whose original is no longer active or the provider's (`invoice_credit:original`). `public.invoice_issue_claim`,
+  `invoice_issue_record`, `invoice_issue_close`, `invoice_issue_requests_open`, `app.invoice_issue_open`, `app.invoice_issue_payload_erased`
+  and `app.member_permission_built_keys` were last redefined in 021313/021314; pinned by md5 in test 381; tests 64 and 88 end with
+  `_invoice_provider_customers.sql`, `_invoice_credit.sql`. The advisor's findings on `invoice_credit_release` and the two app tables are expected.
   In use (OPS-04, owner 26 October 2026, answer (א) and wave 3 use (1); conditions of 2 November 2026, answers (52)-(55); migration
    `_jobs_queue.sql`): the background job worker (`src/features/jobs/run-server.ts`, route `POST /api/jobs/run`, public prefix in
    `src/lib/supabase/proxy.ts`), woken by `app.wake_job_worker()` (pg_cron `crm-jobs-wake`, pg_net; `app.settings` `jobs_run_url`,
