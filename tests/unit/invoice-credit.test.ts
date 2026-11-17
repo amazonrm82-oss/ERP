@@ -5,6 +5,8 @@ import { createInvoiceIssueHandler, requestSchema } from "@/features/invoicing/i
 import { clearFakeInvoices, createFakeInvoiceProvider, fakeCustomerUpserts, fakeIssueCalls, fakeIssuedDocuments, fakeLookupCalls } from "@/features/invoicing/providers/fake";
 import { canIssueCredits, canIssueDocuments } from "@/features/permissions/keys";
 import { DEFAULT_TERMS } from "@/features/terminology/terms";
+import { dbErrorMessage } from "@/lib/errors";
+import { formatMoney } from "@/lib/format";
 
 // DOC-14: a credit invoice through the invoice provider: the form's rules, who credits, and the worker's credit path.
 
@@ -31,6 +33,8 @@ describe("the credit form", () => {
     expect(creditFormSchema.safeParse({ ...base, reason: "  " }).success).toBe(false);
     expect(creditFormSchema.safeParse({ ...base, reason: "x".repeat(501) }).success).toBe(false);
     expect(creditFormSchema.safeParse({ ...base, reason: "a\u0007b" }).success).toBe(false);
+    expect(creditFormSchema.safeParse({ ...base, reason: "a\u200fb" }).success).toBe(false);
+    expect(creditFormSchema.safeParse({ ...base, reason: "a\ufeffb" }).success).toBe(false);
     // one line: line breaks fold into one space (as app.invoice_credit_open)
     const folded = creditFormSchema.safeParse({ ...base, reason: " שורה\n\nשנייה  " });
     expect(folded.success && folded.data.reason).toBe("שורה שנייה");
@@ -128,5 +132,15 @@ describe("the worker's credit path", () => {
     await late(job);
     expect(fakeIssueCalls()).toBe(before);
     expect(fakeLookupCalls()).toBe(1);
+  });
+});
+
+describe("a hand credit above what is left (owner (412) א)", () => {
+  it("says how much may still be credited, from the detail; without one the general message", () => {
+    const text = dbErrorMessage({ code: "P0001", hint: "invoice_credit:hand_over", message: "x", details: "123450" });
+    expect(text).toContain(`אפשר לזכות עד ${formatMoney(123450)} בחשבונית הזו`);
+    const general = dbErrorMessage({ code: "P0001", hint: "invoice_credit:hand_over", message: "x" });
+    expect(general).not.toContain("אפשר לזכות עד");
+    expect(general.length).toBeGreaterThan(10);
   });
 });

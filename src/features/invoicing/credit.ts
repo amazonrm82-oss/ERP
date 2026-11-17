@@ -10,7 +10,10 @@ import { parseMoneyToAgorot } from "@/lib/format";
 export const CREDIT_REASON_MAX = 500;
 
 /** The reason as the database keeps it: trimmed, runs of white space folded into one space. */
-export const foldReason = (text: string) => text.replace(/\s+/g, " ").trim();
+export const foldReason = (text: string) => text.replace(/[^\S\uFEFF]+/g, " ").trim();
+
+/** Direction and zero-width characters (app.document_invisible_class) and U+FEFF: never in a reason. */
+const INVISIBLE = /[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/;
 
 const hasControl = (text: string) => [...text].some((ch) => ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127);
 
@@ -26,7 +29,7 @@ export const creditFormSchema = z.object({
     .pipe(z.string()
     .min(1, "חובה לכתוב את סיבת הזיכוי.")
     .max(CREDIT_REASON_MAX, `הסיבה עד ${CREDIT_REASON_MAX} תווים.`)
-    .refine((value) => !hasControl(value), "הסיבה בלי תווים מיוחדים.")),
+    .refine((value) => !hasControl(value) && !INVISIBLE.test(value), "הסיבה בלי תווים מיוחדים.")),
 });
 
 export const CREDIT_FIELD_NAMES = ["key", "mode", "amount", "reason"] as const;

@@ -1,5 +1,6 @@
 import { MENTION_MAX } from "@/features/mentions/token";
 import { VARIANT_PROBLEM_MESSAGES } from "@/features/whatsapp/variants";
+import { formatMoney } from "@/lib/format";
 import { SUPPORT_LINE } from "@/lib/support-phone";
 
 /** SPD-04, owner (282) ב: an instant reply that holds a price, a percent discount or a marketing word is not saved. */
@@ -117,7 +118,8 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "invoice_credit:reason": "חסרה סיבת זיכוי, או שהיא ארוכה מ-500 תווים או כוללת תווים מיוחדים. כתבו סיבה קצרה בשורה אחת.",
   "invoice_credit:amount": "סכום הזיכוי צריך להיות גדול מאפס ולא יותר ממה שנשאר לזכות במסמך. בדקו את הסכום ונסו שוב.",
   "invoice_credit:check_admin": "בקשת זיכוי שאולי הופקה אצל הספק סוגרים כבדוקה רק בעלים או מנהל מערכת, כי היא שומרת את הסכום שלה. בקשו מהם לבדוק אצל הספק ולסגור אותה.",
-  "invoice_credit:release": "משחררים רק בקשת זיכוי שהסתיימה ולא נרשם לה מסמך. רעננו את העמוד ובדקו את מצב הבקשה.",
+  "invoice_credit:release": "משחררים רק בקשת זיכוי שהסתיימה, שהספק לא הפיק ושלא נרשם לה מסמך. זיכוי שהספק הפיק רשמו ידנית על המסמך המקורי, עם המספר שלו אצל הספק.",
+  "invoice_credit:hand_over": "סכום הזיכוי גדול ממה שנשאר לזכות במסמך המקורי, כולל זיכויים שממתינים לספק. בדקו את הסכום, או חכו שבקשות הזיכוי הפתוחות יסתיימו.",
   "invoice_credit:lines": 'במסמך הזה יש שורות פטורות ממע"מ ושורות חייבות, לכן זיכוי חלקי נעשה לפי שורות. בחרו את השורות לזיכוי, או זכו את כל המסמך.',
   "invoice_credit:nothing_left": "כל הסכום של המסמך כבר זוכה, או שבקשות זיכוי עליו עוד ממתינות לספק. בדקו את הבקשות הפתוחות בהגדרות, בעמוד ספק החשבוניות.",
   "document:parent": "מסמך נרשם על עסקה או על איש קשר. בחרו אחד מהם ונסו שוב.",
@@ -1015,6 +1017,11 @@ export function planHintMessage(hint: string): string | undefined {
   return LIMIT_MESSAGES[hint];
 }
 
+/** DOC-14 (owner (412) א): a credit recorded by hand above what is left of the provider's original. */
+export function creditHandOverMessage(leftAgorot: number): string {
+  return `סכום הזיכוי גדול ממה שנשאר לזכות במסמך המקורי, כולל זיכויים שממתינים לספק. אפשר לזכות עד ${formatMoney(leftAgorot)} בחשבונית הזו. תקנו את הסכום ונסו שוב.`;
+}
+
 export function dbErrorMessage(error: unknown, fallback: string = GENERIC_ERROR): string {
   const e = asErrorLike(error);
   if (!e) {
@@ -1029,6 +1036,11 @@ export function dbErrorMessage(error: unknown, fallback: string = GENERIC_ERROR)
 
   if (code === "P0001") {
     const hint = (e.hint ?? "").trim();
+    // DOC-14, owner (412) א: a hand credit above what is left names what is left (agorot in the detail)
+    if (hint === "invoice_credit:hand_over") {
+      const left = (e.details ?? e.detail ?? "").trim();
+      if (/^\d{1,16}$/.test(left)) return creditHandOverMessage(Number(left));
+    }
     if (hint in LIMIT_MESSAGES) {
       return LIMIT_MESSAGES[hint];
     }

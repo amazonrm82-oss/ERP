@@ -20,6 +20,8 @@ type Props = {
   leftAgorot: number;
   /** owner (411) ב: the original mixes exempt and taxable lines: a partial credit is made of chosen lines */
   mixed: boolean;
+  /** the original's lines are prices with VAT; null = they do not give back its totals (no line credit is offered) */
+  gross: boolean | null;
   lines: { id: string; description: string; vatExempt: boolean; leftAgorot: number }[];
 };
 
@@ -28,7 +30,10 @@ type Props = {
  * the button queues one request with its key (DOC-09): a second press reaches the same request. The database works out the
  * VAT share and refuses more than what is left.
  */
-export function CreditForm({ orgId, documentId, idempotencyKey, leftAgorot, mixed, lines }: Props) {
+export function CreditForm({ orgId, documentId, idempotencyKey, leftAgorot, mixed, gross, lines }: Props) {
+  // a mixed original whose lines do not give back its totals is credited in full only (the database refuses the rest)
+  const partialOffered = !mixed || gross !== null;
+  const basis = gross ? 'כולל מע"מ' : 'לפני מע"מ';
   const [state, formAction] = useActionState<FormState, FormData>(creditDocumentAction.bind(null, orgId, documentId), null);
   const values = state && !state.ok ? state.values : undefined;
   const errors = state && !state.ok ? (state.fieldErrors ?? {}) : {};
@@ -59,10 +64,14 @@ export function CreditForm({ orgId, documentId, idempotencyKey, leftAgorot, mixe
             זיכוי מלא: <span className="tabular-nums">{formatMoney(leftAgorot)}</span>
           </span>
         </label>
+        {partialOffered ? (
         <label className="flex items-start gap-2.5 text-md">
           <input type="radio" name="mode" value={partialMode} checked={mode === partialMode} onChange={() => setMode(partialMode)} className="mt-1 size-4 accent-accent" />
           <span>{mixed ? "זיכוי חלקי לפי שורות" : "זיכוי חלקי"}</span>
         </label>
+        ) : (
+          <p className="text-sm text-ink-soft">{'במסמך יש שורות פטורות ממע"מ ושורות חייבות, והשורות שלו לא מסתכמות בדיוק לסכומים שנרשמו. לכן אפשר כאן רק זיכוי מלא; זיכוי חלקי מפיקים אצל הספק.'}</p>
+        )}
       </fieldset>
       <input type="hidden" name="lines" value={JSON.stringify(picks)} />
       {mode === "lines" ? (
@@ -84,16 +93,17 @@ export function CreditForm({ orgId, documentId, idempotencyKey, leftAgorot, mixe
                   {line.vatExempt ? ' (פטור ממע"מ)' : ""}
                   {" · נשאר "}
                   <span className="tabular-nums">{formatMoney(line.leftAgorot)}</span>
+                  {` ${basis}`}
                 </span>
               </label>
               {picks[index]?.chosen ? (
                 <TextField
-                  label="סכום לזיכוי בשורה (₪)"
+                  label={`סכום לזיכוי בשורה, ${basis} (₪)`}
                   dir="ltr"
                   inputMode="decimal"
                   value={picks[index].amount}
                   onChange={(event) => pick(index, { amount: event.target.value })}
-                  hint={`ריק: כל מה שנשאר (${formatMoney(line.leftAgorot)})`}
+                  hint={`ריק: כל מה שנשאר (${formatMoney(line.leftAgorot)} ${basis})`}
                 />
               ) : null}
             </div>
@@ -140,7 +150,7 @@ export function ReleaseCreditButton({ orgId, documentId, requestId }: { orgId: s
     <ConfirmButton
       variant="secondary"
       title="לשחרר את בקשת הזיכוי?"
-      description="משחררים אחרי שבדקתם אצל הספק שהזיכוי לא הופק שם, או שרשמתם אותו ידנית. אחרי השחרור הסכום שלה זמין שוב לזיכוי, והמערכת לא תפנה לספק שוב בבקשה הזאת."
+      description="משחררים רק אחרי שבדקתם אצל הספק שהזיכוי הזה לא הופק שם. אחרי השחרור הסכום שלה זמין שוב לזיכוי. אם יתברר בכל זאת שהופק, רשמו אותו ידנית כחשבונית זיכוי על המסמך."
       confirmLabel="שחרור"
       action={() => releaseCreditRequestAction(orgId, documentId, requestId)}
     >
