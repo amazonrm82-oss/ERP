@@ -40,7 +40,10 @@ type Answer = Record<string, unknown>;
 // unchanged, the same refusal code. Needs the lead's independent review of this delta before merge.
 const REVIEWED_MD5: Record<string, string> = {
   "email_job_compose(uuid,uuid,text)": "c5c2ae88f99865569bd24ddf80c2168f",
-  "app.email_compose_core(uuid,uuid,text)": "547dbfcd9f376c80c4724a8439261697",
+  // RVW-105, owner (399) א (_org_deletion_messages_wait.sql): one block before the writable check, a business in ADM-03's
+  // deletion wait answers 'paused' (tried again, count given back) instead of 'not_writable'; every other line 021299's body.
+  // Needs the lead's independent review of this delta before merge.
+  "app.email_compose_core(uuid,uuid,text)": "b6f9edd19cde13837cf77e54d059461b",
   "app.email_usage_give_back(uuid)": "c952eaea4bb85cf196cf49280e8b7816",
   "email_quota_return(uuid,uuid)": "9a75bbbe4baa464daf175f376f2be501",
 };

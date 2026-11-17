@@ -209,6 +209,8 @@ const RERUN = [
   migrationFile("_invoice_issue.sql"),
   // RVW-110 redefines app.email_compose_core() of _quote_message_send.sql last (no file once the sender left)
   migrationFile("_email_sender_gone_files.sql"),
+  // owner (399) א redefines public.job_message_may_send() and the two composers last (the deletion wait waits)
+  migrationFile("_org_deletion_messages_wait.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

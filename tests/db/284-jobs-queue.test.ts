@@ -48,7 +48,12 @@ const REVIEWED_MD5 = {
   // SPD-04 review 2 (migration _instant_reply.sql): only the window line changed, it reads app.message_window_exempt
   // (verification_code, instant_reply) instead of app.message_always_sends; the rates keep app.message_always_sends
   // (verification_code only). Reviewed 11 November 2026 (window line only)
-  job_message_may_send: "af0350a2d0e4688855205bcd8cc9779b",
+  // RVW-105, owner (399) א (migration _org_deletion_messages_wait.sql): a business whose ONLY reason for not writing is
+  // ADM-03's 30-day deletion wait (app.org_deletion_waiting) is no longer 'business_closed'; after the event_passed check
+  // the job waits uncounted 15 minutes ('waiting:org_deletion', attempt given back, no other job moved), like HEB-09's pause.
+  // Rechecked by its writer: every other line is 021225's body; deleted, suspended, cancelled and read-only are refused as
+  // before; the branch only delays, never passes a job. Needs the lead's independent review of this delta before merge.
+  job_message_may_send: "26db3aa489a3ef40ae7f26dc078683ac",
 };
 
 // MSG-03: the trigger function that writes public.messages from the worker's path (see its test below)

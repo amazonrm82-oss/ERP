@@ -38,7 +38,10 @@ type Answer = Record<string, unknown>;
 // links); no statement changed.
 const REVIEWED_MD5: Record<string, string> = {
   "sms_job_compose(uuid,uuid,text)": "1788e9cddb254947e6079bdb0dca46f4",
-  "app.sms_compose_core(uuid,uuid,text)": "495a9d34ec0b95d46281408774540227",
+  // RVW-105, owner (399) א (_org_deletion_messages_wait.sql): one block before the writable check, a business in ADM-03's
+  // deletion wait answers 'paused' (tried again, count given back) instead of 'not_writable'; every other line 021283's body.
+  // Needs the lead's independent review of this delta before merge.
+  "app.sms_compose_core(uuid,uuid,text)": "284aa9cd77599539faec7fe149639a0b",
   "app.sms_usage_give_back(uuid)": "f97f0d2ef0eadfbabd93f157793df96e",
   "sms_quota_return(uuid,uuid)": "166b0640aa22b85767118041be671199",
 };
