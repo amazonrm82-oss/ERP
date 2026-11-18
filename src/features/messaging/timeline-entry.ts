@@ -33,7 +33,7 @@ export type MessageEntryInput = {
  * only, judged against now when the timeline is drawn; the stored status never changes. Exactly 48 hours counts as past.
  */
 export const NO_DELIVERY_REPORT_MS = 48 * 60 * 60 * 1000;
-export const NO_DELIVERY_REPORT_TEXT = "נשלחה. אין דיווח מסירה.";
+export const NO_DELIVERY_REPORT_TEXT = "אין דיווח מסירה.";
 
 export function noDeliveryReport(message: MessageEntryInput, now: number): boolean {
   if (message.status !== "sent" || message.direction !== "outbound" || message.channel !== "sms" || message.provider !== "inforu") return false;
