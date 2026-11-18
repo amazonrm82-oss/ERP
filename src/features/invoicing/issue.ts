@@ -138,6 +138,9 @@ export function sourceLineDiscount(line: { quantity: number; unit_price_agorot: 
 export const agorotText = (agorot: number) => (agorot / 100).toFixed(2).replace(/\.00$/, "");
 
 /** Why a request ended without a recorded document, in the person's words (codes of migration invoice_issue). */
+/** = the sync log's reason for an auth code (provider-events.ts, isConnectionAuthCode) */
+export const AUTH_REASON = "הספק לא קיבל את פרטי החיבור";
+
 const ENDED_REASON: Record<string, string> = {
   "document:duplicate": "מסמך מאותו סוג ומספר כבר רשום בעסק",
   org_not_writable: "העסק במצב קריאה בלבד",
@@ -160,7 +163,10 @@ export type IssueRequestState = "pending" | "issued" | "unrecorded" | "failed" |
 
 /** The request page's line for an ended request; null while it waits or once issued. */
 export function issueEndedText(status: IssueRequestState, code: string | null, number: string | null): string | null {
-  const reason = code ? ENDED_REASON[code] : undefined;
+  // DOC-16: the provider refused the business's key (the worker sends it as auth:<code>; the sync log's wording)
+  const reason = code
+    ? (Object.hasOwn(ENDED_REASON, code) ? ENDED_REASON[code] : undefined) ?? (/^((customer|product)_)?auth(:|$)/.test(code) ? AUTH_REASON : undefined)
+    : undefined;
   if (status === "failed") return `המסמך לא הופק${reason ? `: ${reason}` : ", הספק סירב להפיק אותו"}. אפשר לתקן ולהפיק שוב.`;
   if (status === "unrecorded" || status === "stale") {
     return `ייתכן שהמסמך הופק אצל הספק${number ? ` (מספר ${number})` : ""} אבל הוא לא נרשם כאן${reason ? `: ${reason}` : ""}. אל תפיקו אותו שוב; בדקו אצל הספק ובמסמכים הרשומים, או פנו לתמיכה.`;

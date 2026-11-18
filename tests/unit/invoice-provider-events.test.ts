@@ -10,9 +10,10 @@ import {
   isUnreachableCode,
   providerFailureCode,
 } from "@/features/invoicing/provider-events";
+import { AUTH_REASON, issueEndedText } from "@/features/invoicing/issue";
 import { notificationHref } from "@/features/notifications/links";
 
-const MIGRATION = readFileSync(join(process.cwd(), "supabase/migrations/20261006021318_invoice_provider_events.sql"), "utf8");
+const MIGRATION = readFileSync(join(process.cwd(), "supabase/migrations/20261006021319_invoice_provider_events.sql"), "utf8");
 
 // DOC-16: the invoice provider connection's sync log lines and the rule that tells a fallen connection from a refused document.
 describe("invoice provider sync log (DOC-16)", () => {
@@ -31,6 +32,14 @@ describe("invoice provider sync log (DOC-16)", () => {
     expect(["timeout", "customer_unreachable", "unreachable_x", null].map(isUnreachableCode)).toEqual([true, true, false, false]);
   });
 
+  it("only falls while issuing send the notice; a failed check is a line only (owner (425) ג)", () => {
+    const calls = [...MIGRATION.matchAll(/perform app\.invoice_provider_connection_failure\([^,]+, '([a-z]+)'\)/g)].map((m) => m[1]);
+    expect(calls.sort()).toEqual(["auth", "auth", "unreachable"]);
+    const settingsTrigger = MIGRATION.slice(MIGRATION.indexOf("function app.invoice_provider_settings_events()"), MIGRATION.indexOf("create or replace trigger invoice_provider_settings_events"));
+    expect(settingsTrigger).toContain("'check_failed'");
+    expect(settingsTrigger).not.toContain("invoice_provider_connection_failure");
+  });
+
   it("the worker sends an auth failure as auth:<code>, any other failure as the provider's code", () => {
     expect(providerFailureCode({ kind: "auth", code: "key_refused" })).toBe("auth:key_refused");
     expect(providerFailureCode({ kind: "refused", code: "bad_tax_id" })).toBe("bad_tax_id");
@@ -45,6 +54,15 @@ describe("invoice provider sync log (DOC-16)", () => {
     expect(invoiceProviderEventText("failed", "auth:key_refused", 1)).toEqual({ text: "הספק סירב להפיק מסמך: הספק לא קיבל את פרטי החיבור", tone: "danger" });
     expect(invoiceProviderEventText("failed", "bad_tax_id", 1)).toEqual({ text: "הספק סירב להפיק מסמך", tone: "warning" });
     expect(invoiceProviderEventText("something", null, 1).text).toBe("אירוע בחיבור");
+  });
+
+  it("an ended request refused for the connection's key says so in the sync log's words", () => {
+    for (const code of ["auth:key_refused", "customer_auth:x", "product_auth"]) {
+      expect(issueEndedText("failed", code, null)).toBe(`המסמך לא הופק: ${AUTH_REASON}. אפשר לתקן ולהפיק שוב.`);
+    }
+    expect(issueEndedText("unrecorded", "auth:key_refused", null)).toContain(`: ${AUTH_REASON}.`);
+    expect(invoiceProviderEventText("failed", "customer_auth:x", 1).text).toContain(AUTH_REASON);
+    expect(issueEndedText("failed", "author", null)).toBe("המסמך לא הופק, הספק סירב להפיק אותו. אפשר לתקן ולהפיק שוב.");
   });
 
   it("the connection notice opens the invoice provider settings", () => {

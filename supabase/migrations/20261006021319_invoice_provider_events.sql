@@ -27,8 +27,9 @@
 --   record of the provider's answer or a person's change.
 -- * "The connection fell" (app.invoice_provider_connection_failure): the provider refused the business's key (an `auth`
 --   failure: the worker sends its code as `auth:<code>`, also `customer_auth:` / `product_auth:` from the DOC-13 upserts),
---   every try of a request could not reach the provider (a request ended `retries_spent` after `unreachable` / `timeout`),
---   or a connection check failed. A single document the provider refused (its details) is a `failed` line, not a fall.
+--   or every try of a request could not reach the provider (a request ended `retries_spent` after `unreachable` /
+--   `timeout`; owner (426) א). A failed connection check is a `check_failed` line and sends no notice (owner (425) ג): the
+--   person who pressed it sees the answer. A single document the provider refused (its details) is a `failed` line, not a fall.
 --   Then the business's active owners and admins get ONE `system` notice, at most once per business day
 --   (app.invoice_provider_notice_days); the text names no customer, document or person.
 -- * Kept 12 months (INT-03's rule): pg_cron `crm-invoice-provider-events-purge` calls app.purge_old_invoice_provider_events(),
@@ -96,7 +97,11 @@ language plpgsql volatile security definer
 set search_path = ''
 as $$
 declare
-  v_code text := case when p_code ~ '^[A-Za-z0-9_.:-]{1,64}$' then p_code end;
+  -- a code only in the shape of our own codes (lower case, `_` and `:`, never 4 digits in a row), so a provider's code can
+  -- never keep an id number here for 12 months; anything else is kept as `other` (the request keeps its own code)
+  v_code text := case when p_code is null then null
+                      when p_code ~ '^[a-z][a-z0-9_:]{0,63}$' and p_code !~ '[0-9]{4}' then p_code
+                      else 'other' end;
 begin
   if p_org is null or p_provider is null or p_provider !~ '^[a-z][a-z0-9_]{1,39}$' then
     return;
@@ -132,7 +137,7 @@ $$;
 revoke all on function app.invoice_provider_unreachable_code(text) from public, anon, authenticated, service_role;
 
 -- The notice: once per business and business day, to the active owners and admins. Definer, no grants; never raises.
--- p_reason: auth | unreachable | check.
+-- p_reason: auth | unreachable.
 create or replace function app.invoice_provider_connection_failure(p_org uuid, p_reason text) returns void
 language plpgsql volatile security definer
 set search_path = ''
@@ -149,9 +154,8 @@ begin
          case p_reason
            when 'auth' then 'הספק לא מקבל את פרטי החיבור של העסק, ולכן לא ניתן להפיק דרכו מסמכים. '
                             || 'כדאי לבדוק את החשבון אצל הספק ולחבר מחדש בהגדרות > ספק חשבוניות.'
-           when 'unreachable' then 'לא הצלחנו להגיע לספק החשבוניות בכל הניסיונות של בקשת הפקה. '
-                                   || 'כדאי לבדוק את החיבור בהגדרות > ספק חשבוניות, ולבדוק אצל הספק אם המסמך הופק.'
-           else 'בדיקת החיבור לספק החשבוניות נכשלה. כדאי לבדוק את החשבון אצל הספק ולנסות שוב בהגדרות > ספק חשבוניות.'
+           else 'לא הצלחנו להגיע לספק החשבוניות בכל הניסיונות של בקשת הפקה. '
+                || 'כדאי לבדוק את החיבור בהגדרות > ספק חשבוניות, ולבדוק אצל הספק אם המסמך הופק.'
          end,
          'invoice_provider', p_org
     from public.memberships m
@@ -188,8 +192,9 @@ begin
     if new.last_check_ok then
       perform app.invoice_provider_event_log(new.organization_id, new.provider, 'check_ok', null);
     else
+      -- owner (425) ג: a failed check is a log line only; the person who pressed it sees the answer, and only failures
+      -- while issuing send the notice
       perform app.invoice_provider_event_log(new.organization_id, new.provider, 'check_failed', null);
-      perform app.invoice_provider_connection_failure(new.organization_id, 'check');
     end if;
   end if;
   return null;

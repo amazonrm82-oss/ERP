@@ -11,8 +11,8 @@ type Line = { kind: string; code: string | null; hits: number };
 
 // DOC-16 (migration invoice_provider_events): the invoice provider connection's sync log, written only by triggers on the
 // settings row and on the issue requests (the worker's pinned functions are unchanged), read by owners and admins; a fallen
-// connection (the key refused, the provider unreachable on every try, a failed check) tells the active owners and admins
-// once a business day. A document the provider refused is a log line, not an alert.
+// connection while issuing (the key refused, the provider unreachable on every try) tells the active owners and admins
+// once a business day. A failed connection check (owner (425) ג) and a document the provider refused are log lines only.
 
 const one = async <T extends object>(q: Query, sql: string, params: unknown[] = []) => (await q<T>(sql, params)).rows[0];
 const TITLE = "החיבור לספק החשבוניות הפסיק לעבוד";
@@ -100,11 +100,17 @@ describe("invoice provider sync log and connection notice (DOC-16)", () => {
     expect(await told()).toEqual([]);
   });
 
-  it("a failed check is a fall: owners and admins are told once a business day", async () => {
+  it("a failed check writes its line and tells no one (owner (425) ג); a fall while issuing that day still does", async () => {
     await run(owner, (q) => q("select public.invoice_provider_check_recorded($1, false)", [org]));
     await run(owner, (q) => q("select public.invoice_provider_check_recorded($1, false)", [org]));
     expect(await line("check_failed")).toMatchObject({ hits: 2 });
+    expect(await told()).toEqual([]);
+    expect(await asAdmin((q) => count(q, "select 1 from app.invoice_provider_notice_days where organization_id = $1 and day > current_date - 30", [org]))).toBe(0);
+    // the checks used up nothing: an issue-time fall that day is still told
+    const job = await claimJob(await begin());
+    expect(await record(job, { ok: false, code: "auth:key_refused", final: true })).toEqual({ status: "failed", code: "auth:key_refused" });
     expect(await told()).toEqual([owner.id, admin.id].sort());
+    await run(owner, (q) => q("select public.invoice_provider_check_recorded($1, true)", [org]));
   });
 
   it("logs issued documents, retries and the provider's refusals, and folds a day into one line per kind and code", async () => {
@@ -136,7 +142,8 @@ describe("invoice provider sync log and connection notice (DOC-16)", () => {
   it("the key refused (auth) is a fall, also on a retry; a person's close and the stale mark are lines", async () => {
     const job = await claimJob(await begin());
     expect(await record(job, { ok: false, code: "auth:key_refused", final: true })).toEqual({ status: "failed", code: "auth:key_refused" });
-    expect(await line("failed", "auth:key_refused")).toMatchObject({ hits: 1 });
+    // the previous case's fall was the same day, folded into this line
+    expect(await line("failed", "auth:key_refused")).toMatchObject({ hits: 2 });
     expect(await told()).toEqual([owner.id, admin.id].sort());
     // once a business day: a second fall that day tells no one again
     const again = await claimJob(await begin());
@@ -161,6 +168,21 @@ describe("invoice provider sync log and connection notice (DOC-16)", () => {
       (await q<{ column_name: string }>("select column_name from information_schema.columns where table_schema = 'public' and table_name = 'invoice_provider_events' order by column_name")).rows.map((r) => r.column_name),
     );
     expect(columns).toEqual(["code", "created_at", "day", "hits", "id", "kind", "last_at", "organization_id", "provider"]);
+  });
+
+  it("keeps a provider's code in the log only in our codes' shape; one that could hold an id number is kept as `other`", async () => {
+    const job = await claimJob(await begin());
+    expect(await record(job, { ok: false, code: "bad_tax_id:123456789", final: true })).toEqual({ status: "failed", code: "bad_tax_id:123456789" });
+    // the request keeps the provider's own code; the log, which stays 12 months and is exported, does not
+    expect(await line("failed", "other")).toMatchObject({ hits: 1 });
+    for (const code of ["Bad.Code", "x-1", "e123", "auth:key_refused"]) {
+      await asAdmin((q) => q("select app.invoice_provider_event_log($1, 'fake', 'retry', $2)", [org, code]));
+    }
+    const kept = (await lines()).filter((l) => l.kind === "retry").map((l) => l.code);
+    expect(kept).toEqual(expect.arrayContaining(["other", "e123", "auth:key_refused"]));
+    expect(kept).not.toContain("Bad.Code");
+    expect(kept).not.toContain("x-1");
+    expect((await lines()).some((l) => l.code !== null && /[0-9]{4}/.test(l.code))).toBe(false);
   });
 
   it("owners and admins read it; nobody else sees it, no role writes it, another business sees nothing", async () => {
