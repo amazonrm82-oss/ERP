@@ -4,6 +4,15 @@
 // `error` themselves and return `fail(dbErrorMessage(error))`. The lint rule in
 // eslint.config.mjs refuses `{ data }` without `error`, and `(await …).data`.
 
+/**
+ * A database error's code for a log line or a thrown message, never its text (owner (436) א): the SQLSTATE or PostgREST code, or
+ * "no code" when there is none (supabase-js answers code "" for a network or fetch failure).
+ */
+export function errorCode(error: { code?: string | null } | null | undefined): string {
+  const code = error?.code;
+  return typeof code === "string" && code.trim() !== "" ? code : "no code";
+}
+
 type ReadError = { message: string; code?: string | null; hint?: string | null };
 
 export class DbReadError extends Error {
@@ -12,7 +21,7 @@ export class DbReadError extends Error {
   readonly hint: string | null;
   constructor(what: string, cause: ReadError) {
     // the label, and the code only: the database's own text can hold a row's values (owner (436) א, the error-message rule)
-    super(`database read failed: ${what}: ${cause.code ?? "no code"}`);
+    super(`database read failed: ${what}: ${errorCode(cause)}`);
     this.name = "DbReadError";
     this.code = typeof cause.code === "string" ? cause.code : null;
     this.hint = typeof cause.hint === "string" ? cause.hint : null;

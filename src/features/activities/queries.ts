@@ -4,7 +4,7 @@ import { entryLabel, isActivityBase, type ActivityTypeIcon, type ActivityTypeOpt
 import { getUserNames } from "@/features/shell/queries";
 import { DEFAULT_TERMS, type OrgTerms } from "@/features/terminology/terms";
 import type { Json } from "@/lib/database.types";
-import { must } from "@/lib/db-read";
+import { must, errorCode } from "@/lib/db-read";
 import { RECORD_TYPES } from "@/lib/record-types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -106,7 +106,7 @@ async function readTimelineRows(orgId: string, subject: TimelineSubject, filter?
     .order("id", { ascending: false })
     .limit(TIMELINE_LIMIT);
   if (error) {
-    throw new Error(`timeline query failed: ${error.code}`);
+    throw new Error(`timeline query failed: ${errorCode(error)}`);
   }
   return activities;
 }

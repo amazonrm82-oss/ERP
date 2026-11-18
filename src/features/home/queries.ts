@@ -3,7 +3,7 @@ import "server-only";
 import { TIME_ZONE } from "@/lib/app";
 import { endOfToday, zoneDate, zonedIso } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
-import { must } from "@/lib/db-read";
+import { must, errorCode } from "@/lib/db-read";
 import { relatedRecords, type RelatedRecord } from "@/features/tasks/queries";
 import { listCalendarItems } from "@/features/calendar/queries";
 import { rangeBounds } from "@/features/calendar/range";
@@ -134,13 +134,13 @@ export async function getMyDay(orgId: string, userId: string, timeZone?: string)
   ]);
 
   if (tasks.error) {
-    throw new Error(`my tasks query failed: ${tasks.error.code}`);
+    throw new Error(`my tasks query failed: ${errorCode(tasks.error)}`);
   }
   if (leads.error) {
-    throw new Error(`my new leads query failed: ${leads.error.code}`);
+    throw new Error(`my new leads query failed: ${errorCode(leads.error)}`);
   }
   if (deals.error) {
-    throw new Error(`my deals query failed: ${deals.error.code}`);
+    throw new Error(`my deals query failed: ${errorCode(deals.error)}`);
   }
 
   // FXC-12: checked before it is read; a mismatch throws (the page's error screen)

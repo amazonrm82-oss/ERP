@@ -9,7 +9,7 @@ import { requireUser, type SessionUser } from "@/lib/auth";
 import type { MembershipRole, OrgStatus, SubscriptionStatus } from "@/lib/database.types";
 import { isUuid, paths } from "@/lib/paths";
 import { createClient } from "@/lib/supabase/server";
-import { must } from "@/lib/db-read";
+import { must, errorCode } from "@/lib/db-read";
 
 export type OrgContext = {
   user: SessionUser & { displayName: string };
@@ -73,7 +73,7 @@ const loadOrgContext = cache(async (orgId: string): Promise<OrgContext> => {
   // one round trip, read with the user's rights (migration 0028)
   const { data, error } = await supabase.rpc("org_context", { p_org: orgId });
   if (error) {
-    throw new Error(`organization context failed: ${error.code}`);
+    throw new Error(`organization context failed: ${errorCode(error)}`);
   }
   const ctx = (data ?? {}) as RawContext;
   const raw = ctx.org ?? null;

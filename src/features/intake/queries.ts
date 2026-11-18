@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { FormKind } from "@/lib/database.types";
-import { DbReadError, must } from "@/lib/db-read";
+import { DbReadError, must, errorCode } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
 import { isCallbackSlotStart, type CallbackSlotStart } from "./callback";
@@ -28,7 +28,7 @@ export async function listIntakes(orgId: string): Promise<IntakeSummary[]> {
     .in("kind", ["form", "webhook"])
     .order("created_at", { ascending: false });
   if (error) {
-    throw new Error(`forms query failed: ${error.code}`);
+    throw new Error(`forms query failed: ${errorCode(error)}`);
   }
   const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
   const counts = await Promise.all(
@@ -99,7 +99,7 @@ export async function getIntake(orgId: string, formId: string): Promise<IntakeDe
     .in("kind", ["form", "webhook"])
     .maybeSingle();
   if (error) {
-    throw new Error(`form query failed: ${error.code}`);
+    throw new Error(`form query failed: ${errorCode(error)}`);
   }
   if (!data) {
     return null;

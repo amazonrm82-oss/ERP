@@ -12,6 +12,7 @@ import { parseOptionColors } from "./status-colors";
 import { parseFieldUsage } from "./usage";
 import { isFieldType, isLinkTarget, type FieldDefinition, type FieldObject } from "./types";
 import { serverLog } from "@/lib/log-server";
+import { errorCode } from "@/lib/db-read";
 
 /** Custom field definitions of one object type, in order. Active ones only unless asked. */
 export async function listFieldDefinitions(
@@ -31,7 +32,7 @@ export async function listFieldDefinitions(
   }
   const { data, error } = await query.order("position", { ascending: true }).order("created_at", { ascending: true });
   if (error) {
-    throw new Error(`field definitions query failed: ${error.code}`);
+    throw new Error(`field definitions query failed: ${errorCode(error)}`);
   }
   const definitions: FieldDefinition[] = data
     .filter((row) => isFieldType(row.field_type))

@@ -33,7 +33,7 @@ import { punchCardsView } from "./punch-cards";
 import { PUNCH_DAYS_DEFAULT } from "./punch-days";
 import { responseTargetLabels } from "./response-target";
 import { parseReportData, type ReportFunction } from "./schemas";
-import { must } from "@/lib/db-read";
+import { must, errorCode } from "@/lib/db-read";
 
 export type ReportFilters = { period: Period; ownerId: string | null; pipelineId: string | null };
 
@@ -145,7 +145,7 @@ async function rpc<N extends ReportFn & ReportFunction>(name: N, args: Functions
   const supabase = await createClient();
   const { data, error } = await supabase.rpc(name, args);
   if (error) {
-    throw new Error(`${name} failed: ${error.code}`);
+    throw new Error(`${name} failed: ${errorCode(error)}`);
   }
   // a mismatch throws ReportShapeError; withReportShape() logs it and shows the message
   parseReportData(name, data);

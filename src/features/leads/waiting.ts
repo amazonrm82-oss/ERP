@@ -2,7 +2,7 @@ import "server-only";
 
 import { managesTeamChain } from "@/features/activities/schema";
 import { getUserNames } from "@/features/shell/queries";
-import { must } from "@/lib/db-read";
+import { must, errorCode } from "@/lib/db-read";
 import { readAllPages } from "@/lib/paged-read";
 import { createClient } from "@/lib/supabase/server";
 
@@ -165,7 +165,7 @@ async function answeredLeadIds(supabase: Client, orgId: string, ids: string[]): 
 export async function countUnownedLeads(orgId: string): Promise<number> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("unowned_leads_waiting_count", { p_org: orgId });
-  if (error) throw new Error(`unowned leads count failed: ${error.code}`);
+  if (error) throw new Error(`unowned leads count failed: ${errorCode(error)}`);
   return Math.min(data ?? 0, 100);
 }
 
@@ -175,6 +175,6 @@ export async function countUnownedLeads(orgId: string): Promise<number> {
  */
 async function offeredLeads(supabase: Client, orgId: string) {
   const { data, error } = await supabase.rpc("unowned_leads_waiting", { p_org: orgId, p_limit: MAX_SHOWN });
-  if (error) throw new Error(`offered leads failed: ${error.code}`);
+  if (error) throw new Error(`offered leads failed: ${errorCode(error)}`);
   return data ?? [];
 }

@@ -9,6 +9,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 import { PRIVACY_LINK_TOKEN, privacyPageFrom, publicRequestSchema, type PrivacyPage } from "./model";
 import { serverLog } from "@/lib/log-server";
+import { errorCode } from "@/lib/db-read";
 
 // PRK-02: the public privacy-request page, in the approved pattern (owner, 26 October 2026, hard rule 5 wave 3 use (3)): the
 // page reads only through public.privacy_request_page() (the business's display name and brand) and the form sends only
@@ -33,7 +34,7 @@ export async function getPrivacyPage(token: string, ip: string | null): Promise<
   const { data, error } = await service.rpc("privacy_request_page", { p_token: token, p_ip_hash: senderHash(ip) });
   if (error) {
     if (error.code === "P0002") return "not-found";
-    throw new Error(`privacy_request_page failed: ${error.code}`);
+    throw new Error(`privacy_request_page failed: ${errorCode(error)}`);
   }
   if (data && typeof data === "object" && !Array.isArray(data) && (data as { rate_limited?: unknown }).rate_limited === true) {
     return "rate-limited";

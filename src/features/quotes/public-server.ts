@@ -31,6 +31,7 @@ import { signaturePng } from "./signed-pdf";
 import { storeSignedQuotePdfForCustomer } from "./signed-pdf-server";
 import { markNotFound } from "@/lib/public-not-found";
 import { serverLog } from "@/lib/log-server";
+import { errorCode } from "@/lib/db-read";
 
 // QUO-08: the customer's page of a sent quote, in the approved pattern for secret-link pages (owner, 8 October 2026;
 // CLAUDE.md hard rule 5): the server reads only through public.quote_public() (security definer, service_role only),
@@ -56,7 +57,7 @@ export async function getPublicQuote(token: string, ip: string | null = null): P
   const { data, error } = await (sender ? call.setHeader(SENDER_HEADER, sender) : call);
   if (error) {
     if (error.code === "P0002") return "not-found";
-    throw new Error(`quote_public failed: ${error.code}`);
+    throw new Error(`quote_public failed: ${errorCode(error)}`);
   }
   if (data && typeof data === "object" && !Array.isArray(data) && (data as { rate_limited?: unknown }).rate_limited === true) {
     return "rate-limited";

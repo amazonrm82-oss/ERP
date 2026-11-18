@@ -11,6 +11,7 @@ import { bookingManageFrom, confirmationFrom, MANAGE_TOKEN, publicBookingFrom, t
 import { BOOKING_ANSWER_MAX } from "./schema";
 import { markNotFound } from "@/lib/public-not-found";
 import { serverLog } from "@/lib/log-server";
+import { errorCode } from "@/lib/db-read";
 
 // CAL-10: the public booking page, in the approved pattern for secret-link pages (owner, 8 October 2026; hard rule 5):
 // the server reads and books only through public.booking_page_public() / public.booking_submit() (security definer,
@@ -39,7 +40,7 @@ export async function getPublicBooking(token: string, from: string | null, ip: s
   const { data, error } = await service.rpc("booking_page_public", { p_token: token, p_from: from, p_ip_hash: keyedIpHash(ip) });
   if (error) {
     if (error.code === "P0002") return "not-found";
-    throw new Error(`booking_page_public failed: ${error.code}`);
+    throw new Error(`booking_page_public failed: ${errorCode(error)}`);
   }
   if (data && typeof data === "object" && !Array.isArray(data)) {
     if ((data as { unavailable?: unknown }).unavailable === true) return "unavailable";
@@ -161,7 +162,7 @@ export async function getBookingManage(token: string, from: string | null, ip: s
   const { data, error } = await service.rpc("booking_manage_public", { p_token: token, p_from: from, p_ip_hash: keyedIpHash(ip) });
   if (error) {
     if (error.code === "P0002") return "not-found";
-    throw new Error(`booking_manage_public failed: ${error.code}`);
+    throw new Error(`booking_manage_public failed: ${errorCode(error)}`);
   }
   if (data && typeof data === "object" && !Array.isArray(data)) {
     if ((data as { unavailable?: unknown }).unavailable === true) return "unavailable";

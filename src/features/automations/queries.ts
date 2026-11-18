@@ -14,7 +14,7 @@ import { RECORD_TYPES } from "@/lib/record-types";
 import { EMAIL_AUTOMATION_TYPES } from "./send-email";
 import { SMS_AUTOMATION_TYPES } from "./send-sms";
 import { createClient } from "@/lib/supabase/server";
-import { must } from "@/lib/db-read";
+import { must, errorCode } from "@/lib/db-read";
 
 export type Lookups = {
   statuses: Array<{ id: string; name: string; kind: string }>;
@@ -219,7 +219,7 @@ export async function listAutomations(orgId: string): Promise<AutomationSummary[
     .eq("organization_id", orgId)
     .order("created_at", { ascending: false });
   if (error) {
-    throw new Error(`automations query failed: ${error.code}`);
+    throw new Error(`automations query failed: ${errorCode(error)}`);
   }
   const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
   const counts = await Promise.all(
@@ -290,7 +290,7 @@ export async function listRuns(orgId: string, automationId: string): Promise<Run
     .order("created_at", { ascending: false })
     .limit(50);
   if (error) {
-    throw new Error(`runs query failed: ${error.code}`);
+    throw new Error(`runs query failed: ${errorCode(error)}`);
   }
   return data.map((row) => ({
     id: row.id,

@@ -6,7 +6,7 @@ import type { Json, StageKind } from "@/lib/database.types";
 import { PAGE_SIZE, textSearchFilter } from "@/lib/search";
 import { sortColumn, type CustomSortKey, type Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
-import { must } from "@/lib/db-read";
+import { must, errorCode } from "@/lib/db-read";
 import { readAllPages, readAllPagesByIds } from "@/lib/paged-read";
 import { listFieldDefinitions } from "@/features/custom-fields/queries";
 import type { FieldDefinition } from "@/features/custom-fields/types";
@@ -91,7 +91,7 @@ export async function listPipelines(orgId: string): Promise<PipelineOption[]> {
     .order("position", { ascending: true })
     .order("created_at", { ascending: true });
   if (error) {
-    throw new Error(`pipelines query failed: ${error.code}`);
+    throw new Error(`pipelines query failed: ${errorCode(error)}`);
   }
   return data.map((row) => ({ id: row.id, name: row.name, isDefault: row.is_default }));
 }
@@ -117,7 +117,7 @@ export async function getPipeline(
     .eq("pipeline_id", pipeline.id)
     .order("position", { ascending: true });
   if (stagesError) {
-    throw new Error(`stages query failed: ${stagesError.code}`);
+    throw new Error(`stages query failed: ${errorCode(stagesError)}`);
   }
   return { id: pipeline.id, name: pipeline.name, stages };
 }
@@ -182,11 +182,11 @@ export async function getBoard(
     ),
   ]);
   if ("error" in totalsResult && totalsResult.error) {
-    throw new Error(`deal totals query failed: ${totalsResult.error.code}`);
+    throw new Error(`deal totals query failed: ${errorCode(totalsResult.error)}`);
   }
   for (const result of stageResults) {
     if (result.error) {
-      throw new Error(`deals query failed: ${result.error.code}`);
+      throw new Error(`deals query failed: ${errorCode(result.error)}`);
     }
   }
   const rows = stageResults.flatMap((result) => result.data ?? []);
@@ -335,7 +335,7 @@ export async function listRelatedDeals(
     .order("created_at", { ascending: false })
     .limit(50);
   if (error) {
-    throw new Error(`related deals query failed: ${error.code}`);
+    throw new Error(`related deals query failed: ${errorCode(error)}`);
   }
   if (data.length === 0) {
     return [];
@@ -369,7 +369,7 @@ export async function getDeal(orgId: string, dealId: string) {
     .is("deleted_at", null)
     .maybeSingle();
   if (error) {
-    throw new Error(`deal query failed: ${error.code}`);
+    throw new Error(`deal query failed: ${errorCode(error)}`);
   }
   if (!data) {
     return null;
@@ -503,7 +503,7 @@ export async function listDeals(
   );
   const { data, error } = guarded.result;
   if (error) {
-    throw new Error(`deals query failed: ${error.code}`);
+    throw new Error(`deals query failed: ${errorCode(error)}`);
   }
   const rows = data.slice(0, size);
 

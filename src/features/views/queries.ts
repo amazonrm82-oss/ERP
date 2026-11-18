@@ -5,6 +5,7 @@ import type { ViewScope } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
 
 import { cleanFilters, VIEW_SORT_RE, type ViewConfig, type ViewObject } from "./types";
+import { errorCode } from "@/lib/db-read";
 
 export type SavedView = { id: string; name: string; scope: ViewScope; teamId: string | null; ownerId: string; config: ViewConfig };
 
@@ -26,7 +27,7 @@ export async function listSavedViews(orgId: string, objectType: ViewObject): Pro
     .eq("object_type", objectType)
     .order("name", { ascending: true });
   if (error) {
-    throw new Error(`saved views query failed: ${error.code}`);
+    throw new Error(`saved views query failed: ${errorCode(error)}`);
   }
   return data.map((row) => ({ id: row.id, name: row.name, scope: row.scope, teamId: row.team_id, ownerId: row.owner_id, config: readConfig(row.config) }));
 }

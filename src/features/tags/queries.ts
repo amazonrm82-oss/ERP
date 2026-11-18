@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 
 import { createClient } from "@/lib/supabase/server";
+import { errorCode } from "@/lib/db-read";
 
 export type TagOption = { id: string; name: string; color: string | null };
 
@@ -12,7 +13,7 @@ export const listTags = cache(async (orgId: string): Promise<TagOption[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase.from("tags").select("id, name, color").eq("organization_id", orgId).order("name", { ascending: true });
   if (error) {
-    throw new Error(`tags query failed: ${error.code}`);
+    throw new Error(`tags query failed: ${errorCode(error)}`);
   }
   return data;
 });

@@ -11,7 +11,7 @@ import type { TaskStatus } from "@/lib/database.types";
 import { zoneDate, zonedIso } from "@/lib/format";
 import { PAGE_SIZE, textSearchFilter } from "@/lib/search";
 import { sortColumn, type Sort } from "@/lib/sort";
-import { must } from "@/lib/db-read";
+import { must, errorCode } from "@/lib/db-read";
 import { readAllPagesByIds } from "@/lib/paged-read";
 import { createClient } from "@/lib/supabase/server";
 
@@ -133,10 +133,10 @@ export async function listTaskGroups(orgId: string, ownerId: string | null): Pro
     done.order("completed_at", { ascending: false }).limit(DONE_SHOWN),
   ]);
   if (openResult.error) {
-    throw new Error(`tasks query failed: ${openResult.error.code}`);
+    throw new Error(`tasks query failed: ${errorCode(openResult.error)}`);
   }
   if (doneResult.error) {
-    throw new Error(`done tasks query failed: ${doneResult.error.code}`);
+    throw new Error(`done tasks query failed: ${errorCode(doneResult.error)}`);
   }
 
   const openRows = openResult.data.slice(0, OPEN_LIMIT);
@@ -343,7 +343,7 @@ export async function listTasks(
   );
   const { data, error } = guarded.result;
   if (error) {
-    throw new Error(`tasks query failed: ${error.code}`);
+    throw new Error(`tasks query failed: ${errorCode(error)}`);
   }
   const rows = data.slice(0, size);
 

@@ -477,3 +477,22 @@ describe("OPS-05 database errors and long text (owner (436) א)", () => {
     expect(read("src/lib/monitoring/sentry-client.ts")).toContain("original: hint?.originalException");
   });
 });
+
+describe("OPS-05 length cap on every free-text field (review)", () => {
+  it("caps the transaction, the request url, the exception type and module at 200 after scrubbing", () => {
+    const longPath = `/o/${"segment/".repeat(60)}end`;
+    const out = scrubEvent(
+      {
+        transaction: longPath,
+        request: { url: `https://mexuzsystem.com${longPath}?q=dana@example.com`, method: "GET" },
+        exception: { values: [{ type: `Error${"X".repeat(300)}`, value: "boom", ...({ module: longPath } as object) }] },
+      },
+      OPEN,
+    )!;
+    expect(out.transaction!.length).toBeLessThanOrEqual(200);
+    expect(out.request!.url!.length).toBeLessThanOrEqual(200);
+    expect(out.request!.url).not.toContain("dana");
+    expect(out.exception!.values![0].type!.length).toBeLessThanOrEqual(200);
+    expect((out.exception!.values![0] as { module?: string }).module!.length).toBeLessThanOrEqual(200);
+  });
+});

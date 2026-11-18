@@ -2,7 +2,7 @@ import "server-only";
 
 import { moneySubjectPath } from "@/features/payments/money-subject";
 import { quotePath } from "@/features/quotes/paths";
-import { must } from "@/lib/db-read";
+import { must, errorCode } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
 import { agorotText, EMPTY_ISSUE_LINE, sourceLineDiscount, type IssueLineDraft, type IssueSourceKind } from "./issue";
@@ -53,7 +53,7 @@ export async function getIssueSource(orgId: string, kind: IssueSourceKind, id: s
   const { data: customerData, error } = await supabase.rpc("invoice_issue_customer", { p_org: orgId, p_kind: kind, p_id: id });
   if (error) {
     if (error.code === "42501" || error.hint === "invoice:source" || error.hint === "invoice:order_cancelled" || error.hint === "feature:documents") return null;
-    throw new Error(`invoice_issue_customer: ${error.code}`);
+    throw new Error(`invoice_issue_customer: ${errorCode(error)}`);
   }
   const answer = (customerData ?? {}) as Record<string, unknown>;
   const text = (key: string) => (typeof answer[key] === "string" ? (answer[key] as string) : null);

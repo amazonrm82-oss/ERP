@@ -8,6 +8,7 @@ import { PLANS_PUBLIC_CACHE_TAG, publicPlansOrThrow, type PublicPlan } from "@/f
 import type { Database } from "@/lib/database.types";
 import { getSupabaseEnv } from "@/lib/env";
 import { logEvent } from "@/lib/log";
+import { errorCode } from "@/lib/db-read";
 
 /**
  * LND-13 / WEB-01 (owner, 11 November 2026): the landing page's price list reads public.plans_public() with a plain anon
@@ -24,7 +25,7 @@ const readCached = unstable_cache(
       auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     });
     const { data, error } = await client.rpc("plans_public");
-    if (error) throw new Error(`plans_public failed: ${error.code ?? ""}`);
+    if (error) throw new Error(`plans_public failed: ${errorCode(error)}`);
     return publicPlansOrThrow(data);
   },
   ["plans-public"],

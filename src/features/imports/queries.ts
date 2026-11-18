@@ -3,6 +3,7 @@ import "server-only";
 import { getUserNames } from "@/features/shell/queries";
 import type { ImportJobRow } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
+import { errorCode } from "@/lib/db-read";
 
 export type ImportJobItem = ImportJobRow & { createdByName: string | null };
 
@@ -16,7 +17,7 @@ export async function listImportJobs(orgId: string): Promise<ImportJobItem[]> {
     .order("created_at", { ascending: false })
     .limit(50);
   if (error) {
-    throw new Error(`import jobs query failed: ${error.code}`);
+    throw new Error(`import jobs query failed: ${errorCode(error)}`);
   }
   const names = await getUserNames(data.map((job) => job.created_by));
   return data.map((job) => ({ ...job, createdByName: job.created_by ? (names.get(job.created_by) ?? null) : null }));

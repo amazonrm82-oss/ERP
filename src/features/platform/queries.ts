@@ -4,7 +4,7 @@ import { cache } from "react";
 
 import type { Json, PlatformRole, PlanRow } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
-import { must } from "@/lib/db-read";
+import { must, errorCode } from "@/lib/db-read";
 
 import type { AdminSubprocessor } from "./subprocessors";
 import type { AdminVatRate } from "./vat-rates";
@@ -39,7 +39,7 @@ async function call(
 ): Promise<Json> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc(name);
-  if (error) throw new Error(`${name} failed: ${error.code}`);
+  if (error) throw new Error(`${name} failed: ${errorCode(error)}`);
   return data;
 }
 
@@ -139,7 +139,7 @@ export async function listPlatformOrgs(filters: OrgListFilters): Promise<{ total
     p_limit: ORGS_PAGE_SIZE,
     p_offset: (filters.page - 1) * ORGS_PAGE_SIZE,
   });
-  if (error) throw new Error(`platform_list_orgs failed: ${error.code}`);
+  if (error) throw new Error(`platform_list_orgs failed: ${errorCode(error)}`);
   const result = obj(data);
   return { total: Number(result.total ?? 0), rows: (result.rows as Obj[]) ?? [] };
 }
@@ -147,7 +147,7 @@ export async function listPlatformOrgs(filters: OrgListFilters): Promise<{ total
 export async function getPlatformOrg(orgId: string): Promise<Obj | null> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("platform_org", { p_org: orgId });
-  if (error) throw new Error(`platform_org failed: ${error.code}`);
+  if (error) throw new Error(`platform_org failed: ${errorCode(error)}`);
   return data ? obj(data) : null;
 }
 
@@ -167,14 +167,14 @@ export async function getQrExternalBlock(orgId: string): Promise<QrExternalBlock
 export async function listPlatformLog(orgId: string | null, limit = 100): Promise<Obj[]> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("platform_log_list", { p_org: orgId, p_limit: limit });
-  if (error) throw new Error(`platform_log_list failed: ${error.code}`);
+  if (error) throw new Error(`platform_log_list failed: ${errorCode(error)}`);
   return (data as Obj[]) ?? [];
 }
 
 export async function listPlans(): Promise<PlanRow[]> {
   const supabase = await createClient();
   const { data, error } = await supabase.from("plans").select("*").order("position");
-  if (error) throw new Error(`plans query failed: ${error.code}`);
+  if (error) throw new Error(`plans query failed: ${errorCode(error)}`);
   return data;
 }
 
@@ -182,7 +182,7 @@ export async function listPlans(): Promise<PlanRow[]> {
 export async function findPlatformUser(email: string): Promise<Obj | null> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("platform_find_user", { p_email: email });
-  if (error) throw new Error(`platform_find_user failed: ${error.code}`);
+  if (error) throw new Error(`platform_find_user failed: ${errorCode(error)}`);
   return data ? obj(data) : null;
 }
 

@@ -12,6 +12,7 @@ import { buildReport } from "./build";
 import type { ReportSection } from "./definitions";
 import { parsePeriod } from "./period";
 import { parseReportData } from "./schemas";
+import { errorCode } from "@/lib/db-read";
 
 export type DashboardTile = { label: string; value: string; change: string | null; trend: "up" | "down" | "same" | null };
 
@@ -67,7 +68,7 @@ export async function getDashboard(orgId: string, options: { unteamed?: { timeZo
     p_prev_to: previous.to,
   });
   if (error) {
-    throw new Error(`report_summary failed: ${error.code}`);
+    throw new Error(`report_summary failed: ${errorCode(error)}`);
   }
   const s = parseReportData("report_summary", data) as Obj;
   // FLD-10: the tiles name leads and deals in the business's words

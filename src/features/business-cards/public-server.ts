@@ -10,6 +10,7 @@ import { buildVCard, vcardDisposition } from "@/lib/vcard";
 
 import { publicCardFrom, type PublicCard } from "./public";
 import { serverLog } from "@/lib/log-server";
+import { errorCode } from "@/lib/db-read";
 
 // BIZ-02: the public business card, in the approved pattern for secret-link pages (owner, 13 October 2026; hard
 // rule 5): the server reads only through public.business_card_public() and sends the form only through
@@ -34,7 +35,7 @@ export async function getPublicCard(token: string, ip: string | null): Promise<P
   const { data, error } = await service.rpc("business_card_public", { p_token: token, p_ip_hash: keyedIpHash(ip) });
   if (error) {
     if (error.code === "P0002") return "not-found";
-    throw new Error(`business_card_public failed: ${error.code}`);
+    throw new Error(`business_card_public failed: ${errorCode(error)}`);
   }
   if (data && typeof data === "object" && !Array.isArray(data) && (data as { rate_limited?: unknown }).rate_limited === true) {
     return "rate-limited";

@@ -11,6 +11,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 import { LIBRARY_LINK_TOKEN, publicLibraryFileFrom, publicLibraryGoFrom, publicLibraryItemFrom, type PublicLibraryItem } from "./public";
 import { LIBRARY_PAGE_TEXTS } from "./texts";
+import { errorCode } from "@/lib/db-read";
 
 // LIB-02 (approved pattern for public secret-link pages, owner 11 November 2026; CLAUDE.md hard rule 5): the customer's page
 // of a library item sent by a tracked link reads only through public.library_link_public() (security definer, service_role
@@ -33,7 +34,7 @@ export async function getPublicLibraryItem(token: string, ip: string | null): Pr
   const { data, error } = await service.rpc("library_link_public", { p_token: token, p_ip_hash: keyedIpHash(ip, "library") });
   if (error) {
     if (error.code === "P0002") return "not-found";
-    throw new Error(`library_link_public failed: ${error.code}`);
+    throw new Error(`library_link_public failed: ${errorCode(error)}`);
   }
   if (data && typeof data === "object" && !Array.isArray(data) && (data as { rate_limited?: unknown }).rate_limited === true) {
     return "rate-limited";

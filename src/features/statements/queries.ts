@@ -3,6 +3,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 
 import type { StatementCustomer } from "./link-actions";
+import { errorCode } from "@/lib/db-read";
 
 /** BAL-04: whether the customer has a working statement link, and since when; null for someone who may not manage it. */
 export async function getStatementLinkStatus(orgId: string, customer: StatementCustomer): Promise<{ active: boolean; createdAt: string | null } | null> {
@@ -15,7 +16,7 @@ export async function getStatementLinkStatus(orgId: string, customer: StatementC
   if (error) {
     // not someone who records payments: no link card
     if (error.code === "42501") return null;
-    throw new Error(`statement_link_status failed: ${error.code}`);
+    throw new Error(`statement_link_status failed: ${errorCode(error)}`);
   }
   const value = data as { active?: unknown; created_at?: unknown } | null;
   return { active: value?.active === true, createdAt: typeof value?.created_at === "string" ? value.created_at : null };

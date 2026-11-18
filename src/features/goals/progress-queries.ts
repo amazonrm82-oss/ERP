@@ -2,7 +2,7 @@ import "server-only";
 
 import { parseReportData } from "@/features/reports/schemas";
 import { getUserNames } from "@/features/shell/queries";
-import { must } from "@/lib/db-read";
+import { must, errorCode } from "@/lib/db-read";
 import { readAllPages } from "@/lib/paged-read";
 import { zoneDate, zonedIso } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
@@ -33,7 +33,7 @@ export async function getGoalProgress(orgId: string, options: Options = {}): Pro
     p_user: options.userId ?? null,
   });
   if (error) {
-    throw new Error(`report_goal_progress failed: ${error.code}`);
+    throw new Error(`report_goal_progress failed: ${errorCode(error)}`);
   }
   // a mismatch throws ReportShapeError; withReportShape() logs it and shows the message
   const rows = parseReportData("report_goal_progress", data);
@@ -83,7 +83,7 @@ export async function getMyMonthClosings(orgId: string, userId: string, timeZone
     p_owner: userId,
   });
   if (error) {
-    throw new Error(`report_revenue failed: ${error.code}`);
+    throw new Error(`report_revenue failed: ${errorCode(error)}`);
   }
   return parseReportData("report_revenue", data).by_owner.reduce((sum, row) => sum + row.amount, 0);
 }

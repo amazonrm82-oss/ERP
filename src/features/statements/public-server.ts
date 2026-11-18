@@ -11,6 +11,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { publicStatementPdfDocument, statementPdfFileName } from "./pdf";
 import { publicStatementFrom, STATEMENT_LINK_TOKEN, type PublicStatement } from "./public";
 import { markNotFound } from "@/lib/public-not-found";
+import { errorCode } from "@/lib/db-read";
 
 // BAL-04 (approved pattern for public secret-link pages, owner 8 October 2026; CLAUDE.md hard rule 5): the customer's
 // statement page reads only through public.statement_public() (security definer, service_role only), which checks the token
@@ -27,7 +28,7 @@ export async function getPublicStatement(token: string, ip: string | null): Prom
   const { data, error } = await service.rpc("statement_public", { p_token: token, p_ip_hash: keyedIpHash(ip, "statement") });
   if (error) {
     if (error.code === "P0002") return "not-found";
-    throw new Error(`statement_public failed: ${error.code}`);
+    throw new Error(`statement_public failed: ${errorCode(error)}`);
   }
   if (data && typeof data === "object" && !Array.isArray(data) && (data as { rate_limited?: unknown }).rate_limited === true) {
     return "rate-limited";

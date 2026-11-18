@@ -5,7 +5,7 @@ import { strToU8, zipSync } from "fflate";
 
 import { EXPORT_COLUMNS, EXPORT_README, EXPORT_TABLES, exportKey, exportNames, type ExportRow, type ExportTable, toCsv } from "@/features/imports/export-build";
 import { FILES_BUCKET } from "@/features/files/types";
-import { must } from "@/lib/db-read";
+import { must, errorCode } from "@/lib/db-read";
 import { readAllPages } from "@/lib/paged-read";
 import type { Database } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
@@ -26,7 +26,7 @@ async function fetchAll(supabase: Client, t: ExportTable, orgId: string): Promis
     // rows written in one statement share created_at; without a tie-breaker a row can be skipped or repeated between pages (FXC-07)
     for (const column of exportKey(t)) query = query.order(column as "id", { ascending: true });
     const { data, error } = await query.range(from, to);
-    if (error) throw new Error(`export of ${t.table} failed: ${error.code}`);
+    if (error) throw new Error(`export of ${t.table} failed: ${errorCode(error)}`);
     return data as unknown as ExportRow[];
   });
   return rows;

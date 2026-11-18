@@ -3,6 +3,7 @@ import "server-only";
 import type { LeadStatusKind, StageKind } from "@/lib/database.types";
 import { stageRequiredFields, type StageRequiredField } from "@/features/deals/stage-required";
 import { createClient } from "@/lib/supabase/server";
+import { errorCode } from "@/lib/db-read";
 
 export type StageSetting = {
   id: string;
@@ -38,7 +39,7 @@ export async function listPipelineSettings(orgId: string): Promise<PipelineSetti
       .order("position", { ascending: true }),
   ]);
   if (pipelines.error || stages.error) {
-    throw new Error(`pipeline settings query failed: ${(pipelines.error ?? stages.error)?.code}`);
+    throw new Error(`pipeline settings query failed: ${errorCode(pipelines.error ?? stages.error)}`);
   }
 
   // Counted in the database (one small query each): a stage that holds deals,
@@ -99,7 +100,7 @@ export async function listLeadSettings(orgId: string): Promise<{ statuses: Statu
     supabase.from("lead_sources").select("id, name, is_active").eq("organization_id", orgId).order("name", { ascending: true }),
   ]);
   if (statuses.error || sources.error) {
-    throw new Error(`lead settings query failed: ${(statuses.error ?? sources.error)?.code}`);
+    throw new Error(`lead settings query failed: ${errorCode(statuses.error ?? sources.error)}`);
   }
   const counts = await Promise.all(
     statuses.data.map((status) =>

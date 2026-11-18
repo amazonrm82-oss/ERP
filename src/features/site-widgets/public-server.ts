@@ -12,6 +12,7 @@ import { isWidgetToken, widgetFormPath } from "./paths";
 import { publicWidgetFrom, type PublicWidget } from "./public";
 import { widgetScript } from "./script";
 import { serverLog } from "@/lib/log-server";
+import { errorCode } from "@/lib/db-read";
 
 // SPD-07: the site widget, in the approved pattern for public secret-link pages (owner, 13 October 2026; hard rule 5):
 // the server reads only through public.site_widget_public() and sends the form only through public.site_widget_submit()
@@ -39,7 +40,7 @@ export async function getPublicWidget(token: string, ip: string | null): Promise
   const { data, error } = await service.rpc("site_widget_public", { p_token: token, p_ip_hash: keyedIpHash(ip) });
   if (error) {
     if (error.code === "P0002") return "not-found";
-    throw new Error(`site_widget_public failed: ${error.code}`);
+    throw new Error(`site_widget_public failed: ${errorCode(error)}`);
   }
   if (data && typeof data === "object" && !Array.isArray(data) && (data as { rate_limited?: unknown }).rate_limited === true) {
     return "rate-limited";

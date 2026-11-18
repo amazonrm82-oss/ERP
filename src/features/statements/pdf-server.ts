@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { StatementCustomer } from "./link-actions";
 import { publicStatementPdfDocument, STATEMENT_BANK_ELSEWHERE, statementPdfFileName } from "./pdf";
 import { staffStatementFrom } from "./staff";
+import { errorCode } from "@/lib/db-read";
 
 // BAL-04: the staff's PDF of a customer's statement, made for this request with the user's own session and never stored or
 // counted in the PDF quota (owner, 1 November 2026, answer (2) א). Since the owner's answers of 2 November 2026 it is exactly
@@ -47,7 +48,7 @@ export async function handleStaffStatementPdf(orgId: string, kind: string, id: s
     p_contact: kind === "contact" ? id : null,
     p_company: kind === "company" ? id : null,
   });
-  if (error) throw new Error(`statement_staff_view failed: ${error.code}`);
+  if (error) throw new Error(`statement_staff_view failed: ${errorCode(error)}`);
   const view = staffStatementFrom(data);
   if (!view) throw new Error("statement_staff_view: unexpected answer");
   if (view.state === "not-allowed") return text(403, NOT_ALLOWED);

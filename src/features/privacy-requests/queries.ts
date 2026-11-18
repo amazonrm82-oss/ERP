@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { PrivacyRequestRow, PrivacyRequestStatus, PrivacyRequestType, PrivacyVerifyMethod } from "@/lib/database.types";
-import { must } from "@/lib/db-read";
+import { must, errorCode } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
 // PRK-02: the request log and the link's state, read with the user's session (owners and admins only, RLS).
@@ -66,7 +66,7 @@ export async function getPrivacyLinkStatus(orgId: string): Promise<{ active: boo
   const { data, error } = await supabase.rpc("privacy_request_link_status", { p_org: orgId });
   if (error) {
     if (error.code === "42501") return null;
-    throw new Error(`privacy_request_link_status failed: ${error.code}`);
+    throw new Error(`privacy_request_link_status failed: ${errorCode(error)}`);
   }
   const value = data as { active?: unknown; created_at?: unknown; pages_open?: unknown } | null;
   return {

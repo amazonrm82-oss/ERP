@@ -17,6 +17,7 @@ import { getQuoteDecision, type Quote } from "./queries";
 import { readSignature, SIGNATURE_INVALID_MESSAGE, signedQuotePdfFileName } from "./signed-pdf";
 import { renderSignedQuotePdf, writeSignedQuotePdfAsServer } from "./signed-pdf-server";
 import { linesAsSent, parseQuoteSentState, quoteAsSent, remakeRender, SENT_REMAKE_SUFFIX, sentStateDiffers, wasAccepted, type QuoteSentState } from "./sent-state";
+import { errorCode } from "@/lib/db-read";
 
 type Client = SupabaseClient<Database>;
 
@@ -127,7 +128,7 @@ export async function getQuotePdfFile(
     // QUO-09: the PDF as sent (a signed version after it is its own row)
     .is("quote_signed", null)
     .maybeSingle();
-  if (error) throw new Error(`quote pdf: ${error.code}`);
+  if (error) throw new Error(`quote pdf: ${errorCode(error)}`);
   return data && data.unconfirmed_since === null ? { id: data.id, name: data.name, fingerprinted: data.sha256 !== null } : null;
 }
 
@@ -215,7 +216,7 @@ export async function getSignedQuotePdfFile(supabase: Client, orgId: string, quo
     .eq("quote_id", quoteId)
     .eq("quote_signed", true)
     .maybeSingle();
-  if (error) throw new Error(`signed quote pdf: ${error.code}`);
+  if (error) throw new Error(`signed quote pdf: ${errorCode(error)}`);
   return data && data.unconfirmed_since === null ? { id: data.id, name: data.name } : null;
 }
 

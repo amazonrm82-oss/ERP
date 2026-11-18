@@ -14,6 +14,7 @@ import { getOrderDocumentData } from "./document-server";
 import { orderPdfDocument, orderPdfFileName, orderPdfOutdated } from "./pdf";
 import { writeOrderPdfAsServer } from "./pdf-store-server";
 import { readOrder, type Order } from "./queries";
+import { errorCode } from "@/lib/db-read";
 
 export { orderPdfOutdated };
 
@@ -48,7 +49,7 @@ export async function listOrderPdfFiles(supabase: Client, orgId: string, orderId
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(100);
-  if (error) throw new Error(`order pdf: ${error.code}`);
+  if (error) throw new Error(`order pdf: ${errorCode(error)}`);
   return (data ?? []).filter((row) => row.unconfirmed_since === null).map((row) => ({ id: row.id, name: row.name, createdAt: row.created_at, contentStamp: row.order_content_stamp }));
 }
 

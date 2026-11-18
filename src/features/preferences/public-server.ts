@@ -18,6 +18,7 @@ import {
   type PreferenceResult,
   type PreferencesPage,
 } from "./model";
+import { errorCode } from "@/lib/db-read";
 
 // CNS-09 / CNS-10 (owner's answer (225) א, a new use of the service key in the approved pattern of CLAUDE.md hard rule 5):
 // the customer's preferences page and unsubscribe confirmation read only through public.consent_preferences_public(), and
@@ -39,7 +40,7 @@ export async function getPreferencesPage(token: string, ip: string | null): Prom
   const { data, error } = await service.rpc("consent_preferences_public", { p_token: token, p_ip_hash: senderHash(ip) });
   if (error) {
     if (error.code === "P0002") return "not-found";
-    throw new Error(`consent_preferences_public failed: ${error.code}`);
+    throw new Error(`consent_preferences_public failed: ${errorCode(error)}`);
   }
   if (data && typeof data === "object" && !Array.isArray(data) && (data as { rate_limited?: unknown }).rate_limited === true) {
     return "rate-limited";

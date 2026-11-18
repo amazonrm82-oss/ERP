@@ -24,6 +24,7 @@ import {
   type SignStatus,
   type StatusSignatureDocument,
 } from "./public";
+import { errorCode } from "@/lib/db-read";
 
 // SGN-02 (owner, 9 November 2026, answer (191) א): the customer's page of a document sent for signature, in the approved
 // pattern for secret-link pages (CLAUDE.md hard rule 5): the server reads only through public.signature_public() and signs
@@ -45,7 +46,7 @@ export async function getPublicSignature(token: string, ip: string | null): Prom
   const { data, error } = await service.rpc("signature_public", { p_token: token, p_ip_hash: keyedIpHash(ip, "signature") });
   if (error) {
     if (error.code === "P0002") return "not-found";
-    throw new Error(`signature_public failed: ${error.code}`);
+    throw new Error(`signature_public failed: ${errorCode(error)}`);
   }
   if (data && typeof data === "object" && !Array.isArray(data) && (data as { rate_limited?: unknown }).rate_limited === true) {
     return "rate-limited";

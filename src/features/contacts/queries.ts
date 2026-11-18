@@ -8,7 +8,7 @@ import { getUserNames } from "@/features/shell/queries";
 import { PAGE_SIZE, personSearchFilter } from "@/lib/search";
 import { sortColumn, type CustomSortKey, type Sort } from "@/lib/sort";
 import { createClient } from "@/lib/supabase/server";
-import { must } from "@/lib/db-read";
+import { must, errorCode } from "@/lib/db-read";
 import { isUuid } from "@/lib/paths";
 
 import { contactPickerName } from "./picker";
@@ -155,7 +155,7 @@ export async function listContacts(
   );
   const { data, error } = guarded.result;
   if (error) {
-    throw new Error(`contacts query failed: ${error.code}`);
+    throw new Error(`contacts query failed: ${errorCode(error)}`);
   }
 
   const rows = data.slice(0, size);
@@ -213,7 +213,7 @@ export async function getContact(orgId: string, contactId: string) {
     .is("deleted_at", null)
     .maybeSingle();
   if (error) {
-    throw new Error(`contact query failed: ${error.code}`);
+    throw new Error(`contact query failed: ${errorCode(error)}`);
   }
   if (!data) {
     return null;

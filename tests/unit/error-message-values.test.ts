@@ -6,13 +6,18 @@ import { describe, expect, it } from "vitest";
 // OPS-05, owner (436) א, 18 November 2026: "an error message our code throws contains no record value or user input, only a
 // code, a uuid and a field name". An error's message goes to our logs (OPS-06) and, from the Sentry start day, to Sentry; the
 // scrubbing there is the second line, this rule the first. Two scans:
-// (a) TypeScript under src/: every `new <Something>Error(...)` and every `super(...)` of a class that extends an Error. Its
-//     message is a plain string, or a template / concatenation whose interpolated parts are on a closed allowlist (ids, codes,
-//     field and table names, the label the caller passes); a database error's own `.message` (it can quote a row) never is.
+// (a) TypeScript under src/: every `new <Something>Error(...)`, every call of a built-in `Error(...)` / `TypeError(...)` /
+//     `RangeError(...)` without `new`, every `super(...)` of a class that extends an Error, and every `throw "..."` /
+//     `throw \`...\``. Its message is a plain string, or a template / concatenation whose interpolated parts are on a closed
+//     allowlist (ids, codes through errorCode(), field and table names, the label the caller passes); a database error's own
+//     `.message` (it can quote a row) never is. This is a LINT-LEVEL rule: it judges by the names of what is interpolated, not
+//     by data flow, so a variable named `key` that holds a typed value passes; a message assigned to `.message` afterwards, an
+//     error built by a helper that is not named *Error, and a `throw` of a variable are not scanned.
 // (b) SQL migrations: for each function only its LATEST definition (a later `create or replace function` wins; a function
 //     renamed to `*_retired` is gone). Every `raise exception '<format>', args` whose format has a `%` placeholder: each arg is
 //     an id, a code, a field name, a position or a plan number, judged by its variable name with casts and wrappers stripped,
-//     and never the caller's own unknown key echoed back ("unknown ...", "not editable"). Every `using hint =` is one static
+//     and never the caller's own unknown key echoed back ("unknown ...", "not editable"). A `using message =` option is judged
+//     the same way (the values of a `||` concatenation, or the arguments of `format(...)`). Every `using hint =` is one static
 //     code-like string. The violations that stand in functions already applied to the hosted database are listed in
 //     KNOWN_SQL_VIOLATIONS: fixing one needs a new migration (the lead's apply), and then its entry must go (a stale entry fails
 //     too), so the list only shrinks.
@@ -62,7 +67,7 @@ function splitTop(text: string, separator: string): string[] {
  * Interpolations every file may use: an id, a code, a status, a hint or reason code, a kind, a field/table/screen key, and
  * `what` (the caller's own label of a read, e.g. "leads list"). A trailing `?? "<literal>"` is ignored.
  */
-const TS_ALLOWED = /^(?:[\w$]+(?:\?\.|\.))*(?:id|[a-z]\w*Id|\w+_id|code|status|hint|reason|problem|kind|key|table|what|screen)$/;
+const TS_ALLOWED = /^(?:[\w$]+(?:\?\.|\.))*(?:id|[a-z]\w*Id|\w+_id|code|status|hint|reason|problem|kind|key|table|what|screen)$|^errorCode\([^()]*(?:\([^()]*\))?[^()]*\)$/;
 
 /** A module constant in capitals (a fixed text or number of our own code). */
 const CONSTANT = /^[A-Z][A-Z0-9_]*$/;
@@ -186,15 +191,23 @@ function scanTypeScript(): TsFinding[] {
   for (const path of sourceFiles(join(ROOT, "src"))) {
     const file = relative(ROOT, path).split("\\").join("/");
     const source = readFileSync(path, "utf8");
-    const calls: { index: number; call: string; open: number }[] = [];
+    const calls: { index: number; call: string; open: number; text?: string }[] = [];
     for (const m of source.matchAll(/new\s+([A-Za-z_$][\w$]*Error)\s*\(/g)) {
       if (!NOT_A_MESSAGE.has(m[1])) calls.push({ index: m.index, call: `new ${m[1]}`, open: m.index + m[0].length });
+    }
+    for (const m of source.matchAll(/(?<![\w$.])(?<!new\s+)(Error|TypeError|RangeError|SyntaxError)\s*\(/g)) {
+      calls.push({ index: m.index, call: m[1], open: m.index + m[0].length });
+    }
+    for (const m of source.matchAll(/\bthrow\s+(?=[`'"])/g)) {
+      const start = m.index + m[0].length;
+      const end = source.slice(start).search(/;|\n\s*\n/);
+      calls.push({ index: m.index, call: "throw", open: -1, text: source.slice(start, end < 0 ? undefined : start + end).trim() });
     }
     if (/class\s+\w+\s+extends\s+\w*Error\b/.test(source)) {
       for (const m of source.matchAll(/\bsuper\s*\(/g)) calls.push({ index: m.index, call: "super", open: m.index + m[0].length });
     }
-    for (const { index, call, open } of calls) {
-      for (const part of messageProblems(firstArgument(source, open), file)) {
+    for (const { index, call, open, text } of calls) {
+      for (const part of messageProblems(text ?? firstArgument(source, open), file)) {
         findings.push({ file, line: source.slice(0, index).split("\n").length, call, part });
       }
     }
@@ -215,6 +228,8 @@ describe("error messages hold no record value or user input: TypeScript", () => 
     expect(messageProblems("`read failed: ${what}: ${error.code ?? \"\"} ${row.id} ${leadId} ${lead_id}`", "src/x.ts")).toEqual([]);
     expect(messageProblems('"plain text"', "src/x.ts")).toEqual([]);
     expect(messageProblems("REPORT_SHAPE_MESSAGE", "src/x.ts")).toEqual([]);
+    expect(messageProblems("`leads query failed: ${errorCode(error)}`", "src/x.ts")).toEqual([]);
+    expect(messageProblems("`failed: ${errorCode(pipelines.error ?? stages.error)}`", "src/x.ts")).toEqual([]);
     expect(messageProblems("`${name} failed`", "src/features/reports/build.ts")).toEqual([]);
     expect(messageProblems("`${name} failed`", "src/x.ts")).toEqual(["name"]);
   });
@@ -296,7 +311,7 @@ function raiseStatements(body: string): string[] {
 }
 
 /** SQL's own split: single quotes with '' inside. */
-function splitSql(text: string): string[] {
+function splitSql(text: string, separator = ","): string[] {
   const out: string[] = [];
   let depth = 0;
   let quoted = false;
@@ -316,16 +331,17 @@ function splitSql(text: string): string[] {
     if (c === "'") quoted = true;
     else if (c === "(") depth++;
     else if (c === ")") depth--;
-    else if (c === "," && depth === 0) {
+    else if (depth === 0 && text.startsWith(separator, i)) {
       out.push(current.slice(0, -1).trim());
       current = "";
+      i += separator.length - 1;
     }
   }
   if (current.trim() !== "") out.push(current.trim());
   return out;
 }
 
-type Raise = { format: string | null; args: string[]; hint: string | null };
+type Raise = { format: string | null; args: string[]; hint: string | null; message: string | null };
 
 /** An EXCEPTION-level raise (`raise exception ...` or a bare `raise '...'`); null for notices, warnings and a re-raise. */
 function parseRaise(statement: string): Raise | null {
@@ -354,13 +370,16 @@ function parseRaise(statement: string): Raise | null {
   const head = (usingAt < 0 ? rest : rest.slice(0, usingAt)).trim();
   const options = usingAt < 0 ? [] : splitSql(rest.slice(usingAt + 5));
   let hint: string | null = null;
+  let message: string | null = null;
   for (const option of options) {
-    const m = /^hint\s*=\s*([\s\S]*)$/i.exec(option);
-    if (m) hint = m[1].trim();
+    const h = /^hint\s*=\s*([\s\S]*)$/i.exec(option);
+    if (h) hint = h[1].trim();
+    const m = /^message\s*=\s*([\s\S]*)$/i.exec(option);
+    if (m) message = m[1].trim();
   }
-  if (!head.startsWith("'")) return { format: null, args: [], hint };
+  if (!head.startsWith("'")) return { format: null, args: [], hint, message };
   const [format, ...args] = splitSql(head);
-  return { format, args, hint };
+  return { format, args, hint, message };
 }
 
 /**
@@ -383,6 +402,20 @@ function bareSqlArg(arg: string): string {
   return a.toLowerCase();
 }
 
+/**
+ * A `using message =` value as a format and its arguments: `format('...', a, b)` gives its format and arguments; a `||`
+ * concatenation gives its literal parts joined as the text and every other part as an argument; a literal alone has none.
+ */
+function messageOption(expression: string): { text: string; args: string[] } {
+  const formatCall = /^format\s*\(([\s\S]*)\)$/i.exec(expression);
+  if (formatCall) {
+    const [text, ...args] = splitSql(formatCall[1]);
+    return { text, args };
+  }
+  const parts = splitSql(expression, "||");
+  return { text: parts.filter((p) => p.startsWith("'")).join(" "), args: parts.filter((p) => !p.startsWith("'")) };
+}
+
 type SqlFinding = { fn: string; migration: string; raise: string; problem: "value" | "echo" | "hint" };
 
 function scanSql(): SqlFinding[] {
@@ -396,6 +429,14 @@ function scanSql(): SqlFinding[] {
         for (const arg of raise.args) {
           if (!SQL_ALLOWED_ARG.test(bareSqlArg(arg))) findings.push({ fn: def.name, migration: def.migration, raise: label, problem: "value" });
           else if (ECHOES_CALLER.test(raise.format)) findings.push({ fn: def.name, migration: def.migration, raise: label, problem: "echo" });
+        }
+      }
+      if (raise.message !== null) {
+        const option = messageOption(raise.message);
+        const optionLabel = `${label} message = ${raise.message}`;
+        for (const arg of option.args) {
+          if (!SQL_ALLOWED_ARG.test(bareSqlArg(arg))) findings.push({ fn: def.name, migration: def.migration, raise: optionLabel, problem: "value" });
+          else if (ECHOES_CALLER.test(option.text)) findings.push({ fn: def.name, migration: def.migration, raise: optionLabel, problem: "echo" });
         }
       }
       if (raise.hint !== null && !HINT_CODE.test(raise.hint)) {
@@ -509,8 +550,16 @@ describe("error messages hold no record value or user input: SQL (latest definit
       format: "'plan limit reached (%)'",
       args: ["v_limit"],
       hint: "'limit:max_users'",
+      message: null,
     });
     expect(parseRaise("raise notice 'x %', v_name")).toBeNull();
+    expect(parseRaise("raise exception using message = 'no row for ' || v_phone, hint = 'x:y'")).toMatchObject({
+      format: null,
+      message: "'no row for ' || v_phone",
+    });
+    expect(messageOption("'no row for ' || v_phone || ' today'")).toEqual({ text: "'no row for ' ' today'", args: ["v_phone"] });
+    expect(messageOption("format('unknown field %s', v_key)")).toEqual({ text: "'unknown field %s'", args: ["v_key"] });
+    expect(messageOption("'plain'")).toEqual({ text: "'plain'", args: [] });
     expect(parseRaise("raise")).toBeNull();
     expect(SQL_ALLOWED_ARG.test(bareSqlArg("v_lead_id::text"))).toBe(true);
     expect(SQL_ALLOWED_ARG.test(bareSqlArg("substr(v_key, 4)"))).toBe(true);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DbReadError, must } from "@/lib/db-read";
+import { DbReadError, errorCode, must } from "@/lib/db-read";
 
 describe("must() (FXC-05)", () => {
   it("returns the data of a read that worked, null included", () => {
@@ -19,5 +19,13 @@ describe("must() (FXC-05)", () => {
     expect(error.code).toBe("23505");
     expect(error.hint).toBe("quote:frozen");
     expect(new DbReadError("leads", { message: "x" }).message).toBe("database read failed: leads: no code");
+  });
+
+  it("errorCode answers the code, or 'no code' for none or the empty code of a network failure", () => {
+    expect(errorCode({ code: "42501" })).toBe("42501");
+    expect(errorCode({ code: "" })).toBe("no code");
+    expect(errorCode({ code: null })).toBe("no code");
+    expect(errorCode(null)).toBe("no code");
+    expect(new DbReadError("leads", { message: "fetch failed", code: "" }).message).toBe("database read failed: leads: no code");
   });
 });

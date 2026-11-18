@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import type { BuiltinChoices } from "./conditions";
 import type { FieldObject } from "./types";
+import { errorCode } from "@/lib/db-read";
 
 /**
  * FLD-09: the choices of the built-in fields a condition may depend on, keyed "builtin:<name>"
@@ -28,7 +29,7 @@ export async function conditionBuiltinChoices(orgId: string, objectType: FieldOb
       .select("id, name, pipeline_id, position")
       .eq("organization_id", orgId)
       .order("position", { ascending: true });
-    if (error) throw new Error(`stages query failed: ${error.code}`);
+    if (error) throw new Error(`stages query failed: ${errorCode(error)}`);
     const choices: BuiltinChoices[string] = [];
     for (const pipeline of pipelines) {
       for (const stage of data.filter((row) => row.pipeline_id === pipeline.id)) {

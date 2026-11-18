@@ -2,7 +2,7 @@ import "server-only";
 
 import { orgHasFeature } from "@/features/settings/queries";
 import { getUserNames } from "@/features/shell/queries";
-import { must } from "@/lib/db-read";
+import { must, errorCode } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
 import { isPrefillRecordType, type PrefillRecordType } from "./fields";
@@ -63,7 +63,7 @@ const STATES: readonly PrefillLinkState[] = ["open", "submitted", "expired", "re
 export async function getRecordPrefillLinks(orgId: string, recordType: PrefillRecordType, recordId: string): Promise<RecordPrefillLink[]> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("prefill_links_for_record", { p_org: orgId, p_record_type: recordType, p_record_id: recordId });
-  if (error) throw new Error(`prefill_links_for_record failed: ${error.code}`);
+  if (error) throw new Error(`prefill_links_for_record failed: ${errorCode(error)}`);
   const rows = (Array.isArray(data) ? data : []) as Array<Record<string, unknown>>;
   const str = (v: unknown) => (typeof v === "string" ? v : null);
   const names = await getUserNames(rows.map((r) => str(r.created_by)));

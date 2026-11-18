@@ -9,6 +9,7 @@ import { RATE_LIMITED_TEXT, rateLimitedJson } from "@/lib/public-rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { publicBusinessPageFrom, type PublicBusinessPage } from "./public";
+import { errorCode } from "@/lib/db-read";
 
 // BIZ-01: the public business page, in the approved pattern for secret-link pages (owner, 11 November 2026, answer (271) ב;
 // hard rule 5): the server reads only through public.business_page_public() and sends the contact form only through
@@ -33,7 +34,7 @@ export async function getPublicBusinessPage(token: string, ip: string | null): P
   const { data, error } = await service.rpc("business_page_public", { p_token: token, p_ip_hash: keyedIpHash(ip) });
   if (error) {
     if (error.code === "P0002") return "not-found";
-    throw new Error(`business_page_public failed: ${error.code}`);
+    throw new Error(`business_page_public failed: ${errorCode(error)}`);
   }
   if (data && typeof data === "object" && !Array.isArray(data) && (data as { rate_limited?: unknown }).rate_limited === true) {
     return "rate-limited";

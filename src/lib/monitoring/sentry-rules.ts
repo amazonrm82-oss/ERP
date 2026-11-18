@@ -89,7 +89,7 @@ type Mechanism = {
   is_exception_group?: boolean;
   data?: unknown;
 };
-type Exception = { type?: string; value?: string; stacktrace?: { frames?: Frame[] }; mechanism?: Mechanism };
+type Exception = { type?: string; value?: string; module?: string; stacktrace?: { frames?: Frame[] }; mechanism?: Mechanism };
 export type MonitorEvent = {
   message?: string;
   logentry?: { message?: string; params?: unknown[] };
@@ -242,6 +242,9 @@ export function scrubEvent<E extends MonitorEvent>(event: E, options: ScrubOptio
     if (summary) exception.value = summary;
     else if (exception.type === "DbReadError" || exception.type === "PostgrestError") exception.value = "database error";
     else if (typeof exception.value === "string") exception.value = sentryText(exception.value);
+    // the error's name and module are ours or the SDK's, but are free text too: through the same rules and cap
+    if (typeof exception.type === "string") exception.type = sentryText(exception.type);
+    if (typeof exception.module === "string") exception.module = capText(scrubUrl(exception.module));
     if (exception.mechanism) {
       const mechanism = exception.mechanism as unknown as Record<string, unknown>;
       for (const key of Object.keys(mechanism)) if (!MECHANISM_KEYS.has(key)) delete mechanism[key];
@@ -251,11 +254,11 @@ export function scrubEvent<E extends MonitorEvent>(event: E, options: ScrubOptio
   const threads = (event as { threads?: { values?: { stacktrace?: { frames?: Frame[] } }[] } }).threads;
   for (const thread of threads?.values ?? []) scrubFrames(thread.stacktrace?.frames);
   if (event.request) {
-    const url = typeof event.request.url === "string" ? scrubUrl(event.request.url) : undefined;
+    const url = typeof event.request.url === "string" ? capText(scrubUrl(event.request.url)) : undefined;
     const method = typeof event.request.method === "string" && /^[A-Z]{1,16}$/.test(event.request.method) ? event.request.method : undefined;
     event.request = { ...(url ? { url } : {}), ...(method ? { method } : {}) };
   }
-  if (typeof event.transaction === "string") event.transaction = scrubUrl(event.transaction);
+  if (typeof event.transaction === "string") event.transaction = capText(scrubUrl(event.transaction));
   delete event.breadcrumbs;
   delete event.extra;
   delete event.server_name;

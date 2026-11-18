@@ -8,6 +8,7 @@ import { RATE_LIMITED_PAGE_TEXT, RATE_LIMITED_TEXT, rateLimitedJson } from "@/li
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { PREFILL_LINK_TOKEN, prefillWrongField, publicPrefillFrom, type PublicPrefill } from "./public";
+import { errorCode } from "@/lib/db-read";
 
 // BIZ-05 (approved pattern for public secret-link pages, owner 11 November 2026, answer (271) ב; CLAUDE.md hard rule 5): the
 // customer's page of a form that fills an existing record reads only through public.prefill_public() and sends only through
@@ -26,7 +27,7 @@ export async function getPublicPrefill(token: string, ip: string | null): Promis
   const { data, error } = await service.rpc("prefill_public", { p_token: token, p_ip_hash: keyedIpHash(ip, "prefill") });
   if (error) {
     if (error.code === "P0002") return "not-found";
-    throw new Error(`prefill_public failed: ${error.code}`);
+    throw new Error(`prefill_public failed: ${errorCode(error)}`);
   }
   if (data && typeof data === "object" && !Array.isArray(data) && (data as { rate_limited?: unknown }).rate_limited === true) {
     return "rate-limited";

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { must } from "@/lib/db-read";
+import { must, errorCode } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
 import type { ViewSeatUsage } from "./view-seats";
@@ -67,7 +67,7 @@ export async function getViewSeatUsage(orgId: string): Promise<ViewSeatUsage | n
     .is("revoked_at", null)
     .gt("expires_at", new Date().toISOString());
   if (error) {
-    throw new Error(`viewer invitations query failed: ${error.code}`);
+    throw new Error(`viewer invitations query failed: ${errorCode(error)}`);
   }
   return { limit: row.limit, used: row.used, pending: count ?? 0 };
 }

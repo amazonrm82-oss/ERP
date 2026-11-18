@@ -7,6 +7,7 @@ import { RATE_LIMITED_TEXT, rateLimitedJson, rateLimitedText } from "@/lib/publi
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { DIGEST_STOP_TEXTS, DIGEST_STOP_TOKEN } from "./stop";
+import { errorCode } from "@/lib/db-read";
 
 // USR-11 / WAB-03 (owner (377) ב; the approved pattern for public secret-link pages, CLAUDE.md hard rule 5): the daily summary's
 // one-click stop link reads and writes only through public.digest_stop() (security definer, service_role only), which checks the
@@ -25,7 +26,7 @@ async function call(token: string, ip: string | null, stop: boolean): Promise<An
   const service = createServiceClient();
   if (!service) return { kind: "not-configured" };
   const { data, error } = await service.rpc("digest_stop", { p_token: token, p_ip_hash: keyedIpHash(ip, "digest") ?? undefined, p_stop: stop });
-  if (error) throw new Error(`digest_stop failed: ${error.code}`);
+  if (error) throw new Error(`digest_stop failed: ${errorCode(error)}`);
   const r = (data && typeof data === "object" && !Array.isArray(data) ? data : {}) as Record<string, unknown>;
   if (r.rate_limited === true) return { kind: "rate-limited" };
   if (r.status === "not_found") return { kind: "not-found" };

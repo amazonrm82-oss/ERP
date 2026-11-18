@@ -9,7 +9,7 @@ import { notificationHref } from "./links";
 import { notificationText } from "./notification-text";
 import { quietHoursFromRow, type QuietHours } from "./quiet-hours";
 import { NOTIFICATION_KINDS, type NotificationSettings } from "./settings";
-import { must } from "@/lib/db-read";
+import { must, errorCode } from "@/lib/db-read";
 
 export type NotificationView = {
   id: string;
@@ -54,7 +54,7 @@ export async function listNotifications(orgId: string, userId: string, limit: nu
     .limit(limit),
   ]);
   if (error) {
-    throw new Error(`notifications query failed: ${error.code}`);
+    throw new Error(`notifications query failed: ${errorCode(error)}`);
   }
   return data.map((row) => toNotificationView(orgId, row, terms));
 }
@@ -68,7 +68,7 @@ export async function countUnread(orgId: string, userId: string): Promise<number
     .eq("user_id", userId)
     .is("read_at", null);
   if (error) {
-    throw new Error(`unread count failed: ${error.code}`);
+    throw new Error(`unread count failed: ${errorCode(error)}`);
   }
   return count ?? 0;
 }

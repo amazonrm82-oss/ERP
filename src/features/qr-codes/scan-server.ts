@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 import { qrInterstitialHtml } from "./interstitial";
 import { isQrToken, qrScanTarget, type QrScanTarget } from "./redirect";
+import { errorCode } from "@/lib/db-read";
 
 // BIZ-03: a QR scan, in the approved pattern for public secret-link pages (owner, 13 October 2026; hard rule 5): the
 // server calls only public.qr_scan() (security definer, service_role only), which checks the token, counts the scan
@@ -20,7 +21,7 @@ export async function scanQrCode(token: string): Promise<QrScanResult> {
   const { data, error } = await service.rpc("qr_scan", { p_token: token });
   if (error) {
     if (error.code === "P0002") return { ok: false, reason: "not-found" };
-    throw new Error(`qr_scan failed: ${error.code}`);
+    throw new Error(`qr_scan failed: ${errorCode(error)}`);
   }
   const target = qrScanTarget(data);
   return target ? { ok: true, target } : { ok: false, reason: "not-found" };

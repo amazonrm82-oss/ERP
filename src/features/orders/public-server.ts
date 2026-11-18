@@ -8,6 +8,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { ORDER_ACCEPT_WORDING_VERSION, ORDER_LINK_TOKEN, publicOrderFrom, statusOrderFrom, type PublicOrder, type StatusPublicOrder } from "./public";
 import { markNotFound } from "@/lib/public-not-found";
 import { serverLog } from "@/lib/log-server";
+import { errorCode } from "@/lib/db-read";
 
 // ORD-05 (owner, 20 October 2026): the customer's page of a numbered order, in the approved pattern for secret-link pages
 // (CLAUDE.md hard rule 5): the server reads only through public.order_public() and decides only through
@@ -25,7 +26,7 @@ export async function getPublicOrder(token: string, ip: string | null): Promise<
   const { data, error } = await service.rpc("order_public", { p_token: token, p_ip_hash: keyedIpHash(ip, "order") });
   if (error) {
     if (error.code === "P0002") return "not-found";
-    throw new Error(`order_public failed: ${error.code}`);
+    throw new Error(`order_public failed: ${errorCode(error)}`);
   }
   if (data && typeof data === "object" && !Array.isArray(data) && (data as { rate_limited?: unknown }).rate_limited === true) {
     return "rate-limited";

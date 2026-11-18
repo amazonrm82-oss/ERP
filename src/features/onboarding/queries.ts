@@ -2,7 +2,7 @@ import "server-only";
 
 import type { MembershipRole } from "@/lib/database.types";
 import { createClient } from "@/lib/supabase/server";
-import { must } from "@/lib/db-read";
+import { must, errorCode } from "@/lib/db-read";
 
 export type MyOrganization = { id: string; name: string; role: MembershipRole };
 
@@ -17,7 +17,7 @@ export async function listMyOrganizations(userId: string): Promise<MyOrganizatio
     .eq("status", "active")
     .order("created_at", { ascending: true });
   if (error) {
-    throw new Error(`memberships query failed: ${error.code}`);
+    throw new Error(`memberships query failed: ${errorCode(error)}`);
   }
   if (memberships.length === 0) {
     return [];
@@ -32,7 +32,7 @@ export async function listMyOrganizations(userId: string): Promise<MyOrganizatio
     )
     .is("deleted_at", null);
   if (orgError) {
-    throw new Error(`organizations query failed: ${orgError.code}`);
+    throw new Error(`organizations query failed: ${errorCode(orgError)}`);
   }
 
   const names = new Map(organizations.map((org) => [org.id, org.name]));

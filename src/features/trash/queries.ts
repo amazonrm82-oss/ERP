@@ -3,6 +3,7 @@ import "server-only";
 import { getUserNames } from "@/features/shell/queries";
 import type { TrashableTable } from "@/lib/record-trash";
 import { createClient } from "@/lib/supabase/server";
+import { errorCode } from "@/lib/db-read";
 
 export type TrashedRecord = {
   table: TrashableTable;
@@ -49,7 +50,7 @@ export async function listTrash(orgId: string): Promise<TrashedRecord[]> {
   ]);
   for (const result of [leads, contacts, companies, deals]) {
     if (result.error) {
-      throw new Error(`trash query failed: ${result.error.code}`);
+      throw new Error(`trash query failed: ${errorCode(result.error)}`);
     }
   }
 

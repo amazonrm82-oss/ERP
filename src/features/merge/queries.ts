@@ -9,7 +9,7 @@ import { formatDate, formatMoney } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 
 import { MERGE_FIELDS, MERGE_TABLE, type MergeType } from "./fields";
-import { must } from "@/lib/db-read";
+import { must, errorCode } from "@/lib/db-read";
 
 export type Candidate = { id: string; title: string; subtitle: string | null };
 type Row = Record<string, unknown>;
@@ -45,7 +45,7 @@ export async function findDuplicateCandidates(orgId: string, type: MergeType, id
     if (emails.length) ors.push(`email.in.(${emails.map((e) => `"${e}"`).join(",")})`);
     if (phones.length || emails.length) {
       const { data: matches, error } = await supabase.rpc("contact_channel_matches", { p_org: orgId, p_phones: phones, p_emails: emails });
-      if (error) throw new Error(`duplicate candidates: ${error.code}`);
+      if (error) throw new Error(`duplicate candidates: ${errorCode(error)}`);
       const ids = [...new Set(matches.map((m) => m.contact_id))].filter((x) => x !== id);
       if (ids.length) ors.push(`id.in.(${ids.join(",")})`);
     }

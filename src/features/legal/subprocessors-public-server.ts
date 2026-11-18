@@ -12,6 +12,7 @@ import {
 } from "@/features/platform/subprocessors";
 import { createServiceClient } from "@/lib/supabase/service";
 import { logEvent } from "@/lib/log";
+import { errorCode } from "@/lib/db-read";
 
 /**
  * ADM-01 (owner, 26 October 2026, answer (ב)): the public subprocessors page reads the live list with the service key,
@@ -25,7 +26,7 @@ const readCached = unstable_cache(
     const service = createServiceClient();
     if (!service) throw new Error("subprocessors: service key not configured");
     const { data, error } = await service.rpc("subprocessors_public_page");
-    if (error) throw new Error(`subprocessors_public_page failed: ${error.code ?? ""}`);
+    if (error) throw new Error(`subprocessors_public_page failed: ${errorCode(error)}`);
     return publicListOrThrow(data);
   },
   ["subprocessors-public-page"],

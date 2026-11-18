@@ -7,7 +7,7 @@ import { getMyPermissions } from "@/features/permissions/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { orgHasFeature } from "@/features/settings/queries";
 import { getOrgContext } from "@/features/shell/queries";
-import { must } from "@/lib/db-read";
+import { must, errorCode } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
 import { invoiceProviderName } from "./providers/select";
@@ -110,7 +110,7 @@ export async function getOpenIssueRequests(orgId: string): Promise<OpenIssueRequ
   const { data, error } = await supabase.rpc("invoice_issue_requests_open", { p_org: orgId });
   if (error) {
     if (error.code === "42501") return [];
-    throw new Error(`invoice_issue_requests_open: ${error.code}`);
+    throw new Error(`invoice_issue_requests_open: ${errorCode(error)}`);
   }
   if (!Array.isArray(data)) return [];
   return data.flatMap((item) => {
@@ -151,7 +151,7 @@ export async function getIssueRequest(orgId: string, requestId: string): Promise
   const { data, error } = await supabase.rpc("invoice_issue_state", { p_org: orgId, p_request: requestId });
   if (error) {
     if (error.code === "42501" || error.hint === "invoice:request") return null;
-    throw new Error(`invoice_issue_state: ${error.code}`);
+    throw new Error(`invoice_issue_state: ${errorCode(error)}`);
   }
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
   const row = data as Record<string, unknown>;
@@ -224,7 +224,7 @@ export async function getCreditRoom(orgId: string, documentId: string): Promise<
   const { data, error } = await supabase.rpc("invoice_credit_room", { p_org: orgId, p_document: documentId });
   if (error) {
     if (error.code === "42501" || error.hint === "invoice_credit:original" || error.hint === "feature:documents") return null;
-    throw new Error(`invoice_credit_room: ${error.code}`);
+    throw new Error(`invoice_credit_room: ${errorCode(error)}`);
   }
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
   const row = data as Record<string, unknown>;
