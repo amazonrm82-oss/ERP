@@ -3272,6 +3272,12 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   through `@sentry/bundler-plugins`, which only `@sentry/nextjs/config` in next.config.ts loads); a new route, version, id, a higher
   severity, a stale entry, an unreadable range, or a fix that `npm update` can bring fails; the allowlist expires 2026-12-15 (CI fails
   from 16 December Israel time) until it is checked again.
+  Owner (435) א, (436) א (18 November 2026): the audit check fails only when a plain `npm update` brings the fix; a fix only a newer
+  Sentry release brings is a highlighted note in the run summary (`GITHUB_STEP_SUMMARY`), and the 2026-12-15 expiry still fails. Every
+  text field sent to Sentry is cut to 200 characters; a Postgres error goes as `SQLSTATE x [hint y]` only (no detail, where or query;
+  `databaseErrorSummary`), the stack trace stays. Code rule: an error message our code throws holds no record value or user input, only a
+  code, a uuid or a field name (`errorCode()` in `src/lib/db-read.ts`); `tests/unit/error-message-values.test.ts` scans them and lists 11
+  known SQL messages that still break it (to be fixed by a migration).
 - Messages (MSG-01/MSG-03, migrations 021151, 021152): one provider per channel (`src/features/messaging/providers/select.ts`, only
   `fake`, refused on Vercel production/preview); a message of a channel without a provider waits unclaimed and uncounted
   (`app.job_channel_asked`). `public.messages` (one lead or contact, composite FKs cascade, so purge/erasure/retention take them;
