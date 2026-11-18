@@ -51,7 +51,9 @@ jobs:
       - run: npm run build
       # FXS-06: known vulnerabilities in what the app ships fail the build (and so block promote);
       # RVW-53: run last, so an advisory never hides the real checks above
-      - run: npm audit --omit=dev --audit-level=high
+      # OPS-05 / owner (433) א: high or critical findings fail unless listed in scripts/audit-allowlist.json (with a recheck date);
+      # a listed finding fails as soon as a fixed version an update can take exists
+      - run: node scripts/audit-check.mjs
 
   # OPS-01 / RVW-7: the browser flow (tests/e2e/main-flow.mjs) against a throwaway
   # local Supabase stack on the runner, the way the lead runs it before a merge.

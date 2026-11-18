@@ -1,0 +1,16 @@
+{
+  "recheck_by": "2026-12-15",
+  "entries": [
+    { "package": "picomatch", "severity": "high", "advisories": ["GHSA-fc5q-39xc-vjpf"], "reason": "build-time only (Sentry bundler plugins), owner (433) א" },
+    { "package": "@rollup/plugin-commonjs", "severity": "high", "advisories": ["GHSA-fc5q-39xc-vjpf"], "reason": "build-time only (Sentry bundler plugins), owner (433) א" },
+    { "package": "@rollup/pluginutils", "severity": "high", "advisories": ["GHSA-fc5q-39xc-vjpf"], "reason": "build-time only (Sentry bundler plugins), owner (433) א" },
+    { "package": "fdir", "severity": "high", "advisories": ["GHSA-fc5q-39xc-vjpf"], "reason": "build-time only (Sentry bundler plugins), owner (433) א" },
+    { "package": "tinyglobby", "severity": "high", "advisories": ["GHSA-fc5q-39xc-vjpf"], "reason": "build-time only (Sentry bundler plugins), owner (433) א" },
+    { "package": "vite", "severity": "high", "advisories": ["GHSA-fc5q-39xc-vjpf"], "reason": "build-time only (Sentry bundler plugins), owner (433) א" },
+    { "package": "@sentry/nextjs", "severity": "high", "advisories": ["GHSA-fc5q-39xc-vjpf", "GHSA-3g3m-2fjr-6pw4", "GHSA-g3hv-75wg-m249"], "reason": "build-time only (Sentry bundler plugins), owner (433) א" },
+    { "package": "@sentry/node", "severity": "moderate", "advisories": ["GHSA-3g3m-2fjr-6pw4", "GHSA-g3hv-75wg-m249"], "reason": "build-time only (Sentry bundler plugins), owner (433) א" },
+    { "package": "@sentry/bundler-plugins", "severity": "moderate", "advisories": ["GHSA-3g3m-2fjr-6pw4", "GHSA-g3hv-75wg-m249"], "reason": "build-time only (Sentry bundler plugins), owner (433) א" },
+    { "package": "glob", "severity": "moderate", "advisories": ["GHSA-3g3m-2fjr-6pw4", "GHSA-g3hv-75wg-m249"], "reason": "build-time only (Sentry bundler plugins), owner (433) א" },
+    { "package": "minimatch", "severity": "moderate", "advisories": ["GHSA-g3hv-75wg-m249"], "reason": "build-time only (Sentry bundler plugins), owner (433) א" }
+  ]
+}

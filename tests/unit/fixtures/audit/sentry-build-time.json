@@ -1,0 +1,284 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "@rollup/plugin-commonjs": {
+      "name": "@rollup/plugin-commonjs",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@rollup/pluginutils",
+        "fdir",
+        "picomatch"
+      ],
+      "effects": [
+        "@sentry/nextjs"
+      ],
+      "range": ">=15.0.0",
+      "nodes": [
+        "node_modules/@rollup/plugin-commonjs"
+      ],
+      "fixAvailable": {
+        "name": "@sentry/nextjs",
+        "version": "8.38.0",
+        "isSemVerMajor": true
+      }
+    },
+    "@rollup/pluginutils": {
+      "name": "@rollup/pluginutils",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "picomatch"
+      ],
+      "effects": [
+        "@rollup/plugin-commonjs"
+      ],
+      "range": ">=3.0.10",
+      "nodes": [
+        "node_modules/@rollup/pluginutils"
+      ],
+      "fixAvailable": {
+        "name": "@sentry/nextjs",
+        "version": "8.38.0",
+        "isSemVerMajor": true
+      }
+    },
+    "@sentry/bundler-plugins": {
+      "name": "@sentry/bundler-plugins",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "glob"
+      ],
+      "effects": [
+        "@sentry/nextjs",
+        "@sentry/node"
+      ],
+      "range": "<=11.10.0",
+      "nodes": [
+        "node_modules/@sentry/bundler-plugins"
+      ],
+      "fixAvailable": {
+        "name": "@sentry/nextjs",
+        "version": "8.38.0",
+        "isSemVerMajor": true
+      }
+    },
+    "@sentry/nextjs": {
+      "name": "@sentry/nextjs",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "@rollup/plugin-commonjs",
+        "@sentry/bundler-plugins",
+        "@sentry/node"
+      ],
+      "effects": [],
+      "range": ">=8.39.0-beta.0",
+      "nodes": [
+        "node_modules/@sentry/nextjs"
+      ],
+      "fixAvailable": {
+        "name": "@sentry/nextjs",
+        "version": "8.38.0",
+        "isSemVerMajor": true
+      }
+    },
+    "@sentry/node": {
+      "name": "@sentry/node",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "@sentry/bundler-plugins"
+      ],
+      "effects": [
+        "@sentry/nextjs"
+      ],
+      "range": "11.0.0-alpha.0 - 11.10.0",
+      "nodes": [
+        "node_modules/@sentry/node"
+      ],
+      "fixAvailable": {
+        "name": "@sentry/nextjs",
+        "version": "8.38.0",
+        "isSemVerMajor": true
+      }
+    },
+    "fdir": {
+      "name": "fdir",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "picomatch"
+      ],
+      "effects": [],
+      "range": ">=5.2.1",
+      "nodes": [
+        "node_modules/@rollup/plugin-commonjs/node_modules/fdir",
+        "node_modules/tinyglobby/node_modules/fdir"
+      ],
+      "fixAvailable": true
+    },
+    "glob": {
+      "name": "glob",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1244013,
+          "name": "glob",
+          "dependency": "glob",
+          "title": "Glob: AbortSignal cancellation bypass allows post-timeout filesystem traversal",
+          "url": "https://github.com/advisories/GHSA-3g3m-2fjr-6pw4",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-400"
+          ],
+          "cvss": {
+            "score": 0,
+            "vectorString": null
+          },
+          "range": ">=9.0.0 <=14.0.1"
+        },
+        "minimatch"
+      ],
+      "effects": [
+        "@sentry/bundler-plugins"
+      ],
+      "range": "9.0.0 - 14.0.1",
+      "nodes": [
+        "node_modules/glob"
+      ],
+      "fixAvailable": {
+        "name": "@sentry/nextjs",
+        "version": "8.38.0",
+        "isSemVerMajor": true
+      }
+    },
+    "minimatch": {
+      "name": "minimatch",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1244623,
+          "name": "minimatch",
+          "dependency": "minimatch",
+          "title": "minimatch has potential denial of service via globparts amplification",
+          "url": "https://github.com/advisories/GHSA-g3hv-75wg-m249",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-405"
+          ],
+          "cvss": {
+            "score": 0,
+            "vectorString": null
+          },
+          "range": ">=7.0.0 <11.0.1"
+        }
+      ],
+      "effects": [
+        "glob"
+      ],
+      "range": "7.0.0 - 11.0.0",
+      "nodes": [
+        "node_modules/glob/node_modules/minimatch"
+      ],
+      "fixAvailable": {
+        "name": "@sentry/nextjs",
+        "version": "8.38.0",
+        "isSemVerMajor": true
+      }
+    },
+    "picomatch": {
+      "name": "picomatch",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1247710,
+          "name": "picomatch",
+          "dependency": "picomatch",
+          "title": "picomatch vulnerable to ReDoS through single-branch repeated extglobs",
+          "url": "https://github.com/advisories/GHSA-fc5q-39xc-vjpf",
+          "severity": "high",
+          "cwe": [
+            "CWE-1333"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": "<=4.0.7"
+        }
+      ],
+      "effects": [
+        "@rollup/plugin-commonjs",
+        "@rollup/pluginutils",
+        "fdir",
+        "tinyglobby",
+        "vite"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/@rollup/plugin-commonjs/node_modules/picomatch",
+        "node_modules/@rollup/pluginutils/node_modules/picomatch",
+        "node_modules/tinyglobby/node_modules/picomatch",
+        "node_modules/vite/node_modules/picomatch"
+      ],
+      "fixAvailable": {
+        "name": "@sentry/nextjs",
+        "version": "8.38.0",
+        "isSemVerMajor": true
+      }
+    },
+    "tinyglobby": {
+      "name": "tinyglobby",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "fdir",
+        "picomatch"
+      ],
+      "effects": [],
+      "range": "*",
+      "nodes": [
+        "node_modules/tinyglobby"
+      ],
+      "fixAvailable": true
+    },
+    "vite": {
+      "name": "vite",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "picomatch",
+        "tinyglobby"
+      ],
+      "effects": [],
+      "range": ">=6.3.0-beta.0",
+      "nodes": [
+        "node_modules/vite"
+      ],
+      "fixAvailable": true
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 4,
+      "high": 7,
+      "critical": 0,
+      "total": 11
+    },
+    "dependencies": {
+      "prod": 121,
+      "dev": 433,
+      "optional": 161,
+      "peer": 31,
+      "peerOptional": 0,
+      "total": 642
+    }
+  }
+}
