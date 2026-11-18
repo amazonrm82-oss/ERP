@@ -137,9 +137,9 @@ export function sourceLineDiscount(line: { quantity: number; unit_price_agorot: 
 /** A stored amount in agorot as the form types it ("1234.5"). */
 export const agorotText = (agorot: number) => (agorot / 100).toFixed(2).replace(/\.00$/, "");
 
-/** Why a request ended without a recorded document, in the person's words (codes of migration invoice_issue). */
 /** = the sync log's reason for an auth code (provider-events.ts, isConnectionAuthCode) */
 export const AUTH_REASON = "הספק לא קיבל את פרטי החיבור";
+/** Why a request ended without a recorded document, in the person's words (codes of migration invoice_issue). */
 
 const ENDED_REASON: Record<string, string> = {
   "document:duplicate": "מסמך מאותו סוג ומספר כבר רשום בעסק",
