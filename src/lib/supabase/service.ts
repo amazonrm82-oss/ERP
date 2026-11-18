@@ -49,6 +49,7 @@ import { getSupabaseEnv } from "@/lib/env";
  *   provider adapter's signature check passed, and calls only public.payment_link_webhook(); the
  *   OPS-04 worker also calls public.payment_link_page_claim() / payment_link_page_record() (LNK-02,
  *   owner (394) א);
+ *   and, for LNK-07, public.payment_link_refund_claim() / payment_link_refund_record();
  * - InforU's delivery reports and replies (src/features/inforu-callbacks/webhook-server.ts,
  *   routes /api/sms/inforu/status/<secret> and /api/sms/inforu/inbound/<secret>; SMS-05,
  *   owner (318) א, wave 3 use (2)): the client is made only after the secret in the path

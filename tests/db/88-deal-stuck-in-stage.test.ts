@@ -225,6 +225,8 @@ const RERUN = [
   migrationFile("_payment_link_pages.sql"),
   // LNK-04 redefines app.payment_links_check() last (the provider's payment id)
   migrationFile("_payment_link_webhook.sql"),
+  // LNK-07 redefines app.job_kinds() and app.job_payload_ok() last (payment_link.refund)
+  migrationFile("_payment_link_refunds.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

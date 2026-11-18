@@ -11,8 +11,9 @@
 // DOC-07 (owner (398) א): invoice.issue, a document through the invoice provider (src/features/invoicing/issue-handler.ts),
 // registered while this deployment offers a provider.
 // LNK-02 (owner (394) א): payment_link.create, the provider's hosted page of a payment link
-// (src/features/payment-links/page-handler.ts), registered while this deployment offers a payment provider.
-export const JOB_KINDS = ["message.send", "import.run", "export.run", "digest.send", "report.send", "invite.send", "invoice.issue", "payment_link.create"] as const;
+// (src/features/payment-links/page-handler.ts), registered while this deployment offers a payment provider; LNK-07:
+// payment_link.refund, a refund of a link's payment through it (src/features/payment-links/refund-handler.ts).
+export const JOB_KINDS = ["message.send", "import.run", "export.run", "digest.send", "report.send", "invite.send", "invoice.issue", "payment_link.create", "payment_link.refund"] as const;
 export type JobKind = (typeof JOB_KINDS)[number];
 
 export function isJobKind(value: unknown): value is JobKind {

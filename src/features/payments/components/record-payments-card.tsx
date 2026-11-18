@@ -9,6 +9,8 @@ import { getAllocationAccess, getMoneyState, getSubjectCredit, listAllocations }
 import { agorotInput } from "@/features/deals/recurring";
 import { HolderFiles } from "@/features/files/components/holder-files";
 import { listHolderFiles } from "@/features/files/holder-queries";
+import { ProviderRefundButton } from "@/features/payment-links/components/provider-refund";
+import { listProviderRefundable, type ProviderRefundState } from "@/features/payment-links/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatDate, formatMoney, zoneDate } from "@/lib/format";
 
@@ -78,6 +80,8 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
         label: `חשבונית זיכוי${doc.number ? ` ${doc.number}` : ""} מ-${formatDate(`${doc.docDate}T12:00:00Z`)}`,
       }))
     : [];
+  // LNK-07: the payments a payment link was paid with, refunded through the provider (owners and admins)
+  const providerRefundable = access.canCorrect ? await listProviderRefundable(orgId, ids) : new Map<string, ProviderRefundState>();
   const today = zoneDate(new Date(), context.org.timeZone);
   const titleId = `payments-${subject.id}`;
   const total = receivedTotal(payments);
@@ -279,6 +283,16 @@ export async function RecordPaymentsCard({ orgId, subject }: Props) {
                             remaining={remaining}
                             today={today}
                             creditDocuments={creditDocuments}
+                          />
+                        ) : null}
+                        {access.canCorrect && providerRefundable.has(payment.id) ? (
+                          <ProviderRefundButton
+                            orgId={orgId}
+                            subject={subject}
+                            paymentId={payment.id}
+                            label={label}
+                            remaining={remaining}
+                            state={providerRefundable.get(payment.id) as ProviderRefundState}
                           />
                         ) : null}
                         {access.canCorrect ? (

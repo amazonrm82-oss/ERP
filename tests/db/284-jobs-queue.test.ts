@@ -764,10 +764,11 @@ describe("background job queue (OPS-04)", () => {
   // functions are pinned below).
   // USR-09: invite.send, owner's answer (387) א, 16 November 2026 (test 378; its functions are pinned below).
   // DOC-07: invoice.issue, owner's answer (398) א, 16 November 2026 (test 381-invoice-issue; its functions are pinned there).
-  // LNK-02: payment_link.create, owner's answer (394) א, 16 November 2026 (test 385-payment-link-pages; its functions are pinned there).
-  it("(55) א: the job kinds are exactly {message.send, import.run, export.run, digest.send, report.send, invite.send, invoice.issue, payment_link.create}", async () => {
+  // LNK-02 / LNK-07: payment_link.create and payment_link.refund, owner's answer (394) א, 16 November 2026 (tests 385 and 387;
+  // their functions are pinned there).
+  it("(55) א: the job kinds are exactly {message.send, import.run, export.run, digest.send, report.send, invite.send, invoice.issue, payment_link.create, payment_link.refund}", async () => {
     const kinds = await asAdmin(async (q) => (await q<{ k: string[] }>("select app.job_kinds() as k")).rows[0].k);
-    expect(kinds).toEqual(["message.send", "import.run", "export.run", "digest.send", "report.send", "invite.send", "invoice.issue", "payment_link.create"]);
+    expect(kinds).toEqual(["message.send", "import.run", "export.run", "digest.send", "report.send", "invite.send", "invoice.issue", "payment_link.create", "payment_link.refund"]);
   });
 
   // USR-11 / WAB-03 (owner (267) א, (375) ב): the daily summary's worker path, pinned like the queue's own functions (body,

@@ -173,6 +173,13 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "payment_link:expires": "היום האחרון לתשלום הוא מהיום ועד 90 יום קדימה. בחרו יום אחר.",
   "payment_link:max": "יש כבר 20 קישורי תשלום ממתינים כאן. בטלו קישור שלא צריך ונסו שוב.",
   "payment_link:frozen": "קישור תשלום לא משנים. אם צריך סכום או תאריך אחרים, בטלו אותו וצרו קישור חדש.",
+  // LNK-07: a refund through the provider is only for a payment that came from a payment link
+  // LNK-07 review (3, 4): a refund the provider made is not cancelled by hand; only an unclear request is closed
+  "refund:provider_made": "את ההחזר הזה ביצע ספק הסליקה, ולכן לא מבטלים אותו כאן. אם הכסף חזר ללקוח בטעות, בדקו זאת מול ספק הסליקה.",
+  "payment_link_refund:recorded": "ההחזר הזה כבר נרשם בכרטיס התשלום עם המספר של ספק הסליקה. בדקו את רשימת ההחזרים, וסמנו את הבקשה \"לא בוצע\" כדי לסגור אותה.",
+  "payment:refund_request_open": "יש החזר דרך ספק הסליקה שעוד פתוח על התשלום הזה. חכו לתשובת הספק, או סמנו את הבקשה בכרטיס התשלום, ורק אז שנו את התשלום.",
+  "payment_link_refund:closed": "בקשת ההחזר כבר נסגרה, או שאינה ממתינה לבדיקה. רעננו את הדף.",
+  "payment_link_refund:not_link": "החזר דרך ספק הסליקה אפשרי רק לתשלום ששולם בקישור תשלום. לתשלום אחר רשמו החזר רגיל.",
   "payment_link:closed": "הקישור כבר לא ממתין לתשלום: הוא שולם, נכשל, פג תוקף או בוטל. אם צריך, צרו קישור חדש.",
   "refund:cancel_reason": "יש לכתוב למה ההחזר מבוטל (עד 500 תווים).",
   "refund:frozen": "החזר לא משנים. אם נרשם בטעות, בטלו אותו עם סיבה ורשמו החזר חדש.",

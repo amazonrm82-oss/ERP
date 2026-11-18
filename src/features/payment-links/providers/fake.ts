@@ -101,6 +101,7 @@ export function createFakePaymentProvider(options: { webhookSecret?: string } = 
   const secret: string | null = options.webhookSecret ?? (process.env.NODE_ENV === "test" ? FAKE_WEBHOOK_DEFAULT_SECRET : null);
   const links = new Map<string, Link>();
   const tokens = new Map<string, CardToken>();
+  const refunds = new Map<string, string>();
   let counter = 0;
 
   return {
@@ -119,11 +120,21 @@ export function createFakePaymentProvider(options: { webhookSecret?: string } = 
       return { status: link.status, paidAgorot: link.paidAgorot, providerPaymentId: link.paymentId, installments: link.installments };
     },
     async refund(request) {
+      // LNK-07: the same key answers the same refund (a retry never refunds twice)
+      const known = refunds.get(request.idempotencyKey);
+      if (known) return { ok: true, providerRefundId: known };
       if (!Number.isSafeInteger(request.amountAgorot) || request.amountAgorot < 1) return { ok: false, code: "amount" };
       const link = [...links.values()].find((l) => l.paymentId === request.providerPaymentId);
-      if (!link || link.paidAgorot === null || request.amountAgorot > link.paidAgorot) return { ok: false, code: "not_refundable" };
+      if (link) {
+        if (link.paidAgorot === null || request.amountAgorot > link.paidAgorot) return { ok: false, code: "not_refundable" };
+      } else if (!/^fake_payment_/.test(request.providerPaymentId)) {
+        // a payment the fake made in another process is not in this one's memory; the database caps the amount
+        return { ok: false, code: "not_refundable" };
+      }
       counter += 1;
-      return { ok: true, providerRefundId: `fake_refund_${counter}` };
+      const id = `fake_refund_${counter}`;
+      refunds.set(request.idempotencyKey, id);
+      return { ok: true, providerRefundId: id };
     },
     async createTokenPage(request): Promise<PaymentPage> {
       counter += 1;

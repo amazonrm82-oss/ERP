@@ -4639,6 +4639,12 @@ export type Database = {
       payment_link_page_record: { Args: { p_job: string; p_lease: string; p_result: Json }; Returns: Json };
       // LNK-04: the payment provider's signed webhook (service_role only, after the route checked the signature)
       payment_link_webhook: { Args: { p_provider: string; p_event: Json }; Returns: Json };
+      // LNK-07: a refund of a link's payment through the provider (owners/admins ask; the worker claims and records)
+      payment_link_refund_begin: { Args: { p_org: string; p_key: string; p_payment: string; p_amount: number; p_note?: string | null }; Returns: Json };
+      payment_link_refund_state: { Args: { p_org: string; p_payment: string }; Returns: Json };
+      payment_link_refund_close: { Args: { p_org: string; p_request: string; p_outcome: string }; Returns: Json };
+      payment_link_refund_claim: { Args: { p_job: string; p_lease: string }; Returns: Json };
+      payment_link_refund_record: { Args: { p_job: string; p_lease: string; p_result: Json }; Returns: Json };
       invoice_issue_requests_open: { Args: { p_org: string }; Returns: Json };
       invoice_issue_close: { Args: { p_org: string; p_request: string }; Returns: Json };
       // DOC-14 (migration invoice_credit): a credit invoice through the provider, and what is left to credit

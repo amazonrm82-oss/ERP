@@ -105,8 +105,9 @@ describe("OPS-04: the worker route", () => {
     // USR-11 / WAB-03 (owner (267) א, (375) ב): the daily summary's composer, digest_job_compose
     // RPT-03 (owner (386) א): the scheduled report's composer, scheduled_report_compose; USR-09 (owner (387) א): invitation_job_compose
     // DOC-07 (owner (398) א): the invoice issue's claim and record, invoice_issue_claim and invoice_issue_record
-    // LNK-02 (owner (394) א): the payment link page's claim and record, payment_link_page_claim and payment_link_page_record
-    expect(rpcs).toEqual(["background_job_begin", "background_job_end", "background_job_progress", "claim_jobs", "digest_job_compose", "email_job_compose", "email_quota_return", "finish_job", "invitation_job_compose", "invoice_issue_claim", "invoice_issue_record", "job_message_may_send", "payment_link_page_claim", "payment_link_page_record", "scheduled_report_compose", "sms_job_compose", "sms_quota_return"]);
+    // LNK-02 (owner (394) א): the payment link page's claim and record, payment_link_page_claim and payment_link_page_record;
+    // LNK-07: the refund's claim and record, payment_link_refund_claim and payment_link_refund_record
+    expect(rpcs).toEqual(["background_job_begin", "background_job_end", "background_job_progress", "claim_jobs", "digest_job_compose", "email_job_compose", "email_quota_return", "finish_job", "invitation_job_compose", "invoice_issue_claim", "invoice_issue_record", "job_message_may_send", "payment_link_page_claim", "payment_link_page_record", "payment_link_refund_claim", "payment_link_refund_record", "scheduled_report_compose", "sms_job_compose", "sms_quota_return"]);
     // RVW-104: Storage only in the one line that binds the attachment reader to record-files (EML-01, owner (195) א)
     const storageLine = "supabase.storage.from(EMAIL_ATTACHMENT_BUCKET).download(path)";
     expect(code.split(storageLine)).toHaveLength(2);

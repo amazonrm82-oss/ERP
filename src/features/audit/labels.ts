@@ -243,6 +243,10 @@ export const ACTION_LABELS: Record<string, string> = {
   email_attachments: "קבצים שצורפו לאימייל",
   // ADM-03: a request to delete the business, its confirmation by the emailed link, or its cancellation
   org_deletion: "מחיקת העסק",
+  // LNK-07: an owner or admin asked the payment provider to refund part or all of a link's payment (the amount only)
+  refund_request: "בקשת החזר דרך ספק הסליקה",
+  // LNK-07 review (4): an unclear provider refund closed after checking at the provider (the outcome and the amount)
+  refund_request_close: "סגירת בקשת החזר אחרי בדיקה אצל ספק הסליקה",
 };
 
 export const LOGIN_ACTION_LABELS: Record<string, string> = {
@@ -270,6 +274,8 @@ export const FIELD_LABELS: Record<string, string> = {
   subject: "נושא",
   // COL-03
   promised_date: "התאריך שהלקוח התחייב אליו",
+  // LNK-07 (refund_request)
+  request_id: "מספר הבקשה",
   // QUO-06 follow-up (pdf_remake)
   old_size: "גודל קודם (בתים)",
   new_size: "גודל חדש (בתים)",

@@ -10,6 +10,9 @@ import { must } from "@/lib/db-read";
 import { createClient } from "@/lib/supabase/server";
 
 import { paymentProviderCode } from "./providers/select";
+import { providerRefundState, type ProviderRefundState } from "./refund-state";
+
+export type { ProviderRefundState } from "./refund-state";
 import type { PaymentProviderCode } from "./providers/types";
 import { effectiveLinkStatus, SOURCE_COLUMN, type PaymentLinkSource, type PaymentLinkStatus } from "./schema";
 
@@ -74,4 +77,30 @@ export async function listPaymentLinks(orgId: string, source: PaymentLinkSource)
     status: effectiveLinkStatus(r.status, r.expires_at, now),
     createdAt: r.created_at,
   }));
+}
+
+/**
+ * LNK-07: of these payments, the ones a payment link was paid with (read with the user's session), each with its provider
+ * refund requests. Empty without a provider. Owners and admins only ask it.
+ */
+export async function listProviderRefundable(orgId: string, paymentIds: string[]): Promise<Map<string, ProviderRefundState>> {
+  const out = new Map<string, ProviderRefundState>();
+  if (paymentIds.length === 0 || !paymentProviderCode()) return out;
+  const supabase = await createClient();
+  const rows = must(
+    await supabase
+      .from("payment_links")
+      .select("payment_id")
+      .eq("organization_id", orgId)
+      .eq("status", "paid")
+      .not("provider_payment_id", "is", null)
+      .in("payment_id", paymentIds.slice(0, 200)),
+    "payment_links",
+  );
+  for (const row of rows) {
+    if (!row.payment_id || out.has(row.payment_id)) continue;
+    const data = must(await supabase.rpc("payment_link_refund_state", { p_org: orgId, p_payment: row.payment_id }), "payment_link_refund_state");
+    out.set(row.payment_id, providerRefundState(data));
+  }
+  return out;
 }

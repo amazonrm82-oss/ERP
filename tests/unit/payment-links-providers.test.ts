@@ -50,8 +50,11 @@ describe("LNK-01: the fake adapter", () => {
     fake.settle(page.providerLinkId, "paid", 3);
     const status = await fake.getStatus(page.providerLinkId);
     expect(status).toMatchObject({ status: "paid", paidAgorot: 50_000, installments: 3 });
-    expect(await fake.refund({ providerPaymentId: status.providerPaymentId!, amountAgorot: 60_000 })).toEqual({ ok: false, code: "not_refundable" });
-    expect((await fake.refund({ providerPaymentId: status.providerPaymentId!, amountAgorot: 10_000 })).ok).toBe(true);
+    expect(await fake.refund({ idempotencyKey: "r1", providerPaymentId: status.providerPaymentId!, amountAgorot: 60_000 })).toEqual({ ok: false, code: "not_refundable" });
+    const first = await fake.refund({ idempotencyKey: "r2", providerPaymentId: status.providerPaymentId!, amountAgorot: 10_000 });
+    expect(first.ok).toBe(true);
+    // LNK-07: the same key answers the same refund
+    expect(await fake.refund({ idempotencyKey: "r2", providerPaymentId: status.providerPaymentId!, amountAgorot: 10_000 })).toEqual(first);
     // a settled link does not move again
     fake.settle(page.providerLinkId, "failed");
     expect((await fake.getStatus(page.providerLinkId)).status).toBe("paid");

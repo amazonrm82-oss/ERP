@@ -47,7 +47,8 @@ export type PaymentStatusAnswer = {
   installments: number | null;
 };
 
-export type RefundRequest = { providerPaymentId: string; amountAgorot: number };
+// LNK-07: the refund request's id is the provider's idempotency key, so a retry never refunds twice
+export type RefundRequest = { idempotencyKey: string; providerPaymentId: string; amountAgorot: number };
 export type RefundAnswer = { ok: true; providerRefundId: string } | { ok: false; code: string };
 
 /** A saved card at the provider: its token id and display details only (never the card number). */
