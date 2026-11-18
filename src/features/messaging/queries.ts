@@ -21,7 +21,7 @@ export async function messageTimelineItems(orgId: string, subject: TimelineSubje
   const rows = must(
     await supabase
       .from("messages")
-      .select("id, channel, direction, status, provider, provider_error_code, occurred_at, created_at")
+      .select("id, channel, direction, status, provider, provider_error_code, sent_at, occurred_at, created_at")
       .eq("organization_id", orgId)
       .eq(subject.kind === "lead" ? "lead_id" : "contact_id", subject.id)
       .order("occurred_at", { ascending: false })
@@ -29,12 +29,14 @@ export async function messageTimelineItems(orgId: string, subject: TimelineSubje
       .limit(MESSAGES_ON_TIMELINE),
     "timeline messages",
   );
+  // SMS-05b: the "no delivery report" line is judged against the time the page is drawn
+  const now = Date.now();
   return rows.map((row) => ({
     id: `message-${row.id}`,
     type: MESSAGE_TIMELINE_TYPE,
     label: messageEntryLabel(row),
     icon: null,
-    text: messageEntryText(row),
+    text: messageEntryText(row, now),
     isUserContent: false,
     body: "",
     occurredAt: row.occurred_at,

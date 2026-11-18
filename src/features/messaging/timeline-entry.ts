@@ -24,7 +24,22 @@ export type MessageEntryInput = {
   status: string;
   provider?: string | null;
   provider_error_code?: string | null;
+  // SMS-05b (owner (430) א): when the message went out, for the "no delivery report" line
+  sent_at?: string | null;
 };
+
+/**
+ * SMS-05b (owner (430) א, 18 November 2026): an InforU SMS still 'sent' 48 hours after sent_at got no delivery report. Display
+ * only, judged against now when the timeline is drawn; the stored status never changes. Exactly 48 hours counts as past.
+ */
+export const NO_DELIVERY_REPORT_MS = 48 * 60 * 60 * 1000;
+export const NO_DELIVERY_REPORT_TEXT = "נשלחה. אין דיווח מסירה.";
+
+export function noDeliveryReport(message: MessageEntryInput, now: number): boolean {
+  if (message.status !== "sent" || message.direction !== "outbound" || message.channel !== "sms" || message.provider !== "inforu") return false;
+  const sent = message.sent_at ? Date.parse(message.sent_at) : NaN;
+  return Number.isFinite(sent) && now - sent >= NO_DELIVERY_REPORT_MS;
+}
 
 // Owner (96): a message whose filled text passed the channel's cap is not sent and is logged with this code and NO
 // provider (the system's own refusal; a provider's error code that happens to read the same is a provider failure).
@@ -94,7 +109,7 @@ export function messageEntryLabel(message: MessageEntryInput): string {
 }
 
 /** The entry's line: the delivery status only (the text itself is not kept in the system). */
-export function messageEntryText(message: MessageEntryInput): string {
+export function messageEntryText(message: MessageEntryInput, now: number = Date.now()): string {
   if (message.status === "failed" && !message.provider && message.provider_error_code && Object.prototype.hasOwnProperty.call(REFUSED, message.provider_error_code)) {
     return REFUSED[message.provider_error_code];
   }
@@ -105,6 +120,7 @@ export function messageEntryText(message: MessageEntryInput): string {
   if (unknown) {
     return Object.prototype.hasOwnProperty.call(UNKNOWN_WAITING, message.channel) ? UNKNOWN_WAITING[message.channel] : STATUS.unknown;
   }
+  if (noDeliveryReport(message, now)) return NO_DELIVERY_REPORT_TEXT;
   return STATUS[message.status] ?? "";
 }
 

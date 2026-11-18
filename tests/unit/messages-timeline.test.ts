@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { mergeTimeline, messageEntryLabel, messageEntryText, REFUSED } from "@/features/messaging/timeline-entry";
+import { mergeTimeline, messageEntryLabel, messageEntryText, NO_DELIVERY_REPORT_MS, NO_DELIVERY_REPORT_TEXT, noDeliveryReport, REFUSED } from "@/features/messaging/timeline-entry";
 
 const root = join(__dirname, "..", "..");
 
@@ -92,6 +92,30 @@ describe("MSG-03: messages on the timeline", () => {
     expect(messageEntryText({ channel: "sms", direction: "outbound", status: "failed", provider_error_code: "unknown_timeout" })).toBe("השליחה נכשלה.");
     // a reported failure stays a failure
     expect(messageEntryText({ channel: "sms", direction: "outbound", status: "failed", provider: "inforu", provider_error_code: "inforu_undelivered" })).toBe("השליחה נכשלה.");
+  });
+
+  it("SMS-05b (430): an InforU SMS still 'sent' 48 hours after sending reads 'no delivery report', display only", () => {
+    const sentAt = "2026-11-18T10:00:00.000Z";
+    const at = Date.parse(sentAt);
+    const sms = { channel: "sms", direction: "outbound", status: "sent", provider: "inforu", sent_at: sentAt };
+    expect(NO_DELIVERY_REPORT_MS).toBe(172_800_000);
+    // just before the boundary: still "sent"
+    expect(messageEntryText(sms, at + NO_DELIVERY_REPORT_MS - 1)).toBe("נשלחה.");
+    expect(noDeliveryReport(sms, at + NO_DELIVERY_REPORT_MS - 1)).toBe(false);
+    // exactly 48 hours and after: no delivery report
+    expect(messageEntryText(sms, at + NO_DELIVERY_REPORT_MS)).toBe(NO_DELIVERY_REPORT_TEXT);
+    expect(messageEntryText(sms, at + 5 * NO_DELIVERY_REPORT_MS)).toContain("אין דיווח מסירה");
+    // a report came: delivered or failed reads as before
+    expect(messageEntryText({ ...sms, status: "delivered" }, at + 3 * NO_DELIVERY_REPORT_MS)).toBe("נמסרה.");
+    expect(messageEntryText({ ...sms, status: "failed", provider_error_code: "inforu_undelivered" }, at + 3 * NO_DELIVERY_REPORT_MS)).toBe("השליחה נכשלה.");
+    // only InforU SMS, only outbound, only with a sending time
+    expect(messageEntryText({ ...sms, provider: "fake" }, at + 3 * NO_DELIVERY_REPORT_MS)).toBe("נשלחה.");
+    expect(messageEntryText({ ...sms, channel: "email", provider: "inforu" }, at + 3 * NO_DELIVERY_REPORT_MS)).toBe("נשלחה.");
+    expect(messageEntryText({ ...sms, direction: "inbound" }, at + 3 * NO_DELIVERY_REPORT_MS)).toBe("נשלחה.");
+    expect(messageEntryText({ ...sms, sent_at: null }, at + 3 * NO_DELIVERY_REPORT_MS)).toBe("נשלחה.");
+    expect(messageEntryText({ ...sms, sent_at: "not a date" }, at + 3 * NO_DELIVERY_REPORT_MS)).toBe("נשלחה.");
+    // the input row is never changed
+    expect(sms.status).toBe("sent");
   });
 
   it("every status and channel the table allows has its words", () => {
