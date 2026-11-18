@@ -6,8 +6,13 @@
 // note, as `npm audit --audit-level=high` did. The allowlist names ONLY the root vulnerable packages (the ones that carry an
 // advisory themselves): the exact package, its severity, the exact GHSA ids npm audit gives for it, the exact install paths
 // (npm audit's `nodes`), every chain of packages through which the app reaches each path (from the app's direct dependency
-// down, read from package-lock.json), and the reason. The owner allowed these findings only because they sit in Sentry's
-// build-time code, so:
+// down, read from package-lock.json, each package with its locked version: "node_modules/glob@13.0.7"), and the reason. The
+// owner allowed these findings only because they sit in Sentry's build-time code, so:
+// - the "build-time only" claim was checked against the versions on the chains: any version change on a chain fails ("the
+//   chain's versions changed") until someone checks the claim again and updates the allowlist;
+// - a dependent that does not lead back to the app (no dependent of its own, or only a cycle) gives a chain starting with
+//   "(not reached from the app)", which no entry can name, so it fails;
+// - a dependency spec this check cannot read as a version range (npm:, git+, file:, workspace:) fails with its name;
 // - a root finding is covered only when its ids, paths and chains are exactly the entry's and its severity is not above the
 //   entry's: any other package depending on the vulnerable copy (a runtime dependency resolving to the same hoisted folder,
 //   say) adds a chain and fails, an id or chain npm audit or the lockfile no longer gives fails (the list must say exactly
@@ -171,24 +176,31 @@ export function chainTo(lock, node) {
   return null;
 }
 
+/** A lock path with its locked version: "node_modules/glob@13.0.7" ("@?" when the lock gives none). */
+const withVersion = (lock, path) => `${path}@${lock?.packages?.[path]?.version ?? "?"}`;
+
 /**
- * Every chain through which this app reaches the installed copy at `node`, as "a > b > node" strings of lock paths, from
- * the app's direct dependency down. A package that depends on a copy but does not itself lead back to the app gives a
- * chain starting with "(not reached from the app)", which no allowlist can name. Cycles are not routes and are skipped.
+ * Every chain through which this app reaches the installed copy at `node`, as "a@1.0.0 > b@2.0.0 > node@3.0.0" strings of
+ * lock paths with their locked versions, from the app's direct dependency down. A package that depends on a copy but does
+ * not itself lead back to the app (no dependent, or only dependents already on this route, a cycle) gives a chain starting
+ * with "(not reached from the app)", which no allowlist can name.
  */
 export function chainsTo(lock, node, limit = 200) {
   const found = new Set();
   const walk = (path, below, seen) => {
     if (found.size >= limit) return;
-    const dependents = dependentsOf(lock, path, nameOf(path));
-    if (dependents.length === 0) {
-      found.add(["(not reached from the app)", path, ...below].join(" > "));
-      return;
+    const here = [withVersion(lock, path), ...below];
+    let onward = false;
+    for (const dependent of dependentsOf(lock, path, nameOf(path))) {
+      if (dependent.path === "") {
+        found.add(here.join(" > "));
+        onward = true;
+      } else if (!seen.has(dependent.path)) {
+        walk(dependent.path, here, new Set([...seen, dependent.path]));
+        onward = true;
+      }
     }
-    for (const dependent of dependents) {
-      if (dependent.path === "") found.add([path, ...below].join(" > "));
-      else if (!seen.has(dependent.path)) walk(dependent.path, [path, ...below], new Set([...seen, dependent.path]));
-    }
+    if (!onward) found.add(["(not reached from the app)", ...here].join(" > "));
   };
   walk(node, [], new Set([node]));
   return [...found].sort();
@@ -210,6 +222,11 @@ export function calendarDate(value) {
 const RANK = { info: 0, low: 1, moderate: 2, high: 3, critical: 4 };
 const EXACT_PATH = (p) => typeof p === "string" && p.startsWith("node_modules/") && !/[*?\s]/.test(p);
 const chainParts = (chain) => chain.split(" > ");
+// a chain part is "<exact node_modules path>@<exact version>"; the path alone, without the version
+const VERSIONED = /^(node_modules\/\S+)@(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/;
+const partPath = (part) => VERSIONED.exec(part)?.[1] ?? part;
+const chainPaths = (chain) => chainParts(chain).map(partPath);
+const unversioned = (chain) => chainPaths(chain).join(" > ");
 
 /** Why an allowlist entry cannot be used, or null: package, severity, GHSA ids, install paths, their chains, and a reason. */
 function entryProblem(entry) {
@@ -222,10 +239,12 @@ function entryProblem(entry) {
   if (!entry.paths.every(EXACT_PATH)) return "an install path that is not an exact node_modules path";
   if (!Array.isArray(entry.chains) || entry.chains.length === 0) return "no dependent chains";
   for (const chain of entry.chains) {
-    if (typeof chain !== "string" || !chainParts(chain).every(EXACT_PATH)) return "a chain that is not exact node_modules paths joined by \" > \"";
-    if (!entry.paths.includes(chainParts(chain).at(-1))) return `a chain that does not end at one of its install paths: ${chain}`;
+    if (typeof chain !== "string" || !chainParts(chain).every((part) => VERSIONED.test(part) && EXACT_PATH(partPath(part)))) {
+      return "a chain that is not exact node_modules paths with their exact versions (path@1.2.3) joined by \" > \"";
+    }
+    if (!entry.paths.includes(chainPaths(chain).at(-1))) return `a chain that does not end at one of its install paths: ${chain}`;
   }
-  for (const path of entry.paths) if (!entry.chains.some((c) => chainParts(c).at(-1) === path)) return `no chain for install path ${path}`;
+  for (const path of entry.paths) if (!entry.chains.some((c) => chainPaths(c).at(-1) === path)) return `no chain for install path ${path}`;
   if (typeof entry.reason !== "string" || entry.reason.trim() === "") return "no reason";
   return null;
 }
@@ -334,7 +353,16 @@ export function decide({ audit, lock, allowlist, published, registry, now }) {
       if (gone.length > 0) result.problems.push(`allowlist entry ${name} names an install path npm audit no longer reports: ${gone.join(", ")}; remove it`);
       for (const node of nodes.filter((n) => entry.paths.includes(n))) {
         const actual = chainsTo(lock, node);
-        const expected = entry.chains.filter((c) => chainParts(c).at(-1) === node);
+        const expected = entry.chains.filter((c) => chainPaths(c).at(-1) === node);
+        const routes = (list) => [...new Set(list.map(unversioned))].sort().join("\n");
+        if (routes(actual) === routes(expected) && actual.length === expected.length && actual.some((c) => !expected.includes(c))) {
+          // same packages, other versions: the "build-time only" claim was checked against the listed versions only
+          const changed = actual.filter((c) => !expected.includes(c));
+          result.problems.push(
+            `allowlist entry ${name}: the chain's versions changed (now ${changed.join("; ")}): check that ${name} is still reached only by build-time code of these packages, then update scripts/audit-allowlist.json`,
+          );
+          continue;
+        }
         const extra = actual.filter((c) => !expected.includes(c));
         const missing = expected.filter((c) => !actual.includes(c));
         if (extra.length > 0) {
@@ -360,7 +388,7 @@ export function decide({ audit, lock, allowlist, published, registry, now }) {
     if (parents.length > 0 && !result.blocked && result.entries.size > 0) {
       for (const e of result.entries) {
         if (e === entry) continue;
-        const onChain = (n) => e.chains.some((c) => chainParts(c).slice(0, -1).includes(n));
+        const onChain = (n) => e.chains.some((c) => chainPaths(c).slice(0, -1).includes(n));
         const off = nodes.filter((n) => !onChain(n));
         if (off.length > 0) result.problems.push(`${label} is installed at ${off.join(", ")}, which is not on a chain the allowlist names for ${e.package}`);
       }
@@ -410,10 +438,27 @@ export function decide({ audit, lock, allowlist, published, registry, now }) {
       failures.push(`could not read the published versions of ${advisory.package} to look for a fix of ${advisory.id}`);
       continue;
     }
-    const fixed = versions.filter((v) => satisfies(v, "*") && !satisfies(v, advisory.range));
+    let fixed;
+    try {
+      fixed = versions.filter((v) => satisfies(v, "*") && !satisfies(v, advisory.range));
+    } catch {
+      failures.push(`${advisory.id}: cannot read the vulnerable range "${advisory.range}" of ${advisory.package}, so a fix cannot be looked for`);
+      continue;
+    }
     if (fixed.length === 0) continue;
     for (const node of vulnerabilities[advisory.package]?.nodes ?? []) {
       for (const dependent of dependentsOf(lock, node, advisory.package)) {
+        try {
+          satisfies("0.0.0", dependent.range);
+        } catch {
+          // npm:, git+, file:, workspace: and other non-semver specs: what an update would bring cannot be judged
+          failures.push(
+            `${advisory.id}: ${dependent.name} declares ${advisory.package} as "${dependent.range}", which is not a version range this check reads: a fix cannot be looked for`,
+          );
+          continue;
+        }
+        let top = null;
+        let chain = null;
         const takeable = newest(fixed, dependent.range);
         if (takeable) {
           failures.push(
@@ -421,8 +466,12 @@ export function decide({ audit, lock, allowlist, published, registry, now }) {
           );
           continue;
         }
-        const chain = dependent.path === "" ? null : chainTo(lock, dependent.path);
-        const top = topLevelFix(chain ? [...chain, { name: advisory.package, range: dependent.range }] : null, fixed, registry);
+        try {
+          chain = dependent.path === "" ? null : chainTo(lock, dependent.path);
+          top = topLevelFix(chain ? [...chain, { name: advisory.package, range: dependent.range }] : null, fixed, registry);
+        } catch {
+          top = null; // a range up the chain this check cannot read: the note just names no release
+        }
         const latestFixed = newest(fixed, "*");
         let line = `${advisory.id}: ${advisory.package} ${latestFixed} is fixed, but ${dependent.name} declares ${dependent.range}: a newer ${dependent.name} is needed`;
         if (top?.version && !top.dropped) line += `; ${chain[0].name} ${top.version} brings a fixed ${advisory.package} (upgrade once it is two weeks old)`;

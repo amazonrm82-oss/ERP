@@ -7,8 +7,8 @@
       "advisories": ["GHSA-3g3m-2fjr-6pw4"],
       "paths": ["node_modules/glob"],
       "chains": [
-        "node_modules/@sentry/nextjs > node_modules/@sentry/bundler-plugins > node_modules/glob",
-        "node_modules/@sentry/nextjs > node_modules/@sentry/node > node_modules/@sentry/bundler-plugins > node_modules/glob"
+        "node_modules/@sentry/nextjs@11.10.0 > node_modules/@sentry/bundler-plugins@11.10.0 > node_modules/glob@13.0.7",
+        "node_modules/@sentry/nextjs@11.10.0 > node_modules/@sentry/node@11.10.0 > node_modules/@sentry/bundler-plugins@11.10.0 > node_modules/glob@13.0.7"
       ],
       "reason": "build-time only (Sentry bundler plugins), owner (433) א"
     },
@@ -18,8 +18,8 @@
       "advisories": ["GHSA-g3hv-75wg-m249"],
       "paths": ["node_modules/glob/node_modules/minimatch"],
       "chains": [
-        "node_modules/@sentry/nextjs > node_modules/@sentry/bundler-plugins > node_modules/glob > node_modules/glob/node_modules/minimatch",
-        "node_modules/@sentry/nextjs > node_modules/@sentry/node > node_modules/@sentry/bundler-plugins > node_modules/glob > node_modules/glob/node_modules/minimatch"
+        "node_modules/@sentry/nextjs@11.10.0 > node_modules/@sentry/bundler-plugins@11.10.0 > node_modules/glob@13.0.7 > node_modules/glob/node_modules/minimatch@10.2.6",
+        "node_modules/@sentry/nextjs@11.10.0 > node_modules/@sentry/node@11.10.0 > node_modules/@sentry/bundler-plugins@11.10.0 > node_modules/glob@13.0.7 > node_modules/glob/node_modules/minimatch@10.2.6"
       ],
       "reason": "build-time only (Sentry bundler plugins), owner (433) א"
     }

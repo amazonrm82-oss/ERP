@@ -36,8 +36,8 @@ describe("audit-check: the decision on a captured report", () => {
       expect([...entry.chains].sort()).toEqual(entry.paths.flatMap((node: string) => chainsTo(LOCK, node)).sort());
     }
     expect(chainsTo(LOCK, "node_modules/glob")).toEqual([
-      "node_modules/@sentry/nextjs > node_modules/@sentry/bundler-plugins > node_modules/glob",
-      "node_modules/@sentry/nextjs > node_modules/@sentry/node > node_modules/@sentry/bundler-plugins > node_modules/glob",
+      "node_modules/@sentry/nextjs@11.10.0 > node_modules/@sentry/bundler-plugins@11.10.0 > node_modules/glob@13.0.7",
+      "node_modules/@sentry/nextjs@11.10.0 > node_modules/@sentry/node@11.10.0 > node_modules/@sentry/bundler-plugins@11.10.0 > node_modules/glob@13.0.7",
     ]);
     expect(ALLOWLIST.recheck_by).toBe("2026-12-15");
     expect(result.notes.join("\n")).toContain("a newer @sentry/bundler-plugins is needed");
@@ -96,7 +96,7 @@ describe("audit-check: the decision on a captured report", () => {
       severity: "moderate",
       advisories: ["GHSA-fc5q-39xc-vjpf"],
       paths: ["node_modules/picomatch"],
-      chains: ["node_modules/@sentry/nextjs > node_modules/picomatch"],
+      chains: ["node_modules/@sentry/nextjs@11.10.0 > node_modules/picomatch@4.0.3"],
       reason: "build-time only",
     });
     const result = run({ allowlist });
@@ -116,8 +116,10 @@ describe("audit-check: the decision on a captured report", () => {
       [{ ...base, severity: undefined }, "no severity (info, low, moderate, high or critical)"],
       [{ ...base, severity: "severe" }, "no severity (info, low, moderate, high or critical)"],
       [{ ...base, chains: [] }, "no dependent chains"],
-      [{ ...base, chains: ["node_modules/@sentry/* > node_modules/glob/node_modules/minimatch"] }, "a chain that is not exact node_modules paths"],
-      [{ ...base, chains: ["node_modules/@sentry/nextjs > node_modules/glob"] }, "a chain that does not end at one of its install paths"],
+      [{ ...base, chains: ["node_modules/@sentry/*@11.10.0 > node_modules/glob/node_modules/minimatch@10.2.6"] }, "a chain that is not exact node_modules paths with their exact versions"],
+      [{ ...base, chains: ["node_modules/@sentry/nextjs > node_modules/glob/node_modules/minimatch"] }, "a chain that is not exact node_modules paths with their exact versions"],
+      [{ ...base, chains: ["node_modules/@sentry/nextjs@^11 > node_modules/glob/node_modules/minimatch@10.2.6"] }, "a chain that is not exact node_modules paths with their exact versions"],
+      [{ ...base, chains: ["node_modules/@sentry/nextjs@11.10.0 > node_modules/glob@13.0.7"] }, "a chain that does not end at one of its install paths"],
     ];
     for (const [entry, problem] of cases) {
       const allowlist = { ...ALLOWLIST, entries: ALLOWLIST.entries.map((e: { package: string }) => (e.package === "minimatch" ? entry : e)) };
@@ -189,15 +191,17 @@ describe("audit-check: the decision on a captured report", () => {
     const result = run({ lock });
     expect(result.ok).toBe(false);
     expect(result.failures).toContain(
-      "glob (moderate; GHSA-3g3m-2fjr-6pw4) at node_modules/glob is also reached through a chain the allowlist does not name: node_modules/runtime-lib > node_modules/glob",
+      "glob (moderate; GHSA-3g3m-2fjr-6pw4) at node_modules/glob is also reached through a chain the allowlist does not name: node_modules/runtime-lib@1.0.0 > node_modules/glob@13.0.7",
     );
     // a runtime package depending on the bundler plugins one level up is caught on both roots
     const lock2 = clone(LOCK);
     lock2.packages[""].dependencies["runtime-lib"] = "^1.0.0";
     lock2.packages["node_modules/runtime-lib"] = { version: "1.0.0", dependencies: { "@sentry/bundler-plugins": "11.10.0" } };
     const failures = run({ lock: lock2 }).failures.join("\n");
-    expect(failures).toContain("node_modules/runtime-lib > node_modules/@sentry/bundler-plugins > node_modules/glob");
-    expect(failures).toContain("node_modules/runtime-lib > node_modules/@sentry/bundler-plugins > node_modules/glob > node_modules/glob/node_modules/minimatch");
+    expect(failures).toContain("node_modules/runtime-lib@1.0.0 > node_modules/@sentry/bundler-plugins@11.10.0 > node_modules/glob@13.0.7");
+    expect(failures).toContain(
+      "node_modules/runtime-lib@1.0.0 > node_modules/@sentry/bundler-plugins@11.10.0 > node_modules/glob@13.0.7 > node_modules/glob/node_modules/minimatch@10.2.6",
+    );
     // a dev package depending on it changes nothing: it is not shipped
     const lock3 = clone(LOCK);
     lock3.packages["node_modules/dev-lib"] = { version: "1.0.0", dev: true, dependencies: { glob: "^13.0.0" } };
@@ -231,7 +235,7 @@ describe("audit-check: the decision on a captured report", () => {
     expect(run({ audit: off }).failures.join("\n")).toContain("is not on a chain the allowlist names for glob");
     // listing a parent is refused: only roots go on the list
     const allowlist = clone(ALLOWLIST);
-    allowlist.entries.push({ ...ALLOWLIST.entries[0], package: "@sentry/nextjs", paths: ["node_modules/@sentry/nextjs"], chains: ["node_modules/@sentry/nextjs"] });
+    allowlist.entries.push({ ...ALLOWLIST.entries[0], package: "@sentry/nextjs", paths: ["node_modules/@sentry/nextjs"], chains: ["node_modules/@sentry/nextjs@11.10.0"] });
     expect(run({ allowlist }).failures).toContain(
       "allowlist entry @sentry/nextjs names a package that carries no advisory itself: list only the root packages",
     );
@@ -256,13 +260,13 @@ describe("audit-check: the decision on a captured report", () => {
       "allowlist entry glob lists GHSA-g3hv-75wg-m249, which npm audit no longer reports for it; remove the id",
     ]);
     const chains = clone(ALLOWLIST);
-    chains.entries[0].chains.push("node_modules/@sentry/nextjs > node_modules/glob");
+    chains.entries[0].chains.push("node_modules/@sentry/nextjs@11.10.0 > node_modules/glob@13.0.7");
     expect(run({ allowlist: chains }).failures).toEqual([
-      "allowlist entry glob names a chain the lockfile no longer has: node_modules/@sentry/nextjs > node_modules/glob; remove it",
+      "allowlist entry glob names a chain the lockfile no longer has: node_modules/@sentry/nextjs@11.10.0 > node_modules/glob@13.0.7; remove it",
     ]);
     const paths = clone(ALLOWLIST);
     paths.entries[1].paths.push("node_modules/minimatch");
-    paths.entries[1].chains.push("node_modules/eslint > node_modules/minimatch");
+    paths.entries[1].chains.push("node_modules/eslint@9.39.5 > node_modules/minimatch@3.1.5");
     expect(run({ allowlist: paths }).failures).toContain(
       "allowlist entry minimatch names an install path npm audit no longer reports: node_modules/minimatch; remove it",
     );
@@ -275,6 +279,51 @@ describe("audit-check: the decision on a captured report", () => {
       "other-tool (moderate; no advisory of its own) is installed at node_modules/other-tool, which is not on a chain the allowlist names for glob",
       "other-tool (moderate; no advisory of its own) is installed at node_modules/other-tool, which is not on a chain the allowlist names for minimatch",
     ]);
+  });
+
+  it("fails when a version on an allowed chain changes, until someone checks the build-time claim again", () => {
+    for (const [path, version] of [
+      ["node_modules/@sentry/node", "11.11.0"],
+      ["node_modules/@sentry/nextjs", "11.10.1"],
+      ["node_modules/glob", "13.0.8"],
+    ]) {
+      const lock = clone(LOCK);
+      lock.packages[path].version = version;
+      const failures = run({ lock }).failures.join("\n");
+      expect(failures).toContain(`${path}@${version}`);
+      expect(failures).toContain("the chain's versions changed");
+      expect(failures).toContain("then update scripts/audit-allowlist.json");
+    }
+    const lock = clone(LOCK);
+    lock.packages["node_modules/glob/node_modules/minimatch"].version = "10.2.7";
+    expect(run({ lock }).failures).toEqual([
+      "allowlist entry minimatch: the chain's versions changed (now node_modules/@sentry/nextjs@11.10.0 > node_modules/@sentry/bundler-plugins@11.10.0 > node_modules/glob@13.0.7 > node_modules/glob/node_modules/minimatch@10.2.7; node_modules/@sentry/nextjs@11.10.0 > node_modules/@sentry/node@11.10.0 > node_modules/@sentry/bundler-plugins@11.10.0 > node_modules/glob@13.0.7 > node_modules/glob/node_modules/minimatch@10.2.7): check that minimatch is still reached only by build-time code of these packages, then update scripts/audit-allowlist.json",
+    ]);
+  });
+
+  it("marks a dependent that only reaches the copy through a cycle as not reached from the app", () => {
+    const lock = clone(LOCK);
+    lock.packages["node_modules/a"] = { version: "1.0.0", dependencies: { b: "^1.0.0", glob: "^13.0.6" } };
+    lock.packages["node_modules/b"] = { version: "1.0.0", dependencies: { a: "^1.0.0" } };
+    expect(chainsTo(lock, "node_modules/glob")).toContain("(not reached from the app) > node_modules/b@1.0.0 > node_modules/a@1.0.0 > node_modules/glob@13.0.7");
+    const result = run({ lock });
+    expect(result.ok).toBe(false);
+    expect(result.failures.join("\n")).toContain("(not reached from the app)");
+  });
+
+  it("reports a dependency spec that is not a version range instead of throwing", () => {
+    for (const spec of ["npm:glob@^13.0.6", "git+https://example.com/glob.git", "file:../glob", "workspace:*"]) {
+      const lock = clone(LOCK);
+      lock.packages["node_modules/@sentry/bundler-plugins"].dependencies.glob = spec;
+      const result = run({ lock });
+      expect(result.ok).toBe(false);
+      expect(result.failures).toContain(
+        `GHSA-3g3m-2fjr-6pw4: @sentry/bundler-plugins declares glob as "${spec}", which is not a version range this check reads: a fix cannot be looked for`,
+      );
+    }
+    const audit = clone(AUDIT);
+    audit.vulnerabilities.glob.via[0].range = "git+https://x";
+    expect(run({ audit }).failures).toContain('GHSA-3g3m-2fjr-6pw4: cannot read the vulnerable range "git+https://x" of glob, so a fix cannot be looked for');
   });
 
   it("fails when published versions cannot be read, or the report is unreadable", () => {
