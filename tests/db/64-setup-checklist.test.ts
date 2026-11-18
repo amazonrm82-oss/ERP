@@ -946,6 +946,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       // LNK-07 redefines app.job_kinds() and app.job_payload_ok() of _payment_link_pages.sql and app.payment_refunds_check() and
       // app.payments_refund_guard() of _payment_refunds.sql last (payment_link.refund)
       "_payment_link_refunds.sql",
+      // LNK-04b redefines public.payment_link_webhook() of _payment_link_webhook.sql last (the closed-business owner notice)
+      "_payment_link_closed_notice.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

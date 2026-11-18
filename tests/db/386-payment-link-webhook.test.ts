@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { asAdmin, asAnon, asService, asUser, closePool, count, createOrg, createUser, pgError, type Query } from "./helpers";
+import { addMember, asAdmin, asAnon, asService, asUser, closePool, count, createOrg, createUser, pgError, type Query } from "./helpers";
 
 afterAll(closePool);
 
@@ -15,7 +15,10 @@ const REVIEWED_MD5: Record<string, string> = {
   // and the provider payment id judged (1, 5); unknown links logged (6)
   "app.payment_links_check": "f8044a62a3c357da7aece73b50ff09ba",
   "app.payment_webhook_limit": "00742714563cbbb947de3f014750d75f",
-  "public.payment_link_webhook": "39d52c8c3142a45b5ead2516142ef064",
+  // LNK-04b (owner (422) א): rechecked that 021318 keeps 021316's body and adds only the closed-business owner notice after a
+  // recorded payment, in its own block (errors swallowed, 40P01/40001/55P03 raised again); the notice helper is pinned too
+  "public.payment_link_webhook": "5b7b85671537097e050bb98fcaaa7595",
+  "app.payment_link_owner_notice": "ce78f25a1d4496e8d52710aee90e478f",
 };
 
 /**
@@ -221,5 +224,106 @@ describe("payment link webhook (LNK-04)", () => {
         ).rows,
     );
     expect(Object.fromEntries(rows.map((r) => [r.name, r.md5]))).toEqual(REVIEWED_MD5);
+  });
+});
+
+/**
+ * LNK-04b (owner (422) א): a payment through a link is recorded even when the business is closed (suspended, cancelled,
+ * read-only, or waiting for its deletion), and the active owners get one notice; a writable business gets none.
+ */
+describe("payment link webhook in a closed business (LNK-04b)", () => {
+  const TITLE = "התקבל תשלום בקישור בזמן שהעסק סגור";
+  const FEATURES = { payments: true, payment_links: true };
+  const one = async <T extends object>(q: Query, sql: string, params: unknown[] = []) => (await q<T>(sql, params)).rows[0];
+
+  beforeAll(async () => {
+    await asAdmin((q) => q("insert into app.settings (key, value) values ('payment_links_fake', 'on') on conflict (key) do update set value = excluded.value"));
+  });
+
+  // a business with an owner and an admin, a contact and a pending link made while it was writable
+  const setup = async (label: string) => {
+    const owner = await createUser(`lnkc-owner-${label}`);
+    const org = await createOrg(owner.id, `עסק סגור ${label}`);
+    const admin = await addMember(org, owner.id, "admin", `lnkc-admin-${label}`);
+    await asAdmin((q) => q("update public.subscriptions set feature_overrides = $2 where organization_id = $1", [org, JSON.stringify(FEATURES)]));
+    const contact = await asUser(owner.id, async (q) => (await one<{ id: string }>(q, "insert into public.contacts (organization_id, first_name, owner_id) values ($1, 'זהבה', $2) returning id", [org, owner.id])).id);
+    const link = await asUser(owner.id, async (q) =>
+      (
+        await one<{ id: string }>(
+          q,
+          `insert into public.payment_links (organization_id, contact_id, amount_agorot, max_installments, expires_on, provider)
+           values ($1, $2, 4200, 1, (now() at time zone 'Asia/Jerusalem')::date + 7, 'fake') returning id`,
+          [org, contact],
+        )
+      ).id,
+    );
+    return { owner, admin, org, contact, link };
+  };
+  const pay = (link: string) =>
+    asService(async (q) =>
+      (
+        await one<{ r: Record<string, unknown> }>(q, "select public.payment_link_webhook('fake', $1) as r", [
+          JSON.stringify({
+            event_id: `ev_${randomUUID()}`,
+            provider_link_id: `fake_${link}`,
+            status: "paid",
+            paid_agorot: 4200,
+            currency: "ILS",
+            provider_payment_id: `fake_payment_${randomUUID().slice(0, 8)}`,
+            installments: 1,
+          }),
+        ])
+      ).r,
+    );
+  const notices = (org: string) =>
+    asAdmin(
+      async (q) =>
+        (await q<{ user_id: string; type: string; body: string }>("select user_id, type, body from public.notifications where organization_id = $1 and title = $2", [org, TITLE])).rows,
+    );
+  const payments = (org: string, contact: string) =>
+    asAdmin((q) => count(q, "select 1 from public.payments where organization_id = $1 and contact_id = $2 and status = 'confirmed' and amount_agorot = 4200", [org, contact]));
+
+  const closers: Record<string, (org: string, owner: string) => Promise<unknown>> = {
+    suspended: (org) => asAdmin((q) => q("update public.organizations set status = 'suspended' where id = $1", [org])),
+    cancelled: (org) => asAdmin((q) => q("update public.organizations set status = 'cancelled' where id = $1", [org])),
+    read_only: (org) => asAdmin((q) => q("update public.organizations set status = 'read_only' where id = $1", [org])),
+    deletion_pending: (org, owner) =>
+      asAdmin((q) =>
+        q(
+          `insert into app.org_deletions (organization_id, requested_by, requested_at, confirmed_at, scheduled_for)
+           values ($1, $2, now(), now(), now() + interval '30 days')`,
+          [org, owner],
+        ),
+      ),
+  };
+
+  for (const [state, close] of Object.entries(closers)) {
+    it(`${state}: the payment is recorded and only the owner gets one notice, with the link's title and no amount`, async () => {
+      const s = await setup(state);
+      await close(s.org, s.owner.id);
+      expect(await asAdmin(async (q) => (await one<{ w: boolean }>(q, "select app.org_writable($1) as w", [s.org])).w)).toBe(false);
+      expect(await pay(s.link)).toEqual({ status: "recorded" });
+      expect(await payments(s.org, s.contact)).toBe(1);
+      expect((await asAdmin((q) => one<{ status: string }>(q, "select status from public.payment_links where id = $1", [s.link]))).status).toBe("paid");
+      const rows = await notices(s.org);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ user_id: s.owner.id, type: "system" });
+      expect(rows[0].body).not.toMatch(/42|זהבה/);
+      expect(rows.some((r) => r.user_id === s.admin.id)).toBe(false);
+    });
+  }
+
+  it("a writable business gets no such notice", async () => {
+    const s = await setup("open");
+    expect(await pay(s.link)).toEqual({ status: "recorded" });
+    expect(await payments(s.org, s.contact)).toBe(1);
+    expect(await notices(s.org)).toHaveLength(0);
+  });
+
+  it("the notice helper is no role's to call", async () => {
+    const s = await setup("grants");
+    for (const run of [(fn: (q: Query) => Promise<unknown>) => asUser(s.owner.id, fn), asAnon, asService]) {
+      expect((await pgError(run((q) => q("select app.payment_link_owner_notice($1, 'x', 'y')", [s.org])))).code).toBe("42501");
+    }
   });
 });
