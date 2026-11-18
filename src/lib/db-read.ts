@@ -4,12 +4,17 @@
 // `error` themselves and return `fail(dbErrorMessage(error))`. The lint rule in
 // eslint.config.mjs refuses `{ data }` without `error`, and `(await …).data`.
 
-type ReadError = { message: string; code?: string | null };
+type ReadError = { message: string; code?: string | null; hint?: string | null };
 
 export class DbReadError extends Error {
+  /** The database's SQLSTATE (or PostgREST code) and hint, kept apart so monitoring sends only these (OPS-05, owner (436) א). */
+  readonly code: string | null;
+  readonly hint: string | null;
   constructor(what: string, cause: ReadError) {
     super(`database read failed: ${what}: ${cause.code ?? ""} ${cause.message}`);
     this.name = "DbReadError";
+    this.code = typeof cause.code === "string" ? cause.code : null;
+    this.hint = typeof cause.hint === "string" ? cause.hint : null;
   }
 }
 

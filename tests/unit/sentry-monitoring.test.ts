@@ -14,6 +14,8 @@ import {
   keptIntegrations,
   orgIdFromPath,
   parseActiveFrom,
+  databaseErrorSummary,
+  SENTRY_TEXT_MAX,
   scrubEvent,
   scrubFramePath,
   sentryText,
@@ -23,6 +25,7 @@ import {
   sentryOpen,
   type MonitorEvent,
 } from "@/lib/monitoring/sentry-rules";
+import { DbReadError } from "@/lib/db-read";
 import { sourceMapUploadReady } from "../../next.config";
 
 const ROOT = join(__dirname, "..", "..");
@@ -167,7 +170,7 @@ describe("OPS-05 scrubbing", () => {
       {
         message: "שגיאה עבור משה",
         logentry: { message: "Key (name)=(משה) exists" },
-        exception: { values: [{ type: "DbReadError", value: "read failed: לקוח דני", mechanism: { data: { function: "x", body: "דני" } } }] },
+        exception: { values: [{ type: "Error", value: "read failed: לקוח דני", mechanism: { data: { function: "x", body: "דני" } } }] },
         fingerprint: ["דני"],
       },
       OPEN,
@@ -330,5 +333,147 @@ describe("OPS-05 CSP and build", () => {
     for (const name of ["NEXT_PUBLIC_SENTRY_DSN", "SENTRY_DSN", "SENTRY_ACTIVE_FROM", "NEXT_PUBLIC_SENTRY_ACTIVE_FROM", "SENTRY_ORG", "SENTRY_PROJECT", "SENTRY_AUTH_TOKEN"]) {
       expect(example).toMatch(new RegExp(`^${name}=$`, "m"));
     }
+  });
+});
+
+describe("OPS-05 database errors and long text (owner (436) א)", () => {
+  // what supabase-js returns for a failed call: a plain object (or a PostgrestError) with message, details, hint and code
+  const POSTGREST = {
+    message: "new row for relation \"leads\" violates check constraint: value דני כהן",
+    details: "Failing row contains (dana@example.com, 0501234567, secret note).",
+    hint: "limit:max_leads",
+    code: "P0001",
+  };
+
+  it("reads a database error as its SQLSTATE and a code-like hint only", () => {
+    expect(databaseErrorSummary(POSTGREST)).toBe("SQLSTATE P0001 hint limit:max_leads");
+    expect(databaseErrorSummary({ ...POSTGREST, hint: "No function matches the given name and argument types." })).toBe("SQLSTATE P0001");
+    expect(databaseErrorSummary({ ...POSTGREST, hint: null, code: "23505" })).toBe("SQLSTATE 23505");
+    expect(databaseErrorSummary({ message: "JSON object requested, multiple rows", details: null, hint: null, code: "PGRST116" })).toBe(
+      "PostgREST PGRST116",
+    );
+    const read = new DbReadError("leads list", { message: "Key (email)=(dana@example.com) exists", code: "57014", hint: "quote:frozen" });
+    expect(databaseErrorSummary(read)).toBe("SQLSTATE 57014 hint quote:frozen");
+    // not database errors: a Node system error (EPIPE has 5 capitals but no PostgREST shape), no code, a malformed code
+    expect(databaseErrorSummary(Object.assign(new Error("write EPIPE"), { code: "EPIPE", errno: -32, syscall: "write" }))).toBeNull();
+    expect(databaseErrorSummary(new Error("boom"))).toBeNull();
+    expect(databaseErrorSummary({ code: "p0001", hint: null })).toBeNull();
+    expect(databaseErrorSummary("P0001")).toBeNull();
+  });
+
+  it("sends a captured PostgREST object as code and hint only, nothing of message, details, where or query", () => {
+    // Sentry's own shape for a plain object: the message in the value, the whole object in extra.__serialized__
+    const event: MonitorEvent = {
+      exception: {
+        values: [
+          {
+            type: "Error",
+            value: `Object captured as exception with message '${POSTGREST.message}'`,
+            stacktrace: { frames: [{ filename: "app:///_next/server/chunks/ssr/abc123def456ghi789.js" }] },
+            mechanism: { type: "generic", handled: true, synthetic: true, data: { details: POSTGREST.details } },
+            ...({ details: POSTGREST.details, where: "PL/pgSQL function app.x() line 3", query: "select 1" } as object),
+          },
+        ],
+      },
+      extra: { __serialized__: POSTGREST },
+      contexts: { os: { name: "linux" }, postgres: { details: POSTGREST.details, where: "w", query: "q" } },
+    };
+    const out = scrubEvent(event, { ...OPEN, original: POSTGREST })!;
+    const value = out.exception!.values![0];
+    expect(value.value).toBe("SQLSTATE P0001 hint limit:max_leads");
+    expect(value.stacktrace!.frames).toHaveLength(1);
+    expect(value.mechanism).toEqual({ type: "generic", handled: true, synthetic: true });
+    expect(Object.keys(value).sort()).toEqual(["mechanism", "stacktrace", "type", "value"]);
+    const text = JSON.stringify(out);
+    for (const leak of ["Failing row", "dana@example.com", "0501234567", "violates", "PL/pgSQL", "select 1", "where", "query"]) {
+      expect(text).not.toContain(leak);
+    }
+    expect(out.contexts).toEqual({ os: { name: "linux" } });
+  });
+
+  it("sends a thrown DbReadError as code and hint, and keeps its stack", () => {
+    const error = new DbReadError("deal_lines", { message: "permission denied for table leads: דני", code: "42501", hint: null });
+    const frames = [{ filename: "/var/task/.next/server/chunks/ssr/abc123def456ghi789.js", function: "must" }];
+    const out = scrubEvent(
+      { exception: { values: [{ type: "DbReadError", value: error.message, stacktrace: { frames } }] } },
+      { ...OPEN, original: error },
+    )!;
+    expect(out.exception!.values![0].value).toBe("SQLSTATE 42501");
+    expect(out.exception!.values![0].stacktrace!.frames![0]).toMatchObject({ function: "must" });
+  });
+
+  it("replaces a database error that is the cause of another error, matched by its type", () => {
+    const cause = Object.assign(new Error("deadlock detected DETAIL: Process 12 waits for row (7, dana)"), {
+      name: "PostgrestError",
+      code: "40P01",
+      details: "Process 12 waits for ShareLock",
+      hint: "See server log for query details.",
+    });
+    const outer = new Error("save failed", { cause });
+    const out = scrubEvent(
+      {
+        exception: {
+          values: [
+            { type: "PostgrestError", value: cause.message, mechanism: { type: "chained", source: "cause", exception_id: 1, parent_id: 0 } },
+            { type: "Error", value: "save failed", mechanism: { type: "generic", exception_id: 0 } },
+          ],
+        },
+      },
+      { ...OPEN, original: outer },
+    )!;
+    expect(out.exception!.values![0].value).toBe("SQLSTATE 40P01");
+    expect(out.exception!.values![1].value).toBe("save failed");
+  });
+
+  it("never sends a database error's own text even when the original is not known", () => {
+    const out = scrubEvent(
+      {
+        exception: {
+          values: [
+            { type: "DbReadError", value: "database read failed: leads: 23505 duplicate key Key (email)=(x@y.z)" },
+            { type: "PostgrestError", value: "permission denied" },
+          ],
+        },
+      },
+      OPEN,
+    )!;
+    expect(out.exception!.values!.map((v) => v.value)).toEqual(["database error", "database error"]);
+  });
+
+  it("cuts Postgres report tails (HINT, CONTEXT, WHERE, QUERY, STATEMENT, LINE n) out of any text", () => {
+    expect(sentryText("function failed HINT: check the row of dana")).toBe("function failed");
+    expect(sentryText("raise CONTEXT: PL/pgSQL function app.x() line 3 at RAISE")).toBe("raise");
+    expect(sentryText("syntax error WHERE: SQL statement \"select secret\"")).toBe("syntax error");
+    expect(sentryText("bad QUERY: select * from leads")).toBe("bad");
+    expect(sentryText("bad STATEMENT: update leads set x")).toBe("bad");
+    expect(sentryText("syntax error at or near x LINE 1: select x")).toBe("syntax error at or near x");
+  });
+
+  it("cuts every free text to 200 characters after the scrubbing", () => {
+    expect(SENTRY_TEXT_MAX).toBe(200);
+    const long = `failed ${"at step ".repeat(60)}`;
+    expect(sentryText(long)).toHaveLength(200);
+    // the redaction runs first, so an address near the end is replaced, not cut in half
+    const out = scrubEvent(
+      {
+        message: long,
+        logentry: { message: long },
+        exception: { values: [{ type: "Error", value: `${"go on ".repeat(31)} dana@example.com and more` }] },
+      },
+      OPEN,
+    )!;
+    expect(out.message).toHaveLength(200);
+    expect(out.logentry!.message).toHaveLength(200);
+    expect(out.exception!.values![0].value!.length).toBeLessThanOrEqual(200);
+    expect(out.exception!.values![0].value).not.toContain("dana");
+    // never half of a surrogate pair
+    const emoji = `${"x y ".repeat(49)}abc\u{1F600}tail`;
+    const cut = sentryText(emoji);
+    expect(cut).toBe(`${"x y ".repeat(49)}abc`);
+  });
+
+  it("both runtimes hand the captured error to the rules", () => {
+    expect(read("src/lib/monitoring/sentry-server.ts")).toContain("original: hint?.originalException");
+    expect(read("src/lib/monitoring/sentry-client.ts")).toContain("original: hint?.originalException");
   });
 });

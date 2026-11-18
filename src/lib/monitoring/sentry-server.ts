@@ -20,7 +20,7 @@ export function startServerMonitoring(dsn: string, environment: string, extra: I
     integrations: (defaults) => [...keptIntegrations(defaults), ...extra],
     beforeSend(event, hint) {
       const identity = (hint?.data as { monitoringIdentity?: MonitoringIdentity } | undefined)?.monitoringIdentity ?? null;
-      return scrubEvent(event, { activeFrom: process.env.SENTRY_ACTIVE_FROM, identity });
+      return scrubEvent(event, { activeFrom: process.env.SENTRY_ACTIVE_FROM, identity, original: hint?.originalException });
     },
   });
 }

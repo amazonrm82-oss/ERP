@@ -79,7 +79,17 @@ export function scrubUrl(value: string): string {
 
 // The shape of a Sentry event as far as these rules touch it (structurally compatible with ErrorEvent / TransactionEvent).
 type Frame = { filename?: string; abs_path?: string; vars?: unknown };
-type Exception = { type?: string; value?: string; stacktrace?: { frames?: Frame[] }; mechanism?: { data?: unknown } };
+type Mechanism = {
+  type?: string;
+  handled?: boolean;
+  synthetic?: boolean;
+  source?: string;
+  exception_id?: number;
+  parent_id?: number;
+  is_exception_group?: boolean;
+  data?: unknown;
+};
+type Exception = { type?: string; value?: string; stacktrace?: { frames?: Frame[] }; mechanism?: Mechanism };
 export type MonitorEvent = {
   message?: string;
   logentry?: { message?: string; params?: unknown[] };
@@ -115,8 +125,62 @@ const NON_ASCII_WORDS = /(?:[^\P{L}A-Za-z]|\p{M})+(?:[\s'"\u05F3\u05F4-]+(?:[^\P
  * of non-ASCII letters (a Hebrew name, an address) replaced by [text].
  */
 export function sentryText(text: string): string {
-  const cut = text.replace(/\s*\b(?:DETAIL|Detail):[\s\S]*$/, "").replace(/(Key \([^)]*\)=\()[^)]*\)/g, "$1[value])");
-  return redactText(cut).replace(NON_ASCII_WORDS, "[text]");
+  const cut = text.replace(POSTGRES_TAIL, "").replace(/(Key \([^)]*\)=\()[^)]*\)/g, "$1[value])");
+  return capText(redactText(cut).replace(NON_ASCII_WORDS, "[text]"));
+}
+
+// A Postgres report's tail: everything from DETAIL, HINT, CONTEXT, WHERE, QUERY, STATEMENT or "LINE n:" on (they can quote a row,
+// the statement or the function's text).
+const POSTGRES_TAIL = /\s*\b(?:DETAIL|Detail|HINT|Hint|CONTEXT|Context|WHERE|Where|QUERY|Query|STATEMENT|Statement|LINE \d+):[\s\S]*$/;
+
+/** The longest free text an event carries (owner (436) א): cut after the scrubbing, never inside a surrogate pair. */
+export const SENTRY_TEXT_MAX = 200;
+
+function capText(text: string): string {
+  if (text.length <= SENTRY_TEXT_MAX) return text;
+  let end = SENTRY_TEXT_MAX;
+  const last = text.charCodeAt(end - 1);
+  if (last >= 0xd800 && last <= 0xdbff) end -= 1;
+  return text.slice(0, end);
+}
+
+// a five-character SQLSTATE (Postgres) or a PostgREST code (PGRST116)
+const DB_CODE = /^(?:[0-9A-Z]{5}|PGRST\d{3})$/;
+// a hint our migrations write (`using hint = 'limit:max_quotes'`, 'feature:x', 'quote:frozen'); Postgres's own prose hints are dropped
+const HINT_CODE = /^[a-z][a-z0-9_]*(?:[:.][a-z0-9_.-]+)*$/i;
+
+/**
+ * A database error as Sentry may see it (owner (436) א): "SQLSTATE <code>" (or "PostgREST <code>") and, when it is one of our
+ * code-like hints, " hint <hint>". Never the message, details, where, query or a prose hint from the database. Null when the
+ * value is not a database error: an object (an Error or a plain PostgREST answer) with a code of that shape AND the PostgREST
+ * shape (a `details` or `hint` key), or a DbReadError / PostgrestError by name.
+ */
+export function databaseErrorSummary(value: unknown): string | null {
+  if (typeof value !== "object" || value === null) return null;
+  const record = value as { code?: unknown; hint?: unknown; name?: unknown };
+  const code = record.code;
+  if (typeof code !== "string" || !DB_CODE.test(code)) return null;
+  const shaped = "details" in record || "hint" in record || record.name === "DbReadError" || record.name === "PostgrestError";
+  if (!shaped) return null;
+  const label = code.startsWith("PGRST") ? `PostgREST ${code}` : `SQLSTATE ${code}`;
+  const hint = typeof record.hint === "string" && record.hint.length <= 100 && HINT_CODE.test(record.hint) ? record.hint : null;
+  return hint ? `${label} hint ${hint}` : label;
+}
+
+/** The captured error and the errors it was caused by, in the order LinkedErrors walks them (at most 10). */
+function causeChain(original: unknown): unknown[] {
+  const chain: unknown[] = [];
+  let current: unknown = original;
+  while (current !== null && typeof current === "object" && chain.length < 10 && !chain.includes(current)) {
+    chain.push(current);
+    current = (current as { cause?: unknown }).cause;
+  }
+  return chain;
+}
+
+/** An error's name as Sentry writes it in `exception.type` (a plain object has none). */
+function errorTypeName(value: unknown): string | null {
+  return value instanceof Error ? value.name || null : null;
 }
 
 /** The tags an event may carry: ours (codes and ids) and the SDK's own plain ones. Any other tag is dropped. */
@@ -133,7 +197,14 @@ function scrubFrames(frames: Frame[] | undefined): void {
   }
 }
 
+/** The fields an exception value may keep: its type, text, frames and how it was caught. Anything else is dropped. */
+const EXCEPTION_KEYS = new Set(["type", "value", "module", "thread_id", "stacktrace", "mechanism"]);
+/** The fields of `mechanism` that say how an error was caught, never what it held (`data` is dropped). */
+const MECHANISM_KEYS = new Set(["type", "handled", "synthetic", "source", "exception_id", "parent_id", "is_exception_group"]);
+
 type ScrubOptions = {
+  /** The error that was captured (Sentry's hint.originalException): a database error is sent as its code and hint only. */
+  original?: unknown;
   /** SENTRY_ACTIVE_FROM as read now (server: process.env at run time; browser: the inlined value). */
   activeFrom: string | undefined | null;
   /** The user and business the event belongs to, when known; only their ids are kept. */
@@ -142,7 +213,8 @@ type ScrubOptions = {
 };
 
 /**
- * The event as it may leave, or null (nothing is sent): closed before SENTRY_ACTIVE_FROM, and always without headers,
+ * The event as it may leave, or null (nothing is sent): closed before SENTRY_ACTIVE_FROM; a database error as "SQLSTATE <code>"
+ * and its code-like hint only (databaseErrorSummary); every free text at most 200 characters; and always without headers,
  * cookies, body, query, breadcrumbs, extra data, local variables, mechanism data or fingerprint; free text through
  * sentryText; a request URL and the transaction through scrubUrl, stack frame files through scrubFramePath;
  * scrubUrl; user = {id} only, the business id as the tag org_id.
@@ -153,11 +225,29 @@ export function scrubEvent<E extends MonitorEvent>(event: E, options: ScrubOptio
   if (event.logentry) {
     event.logentry = typeof event.logentry.message === "string" ? { message: sentryText(event.logentry.message) } : undefined;
   }
-  for (const exception of event.exception?.values ?? []) {
-    if (typeof exception.value === "string") exception.value = sentryText(exception.value);
-    if (exception.mechanism) delete exception.mechanism.data;
+  const values = event.exception?.values ?? [];
+  // the captured error is the last value; LinkedErrors puts each cause before the error it caused
+  const summaries = new Map<number, string>();
+  causeChain(options.original).forEach((error, depth) => {
+    const index = values.length - 1 - depth;
+    const summary = databaseErrorSummary(error);
+    if (index < 0 || !summary) return;
+    // the captured error (a plain object too) is always the last value; a cause only when its type agrees
+    if (depth === 0 || values[index].type === errorTypeName(error)) summaries.set(index, summary);
+  });
+  values.forEach((exception, index) => {
+    const fields = exception as unknown as Record<string, unknown>;
+    for (const key of Object.keys(fields)) if (!EXCEPTION_KEYS.has(key)) delete fields[key];
+    const summary = summaries.get(index);
+    if (summary) exception.value = summary;
+    else if (exception.type === "DbReadError" || exception.type === "PostgrestError") exception.value = "database error";
+    else if (typeof exception.value === "string") exception.value = sentryText(exception.value);
+    if (exception.mechanism) {
+      const mechanism = exception.mechanism as unknown as Record<string, unknown>;
+      for (const key of Object.keys(mechanism)) if (!MECHANISM_KEYS.has(key)) delete mechanism[key];
+    }
     scrubFrames(exception.stacktrace?.frames);
-  }
+  });
   const threads = (event as { threads?: { values?: { stacktrace?: { frames?: Frame[] } }[] } }).threads;
   for (const thread of threads?.values ?? []) scrubFrames(thread.stacktrace?.frames);
   if (event.request) {

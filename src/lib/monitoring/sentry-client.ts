@@ -10,9 +10,9 @@ import { baseSentryOptions, isCustomerPagePath, scrubEvent } from "@/lib/monitor
 export function startClientMonitoring(dsn: string, environment: string, activeFrom: string | undefined): void {
   Sentry.init({
     ...baseSentryOptions(dsn, environment),
-    beforeSend(event) {
+    beforeSend(event, hint) {
       if (isCustomerPagePath(window.location.pathname)) return null;
-      return scrubEvent(event, { activeFrom, identity: currentMonitoringIdentity() });
+      return scrubEvent(event, { activeFrom, identity: currentMonitoringIdentity(), original: hint?.originalException });
     },
   });
 }
