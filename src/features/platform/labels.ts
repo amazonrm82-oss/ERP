@@ -36,6 +36,8 @@ export const ACTION_LABELS: Record<string, string> = {
   "vat_rate.update": "תיקון שיעור מע\"מ עתידי",
   "vat_rate.remove": "הסרת שיעור מע\"מ עתידי",
   "qr_external.block": "כיבוי הקישורים החיצוניים בקודי QR",
+  // SMS-06: a prepaid SMS pack loaded by hand
+  "sms.grant": "טעינת חבילת SMS",
   "qr_external.unblock": "החזרת הקישורים החיצוניים בקודי QR",
   // ADM-04
   "banner.add": "הודעת מערכת חדשה",

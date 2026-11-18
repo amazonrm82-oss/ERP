@@ -9,7 +9,7 @@ const setKey = (value: string) =>
     q("insert into app.settings (key, value) values ('consent_hash_key', $1) on conflict (key) do update set value = excluded.value", [value]),
   );
 
-// review F1: SMS needs the plan's sms flag and a month quota (off and 0 in every plan)
+// review F1: SMS needs the plan's sms flag (SMS-06: and a loaded balance; the monthly quota is no longer read)
 const allowSms = (...orgs: string[]) =>
   asAdmin((q) =>
     q(
@@ -105,6 +105,8 @@ describe("SMS from the record card and from an automation (SMS-02)", () => {
     await setKey(KEY);
     owner = await createUser("sms-owner");
     org = await createOrg(owner.id, "עסק SMS");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [org]));
     // EML-02 (owner, 15 November 2026): a marketing message is queued only while the envelope's business address and phone are set
     await asAdmin((q) =>
       q(
@@ -117,7 +119,9 @@ describe("SMS from the record card and from an automation (SMS-02)", () => {
     viewer = await addMember(org, owner.id, "viewer", "sms-viewer");
     ownerB = await createUser("sms-owner-b");
     orgB = await createOrg(ownerB.id, "עסק אחר");
-    // review F1: SMS needs the plan's sms flag and a month quota (off and 0 in every plan): both businesses get them here
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [orgB]));
+    // review F1: SMS needs the plan's sms flag (SMS-06: and a loaded balance; the monthly quota is no longer read): both businesses get them here
     await allowSms(org, orgB);
     service = await template(owner.id, org, { name: "מסמך מבוקש SMS" });
   });
@@ -247,6 +251,8 @@ describe("SMS from the record card and from an automation (SMS-02)", () => {
   it("HEB-09: while sending is paused the SMS is queued, said so, and waits", async () => {
     const pausedOwner = await createUser("sms-pause-owner");
     const pausedOrg = await createOrg(pausedOwner.id, "עסק עצור");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [pausedOrg]));
     await allowSms(pausedOrg);
     const tpl = await template(pausedOwner.id, pausedOrg, { name: "מסמך" });
     const id = await lead(pausedOwner.id, pausedOrg, "0521110006");
@@ -276,6 +282,8 @@ describe("SMS from the record card and from an automation (SMS-02)", () => {
     // 30 SMS in another business stop the person here too
     const second = await createUser("sms-rate-two");
     const orgC = await createOrg(second.id, "עסק שלישי");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [orgC]));
     const leadC = await lead(second.id, orgC, "0521110008");
     await fill(orgC, leadC, second.id, "sent_by_user_id", "sms");
     const token = await asUser(owner.id, async (q) => (await q<{ t: string }>("select public.create_invitation($1, $2, 'member') as t", [org, (await asAdmin(async (qq) => (await qq<{ e: string }>("select email as e from auth.users where id = $1", [second.id])).rows[0].e))])).rows[0].t);
@@ -436,13 +444,13 @@ describe("SMS from the record card and from an automation (SMS-02)", () => {
     });
   });
 
-  describe("owner (210) ב: the plan's sms flag and month quota over every SMS to a customer", () => {
+  describe("owner (210) ב and SMS-06: the plan's sms flag over every SMS to a customer", () => {
     const noSms = (o: string) =>
       asAdmin((q) => q("update public.subscriptions set feature_overrides = coalesce(feature_overrides, '{}'::jsonb) || '{\"sms\": false}'::jsonb where organization_id = $1", [o]));
     const enqueue = (o: string, payload: Payload) =>
       asAdmin(async (q) => (await q<{ id: string }>("select app.enqueue_job($1, 'message.send', $2::jsonb, null) as id", [o, JSON.stringify(payload)])).rows[0].id);
 
-    it("the plans: personal off and 0, basic 100, pro 300, business 1,000; the fallback off and 0", async () => {
+    it("SMS-06 (owner (437) א): the flag on in every sold plan, the monthly quota 0 everywhere; the fallback off and 0", async () => {
       const plans = await asAdmin(
         async (q) =>
           (
@@ -452,10 +460,10 @@ describe("SMS from the record card and from an automation (SMS-02)", () => {
           ).rows,
       );
       expect(plans).toEqual([
-        { key: "personal", f: false, l: 0 },
-        { key: "basic", f: true, l: 100 },
-        { key: "pro", f: true, l: 300 },
-        { key: "business", f: true, l: 1000 },
+        { key: "personal", f: true, l: 0 },
+        { key: "basic", f: true, l: 0 },
+        { key: "pro", f: true, l: 0 },
+        { key: "business", f: true, l: 0 },
       ]);
       const fallback = await asAdmin(async (q) => (await q<{ d: { features: Record<string, unknown>; limits: Record<string, unknown> } }>("select app.plan_key_defaults() as d")).rows[0].d);
       expect([fallback.features.sms, fallback.limits.max_sms_per_month]).toEqual([false, 0]);
@@ -464,6 +472,8 @@ describe("SMS from the record card and from an automation (SMS-02)", () => {
     it("without the flag the card is refused (feature:sms), the step fails, and any other SMS waits uncounted", async () => {
       const plainOwner = await createUser("sms-plain-owner");
       const plainOrg = await createOrg(plainOwner.id, "עסק בלי SMS");
+      // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+      await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [plainOrg]));
       await noSms(plainOrg);
       const tpl = await template(plainOwner.id, plainOrg, { name: "מסמך" });
       const id = await lead(plainOwner.id, plainOrg, "0521110030");
@@ -490,54 +500,28 @@ describe("SMS from the record card and from an automation (SMS-02)", () => {
       });
     });
 
-    it("the quota holds every SMS when it is about to go, never a verification code; the owners are told; a raise lets it go", async () => {
+    it("SMS-06 (owner (437) א): the monthly quota is no longer read or counted; the balance decides", async () => {
       const qOwner = await createUser("sms-quota-owner");
       const qOrg = await createOrg(qOwner.id, "עסק מכסה");
+      // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+      await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 300, null, 300, null, null)", [qOrg]));
       await allowSms(qOrg);
-      const setCap = (cap: number) =>
-        asAdmin((q) => q("update public.subscriptions set limit_overrides = limit_overrides || jsonb_build_object('max_sms_per_month', $2::int) where organization_id = $1", [qOrg, cap]));
-      await setCap(2);
+      // a quota of 0 (every plan now) holds nothing
+      await asAdmin((q) => q("update public.subscriptions set limit_overrides = limit_overrides || '{\"max_sms_per_month\": 0}'::jsonb where organization_id = $1", [qOrg]));
       const tpl = await template(qOwner.id, qOrg, { name: "מסמך" });
-      const smsNotices = () =>
-        asAdmin(
-          async (q) =>
-            (await q<{ title: string }>("select title from public.notifications where organization_id = $1 and type = 'system' and title like '%SMS%' order by created_at", [qOrg]))
-              .rows.map((n) => n.title),
-        );
-      const used = () =>
-        asAdmin(async (q) => (await q<{ used: number }>("select used from app.sms_quota_months where organization_id = $1", [qOrg])).rows.map((r) => r.used));
       const l1 = await lead(qOwner.id, qOrg, "0521110031");
-      // a card SMS and a CAL-12-like service SMS of another path: both counted
       const card = await send(qOwner.id, qOrg, "lead", l1, tpl);
       expect(await maySend(await claimOne(card.job_id))).toEqual({ may_send: true });
       const other = await enqueue(qOrg, { channel: "sms", message_type: "requested_document", lead_id: l1 });
       expect(await maySend(await claimOne(other))).toEqual({ may_send: true });
-      expect(await used()).toEqual([2]);
-      expect(await smsNotices()).toEqual(["הודעות SMS מחכות: מכסת החבילה מלאה"]);
-      // over the quota: the next one waits uncounted as a cap waiter, one notice a day
-      const third = await send(qOwner.id, qOrg, "lead", await lead(qOwner.id, qOrg, "0521110033"), tpl);
-      expect(await maySend(await claimOne(third.job_id))).toEqual({ may_send: false, reason: "over_cap", retry: true });
-      expect(await asAdmin(async (q) => (await q<{ w: string | null; c: boolean }>("select cap_wait as w, usage_counted as c from app.jobs where id = $1", [third.job_id])).rows[0])).toEqual({
-        w: "over_cap",
-        c: false,
-      });
-      expect(await smsNotices()).toEqual(["הודעות SMS מחכות: מכסת החבילה מלאה"]);
-      expect(await used()).toEqual([2]);
-      // a verification code is never counted and never held
+      // nothing new in the month's counter; the jobs are marked for the composer's charge
+      expect(await asAdmin(async (q) => (await q<{ n: number }>("select count(*)::int as n from app.sms_quota_months where organization_id = $1", [qOrg])).rows[0].n)).toBe(0);
+      expect(await asAdmin(async (q) => (await q<{ m: boolean }>("select bool_and(sms_metered) as m from app.jobs where id = any($1::uuid[])", [[card.job_id, other]])).rows[0].m)).toBe(true);
+      // a verification code is never metered
       const check = await asAdmin(async (q) => (await q<{ id: string }>("insert into app.sms_sender_checks (organization_id, phone) values ($1, '+972521110031') returning id", [qOrg])).rows[0].id);
       const code = await enqueue(qOrg, { channel: "sms", message_type: "verification_code", sender_check_id: check });
       expect(await maySend(await claimOne(code))).toEqual({ may_send: true });
-      expect(await used()).toEqual([2]);
-      // a raised quota lets the waiting one go
-      await setCap(10);
-      await asAdmin((q) => q("update app.jobs set next_run_at = now() where id = $1", [third.job_id]));
-      expect(await maySend(await claimOne(third.job_id))).toEqual({ may_send: true });
-      expect(await used()).toEqual([3]);
-      // a new month starts again (the counter of the month)
-      await setCap(3);
-      await asAdmin((q) => q("update app.sms_quota_months set month = (month - interval '1 month')::date where organization_id = $1", [qOrg]));
-      const next = await send(qOwner.id, qOrg, "lead", l1, tpl);
-      expect(await maySend(await claimOne(next.job_id))).toEqual({ may_send: true });
+      expect(await asAdmin(async (q) => (await q<{ m: boolean }>("select sms_metered as m from app.jobs where id = $1", [code])).rows[0].m)).toBe(false);
     });
   });
 

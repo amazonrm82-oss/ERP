@@ -94,6 +94,9 @@ export function senderCheckMessage(answer: unknown): { ok: boolean; message: str
       return { ok: false, message: "היו יותר מדי ניסיונות. אפשר לנסות שוב בעוד חצי שעה." };
     case "rate":
       return { ok: false, message: "נשלחו כבר שלושה קודים בשעה האחרונה. אפשר לנסות שוב מאוחר יותר." };
+    // SMS-06, owner (438) א: the codes are not charged from the SMS balance, so at most 3 a day
+    case "daily":
+      return { ok: false, message: "היום נשלחו כבר שלושה קודי אימות. אפשר לנסות שוב מחר." };
     case "no_code":
       return { ok: false, message: "אין קוד פעיל. שלחו קוד חדש." };
     case "expired":

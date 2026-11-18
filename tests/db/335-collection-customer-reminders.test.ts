@@ -132,6 +132,8 @@ describe("collection reminders to the customer (COL-07)", () => {
   beforeAll(async () => {
     owner = await createUser("cc-owner");
     org = await createOrg(owner.id, "עסק התזכורות ללקוח");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [org]));
     member = await addMember(org, owner.id, "member", "cc-member");
     zone = await pickZone();
     await prepare(org, owner);
@@ -273,6 +275,8 @@ describe("collection reminders to the customer (COL-07)", () => {
     beforeAll(async () => {
       boss = await createUser("cc-boss");
       o = await createOrg(boss.id, "עסק הערוצים");
+      // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+      await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [o]));
       await addMember(o, boss.id, "member", "cc-x");
       await prepare(o, boss);
       await setSwitch(o, true, boss);
@@ -419,6 +423,8 @@ describe("collection reminders to the customer (COL-07)", () => {
     beforeAll(async () => {
       boss = await createUser("cc-sweep");
       o = await createOrg(boss.id, "עסק הסריקה");
+      // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+      await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [o]));
       await addMember(o, boss.id, "member", "cc-z");
       await prepare(o, boss);
       await setSwitch(o, true, boss);
@@ -524,6 +530,8 @@ describe("collection reminders to the customer (COL-07)", () => {
   it("past the 50-template cap nothing is seeded: the stage makes only the task, and the seeding is not tried again", async () => {
     const boss = await createUser("cc-full");
     const o = await createOrg(boss.id, "עסק מלא בתבניות");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [o]));
     await addMember(o, boss.id, "member", "cc-y");
     await prepare(o, boss);
     await run(boss, async (q) => {
@@ -554,6 +562,8 @@ describe("collection reminders to the customer (COL-07)", () => {
     beforeAll(async () => {
       boss = await createUser("cc-second");
       o = await createOrg(boss.id, "עסק הסקירה השנייה");
+      // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+      await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [o]));
       await addMember(o, boss.id, "member", "cc-w");
       await prepare(o, boss);
       await setSwitch(o, true, boss);
@@ -687,35 +697,31 @@ describe("collection reminders to the customer (COL-07)", () => {
       );
     const setJob = (id: string, status: string, error: string | null) =>
       asAdmin((q) => q("update app.jobs set status = $2, last_error = $3, lease_id = null, locked_until = null, finished_at = now() where id = $1", [id, status, error]));
-    const smsUsed = (used: number) =>
-      asAdmin((q) =>
-        q(
-          `insert into app.sms_quota_months (organization_id, month, used)
-           values ($1, date_trunc('month', (now() at time zone $2)::date)::date, $3)
-           on conflict (organization_id, month) do update set used = excluded.used`,
-          [o, zone, used],
-        ),
-      );
     beforeAll(async () => {
       boss = await createUser("cc-third");
       o = await createOrg(boss.id, "עסק הסקירה השלישית");
+      // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+      await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [o]));
       await addMember(o, boss.id, "member", "cc-v");
       await prepare(o, boss);
       await setSwitch(o, true, boss);
     });
 
-    it("(a) SMS is chosen only while the month's quota has room: else email, else outcome quota with the task", async () => {
+    // SMS-06 (owner (437) א): the room is the prepaid balance (loaded and above 0), no longer the month's quota
+    it("(a) SMS is chosen only while the SMS balance has room: else email, else outcome quota with the task", async () => {
       await features(o, { sms: true });
-      await asAdmin((q) => q(`update public.subscriptions set limit_overrides = coalesce(limit_overrides, '{}'::jsonb) || '{"max_sms_per_month": 2}'::jsonb where organization_id = $1`, [o]));
+      const balance = async () => (await asAdmin(async (q) => (await q<{ b: number }>("select balance as b from app.sms_balances where organization_id = $1", [o])).rows[0])).b;
       try {
         // room: SMS
-        await smsUsed(1);
         const room = await contactWith(o, "0531111111", "room@example.com", boss);
         const d1 = await doc(0, { contact: room }, o, boss);
         await job(o);
         expect((await jobs(d1))[0].payload.channel).toBe("sms");
         // used up: email; a phone only: quota, and the rep's task
-        await smsUsed(2);
+        const left = await balance();
+        if (left > 0) {
+          await asAdmin((q) => q("select app.sms_balance_move($1, 'charge', $2, gen_random_uuid(), null, null, null)", [o, -left]));
+        }
         const both = await contactWith(o, "0532222222", "full@example.com", boss);
         const phoneOnly = await contactWith(o, "0533333333", null, boss);
         const d2 = await doc(0, { contact: both }, o, boss);
@@ -732,7 +738,7 @@ describe("collection reminders to the customer (COL-07)", () => {
         expect((await jobs(d4))[0].payload.channel).toBe("email");
         expect((await outcomes(d5))[0]).toEqual({ offset_days: 0, customer_outcome: "no_address", has_task: true });
       } finally {
-        await smsUsed(0);
+        await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [o]));
         await features(o);
       }
     });

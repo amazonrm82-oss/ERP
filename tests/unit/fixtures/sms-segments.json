@@ -1,0 +1,130 @@
+[
+  {
+    "text": "",
+    "segments": 0
+  },
+  {
+    "text": "hello",
+    "segments": 1
+  },
+  {
+    "text": "a",
+    "repeat": 160,
+    "segments": 1
+  },
+  {
+    "text": "a",
+    "repeat": 161,
+    "segments": 2
+  },
+  {
+    "text": "a",
+    "repeat": 306,
+    "segments": 2
+  },
+  {
+    "text": "a",
+    "repeat": 307,
+    "segments": 3
+  },
+  {
+    "text": "a",
+    "repeat": 459,
+    "segments": 3
+  },
+  {
+    "text": "a",
+    "repeat": 460,
+    "segments": 4
+  },
+  {
+    "text": "€",
+    "repeat": 80,
+    "segments": 1
+  },
+  {
+    "text": "€",
+    "repeat": 81,
+    "segments": 2
+  },
+  {
+    "text": "{}[]~|^\\",
+    "segments": 1
+  },
+  {
+    "text": "line one\nline two\r\n",
+    "segments": 1
+  },
+  {
+    "text": "@£$¥èéùìòÇØøÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ!\"#¤%&'()*+,-./:;<=>?¡ÄÖÑÜ§¿äöñüà",
+    "segments": 1
+  },
+  {
+    "text": "שלום",
+    "segments": 1
+  },
+  {
+    "text": "ש",
+    "repeat": 70,
+    "segments": 1
+  },
+  {
+    "text": "ש",
+    "repeat": 71,
+    "segments": 2
+  },
+  {
+    "text": "ש",
+    "repeat": 134,
+    "segments": 2
+  },
+  {
+    "text": "ש",
+    "repeat": 135,
+    "segments": 3
+  },
+  {
+    "text": "a",
+    "repeat": 159,
+    "suffix": "ש",
+    "segments": 3
+  },
+  {
+    "text": "a",
+    "repeat": 69,
+    "suffix": "ש",
+    "segments": 1
+  },
+  {
+    "text": "é",
+    "repeat": 160,
+    "segments": 1
+  },
+  {
+    "text": "á",
+    "segments": 1
+  },
+  {
+    "text": "á",
+    "repeat": 71,
+    "segments": 2
+  },
+  {
+    "text": "😀",
+    "repeat": 35,
+    "segments": 1
+  },
+  {
+    "text": "😀",
+    "repeat": 36,
+    "segments": 2
+  },
+  {
+    "text": "`",
+    "segments": 1
+  },
+  {
+    "text": "שלום דנה, הפגישה שלך מחר ב-10:00. לביטול: https://mexuz.test/f/book/manage/abc",
+    "segments": 2
+  }
+]

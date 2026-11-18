@@ -4909,6 +4909,9 @@ export type Database = {
       platform_set_qr_external_block: { Args: { p_org: string; p_blocked: boolean; p_reason: string }; Returns: Json };
       // SMS-01b: the platform's approval of a business's letter SMS sender name
       platform_set_sms_sender_approval: { Args: { p_org: string; p_name: string; p_approved: boolean }; Returns: Json };
+      // SMS-06 (migration sms_packs)
+      platform_sms_grant: { Args: { p_org: string; p_pack: number; p_note: string | null }; Returns: Json };
+      platform_sms_balance: { Args: { p_org: string }; Returns: Json };
       platform_list_sms_sender_pending: { Args: Record<string, never>; Returns: Json };
       business_card_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       // BIZ-01: the public business page (service_role only)
@@ -5207,6 +5210,7 @@ export type Database = {
       // SMS-05: the InforU sender's composer (service_role only, migration sms_compose)
       sms_job_compose: { Args: { p_job: string; p_lease: string; p_site_url: string }; Returns: Json };
       sms_quota_return: { Args: { p_job: string; p_lease: string }; Returns: Json };
+      sms_balance_summary: { Args: { p_org: string }; Returns: Json };
       email_job_compose: { Args: { p_job: string; p_lease: string; p_site_url: string }; Returns: Json };
       email_quota_return: { Args: { p_job: string; p_lease: string }; Returns: Json };
       // SMS-05: InforU's callbacks (service_role only, migration sms_inforu_callbacks)

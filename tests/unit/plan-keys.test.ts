@@ -45,7 +45,7 @@ describe("plan prices, limits and flags (owner's pricing, 13 October 2026)", () 
   it("the TS mirror equals the seed with the later changes, and the latest app.plan_key_defaults()", () => {
     const seed = quoted(migration("_plan_pricing.sql"), "seed") as Values;
     // every later change of the plans, in name order (plan_trial_built_with, then a key per capability, e.g. CAP-08)
-    for (const suffix of ["_plan_trial_built_with.sql", "_lead_distribution_plan.sql", "_campaign_costs_plan.sql", "_punch_cards_plan.sql", "_meta_leads_plan.sql", "_meeting_customer_reminders.sql", "_document_templates.sql", "_sms_b_send.sql", "_review_requests.sql", "_business_page.sql", "_free_plan_quotes.sql", "_recurring_billing.sql", "_prefill_forms.sql", "_daily_digest.sql", "_quote_reminders.sql"]) {
+    for (const suffix of ["_plan_trial_built_with.sql", "_lead_distribution_plan.sql", "_campaign_costs_plan.sql", "_punch_cards_plan.sql", "_meta_leads_plan.sql", "_meeting_customer_reminders.sql", "_document_templates.sql", "_sms_b_send.sql", "_review_requests.sql", "_business_page.sql", "_free_plan_quotes.sql", "_recurring_billing.sql", "_prefill_forms.sql", "_daily_digest.sql", "_quote_reminders.sql", "_sms_packs.sql"]) {
       const delta = quoted(migration(suffix), "delta") as Values;
       for (const [plan, change] of Object.entries(delta)) {
         seed[plan].limits = { ...seed[plan].limits, ...change.limits };

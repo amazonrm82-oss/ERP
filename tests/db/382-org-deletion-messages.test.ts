@@ -62,7 +62,11 @@ describe("customer messages during the deletion wait (ADM-03, owner (399) א)", 
     await setKey();
     owner = await createUser("del-msg-owner");
     org = await createOrg(owner.id, "עסק בהמתנה למחיקה");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [org]));
     orgB = await createOrg(owner.id, "עסק מושעה בהמתנה");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [orgB]));
   });
   beforeEach(() => asAdmin((q) => q("update app.jobs set status = 'done', lease_id = null, locked_until = null where status in ('queued', 'failed', 'running')")));
   afterAll(async () => {

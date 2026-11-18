@@ -25,8 +25,9 @@ export type ComposeCall = (job: { id: string; lease: string }) => Promise<unknow
 export type ComposeAnswer = { ok: true; content: ComposedSms } | { ok: false; code: string };
 
 const CODE = /^[A-Za-z0-9_.:-]{1,64}$/;
-// the composer's refusals that are not final (the job waits and is tried again)
-const RETRY_REFUSALS = new Set(["paused", "site_url"]);
+// the composer's refusals that are not final (the job waits and is tried again). SMS-06: 'sms_balance' = the final text's
+// segments did not fit the prepaid balance; the database already put the job back to wait (its finish changes nothing)
+const RETRY_REFUSALS = new Set(["paused", "site_url", "sms_balance"]);
 
 /** Parses the composer's answer; anything malformed is null (a failed try, never a send). */
 export function parseComposed(data: unknown): ComposeAnswer | null {

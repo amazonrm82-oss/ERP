@@ -952,6 +952,10 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_sms_unknown_outcome.sql",
       // WEB-05 redefines app.job_kinds() and app.job_payload_ok() of _payment_link_refunds.sql last (signup.send)
       "_signup_service_emails.sql",
+      // SMS-06 redefines public.job_message_may_send() of _org_deletion_messages_wait.sql, public.record_sms_send() of _sms_b_send.sql,
+      // public.sms_sender_verify_start() of _review_1111_messaging.sql and app.collection_sms_room() of
+      // _collection_customer_reminders.sql last (the prepaid SMS balance)
+      "_sms_packs.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

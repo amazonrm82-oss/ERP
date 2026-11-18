@@ -109,6 +109,24 @@ export async function setQrExternalBlockAction(orgId: string, blocked: boolean, 
   return { ok: true, message: blocked ? "הקישורים החיצוניים של העסק כובו." : "הקישורים החיצוניים של העסק הוחזרו." };
 }
 
+/**
+ * SMS-06 (owner, 18 November 2026): until a clearing provider is chosen, the platform owner loads a prepaid SMS pack by hand
+ * (300 / 1,000 / 5,000 segments; logged in the platform log). The note is optional.
+ */
+export async function smsGrantAction(orgId: string, _prev: FormState, formData: FormData): Promise<FormState> {
+  const supabase = await client();
+  if (!supabase || !isUuid(orgId)) return fail(SESSION_EXPIRED);
+  const pack = Number(text(formData, "pack"));
+  const note = text(formData, "note");
+  if (![300, 1000, 5000].includes(pack)) return fail("בחרו חבילה.", { values: formValues(formData) });
+  if (note.length > 200) return fail("ההערה עד 200 תווים.", { values: formValues(formData) });
+  const { data, error } = await supabase.rpc("platform_sms_grant", { p_org: orgId, p_pack: pack, p_note: note === "" ? null : note });
+  if (error) return fail(platformError(error), { values: formValues(formData) });
+  revalidatePath(paths.adminOrg(orgId));
+  const balance = data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>).balance : null;
+  return { ok: true, message: typeof balance === "number" ? `החבילה נטענה. היתרה עכשיו: ${balance} מקטעים.` : "החבילה נטענה." };
+}
+
 const shekels = (value: string) => {
   const n = Number(value.replace(/[,₪\s]/g, ""));
   return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null;

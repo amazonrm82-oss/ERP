@@ -94,10 +94,14 @@ describe("meeting messages to the customer (CAL-12)", () => {
     );
     owner = await createUser("cal12-owner");
     org = await createOrg(owner.id, "קליניקה לתזכורות");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [org]));
     admin = await addMember(org, owner.id, "admin", "cal12-admin");
     member = await addMember(org, owner.id, "member", "cal12-member");
     otherOwner = await createUser("cal12-other");
     other = await createOrg(otherOwner.id, "עסק אחר לתזכורות");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [other]));
     dana = await contact(org);
   });
   afterAll(async () => {
@@ -505,6 +509,8 @@ describe("meeting messages to the customer (CAL-12)", () => {
   const newBiz = async (label: string, switches: { confirm?: boolean; day?: boolean; hour?: boolean }) => {
     const o = await createUser(`cal12-${label}`);
     const id = await createOrg(o.id, `עסק ${label}`);
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [id]));
     await setKey(id, true);
     await settings(switches, id, o.id);
     const c = await contact(id, { phone: "0521234567" });

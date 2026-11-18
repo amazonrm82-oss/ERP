@@ -1,7 +1,7 @@
 // Plan keys, prices and states (owner's pricing of 13 October 2026; it replaces the
 // temporary "everything open, high values" defaults). Mirrors migrations plan_pricing
 // (the seed), plan_trial_built_with (the changes of the owner's later decisions) and
-// plan_review_fixes, lead_distribution_plan, campaign_costs_plan, punch_cards_plan, meta_leads_plan, meeting_customer_reminders, document_templates, sms_b_send, review_requests, business_page, free_plan_quotes, recurring_billing and prefill_forms (the latest app.plan_key_defaults()): PLAN_VALUES = the seed with
+// plan_review_fixes, lead_distribution_plan, campaign_costs_plan, punch_cards_plan, meta_leads_plan, meeting_customer_reminders, document_templates, sms_b_send, review_requests, business_page, free_plan_quotes, recurring_billing, prefill_forms and sms_packs (the latest app.plan_key_defaults(): quote_reminders): PLAN_VALUES = the seed with
 // those changes, PLAN_KEY_FALLBACK = the latest app.plan_key_defaults().
 // tests/unit/plan-keys.test.ts reads the migrations and compares; keep them in step.
 //
@@ -75,9 +75,9 @@ const LIMITS: Record<string, Record<SoldPlan, number | null>> = {
   max_booking_team_pages: byPlan(0, 0, 10, 50),
   // SGN-01/SGN-02 (owner, 3 November 2026, answer (67) ג): documents sent for signature a month
   max_signatures_per_month: byPlan(0, 20, 100, null),
-  // SMS (owner (210) ב, 10 November 2026, scope (א2)): every SMS to a customer a month (never a verification code);
-  // personal 0 (later only from the SMS-04 wallet)
-  max_sms_per_month: byPlan(0, 100, 300, 1000),
+  // SMS-06 (owner (437) א, 18 November 2026): no monthly SMS in any plan; every segment is paid from the prepaid balance
+  // (migration sms_packs). The key stays, 0, and is no longer read.
+  max_sms_per_month: byPlan(0, 0, 0, 0),
   // owner (331) א, 12 November 2026: quotes SENT a month; no cap in the sold plans (the hidden free plan: 3)
   max_quotes_per_month: byPlan(null, null, null, null),
 };
@@ -108,8 +108,9 @@ const FEATURES: Record<string, Record<SoldPlan, boolean>> = {
   meta_leads: BASIC_UP, // CAP-11 (owner, 8 November 2026, answer (143) ב: the plans of lead_distribution)
   meeting_reminders: BASIC_UP, // CAL-12 (owner, 9 November 2026, answer (178) ב: the plans of lead_distribution)
   signatures: BASIC_UP, // SGN-01 (owner, 3 November 2026, answer (67) ג: basic and up)
-  // SMS (owner (210) ב, 10 November 2026): basic and up
-  sms: BASIC_UP,
+  // SMS (owner (210) ב, 10 November 2026): basic and up; SMS-06 (18 November 2026): the packs are sold in every plan, so the
+  // flag (the channel offered at all) is on in every sold plan (migration sms_packs)
+  sms: ALL,
   // RET-02 (owner, 11 November 2026, answer (273)): a new key, basic and up
   review_requests: BASIC_UP,
   // QUO-18 (owner, 16 November 2026, answer (384) ב): automatic quote reminders to the customer, basic and up

@@ -58,7 +58,9 @@ const pgErr = (e: unknown) => e as { code?: string; hint?: string; detail?: stri
 // A change of its body, or a new trigger on public.messages, fails here until it gets a fresh independent review (it writes
 // a public table, notifications, on every failed message); then update the md5 / the list.
 const SENDER_NOTICE_MD5 = "57d1c65f2b45743a46439bea1d989702";
-const MESSAGES_TRIGGERS = ["messages_refused_sender_notice", "messages_touch"];
+// SMS-06 (_sms_packs.sql) adds messages_sms_failed_refund: a failed SMS delivery gives its segments back to the balance (it writes
+// only schema app through app.sms_balance_refund, never a public table, and never fails the write)
+const MESSAGES_TRIGGERS = ["messages_refused_sender_notice", "messages_sms_failed_refund", "messages_touch"];
 
 describe("the fields a card's message fills (EML-02, 15 November 2026)", () => {
   let owner: { id: string }, member: { id: string }, viewer: { id: string };
@@ -70,6 +72,8 @@ describe("the fields a card's message fills (EML-02, 15 November 2026)", () => {
     );
     owner = await createUser("cardf-owner");
     org = await createOrg(owner.id, "עסק השדות");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [org]));
     member = await addMember(org, owner.id, "member", "cardf-member");
     viewer = await addMember(org, owner.id, "viewer", "cardf-viewer");
     await allow(org);
@@ -227,6 +231,8 @@ describe("the fields a card's message fills (EML-02, 15 November 2026)", () => {
 
   it("a marketing message is not queued while the envelope's business address or phone is missing", async () => {
     const bare = await createOrg(owner.id, "עסק בלי פרטים");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [bare]));
     await allow(bare);
     const lead = await insertLead(owner.id, bare, { full_name: "רון", email: "ron2@example.test", phone: "052-1112299", owner_id: owner.id });
     const mEmail = await template(bare, { channel: "email", type: "marketing", body: "שלום {שם פרטי}" });
@@ -252,6 +258,8 @@ describe("the fields a card's message fills (EML-02, 15 November 2026)", () => {
 
   it("new sending hours judge again only this business's jobs waiting for the window", async () => {
     const other = await createOrg(owner.id, "עסק שכן");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [other]));
     const lead = await insertLead(owner.id, org, { full_name: "שעות", email: "hours@example.test", owner_id: owner.id });
     const otherLead = await insertLead(owner.id, other, { full_name: "שעות", email: "hours2@example.test", owner_id: owner.id });
     const t = await template(org, { channel: "email", type: "requested_document", body: "שלום {שם פרטי}" });
@@ -351,6 +359,8 @@ describe("the fields a card's message fills (EML-02, 15 November 2026)", () => {
     expect(steps.map((x) => x.error)).toEqual(["the template holds a field an automation cannot fill", "the template holds a field an automation cannot fill"]);
     // a marketing template while the business details are missing
     const bare = await createOrg(owner.id, "עסק כלל בלי פרטים");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [bare]));
     await allow(bare);
     const bareLead = await insertLead(owner.id, bare, { full_name: "כלל", email: "rule2@example.test", owner_id: owner.id });
     const mkt = await template(bare, { channel: "email", type: "marketing", body: "שלום {שם פרטי}" });

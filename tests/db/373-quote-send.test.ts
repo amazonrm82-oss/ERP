@@ -86,11 +86,15 @@ describe("sending a quote to its customer (QUO-18)", () => {
     await asAdmin((q) => q("insert into app.settings (key, value) values ('consent_hash_key', $1) on conflict (key) do update set value = excluded.value", [KEY]));
     owner = await createUser("qsend-owner");
     org = await createOrg(owner.id, "עסק ההצעות");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [org]));
     member = await addMember(org, owner.id, "member", "qsend-member");
     other = await addMember(org, owner.id, "member", "qsend-other");
     viewer = await addMember(org, owner.id, "viewer", "qsend-viewer");
     outsider = await createUser("qsend-outsider");
     otherOrg = await createOrg(outsider.id, "עסק אחר");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [otherOrg]));
     const p = await defaultPipeline(org);
     pipe = { pipelineId: p.pipelineId, stageId: p.stages[0].id };
     await asAdmin(async (q) => {

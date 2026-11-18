@@ -121,12 +121,16 @@ describe("signature states and reminders (SGN-03)", () => {
   beforeAll(async () => {
     owner = await createUser("sr-owner");
     org = await createOrg(owner.id, "עסק התזכורות");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [org]));
     admin = await addMember(org, owner.id, "admin", "sr-admin");
     member = await addMember(org, owner.id, "member", "sr-member");
     other = await addMember(org, owner.id, "member", "sr-other");
     viewer = await addMember(org, owner.id, "viewer", "sr-viewer");
     outsider = await createUser("sr-outsider");
     otherOrg = await createOrg(outsider.id, "עסק אחר");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [otherOrg]));
     await setPlan(org, { signatures: true });
     await setPlan(otherOrg, { signatures: true });
     await run(owner, (q) => q("update public.organizations set record_visibility = 'own' where id = $1", [org]));
@@ -153,6 +157,8 @@ describe("signature states and reminders (SGN-03)", () => {
   it("the setting: 3 by default, 0..30, owners and admins write it, every member reads it", async () => {
     const fresh = await createUser("sr-fresh");
     const freshOrg = await createOrg(fresh.id, "עסק חדש");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [freshOrg]));
     await run(fresh, (q) => q("insert into public.org_document_settings (organization_id) values ($1) on conflict do nothing", [freshOrg]));
     expect((await run(fresh, (q) => one<{ d: number }>(q, "select signature_reminder_days as d from public.org_document_settings where organization_id = $1", [freshOrg]))).d).toBe(3);
     await setDays(org, 3);
@@ -726,6 +732,8 @@ describe("signature states and reminders (SGN-03)", () => {
     it("delta review D2: a business with no settings row whose first save inserts the switch off cancels its waiting reminders", async () => {
       const boss = await createUser("sr-norow");
       const fresh = await createOrg(boss.id, "עסק בלי הגדרות");
+      // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+      await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [fresh]));
       await setPlan(fresh, { signatures: true });
       await setZone(fresh, workZone);
       await asUser(boss.id, (q) => q("update public.document_templates set body = $2 where organization_id = $1 and key = 'service_agreement'", [fresh, CONTACT_BODY]));
@@ -747,6 +755,8 @@ describe("signature states and reminders (SGN-03)", () => {
     it("review L6: seeding at the 50-template cap is recorded once and never retried", async () => {
       const fullOwner = await createUser("sr-full");
       const full = await createOrg(fullOwner.id, "עסק מלא");
+      // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+      await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [full]));
       await asAdmin(async (q) => {
         const have = Number((await one<{ n: string }>(q, "select count(*) as n from public.message_templates where organization_id = $1", [full])).n);
         for (let i = have; i < 50; i += 1) {

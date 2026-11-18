@@ -73,11 +73,11 @@ describe("LND-20 v2 price cards", () => {
     expect(cards[1].full[0]).toMatchObject({ label: "כל מה שבאישית, ועוד:", intro: true });
   });
 
-  it("the comparison table has a cell per plan, the SMS row carries the month quota, and the footnote keeps the owner's lines", () => {
+  it("the comparison table has a cell per plan, the SMS row says prepaid packs (SMS-06), and the footnote keeps the owner's lines", () => {
     const rows = comparisonRows(PLANS);
     for (const row of rows) expect(row.cells).toHaveLength(PLANS.length);
     const sms = rows.find((r) => r.key === "sms");
-    if (sms) expect(sms.cells.some((c) => c.kind === "text")).toBe(true);
+    if (sms) expect(sms.cells.some((c) => c.kind === "text" && c.text === "חבילות מראש")).toBe(true);
     expect(pricingFootnote().startsWith(SOON_LINE)).toBe(true);
     expect(pricingShowsSoon(planCards(PLANS), comparisonRows(PLANS))).toBe(PLAN_CAPABILITIES.some((c) => !c.built && c.core !== true));
     expect(pricingShowsSoon(planCards(PLANS, new Set(["sms"])), comparisonRows(PLANS, new Set(["sms"])))).toBe(true);

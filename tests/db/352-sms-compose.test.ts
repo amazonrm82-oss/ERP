@@ -37,12 +37,17 @@ type Answer = Record<string, unknown>;
 // Then the delta review of 111cbb39: two comment lines about the quote's link changed (since 021285 it is added beside the earlier
 // links); no statement changed.
 const REVIEWED_MD5: Record<string, string> = {
-  "sms_job_compose(uuid,uuid,text)": "1788e9cddb254947e6079bdb0dca46f4",
+  // SMS-06 (_sms_packs.sql): the wrapper charges the composed text's segments from the prepaid balance
+  // (app.sms_balance_charge); without room it gives the count back and puts the job back to wait (cap_wait 'sms_balance',
+  // attempt given back), answering {refused: 'sms_balance'}; the core is unchanged. Needs an independent review.
+  "sms_job_compose(uuid,uuid,text)": "0564876e9974c7248cf39f11a2a4cdff",
   // RVW-105, owner (399) א (_org_deletion_messages_wait.sql): one block before the writable check, a business in ADM-03's
   // deletion wait answers 'paused' (tried again, count given back) instead of 'not_writable'; every other line 021283's body.
   // Needs the lead's independent review of this delta before merge.
   "app.sms_compose_core(uuid,uuid,text)": "284aa9cd77599539faec7fe149639a0b",
-  "app.sms_usage_give_back(uuid)": "f97f0d2ef0eadfbabd93f157793df96e",
+  // SMS-06: a job charged from the balance (sms_metered) gets its segments back (app.sms_balance_refund) instead of a month
+  // decrement; a job counted before SMS-06 is returned to its month as before; sms_metered is cleared with the count.
+  "app.sms_usage_give_back(uuid)": "0ef683ea023bc01a7cbd2589ced71336",
   "sms_quota_return(uuid,uuid)": "166b0640aa22b85767118041be671199",
 };
 

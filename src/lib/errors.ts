@@ -687,6 +687,10 @@ const LIMIT_MESSAGES: Record<string, string> = {
   "record_message:unfillable_field": "בתבנית יש שדה שלא מתמלא בשליחה מהכרטיס, ולכן היא לא תישלח. בחרו תבנית אחרת, או בקשו מבעלי העסק לתקן אותה.",
   "record_sms:not_sendable": "התבנית הזו לא תישלח כרגע. בדקו אותה במסך תבניות ההודעה.",
   "record_sms:collection": "תבנית גבייה נשלחת רק על ידי מי שרושם תשלומים בעסק. בחרו תבנית אחרת.",
+  // SMS-06 (owner, 18 November 2026): SMS is paid from a prepaid balance; a business that never loaded one has the channel off
+  "sms_balance:none": "לעסק אין עדיין יתרת SMS, ולכן שליחת SMS כבויה. אפשר לרכוש חבילת SMS ב\"הגדרות > חבילה ושימוש\" (בעלים ומנהלי מערכת).",
+  "sms_grant:pack": "אפשר לטעון רק חבילה של 300, 1,000 או 5,000 מקטעים.",
+  "sms_grant:cancelled": "המנוי של העסק בוטל, ולכן אי אפשר לטעון לו יתרת SMS.",
   "record_sms:rate": "שלחתם הרבה הודעות SMS בשעה האחרונה. אפשר לשלוח עד 30 בשעה. נסו שוב מאוחר יותר.",
   // SGN-02 (migration signature_documents)
   "signature_document:template": "התבנית כבר לא פעילה, או שהיא לסוג רשומה אחר. רעננו את הדף ובחרו תבנית.",

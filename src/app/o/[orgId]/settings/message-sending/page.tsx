@@ -14,6 +14,8 @@ import { getMarketingSmsMissing, getMeetingMessages, getMessageCaps, getMessageU
 import { CHANNEL_LABELS, MESSAGE_CHANNELS } from "@/features/message-sending/usage";
 import { isAdminRole } from "@/features/settings/permissions";
 import { orgHasFeature } from "@/features/settings/queries";
+import { SmsBalanceCard } from "@/features/sms-balance/components/sms-balance-card";
+import { getSmsBalance } from "@/features/sms-balance/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatNumber } from "@/lib/format";
 
@@ -29,7 +31,7 @@ export default async function MessageSendingSettingsPage({ params }: Props) {
   const { role, canWrite } = await getOrgContext(orgId);
   const admin = isAdminRole(role);
   const editable = admin && canWrite;
-  const [hours, caps, meetingMessages, meetingRemindersInPlan, usage, smsSender, smsInPlan, smsMissing] = await Promise.all([
+  const [hours, caps, meetingMessages, meetingRemindersInPlan, usage, smsSender, smsInPlan, smsMissing, smsBalance] = await Promise.all([
     getSendingHours(orgId),
     getMessageCaps(orgId),
     getMeetingMessages(orgId),
@@ -38,6 +40,7 @@ export default async function MessageSendingSettingsPage({ params }: Props) {
     getSmsSender(orgId),
     orgHasFeature(orgId, "sms"),
     getMarketingSmsMissing(orgId),
+    admin ? getSmsBalance(orgId) : Promise.resolve(null),
   ]);
   // RVW-89: a marketing SMS without the business's address or phone is refused by the composer; say so first
   const smsDetails = smsInPlan ? <MarketingSmsDetailsNotice orgId={orgId} missing={smsMissing} /> : null;
@@ -58,9 +61,10 @@ export default async function MessageSendingSettingsPage({ params }: Props) {
           כשהודעות השיווק מגיעות ל-80% מהתקרה החודשית, הבעלים ומנהלי המערכת מקבלים התראה. כשהתקרה מלאה הם מקבלים התראה, ושוב פעם ביום (לפי לוח השנה) כל עוד יש הודעות שמחכות.
         </p>
         <p>
-          {/* SMS (owner (210) ב): the plan's SMS quota covers every SMS to a customer; a verification code is never counted */}
-          מכסת ה-SMS של החבילה חלה על כל הודעת SMS ללקוח: מהכרטיס, מאוטומציות, אישורי ותזכורות פגישה והודעות כרטיסייה. כשהיא מלאה, ההודעות מחכות עד
-          החודש הבא או עד שהחבילה תוגדל, ושם אפשר גם לבטל אותן. קוד אימות לא נספר ויוצא תמיד.
+          {/* SMS-06 (owner, 18 November 2026): every SMS to a customer is paid from the prepaid balance; a verification code never */}
+          כל הודעת SMS ללקוח (מהכרטיס, מאוטומציות, אישורי ותזכורות פגישה והודעות כרטיסייה) נספרת מיתרת ה-SMS של העסק, לפי מקטעים: עד 70 תווים
+          בעברית (160 באנגלית) הם מקטע אחד. כשהיתרה נגמרת, הודעות שיווק מחכות עד 24 שעות ואז מתבטלות, והודעות שירות יוצאות עד 50 מקטעים במינוס. הודעה
+          שהספק דיווח שנכשלה חוזרת ליתרה. קוד אימות של מספר השולח לא נספר, ואפשר לשלוח עד 3 כאלה ביום.
         </p>
         <p className="text-ink-soft">
           קצב קבוע לכל עסק: עד {RATE_PER_MINUTE.email} אימיילים, {RATE_PER_MINUTE.sms} הודעות SMS ו-{RATE_PER_MINUTE.whatsapp} הודעות WhatsApp בדקה. מה
@@ -71,6 +75,7 @@ export default async function MessageSendingSettingsPage({ params }: Props) {
   );
 
   const usageCard = usage.allowed ? <MessageUsageCard orgId={orgId} month={usage.month} channels={usage.channels} /> : null;
+  const smsBalanceCard = smsBalance ? <SmsBalanceCard balance={smsBalance} id="sending-sms-balance-title" /> : null;
 
   if (editable) {
     return (
@@ -78,6 +83,7 @@ export default async function MessageSendingSettingsPage({ params }: Props) {
         {smsDetails}
         <SendingHoursForm orgId={orgId} hours={hours} />
         {usageCard}
+        {smsBalanceCard}
         <MessageCapsForm orgId={orgId} caps={caps} />
         <MeetingMessagesForm orgId={orgId} settings={meetingMessages} available={meetingRemindersInPlan} />
         <SmsSenderForm orgId={orgId} sender={smsSender} smsInPlan={smsInPlan} />
@@ -109,6 +115,7 @@ export default async function MessageSendingSettingsPage({ params }: Props) {
         </CardBody>
       </Card>
       {usageCard}
+      {smsBalanceCard}
       {rules}
     </div>
   );

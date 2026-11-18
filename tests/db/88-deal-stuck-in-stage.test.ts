@@ -233,6 +233,9 @@ const RERUN = [
   migrationFile("_sms_unknown_outcome.sql"),
   // WEB-05 redefines app.job_kinds() and app.job_payload_ok() last (signup.send)
   migrationFile("_signup_service_emails.sql"),
+  // SMS-06 redefines public.job_message_may_send(), public.record_sms_send(), public.sms_sender_verify_start() and
+  // app.collection_sms_room() last (the prepaid SMS balance)
+  migrationFile("_sms_packs.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

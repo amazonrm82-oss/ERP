@@ -93,6 +93,8 @@ describe("send check batch moves and caps after review (MSG-05, MSG-06)", () => 
     );
     owner = await createUser("review-owner");
     org = await createOrg(owner.id, "עסק בדיקת תיקונים");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [org]));
     await addMember(org, owner.id, "admin", "review-admin");
     lead = await insertLead(owner.id, org, { email: "review@example.test", phone: "0501230004" });
     for (const channel of ["email", "sms", "whatsapp"]) {

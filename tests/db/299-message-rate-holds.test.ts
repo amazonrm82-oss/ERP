@@ -70,6 +70,8 @@ describe("system rate, cap holds and cancelling (MSG-05, MSG-06)", () => {
     );
     owner = await createUser("holds-owner");
     org = await createOrg(owner.id, "עסק החזקות");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [org]));
     admin = await addMember(org, owner.id, "admin", "holds-admin");
     member = await addMember(org, owner.id, "member", "holds-member");
     lead = await insertLead(owner.id, org, { email: "holds@example.test", phone: "0501230003" });

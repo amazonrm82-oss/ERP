@@ -82,6 +82,8 @@ describe("messages (MSG-03)", () => {
     );
     owner = await createUser("messages-owner");
     org = await createOrg(owner.id, "עסק הודעות");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [org]));
   });
   beforeEach(() => asAdmin((q) => q("update app.jobs set status = 'done', lease_id = null, locked_until = null where status in ('queued', 'failed', 'running')")));
   afterAll(() => closePool());
@@ -243,6 +245,8 @@ describe("messages (MSG-03)", () => {
   it("the shape holds: one record, a known channel and status, ILS only, and no other business's record", async () => {
     const lead = await insertLead(owner.id, org, { email: "shape2@example.test", phone: "0509900008" });
     const other = await createOrg(owner.id, "עסק אחר להודעות");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [other]));
     const otherLead = await insertLead(owner.id, other, { email: "other@example.test", phone: "0509900009" });
     const insert = (cols: string, values: string, params: unknown[]) =>
       pgError(asAdmin((q) => q(`insert into public.messages (organization_id, ${cols}) values ($1, ${values})`, [org, ...params])));

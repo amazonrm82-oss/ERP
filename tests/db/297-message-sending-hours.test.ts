@@ -61,6 +61,8 @@ describe("sending hours and rate (MSG-06)", () => {
     );
     owner = await createUser("hours-owner");
     org = await createOrg(owner.id, "עסק שעות שליחה");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [org]));
     admin = await addMember(org, owner.id, "admin", "hours-admin");
     member = await addMember(org, owner.id, "member", "hours-member");
     lead = await insertLead(owner.id, org, { email: "hours@example.test", phone: "0501230001" });
@@ -81,6 +83,8 @@ describe("sending hours and rate (MSG-06)", () => {
   it("settings: members read, owners and admins of a writable business write, the shape holds", async () => {
     const other = await createUser("hours-other");
     const otherOrg = await createOrg(other.id, "עסק אחר לשעות");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [otherOrg]));
     // a member cannot write, an outsider cannot write into another business
     expect((await pgError(asUser(member.id, (q) => q("insert into public.org_message_settings (organization_id) values ($1)", [org])))).code).toBe("42501");
     expect((await pgError(asUser(other.id, (q) => q("insert into public.org_message_settings (organization_id) values ($1)", [org])))).code).toBe("42501");
@@ -112,6 +116,8 @@ describe("sending hours and rate (MSG-06)", () => {
   it("the window: 08:00-20:00 by default, never on a rest day, until 15:00 on a short day; the business changes it", async () => {
     const o = await createUser("hours-window");
     const w = await createOrg(o.id, "עסק חלון");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [w]));
     // no settings row: 08:00-20:00, Friday and Saturday off (the calendar's defaults). 11 November 2026 is a Wednesday
     expect(await openAt(w, "2026-11-11T10:00:00+02:00")).toBe(new Date("2026-11-11T10:00:00+02:00").toISOString());
     expect(await openAt(w, "2026-11-11T07:00:00+02:00")).toBe(new Date("2026-11-11T08:00:00+02:00").toISOString());

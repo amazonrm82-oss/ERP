@@ -155,10 +155,8 @@ export function comparisonRows(plans: readonly PublicPlan[], waiting: ReadonlySe
       soon: !capability.built || waiting.has(capability.feature),
       cells: plans.map((plan, i): ComparisonCell => {
         if (!held[i].has(capability.label)) return { kind: "no" };
-        if (capability.feature === "sms" && isSold(plan.key)) {
-          const quota = PLAN_VALUES[plan.key].limits.max_sms_per_month;
-          if (typeof quota === "number" && quota > 0) return { kind: "text", text: formatNumber(quota) };
-        }
+        // SMS-06 (owner, 18 November 2026): SMS is sold in prepaid packs in every plan, never a monthly quota
+        if (capability.feature === "sms" && isSold(plan.key)) return { kind: "text", text: "חבילות מראש" };
         return { kind: "yes" };
       }),
     });

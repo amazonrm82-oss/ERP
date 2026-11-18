@@ -53,7 +53,11 @@ const REVIEWED_MD5 = {
   // the job waits uncounted 15 minutes ('waiting:org_deletion', attempt given back, no other job moved), like HEB-09's pause.
   // Rechecked by its writer: every other line is 021225's body; deleted, suspended, cancelled and read-only are refused as
   // before; the branch only delays, never passes a job. Needs the lead's independent review of this delta before merge.
-  job_message_may_send: "26db3aa489a3ef40ae7f26dc078683ac",
+  // SMS-06 (_sms_packs.sql, owner 18 November 2026, answers (437) א, (438) א): only the SMS lines changed, rechecked against
+  // 021300's body: the plan's monthly SMS quota is replaced by the prepaid balance (a loaded balance with room for the job's
+  // segments; marketing to 0, service to minus 50; else wait uncounted as cap_wait 'sms_balance', cancelled after 24 hours
+  // waiting), no app.sms_quota_months counting, the job marked sms_metered for the composer's charge. Needs an independent review.
+  job_message_may_send: "172fb1bc925fee5d3270a8a284c6bfee",
 };
 
 // MSG-03: the trigger function that writes public.messages from the worker's path (see its test below)
@@ -135,8 +139,14 @@ describe("background job queue (OPS-04)", () => {
     await setKey(KEY);
     owner = await createUser("jobs-owner");
     org = await createOrg(owner.id, "עסק תור");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [org]));
     orgB = await createOrg(owner.id, "עסק תור ב");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [orgB]));
     orgC = await createOrg(owner.id, "עסק תור ג");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [orgC]));
   });
   // every test starts from an empty queue (other tests' jobs would be claimed too)
   beforeEach(() => asAdmin((q) => q("update app.jobs set status = 'done', lease_id = null, locked_until = null where status in ('queued', 'failed', 'running')")));
@@ -566,6 +576,8 @@ describe("background job queue (OPS-04)", () => {
   it("(53) א, (54) ב: the send check cancels for a soft-deleted or read-only business", async () => {
     const owner2 = await createUser("jobs-deleted");
     const gone = await createOrg(owner2.id, "עסק שנמחק");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [gone]));
     const lead = await insertLead(owner2.id, gone, { email: "deleted@example.test" });
     await asAdmin((q) => q("update public.organizations set deleted_at = now() where id = $1", [gone]));
     const id = await enqueue(gone, send(lead));

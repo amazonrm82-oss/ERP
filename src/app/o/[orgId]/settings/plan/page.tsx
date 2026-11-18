@@ -8,6 +8,8 @@ import { PlanCards } from "@/features/plans/components/plan-cards";
 import { listPlanCards } from "@/features/plans/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getPlanUsage } from "@/features/settings/plan-usage";
+import { SmsBalanceCard } from "@/features/sms-balance/components/sms-balance-card";
+import { getSmsBalance } from "@/features/sms-balance/queries";
 import { getOrgContextForOwner } from "@/features/shell/queries";
 import { trialEndBannerText } from "@/features/trial-end/notice";
 import { getTrialEndNotice } from "@/features/trial-end/queries";
@@ -43,7 +45,7 @@ export default async function PlanUsagePage({ params }: Props) {
     return null;
   }
   const trialDays = plan.status === "trialing" ? daysUntil(plan.trialEndsAt) : null;
-  const [cards, trialEnd] = await Promise.all([listPlanCards(orgId, plan.planKey), getTrialEndNotice(orgId)]);
+  const [cards, trialEnd, smsBalance] = await Promise.all([listPlanCards(orgId, plan.planKey), getTrialEndNotice(orgId), getSmsBalance(orgId)]);
   // BIL-08: an ended trial says so only while the trial-end switch covers the business; else it is just the plan
   const trialOver = trialDays !== null && trialDays <= 0;
   const statusKey = trialOver && !trialEnd ? "active" : plan.status;
@@ -114,6 +116,9 @@ export default async function PlanUsagePage({ params }: Props) {
           })}
         </ul>
       </Card>
+
+      {/* SMS-06 (owner, 18 November 2026): SMS is paid from a prepaid balance of segments, not from the plan */}
+      {smsBalance ? <SmsBalanceCard balance={smsBalance} /> : null}
     </div>
   );
 }

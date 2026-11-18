@@ -56,6 +56,8 @@ describe("SMS sender verification and approval (SMS-01b)", () => {
   beforeAll(async () => {
     owner = await createUser("sms-check-owner");
     org = await createOrg(owner.id, "עסק אימות");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [org]));
     member = await addMember(org, owner.id, "member", "sms-check-member");
     staff = await createUser("sms-check-staff");
     await asAdmin(async (q) => {
@@ -122,6 +124,8 @@ describe("SMS sender verification and approval (SMS-01b)", () => {
   it("an expired code is refused; five wrong codes end the check and cool the business down", async () => {
     const other = await createUser("sms-check-owner-2");
     const org2 = await createOrg(other.id, "עסק קירור");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [org2]));
     await asAdmin((q) => q("update public.organizations set phone = '052-7770003' where id = $1", [org2]));
     expect(await start(other.id, org2)).toEqual({ ok: true });
     const claimed = await claim((await checkJob(org2)).id);
@@ -199,6 +203,8 @@ describe("SMS sender verification and approval (SMS-01b)", () => {
   it("review (6): a sender check's code is not held by HEB-09's pause; review (5): an SMS waiting for the flag is a cap waiter", async () => {
     const o = await createUser("sms-check-pause");
     const po = await createOrg(o.id, "עסק עצור לאימות");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [po]));
     await asAdmin(async (q) => {
       await q("update public.organizations set phone = '052-7770009' where id = $1", [po]);
       await q("insert into public.org_message_settings (organization_id, window_from, window_until, skip_rest_days) values ($1, '00:00', '24:00', false)", [po]);
@@ -263,6 +269,8 @@ describe("SMS sender verification and approval (SMS-01b)", () => {
   it("RVW-80: finishing a verification code writes no message row and no warning; a customer's SMS is still recorded", async () => {
     const o = await createUser("sms-check-finish");
     const fo = await createOrg(o.id, "עסק סיום אימות");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [fo]));
     await asAdmin(async (q) => {
       await q("update public.organizations set phone = '052-7770030' where id = $1", [fo]);
       await q("insert into public.org_message_settings (organization_id, window_from, window_until, skip_rest_days) values ($1, '00:00', '24:00', false)", [fo]);
@@ -301,6 +309,8 @@ describe("SMS sender verification and approval (SMS-01b)", () => {
   it("RVW-81: a business whose plan has no SMS cannot ask for a verification code", async () => {
     const o = await createUser("sms-check-noflag");
     const nf = await createOrg(o.id, "עסק בלי SMS");
+    // SMS-06: SMS is paid from a prepaid balance; this business gets a pack, as the platform owner loads one
+    await asAdmin((q) => q("select app.sms_balance_move($1, 'grant', 5000, null, 5000, null, null)", [nf]));
     await asAdmin(async (q) => {
       await q("update public.organizations set phone = '052-7770020' where id = $1", [nf]);
       await q("update public.subscriptions set feature_overrides = coalesce(feature_overrides, '{}'::jsonb) || '{\"sms\": false}'::jsonb where organization_id = $1", [nf]);

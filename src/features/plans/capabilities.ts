@@ -77,7 +77,7 @@ export const PLAN_CAPABILITIES: readonly PlanCapability[] = [
   // SGN-01 (owner, 3 November 2026, answer (67) ג): basic and up; templates (SGN-01), sending and signing (SGN-02) are built
   { feature: "signatures", label: "תבניות מסמך וחתימה דיגיטלית", built: true },
   // SMS (owner (210) ב): every SMS to a customer, with the plan's month quota
-  { feature: "sms", label: "הודעות SMS ללקוחות, עם מכסה חודשית", built: true },
+  { feature: "sms", label: "הודעות SMS ללקוחות, בחבילות מראש", built: true },
   // RET-02 (owner, 11 November 2026, answer (273)): basic and up
   { feature: "review_requests", label: "בקשת ביקורת ב-Google אחרי עסקה או פגישה", built: true },
   { feature: "orders", label: "מודול הזמנות", built: true },

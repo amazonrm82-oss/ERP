@@ -5,13 +5,15 @@ import { ActionButton } from "@/components/action-button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { SelectField, TextareaField, TextField } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
-import { openSupportAction, setOrgStatusAction, setOverridesAction, setQrExternalBlockAction, updateSubscriptionAction } from "@/features/platform/actions";
+import { openSupportAction, setOrgStatusAction, setOverridesAction, setQrExternalBlockAction, smsGrantAction, updateSubscriptionAction } from "@/features/platform/actions";
 import { PlatformForm } from "@/features/platform/components/platform-form";
 import { activationText } from "@/features/platform/activation";
 import { parseSignupOrigin, signupPlanText, signupSourceText } from "@/features/platform/signup-origin";
 import { ACTION_LABELS, canDo, ORG_STATUS_LABELS } from "@/features/platform/labels";
 import { getPlatformOrg, getQrExternalBlock, listPlans, listPlatformLog, platformReady } from "@/features/platform/queries";
 import { ROLE_LABELS } from "@/features/shell/labels";
+import { SMS_PACKS, smsBalanceLine } from "@/features/sms-balance/packs";
+import { getPlatformSmsBalance } from "@/features/sms-balance/queries";
 import type { MembershipRole } from "@/lib/database.types";
 import { formatDate, formatDateTime, formatNumber, zoneDate } from "@/lib/format";
 import { isUuid, paths } from "@/lib/paths";
@@ -29,7 +31,13 @@ export default async function AdminOrgPage({ params }: { params: Promise<{ orgId
   if (!isUuid(orgId)) notFound();
   const me = await platformReady();
   if (!me) return null;
-  const [data, plans, log, qrBlock] = await Promise.all([getPlatformOrg(orgId), listPlans(), listPlatformLog(orgId, 50), getQrExternalBlock(orgId)]);
+  const [data, plans, log, qrBlock, smsBalance] = await Promise.all([
+    getPlatformOrg(orgId),
+    listPlans(),
+    listPlatformLog(orgId, 50),
+    getQrExternalBlock(orgId),
+    getPlatformSmsBalance(orgId),
+  ]);
   if (!data) notFound();
 
   const org = data.org as Obj;
@@ -176,6 +184,29 @@ export default async function AdminOrgPage({ params }: { params: Promise<{ orgId
             </CardBody>
           </Card>
         ) : null}
+
+        {/* SMS-06 (owner, 18 November 2026): the prepaid SMS balance; the platform owner loads a pack by hand until a clearing
+            provider is chosen (logged) */}
+        <Card aria-labelledby="sms-balance">
+          <CardHeader id="sms-balance" title="יתרת SMS" />
+          <CardBody className="space-y-3">
+            <p className="text-md">{smsBalance ? smsBalanceLine(smsBalance) : "לא הצלחנו לקרוא את היתרה."}</p>
+            {me.role === "owner" ? (
+              <PlatformForm action={smsGrantAction.bind(null, orgId)} submitLabel="טעינת חבילה">
+                <SelectField label="חבילה" name="pack" defaultValue={String(SMS_PACKS[0].segments)}>
+                  {SMS_PACKS.map((p) => (
+                    <option key={p.segments} value={p.segments}>
+                      {`${formatNumber(p.segments)} מקטעים`}
+                    </option>
+                  ))}
+                </SelectField>
+                <TextField label="הערה (לא חובה)" name="note" maxLength={200} hint="למשל מספר הקבלה. נרשמת ביתרה של העסק." />
+              </PlatformForm>
+            ) : (
+              <p className="text-sm text-ink-soft">טעינת חבילה מותרת לבעל הפלטפורמה.</p>
+            )}
+          </CardBody>
+        </Card>
 
         {/* BIZ-03 (owner, 27 October 2026, answer (ה)): the emergency switch for the business's external QR links */}
         <Card aria-labelledby="qr-external">
