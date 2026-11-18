@@ -325,5 +325,8 @@ describe("payment link webhook in a closed business (LNK-04b)", () => {
     for (const run of [(fn: (q: Query) => Promise<unknown>) => asUser(s.owner.id, fn), asAnon, asService]) {
       expect((await pgError(run((q) => q("select app.payment_link_owner_notice($1, 'x', 'y')", [s.org])))).code).toBe("42501");
     }
+    // the error above may come from schema app's usage alone: the function's own ACL holds the owner only
+    const acl = await asAdmin(async (q) => (await one<{ a: string }>(q, "select coalesce(p.proacl::text, '') as a from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'app' and p.proname = 'payment_link_owner_notice'")).a);
+    expect(acl).toBe("{postgres=X/postgres}");
   });
 });
