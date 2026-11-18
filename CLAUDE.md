@@ -130,6 +130,51 @@ and build this CRM here instead. The old code is preserved on the branch
   emails only (WEB-05: welcome, trial ending; no tips or marketing), under answer (55)'s conditions; subscription billing against a
   fake clearing provider (BIL-02..07): an OPS-04 job kind for the daily charge and the clearing provider's signed webhook, under
   (394)'s conditions. Neither the clearing provider nor the invoicing provider is chosen.
+  In use (WEB-05 sign-up service emails, owner 18 November 2026, answers (418) ב, (440) ב, (441) א, (442) א, (443) ב, (444) א;
+  migration 021323, applied and md5 checked 18 November 2026; an independent review and two delta reviews): the OPS-04 worker (same
+  route and secret) claims `signup.send` (payload `{organization_id, user_id, kind}` only, kind welcome|trial_ending), queued by pg_cron
+  `crm-signup-emails` (`app.queue_signup_emails`, every 10 minutes) only while a worker asked for the kind. A welcome goes to a person's
+  FIRST business (organizations.created_by; a business purged by ADM-03 no longer counts) made in the last 2 days, in every plan (also
+  a zero-price plan that starts active, 021312), while open (not deleted, closed or waiting for deletion; read-only counts as open) and
+  its creator is its active owner; at once. `trial_ending` goes only to a trialing business, from 09:00 in its zone on a working day
+  (CAL-03), from 3 days before the trial's last day (`app.signup_trial_last_day`: the local date of trial_ends_at minus 1 µs), while
+  more than 12 hours are left, to the current active owner, after their quiet hours (`app.digest_run_at`). Owner (444) א: the
+  trial-ending email and the welcome's "תקופת הניסיון פעילה עד" line go only while `app.signup_trial_end_applies` holds (BIL-08's
+  switch `app.trial_end_settings.enabled` on and no hand assignment at or after the trial end, `app.trial_end_candidates`' rule; keep in
+  step), judged again at send time. Once per business and kind (`app.signup_email_sends`, no grants, cascades); caps through
+  `app.signup_email_limits` (1,000 an hour, 3 trial_ending a person a day, 500 a run; a transaction may only lower them). With the service
+  key the worker calls only `public.signup_job_compose()` (service_role, the live lease): it re-checks the queued row is this job's, the
+  open business, the trial and the switch (trial_ending only), the person still the active owner (a welcome only to its creator) and a
+  plain sign-in address, and answers `{to, first_name, business_name, kind, trial_end_day}` or `{refused}`; a refusal is final, nothing
+  sent. The first name is the first word of profiles.full_name, at most 40 characters, null for a link, "@", "://", control, bidi or
+  invisible characters; a business name holding a link, "@" or "://" is sent as "העסק". Fixed DRAFT texts `signup-draft-2`
+  (`src/features/signup-emails/email.ts`): service only, three setup links in the welcome (staff, `/settings/intake`, import), from
+  "מקסוז" `<RESEND_FROM>`, no reply-to or unsubscribe header, the support phone in the footer. Pinned by md5 in test 284. The advisor's
+  finding on `app.signup_email_sends` is expected.
+  In use (DOC-15, owner 18 November 2026, answers (413) ג and (414) א, this rule's secret-link pattern; migrations 021324 and 021325,
+  applied and md5 checked 18 November 2026; an independent review and two delta reviews): the customer's accounting-document page
+  (`src/features/document-links/public-server.ts`, page `/f/doc/<token>`, route `GET /api/forms/doc/<token>/file`), which calls only
+  `public.document_public()` (the business's name as documents use it, `org_document_settings.legal_name` when set, else
+  `organizations.name`, and the display name for the logo's alt; logo, colour, built-with; the document's type, number, date,
+  net/VAT/total and rate as recorded, allocation number, recorded lines, due date and, for a debt document, its pay state, balance and
+  days overdue by `money_allocation_state`; a cancelled document answers a status page without amounts; never an id, the customer's
+  name or notes) and `public.document_public_file()` (the current confirmed PDF's path, SHA-256 and size only; the route compares the
+  SHA-256, else the size). One not-found rule `app.document_link_usable` (unknown or revoked token, public pages closed, no `documents`
+  key, a type outside `app.document_link_types()` (never an opening balance), no live record). Limits after the lookup, before data is
+  read: 120 per link and 60 per sender (keyed IP hash scope `document`, re-scoped per link, 1,024 buckets in
+  `app.document_link_view_counts`, no hash kept) in 10 minutes, page and file together; OPS-02 shared guard first. Links in
+  `app.document_links` (no grants, SHA-256 only, one per document, a new link replaces the old, cascades with the document) through
+  `public.document_link_create`, `_revoke`, `_status` (exists, usable and a reason pages_closed|feature_off|record_gone) and
+  `public.document_links_existing` (200 ids), all definer: `app.can_record_documents` or `app.can_issue_documents` on a document the
+  caller reads by `app.document_link_readable` (the `accounting_documents_select` rule; HEB-08 deputies, support sessions and sessions
+  without a required second step are refused); create needs a writable business and `documents`; status and revoke work also while the
+  link does not open, so a dormant link is turned off and never comes back. Audited `document_link` with the document's contact, deal and
+  company ids, never the token. A privacy erasure that erases a document's audit entries turns its link off (trigger
+  `audit_log_document_link_erase`; also a deal's or a merged duplicate's erasure, the safe side). Staff send the link by wa.me or their
+  own mail program from the documents card; the timeline keeps the message with `[קישור למסמך]`. Never framed, no-referrer, generic
+  previews, no cookies. `org_document_settings.document_delivery` (system|provider, 021325) is stored only; automatic email from our
+  system and the provider choice reaching the issue request wait for DOC-15 part 3. In the eslint allow-list. The advisor's findings on
+  the four staff definers and the two app tables are expected.
   Built, no service-key use yet (AUT-08, SPD-04; migrations 021224, 021225; owner (80) א, (120) ג, (259) א, (261) א, (280) ג;
   four independent reviews): automation step `send_email` (`app.automation_send_email`, EML-02's rules; one per rule, record and
   business day; no attachments; button presses count in the person's 30 emails an hour with card sends; a session's step takes the
