@@ -445,11 +445,19 @@ describe("prefill links (BIZ-05)", () => {
     for (let i = 0; i < 60; i++) expect((await page(token, ip)).status).toBe("done");
     expect(await page(token, ip)).toEqual({ rate_limited: true });
     expect(await submit(token, { first_name: "שוב" }, ip)).toEqual({ rate_limited: true });
-    // another sender still gets "done", until the link's own window is full
-    expect((await page(token)).status).toBe("done");
+    // another sender still gets "done", until the link's own window is full. The senders share 1,024 buckets per link,
+    // so the other sender is picked from a different bucket than ip's (else the test fails about once in 1,024 runs)
+    const bucketOf = (h: string) =>
+      asAdmin(async (q) => (await one<{ b: number }>(q,
+        "select ((hashtextextended(app.prefill_link_sender(l.id, $2), 0) % 1024) + 1024) % 1024 as b from app.prefill_links l where l.token_hash = $1",
+        [sha256(token), h])).b);
+    const ipBucket = await bucketOf(ip);
+    let other = sender(++n);
+    while ((await bucketOf(other)) === ipBucket) other = sender(++n);
+    expect((await page(token, other)).status).toBe("done");
     await asAdmin((q) => q("update app.prefill_links set window_count = 120, window_started_at = now() where token_hash = $1", [sha256(token)]));
-    expect(await page(token)).toEqual({ rate_limited: true });
-    expect(await submit(token, { first_name: "שוב" })).toEqual({ rate_limited: true });
+    expect(await page(token, other)).toEqual({ rate_limited: true });
+    expect(await submit(token, { first_name: "שוב" }, other)).toEqual({ rate_limited: true });
   });
 
   // RVW-115: "today" for a birth date is the business's own day
