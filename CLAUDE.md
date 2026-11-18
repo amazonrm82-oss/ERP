@@ -2636,7 +2636,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   (02:41 UTC) calls `app.purge_old_integration_events()`, which runs the pasted `app.integration_events_purge_rows` (live lines 12
   months after `last_at`, deleted connections' 12 months after the delete). The token-expiry alert waits for the real Graph
   adapter (226). Since 021215 (independent review 10 November 2026) `meta_lead_finish`'s lost-the-race branch answers `refused`, marks its own connection `page_taken` (status kept, so `app.meta_lead_connection_open` closes it; one log line and the daily notice) and ends its pending arrivals; no lead. Since 021217 (independent review) `app.integrations_check` (pinned in test 305) also runs the going-live check when a write clears `last_error_code` (a re-open), so a new token on a connection ended by `page_taken` is refused (`integration:taken`) while the page is verified elsewhere; its owner can only disconnect or delete it.
-- Invoice provider sync log (DOC-16, migrations 021319 and 021320 (021320 to be pasted by hand); owner (425) ג, (426) א; an independent
+- Invoice provider sync log (DOC-16, migrations 021319 and 021320 (021320 pasted by hand, md5 checked 18 November 2026); owner (425) ג, (426) א; an independent
   review and a delta review): `public.invoice_provider_events` (INT-03's shape, its own table: one line per business, provider, kind,
   code and business day folded with `hits`/`last_at`; ids and codes only; owners/admins read, no client writes; in `EXPORT_TABLES`),
   written only by `app.invoice_provider_event_log` from definer AFTER triggers `invoice_provider_settings_events` and
