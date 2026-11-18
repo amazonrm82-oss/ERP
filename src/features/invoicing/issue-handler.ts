@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import type { ClaimedJob, JobHandler } from "@/features/jobs/registry";
 
+import { providerFailureCode } from "./provider-events";
 import { ISSUABLE_DOCUMENT_TYPES, type CreditRequest, type InvoiceProvider, type IssueRequest } from "./providers/types";
 
 export const PROVIDER_TIMEOUT_MS = 10_000;
@@ -272,7 +273,7 @@ export function createInvoiceIssueHandler(deps: { calls: InvoiceIssueCalls; prov
             }
           : late && issued.code === "not_found"
             ? { ok: false, code: "not_at_provider", final: true }
-            : { ok: false, code: issued.code, final: issued.kind !== "retry" };
+            : { ok: false, code: providerFailureCode(issued), final: issued.kind !== "retry" };
     const result = withKept(answered, customerKept, productsKept);
     return finish(await deps.calls.record(job, result));
   };
@@ -282,7 +283,7 @@ export function createInvoiceIssueHandler(deps: { calls: InvoiceIssueCalls; prov
 function upsertFailure(what: "customer" | "product", upserted: "timeout" | "unreachable" | { ok: false; kind: "retry" | "refused" | "auth"; code: string }): Record<string, unknown> {
   return typeof upserted === "string"
     ? { ok: false, code: `${what}_${upserted}`, final: false }
-    : { ok: false, code: `${what}_${upserted.code}`.slice(0, 64), final: upserted.kind !== "retry" };
+    : { ok: false, code: `${what}_${providerFailureCode(upserted)}`.slice(0, 64), final: upserted.kind !== "retry" };
 }
 
 /** The answer with the provider ids this try got (the record keeps them whatever the document's outcome). */

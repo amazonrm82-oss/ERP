@@ -4,7 +4,10 @@ import { notFound } from "next/navigation";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { CloseIssueRequestButton, ConnectionButtons, InvoiceDefaultsForm } from "@/features/invoicing/components/invoicing-settings";
 import { DOCUMENT_TYPE_LABELS } from "@/features/documents/schema";
-import { getInvoicingAccess, getInvoicingSettings, getOpenIssueRequests } from "@/features/invoicing/queries";
+import { invoiceProviderEventText } from "@/features/invoicing/provider-events";
+import { getInvoiceProviderEvents, getInvoicingAccess, getInvoicingSettings, getOpenIssueRequests } from "@/features/invoicing/queries";
+import { isAdminRole } from "@/features/settings/permissions";
+import { getOrgContext } from "@/features/shell/queries";
 import { formatDateTime, formatMoney } from "@/lib/format";
 
 export const metadata: Metadata = { title: "ספק חשבוניות" };
@@ -17,7 +20,10 @@ export default async function InvoicingSettingsPage({ params }: Props) {
   const { orgId } = await params;
   const access = await getInvoicingAccess(orgId);
   if (!access.offered || !access.inPlan) notFound();
-  const [settings, openRequests] = await Promise.all([getInvoicingSettings(orgId), getOpenIssueRequests(orgId)]);
+  const [settings, openRequests, context] = await Promise.all([getInvoicingSettings(orgId), getOpenIssueRequests(orgId), getOrgContext(orgId)]);
+  // DOC-16: owners and admins read the connection's sync log (RLS); nobody else is shown an empty one
+  const showLog = isAdminRole(context.role);
+  const events = showLog ? await getInvoiceProviderEvents(orgId) : [];
   const otherProvider = settings.connected && settings.provider !== access.offered;
   return (
     <div className="space-y-5">
@@ -65,6 +71,33 @@ export default async function InvoicingSettingsPage({ params }: Props) {
                 </li>
               ))}
             </ul>
+          </CardBody>
+        </Card>
+      ) : null}
+      {showLog ? (
+        <Card aria-labelledby="invoicing-log">
+          <CardHeader id="invoicing-log" title="יומן סנכרון" />
+          <CardBody className="space-y-3 text-sm">
+            {events.length === 0 ? (
+              <p className="text-ink-soft">אין עדיין רישומים ביומן.</p>
+            ) : (
+              <ul className="divide-y divide-line rounded-md border border-line">
+                {events.map((event) => {
+                  const line = invoiceProviderEventText(event.kind, event.code, event.hits);
+                  return (
+                    <li key={event.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                      <span className={line.tone === "danger" ? "text-danger" : line.tone === "warning" ? "text-warning" : undefined}>{line.text}</span>
+                      <time dateTime={event.lastAt} className="text-ink-soft">
+                        {formatDateTime(event.lastAt)}
+                      </time>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+            <p className="text-ink-soft">
+              ביומן נרשמים רק סוג האירוע, הסיבה ושעתו, בלי פרטי לקוחות ובלי סכומים. אירועים מאותו סוג באותו יום מוצגים בשורה אחת, עם מספר הפעמים. כשהחיבור נופל, בעלים ומנהלי מערכת מקבלים התראה אחת ביום.
+            </p>
           </CardBody>
         </Card>
       ) : null}

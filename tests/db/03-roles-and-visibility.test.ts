@@ -1337,6 +1337,31 @@ describe("roles and record visibility", () => {
     }
   });
 
+  it("the invoice provider sync log: owners and admins read it, also in a read-only business; no role writes it (DOC-16)", async () => {
+    await asAdmin((q) => q("insert into public.invoice_provider_events (organization_id, provider, kind, code, day) values ($1, 'fake', 'retry', 'timeout', current_date)", [org]));
+    const status = await asAdmin(async (q) => (await q<{ status: string }>("select status from public.organizations where id = $1", [org])).rows[0].status);
+    for (const state of [status, "read_only"]) {
+      await asAdmin((q) => q("update public.organizations set status = $1 where id = $2", [state, org]));
+      try {
+        for (const u of [owner, admin, manager, m1, viewer]) {
+          const seen = await asUser(u.id, (q) => count(q, "select 1 from public.invoice_provider_events where organization_id = $1", [org]));
+          if (u === owner || u === admin) expect(seen, `${state} ${u.email}`).toBeGreaterThan(0);
+          else expect(seen, `${state} ${u.email}`).toBe(0);
+        }
+      } finally {
+        await asAdmin((q) => q("update public.organizations set status = $1 where id = $2", [status, org]));
+      }
+    }
+    for (const u of [owner, admin, manager, m1, viewer]) {
+      expect((await pgError(asUser(u.id, (q) => q("update public.invoice_provider_events set hits = 9 where organization_id = $1", [org])))).code, u.email).toBe("42501");
+      expect((await pgError(asUser(u.id, (q) => q("delete from public.invoice_provider_events where organization_id = $1", [org])))).code, u.email).toBe("42501");
+      expect(
+        (await pgError(asUser(u.id, (q) => q("insert into public.invoice_provider_events (organization_id, provider, kind, day) values ($1, 'fake', 'connected', current_date)", [org])))).code,
+        u.email,
+      ).toBe("42501");
+    }
+  });
+
   it("the daily summary setting: every role keeps its own row, nobody reads or changes another's (USR-11 / WAB-03)", async () => {
     for (const u of [owner, admin, manager, m1, viewer]) {
       await asUser(u.id, (q) => q("insert into public.digest_settings (organization_id, send_at) values ($1, '09:00')", [org]));

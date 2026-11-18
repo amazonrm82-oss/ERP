@@ -289,6 +289,8 @@ describe("tenant isolation", () => {
     await asAdmin((q) =>
       q("insert into public.quote_decisions (organization_id, quote_id, decision, content_sha256, ip) values ($1, $2, 'rejected', repeat('0', 64), '203.0.113.7')", [orgA, ids.quoteA]),
     );
+    // DOC-16: a line of A's invoice provider sync log (written only by the server's triggers; no client write grant)
+    await asAdmin((q) => q("insert into public.invoice_provider_events (organization_id, provider, kind, day) values ($1, 'fake', 'connected', current_date)", [orgA]));
     // QUO-10: the customer opened A's quote (written by the server only)
     await asAdmin((q) => q("insert into public.quote_views (organization_id, quote_id) values ($1, $2)", [orgA, ids.quoteA]));
     // LIB-02: a library link sent to A's lead (written only by public.library_link_create; no client write grant)
@@ -505,6 +507,8 @@ describe("tenant isolation", () => {
     "anomaly_alert_settings",
     // DOC-05
     "invoice_provider_settings",
+    // DOC-16: the connection's sync log
+    "invoice_provider_events",
     // RET-02
     "review_request_settings",
     // HEB-09
@@ -800,6 +804,8 @@ describe("tenant isolation", () => {
       anomaly_alert_settings: "idle_rep_days = idle_rep_days",
       // no delete grant at all: a permission error is the expected outcome for the delete
       invoice_provider_settings: "locale = locale",
+      // no client write grant at all (definer triggers write): a permission error is the expected outcome
+      invoice_provider_events: "hits = hits",
       review_request_settings: "delay_days = delay_days",
       // no delete grant at all: a permission error is the expected outcome for the delete
       org_sending_pauses: "reason = reason",
@@ -1015,6 +1021,7 @@ describe("tenant isolation", () => {
       ["insert into public.punch_card_alert_settings (organization_id, low_entries) values ($1, 4)", [orgA]],
       ["insert into public.anomaly_alert_settings (organization_id, idle_rep_days) values ($1, 4)", [orgA]],
       ["insert into public.invoice_provider_settings (organization_id) values ($1)", [orgA]],
+      ["insert into public.invoice_provider_events (organization_id, provider, kind, day) values ($1, 'fake', 'connected', current_date)", [orgA]],
       ["insert into public.review_request_settings (organization_id, delay_days) values ($1, 3)", [orgA]],
       ["insert into public.org_sending_pauses (organization_id, paused, reason) values ($1, true, 'x')", [orgA]],
       ["insert into public.org_message_settings (organization_id) values ($1)", [orgA]],

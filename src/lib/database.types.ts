@@ -1091,6 +1091,19 @@ export type PunchCardAlertSettingsRow = {
   updated_at: string;
 };
 
+// DOC-16: the invoice provider connection's sync log (migration invoice_provider_events); server writes only
+export type InvoiceProviderEventRow = {
+  id: string;
+  organization_id: string;
+  provider: string;
+  kind: string;
+  code: string | null;
+  day: string;
+  hits: number;
+  created_at: string;
+  last_at: string;
+};
+
 // DOC-05: the business's invoice provider (server-kept) and its issue defaults (migration invoice_provider_settings).
 export type InvoiceProviderSettingsRow = {
   id: string;
@@ -4442,6 +4455,8 @@ export type Database = {
         MetaLeadFormWrite
       >;
       integration_events: ReadOnlyTable<IntegrationEventRow>;
+      // DOC-16: owners and admins read; no client writes
+      invoice_provider_events: ReadOnlyTable<InvoiceProviderEventRow>;
       integrations: Table<IntegrationRow, { organization_id: string; provider: string; external_id?: string | null; name: string; config?: Json }, IntegrationWrite>;
       // SPD-07: owners and admins only; column grants (token made by the database; the form by the widget's trigger)
       site_widgets: Table<SiteWidgetRow, SiteWidgetWrite & { organization_id: string; name: string }, SiteWidgetWrite>;

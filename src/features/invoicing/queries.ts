@@ -265,3 +265,24 @@ export async function getCreditRoom(orgId: string, documentId: string): Promise<
     back: parent?.deal_id ? { kind: "deal", id: parent.deal_id } : parent?.contact_id ? { kind: "contact", id: parent.contact_id } : null,
   };
 }
+
+export type InvoiceProviderEvent = { id: string; kind: string; code: string | null; hits: number; lastAt: string };
+
+/** DOC-16: shown on the settings page (the newest lines; each is one kind, code and day). */
+export const INVOICE_PROVIDER_EVENTS_SHOWN = 30;
+
+/** DOC-16: the connection's sync log, newest first (owners and admins read it; anyone else gets none, RLS). */
+export async function getInvoiceProviderEvents(orgId: string): Promise<InvoiceProviderEvent[]> {
+  const supabase = await createClient();
+  const rows = must(
+    await supabase
+      .from("invoice_provider_events")
+      .select("id, kind, code, hits, last_at")
+      .eq("organization_id", orgId)
+      .order("last_at", { ascending: false })
+      .order("id")
+      .limit(INVOICE_PROVIDER_EVENTS_SHOWN),
+    "invoice provider events",
+  );
+  return rows.map((row) => ({ id: row.id, kind: row.kind, code: row.code, hits: row.hits, lastAt: row.last_at }));
+}

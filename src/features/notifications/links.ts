@@ -1,4 +1,5 @@
 import { calendarPath } from "@/features/calendar/range";
+import { invoicingSettingsPath } from "@/features/invoicing/paths";
 import { cleanupPath } from "@/features/data-quality/paths";
 import { messageTemplatesPath } from "@/features/message-templates/paths";
 import { retentionListPath } from "@/features/lead-retention/paths";
@@ -84,6 +85,9 @@ export function notificationHref(orgId: string, entityType: string | null, entit
       return paths.settingsIntake(orgId);
     case "anomaly_campaign_jump":
       return paths.report(orgId, "campaign_roi");
+    // DOC-16: the invoice provider connection fell (the id is the business); its settings page shows the sync log
+    case "invoice_provider":
+      return invoicingSettingsPath(orgId);
     default:
       return null;
   }

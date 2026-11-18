@@ -191,6 +191,8 @@ export const EXPORT_TABLES: ReadonlyArray<ExportTable> = [
   { table: "anomaly_alert_settings", file: "anomaly-alert-settings.csv" },
   // DOC-05
   { table: "invoice_provider_settings", file: "invoice-provider-settings.csv" },
+  // DOC-16: the connection's sync log (kinds and codes only)
+  { table: "invoice_provider_events", file: "invoice-provider-events.csv" },
   // RET-02
   { table: "review_request_settings", file: "review-request-settings.csv" },
   // HEB-09
