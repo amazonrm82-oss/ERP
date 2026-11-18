@@ -15,6 +15,8 @@ import {
   orgIdFromPath,
   parseActiveFrom,
   scrubEvent,
+  scrubFramePath,
+  sentryText,
   scrubUrl,
   sentryConfigured,
   sentryIngestOrigin,
@@ -121,6 +123,63 @@ describe("OPS-05 scrubbing", () => {
     expect(frame.vars).toBeUndefined();
   });
 
+  it("keeps build file names in stack frames whole, so they meet their source maps", () => {
+    const out = scrubEvent(
+      {
+        exception: {
+          values: [
+            {
+              type: "Error",
+              value: "x",
+              stacktrace: {
+                frames: [
+                  { filename: "https://mexuzsystem.com/_next/static/chunks/0a1b2c3d4e5f6a7b.js?dpl=dpl_abc123def456ghi789" },
+                  { filename: "/var/task/.next/server/chunks/ssr/abc123def456ghi789.js", abs_path: "/var/task/.next/server/chunks/ssr/abc123def456ghi789.js#x" },
+                  { filename: "https://mexuzsystem.com/f/quote/SECRETtoken1234567890?x=1" },
+                ],
+              },
+            },
+          ],
+        },
+      },
+      OPEN,
+    )!;
+    const frames = out.exception!.values![0].stacktrace!.frames!;
+    expect(frames[0].filename).toBe("https://mexuzsystem.com/_next/static/chunks/0a1b2c3d4e5f6a7b.js");
+    expect(frames[1].filename).toBe("/var/task/.next/server/chunks/ssr/abc123def456ghi789.js");
+    expect(frames[1].abs_path).toBe("/var/task/.next/server/chunks/ssr/abc123def456ghi789.js");
+    expect(frames[2].filename).toBe("https://mexuzsystem.com/f/quote/[token]");
+    expect(scrubFramePath("/f/abcd1234efgh5678ijkl")).toBe("/f/[token]");
+  });
+
+  it("takes Hebrew and other non-ASCII words, Postgres key values and DETAIL tails out of the text", () => {
+    expect(sentryText('duplicate key value violates unique constraint "x" Key (name)=(דני כהן) already exists')).toBe(
+      'duplicate key value violates unique constraint "…" Key (name)=([value]) already exists',
+    );
+    expect(sentryText("Key (email, phone)=(dana, 0501234567) already exists.")).toBe("Key (email, phone)=([value]) already exists.");
+    expect(sentryText("insert failed DETAIL: Failing row contains (דני, dana@example.com, 050).")).toBe("insert failed");
+    expect(sentryText("read failed. Detail: name was Иван")).toBe("read failed.");
+    expect(sentryText("לא נמצא הלקוח דני כהן ברשומה")).toBe("[text]");
+    expect(sentryText("failed for ‏דני‏ at stage 3")).not.toMatch(/[^\x00-\x7f‏]/);
+    expect(sentryText("שָׁלוֹם world")).toBe("[text] world");
+    expect(sentryText("Ошибка: Müller not found")).toBe("[text]: M[text]ller not found");
+    const out = scrubEvent(
+      {
+        message: "שגיאה עבור משה",
+        logentry: { message: "Key (name)=(משה) exists" },
+        exception: { values: [{ type: "DbReadError", value: "read failed: לקוח דני", mechanism: { data: { function: "x", body: "דני" } } }] },
+        fingerprint: ["דני"],
+      },
+      OPEN,
+    )!;
+    expect(out.message).toBe("[text]");
+    expect(out.logentry).toEqual({ message: "Key (name)=([value]) exists" });
+    expect(out.exception!.values![0].value).toBe("read failed: [text]");
+    expect(out.exception!.values![0].mechanism).toEqual({});
+    expect(out.fingerprint).toBeUndefined();
+    expect(JSON.stringify(out)).not.toMatch(/[֐-׿]/);
+  });
+
   it("redacts emails, phones and secrets in messages and exception values", () => {
     const out = scrubEvent(
       {
@@ -177,8 +236,14 @@ describe("OPS-05 scrubbing", () => {
     expect(options.tracesSampleRate).toBe(0);
     expect(options.maxBreadcrumbs).toBe(0);
     expect(options.beforeSendTransaction()).toBeNull();
-    const names = ["Breadcrumbs", "BrowserTracing", "BrowserSession", "Replay", "Feedback", "Http", "RequestData", "LocalVariables", "Console", "GlobalHandlers", "LinkedErrors", "Dedupe"];
+    const names = [
+      "Breadcrumbs", "BrowserTracing", "BrowserSession", "Replay", "Feedback", "Http", "RequestData", "LocalVariables", "Console",
+      "OnUncaughtException", "OnUnhandledRejection", "WinterCGFetch", "GlobalHandlers", "LinkedErrors", "Dedupe",
+    ];
     expect(keptIntegrations(names.map((name) => ({ name }))).map((i) => i.name)).toEqual(["GlobalHandlers", "LinkedErrors", "Dedupe"]);
+    // the server adds its own unhandled-rejection capture that never prints (OPS-06)
+    expect(read("src/lib/monitoring/sentry-node.ts")).toContain('onUnhandledRejectionIntegration({ mode: "none" })');
+    expect(read("src/instrumentation.ts")).toContain('process.env.NEXT_RUNTIME === "nodejs" ? (await import("@/lib/monitoring/sentry-node"))');
     // no replay or tracing integration is ever named in our code
     for (const file of ["src/lib/monitoring/sentry-client.ts", "src/lib/monitoring/sentry-server.ts", "src/lib/monitoring/sentry-rules.ts"]) {
       expect(read(file)).not.toMatch(/replayIntegration|browserTracingIntegration|profilingIntegration|captureRequestError/);

@@ -1,4 +1,5 @@
 import { cleanLogPath, redactText } from "@/lib/log";
+import { redactPublicPath } from "@/lib/request-error-log";
 
 // OPS-05 (owner 18 November 2026; DECISIONS.md "ניטור תקלות: Sentry"): the rules every Sentry event passes, shared by the
 // browser, the Node server and the edge runtime. Pure: no Sentry import, no Node import, so the unit tests read it directly
@@ -7,7 +8,7 @@ import { cleanLogPath, redactText } from "@/lib/log";
 // Never headers, cookies, a request body, a query string, an email, a phone, a name or an IP address.
 //
 // Owner (427) א: nothing is sent before the day in SENTRY_ACTIVE_FROM (an Israel date, the subprocessor entry's first day,
-// migration 021321). The gate is judged at run time for every event, so a long-lived server or page opens on the day by itself;
+// migration 021322). The gate is judged at run time for every event, so a long-lived server or page opens on the day by itself;
 // unset, empty or malformed = closed for good.
 
 /** The business day the gate is judged in (the subprocessor notice counts Israel days). */
@@ -78,7 +79,7 @@ export function scrubUrl(value: string): string {
 
 // The shape of a Sentry event as far as these rules touch it (structurally compatible with ErrorEvent / TransactionEvent).
 type Frame = { filename?: string; abs_path?: string; vars?: unknown };
-type Exception = { type?: string; value?: string; stacktrace?: { frames?: Frame[] } };
+type Exception = { type?: string; value?: string; stacktrace?: { frames?: Frame[] }; mechanism?: { data?: unknown } };
 export type MonitorEvent = {
   message?: string;
   logentry?: { message?: string; params?: unknown[] };
@@ -91,7 +92,32 @@ export type MonitorEvent = {
   tags?: Record<string, unknown>;
   contexts?: Record<string, unknown>;
   server_name?: string;
+  fingerprint?: unknown;
 };
+
+/**
+ * A stack frame's file: a build file (a chunk name of 16+ characters is the file's own name and must stay, or the frame never
+ * meets its source map), so only the query and fragment are dropped and a public link's token in a page URL becomes [token].
+ */
+export function scrubFramePath(value: string): string {
+  const bare = value.split("?")[0].split("#")[0];
+  const absolute = /^([a-z][a-z0-9+.-]*:\/\/[^/]*)(.*)$/i.exec(bare);
+  if (!absolute) return redactPublicPath(bare);
+  return `${absolute[1].replace(/\/\/[^@/]*@/, "//")}${redactPublicPath(absolute[2] || "/")}`;
+}
+
+// a run of letters outside ASCII (Hebrew, Arabic, Cyrillic...), with their marks and the spaces between such words
+const NON_ASCII_WORDS = /(?:[^\P{L}A-Za-z]|\p{M})+(?:[\s'"\u05F3\u05F4-]+(?:[^\P{L}A-Za-z]|\p{M})+)*/gu;
+
+/**
+ * Free text for Sentry (a third party; the subprocessor entry says no contact details): a Postgres "DETAIL:" tail dropped,
+ * the values of "Key (...)=(...)" replaced by [value], then redactText (secrets, emails, phones, quoted runs), then every run
+ * of non-ASCII letters (a Hebrew name, an address) replaced by [text].
+ */
+export function sentryText(text: string): string {
+  const cut = text.replace(/\s*\b(?:DETAIL|Detail):[\s\S]*$/, "").replace(/(Key \([^)]*\)=\()[^)]*\)/g, "$1[value])");
+  return redactText(cut).replace(NON_ASCII_WORDS, "[text]");
+}
 
 /** The tags an event may carry: ours (codes and ids) and the SDK's own plain ones. Any other tag is dropped. */
 const TAG_KEYS = new Set(["org_id", "digest", "route", "route_type", "method", "request_id", "runtime", "environment", "level", "release"]);
@@ -102,8 +128,8 @@ const CONTEXT_KEYS = new Set(["os", "runtime", "browser", "app", "device", "cult
 function scrubFrames(frames: Frame[] | undefined): void {
   for (const frame of frames ?? []) {
     delete frame.vars;
-    if (typeof frame.filename === "string") frame.filename = scrubUrl(frame.filename);
-    if (typeof frame.abs_path === "string") frame.abs_path = scrubUrl(frame.abs_path);
+    if (typeof frame.filename === "string") frame.filename = scrubFramePath(frame.filename);
+    if (typeof frame.abs_path === "string") frame.abs_path = scrubFramePath(frame.abs_path);
   }
 }
 
@@ -117,17 +143,19 @@ type ScrubOptions = {
 
 /**
  * The event as it may leave, or null (nothing is sent): closed before SENTRY_ACTIVE_FROM, and always without headers,
- * cookies, body, query, breadcrumbs, extra data or local variables; free text through redactText; every URL and path through
+ * cookies, body, query, breadcrumbs, extra data, local variables, mechanism data or fingerprint; free text through
+ * sentryText; a request URL and the transaction through scrubUrl, stack frame files through scrubFramePath;
  * scrubUrl; user = {id} only, the business id as the tag org_id.
  */
 export function scrubEvent<E extends MonitorEvent>(event: E, options: ScrubOptions): E | null {
   if (!sentryOpen(options.activeFrom, options.now)) return null;
-  if (typeof event.message === "string") event.message = redactText(event.message);
+  if (typeof event.message === "string") event.message = sentryText(event.message);
   if (event.logentry) {
-    event.logentry = typeof event.logentry.message === "string" ? { message: redactText(event.logentry.message) } : undefined;
+    event.logentry = typeof event.logentry.message === "string" ? { message: sentryText(event.logentry.message) } : undefined;
   }
   for (const exception of event.exception?.values ?? []) {
-    if (typeof exception.value === "string") exception.value = redactText(exception.value);
+    if (typeof exception.value === "string") exception.value = sentryText(exception.value);
+    if (exception.mechanism) delete exception.mechanism.data;
     scrubFrames(exception.stacktrace?.frames);
   }
   const threads = (event as { threads?: { values?: { stacktrace?: { frames?: Frame[] } }[] } }).threads;
@@ -141,6 +169,7 @@ export function scrubEvent<E extends MonitorEvent>(event: E, options: ScrubOptio
   delete event.breadcrumbs;
   delete event.extra;
   delete event.server_name;
+  delete event.fingerprint;
   delete (event as { modules?: unknown }).modules;
   delete (event as { sdkProcessingMetadata?: unknown }).sdkProcessingMetadata;
   if (event.contexts) {
@@ -167,7 +196,10 @@ export function dropBreadcrumb(): null {
 /**
  * The default integrations Sentry may keep: error capture and stack handling only. Anything that reads requests, local
  * variables, log output, navigation, sessions, replays or traces is removed by name (a whitelist, so a new SDK
- * integration stays off until judged).
+ * integration stays off until judged). Left out on purpose too: OnUncaughtException (its fatal handler prints the error
+ * and exits the process; Next.js handles those errors and onRequestError reports them), the default OnUnhandledRejection
+ * (it prints in its "warn" mode; the server adds its own in mode "none", OPS-06: src/lib/log.ts is the only writer) and
+ * WinterCGFetch (it adds sentry-trace/baggage headers to the edge runtime's outgoing fetches).
  */
 const KEPT_INTEGRATIONS = new Set([
   "InboundFilters",
@@ -177,15 +209,12 @@ const KEPT_INTEGRATIONS = new Set([
   "Dedupe",
   "GlobalHandlers",
   "BrowserApiErrors",
-  "OnUncaughtException",
-  "OnUnhandledRejection",
   "ContextLines",
   "NodeContext",
   "Context",
   "NextjsClientStackFrameNormalization",
   "DistDirRewriteFrames",
   "RewriteFrames",
-  "WinterCGFetch",
 ]);
 
 export function keptIntegrations<I extends { name: string }>(defaults: I[]): I[] {

@@ -15,7 +15,9 @@ export async function register(): Promise<void> {
     const dsn = process.env.SENTRY_DSN;
     if (!sentryConfigured(dsn, process.env.VERCEL_ENV) || parseActiveFrom(process.env.SENTRY_ACTIVE_FROM) === null) return;
     const loaded = await import("@/lib/monitoring/sentry-server");
-    loaded.startServerMonitoring((dsn ?? "").trim(), "production");
+    // Node-only integrations; Next.js replaces NEXT_RUNTIME per bundle, so the edge bundle never holds sentry-node.ts
+    const extra = process.env.NEXT_RUNTIME === "nodejs" ? (await import("@/lib/monitoring/sentry-node")).nodeIntegrations() : [];
+    loaded.startServerMonitoring((dsn ?? "").trim(), "production", extra);
     monitoring = loaded;
   } catch {
     // monitoring never stops the server
