@@ -735,8 +735,10 @@ and build this CRM here instead. The old code is preserved on the branch
   becomes paid with `provider_payment_id`. A paid event for a link that is not pending records nothing and tells owners/admins; an unknown or
   ambiguous link writes one `app.platform_log` line `payment_link.webhook_unknown` (ids and codes only). The link is found by provider id
   across businesses: acceptable only for one platform merchant account; a real adapter with per-business merchant accounts must first bind
-  the event to the business whose credentials signed it. Owner questions 422-424 (closed business, the payment's status, who refunds) built
-  as (א) until answered. Pinned by md5 in test 386. In the eslint allow-list. The advisor's findings on the two app tables are expected.
+  the event to the business whose credentials signed it. Owner answers (422) א, (423) א, (424) א (18 November 2026): recorded also in a
+  closed business, confirmed, refunds by owners/admins only; since 021318 (LNK-04b; an independent review) a payment recorded while
+  `app.org_writable` is false also tells the active OWNERS once (`app.payment_link_owner_notice`, definer, no grants; link title only,
+  in its own exception block, 40P01/40001/55P03 re-raised); `public.payment_link_webhook` was last redefined there. Pinned by md5 in test 386. In the eslint allow-list. The advisor's findings on the two app tables are expected.
   In use (LNK-07 payment_link.refund, owner (394) א; migration 021317; same reviews): owners/admins ask through
   `public.payment_link_refund_begin` (definer: PAY-08's rights, a writable business, `payments` + `payment_links`, a recorded/confirmed payment
   that paid a link, at most `app.payment_link_refund_room`; one request per idempotency key in `app.payment_link_refund_requests`, no grants,
