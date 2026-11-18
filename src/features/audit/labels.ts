@@ -219,6 +219,7 @@ export const ACTION_LABELS: Record<string, string> = {
   in_person_decline: "דחייה במקום",
   // BAL-04: the customer's statement link on a contact or company (created / revoked; never the token)
   statement_link: "קישור לדף חשבון",
+  document_link: "קישור ללקוח למסמך",
   // LIB-02: a library item sent to the record by a tracked link (created / revoked; never the token)
   library_link: "קישור לפריט מהספרייה",
   // BIZ-05: a prefill form sent to the record by a personal link (created / revoked; never the token)

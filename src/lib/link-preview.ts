@@ -93,6 +93,8 @@ export const PREVIEW_TEXTS = {
   page: { what: "דף העסק", joiner: "של", description: "שעות פעילות, קביעת תור, WhatsApp ופנייה לעסק, בלי הרשמה ובלי אפליקציה." },
   // BAL-04: always generic (no business name either): the page is never read for a preview
   statement: { what: "דף חשבון", joiner: "מאת", description: "פירוט החובות הפתוחים, בקישור אישי." },
+  // DOC-15: always generic as well: the page is never read for a preview (a read counts a view)
+  document: { what: "מסמך מהעסק", joiner: "מאת", description: "חשבונית או קבלה שנשלחה אליכם בקישור אישי." },
   // CNS-09 / CNS-10: always generic as well: the page is never read for a preview (a read counts a call)
   preferences: { what: "העדפות דיוור", joiner: "של", description: "בחירה באילו ערוצים לקבל הודעות, בקישור אישי." },
   // LIB-02: always generic as well: the page is never read for a preview (a read counts a view and tells the rep)

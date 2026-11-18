@@ -225,6 +225,9 @@ export type OrgDocumentSettingsRow = {
   collection_customer_reminder: boolean;
   // COL-07 owner (256) ג: the COL-04 stages (days from the due date: -3, 0, 7, 14) that go to the customer; default {0,7,14}
   collection_customer_stages: number[];
+  // DOC-15 (owner (413) ג, migration document_links): text with a check: system | provider (how a document goes to the
+  // customer by email: our email with the link, or the invoicing provider); default system
+  document_delivery: string;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
@@ -373,6 +376,7 @@ type OrgDocumentSettingsWrite = {
   contract_renewal_days?: number;
   collection_customer_reminder?: boolean;
   collection_customer_stages?: number[];
+  document_delivery?: "system" | "provider";
   legal_name?: string | null;
   tax_id?: string | null;
   address_line?: string | null;
@@ -5218,6 +5222,13 @@ export type Database = {
       statement_link_revoke: { Args: { p_org: string; p_contact?: string | null; p_company?: string | null }; Returns: boolean };
       statement_link_status: { Args: { p_org: string; p_contact?: string | null; p_company?: string | null }; Returns: Json };
       statement_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
+      // DOC-15 (migration document_links): the customer's document link; the page and file are service_role only
+      document_link_create: { Args: { p_org: string; p_document: string }; Returns: string };
+      document_link_revoke: { Args: { p_org: string; p_document: string }; Returns: boolean };
+      document_link_status: { Args: { p_org: string; p_document: string }; Returns: Json };
+      document_links_existing: { Args: { p_org: string; p_documents: string[] }; Returns: string[] };
+      document_public: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
+      document_public_file: { Args: { p_token: string; p_ip_hash?: string | null }; Returns: Json };
       // LIB-02: a library item's tracked link (writers who read the record) and the customer's page (service_role only)
       library_link_create: { Args: { p_org: string; p_item: string; p_record_type: string; p_record_id: string }; Returns: string };
       library_link_revoke: { Args: { p_org: string; p_link: string }; Returns: boolean };

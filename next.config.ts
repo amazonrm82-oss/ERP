@@ -24,7 +24,7 @@ const nextConfig: NextConfig = {
         // before an external link (BIZ-03) names the business on our domain, nor the customer's statement page (BAL-04),
         // which shows a customer's debts, nor the preferences and unsubscribe pages (CNS-09/10), nor a document for signature
         // (SGN-02: a signature must never be clicked inside another site), nor a library item sent by a tracked link (LIB-02), nor the prefill form that shows a person's details (BIZ-05), nor the daily summary's stop link (USR-11). Same prefixes as NOT_EMBEDDABLE_PUBLIC_PREFIXES in src/lib/csp.ts.
-        source: "/((?!f/(?!q/|statement/|prefs/|unsub/|sign/|lib/|fill/|digest-stop/)).*)",
+        source: "/((?!f/(?!q/|statement/|doc/|prefs/|unsub/|sign/|lib/|fill/|digest-stop/)).*)",
         headers: [
           { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
           { key: "X-Frame-Options", value: "DENY" },
@@ -35,7 +35,7 @@ const nextConfig: NextConfig = {
       {
         // Public lead forms are made to be embedded in customers' websites (every /f/ page but the QR scan route and
         // the statement page, the preferences and unsubscribe pages and the signing page).
-        source: "/f/((?!q/|statement/|prefs/|unsub/|sign/|lib/|fill/|digest-stop/).*)",
+        source: "/f/((?!q/|statement/|doc/|prefs/|unsub/|sign/|lib/|fill/|digest-stop/).*)",
         headers: [
           { key: "Content-Security-Policy", value: "frame-ancestors *" },
           { key: "Referrer-Policy", value: "no-referrer" },
@@ -55,7 +55,7 @@ const nextConfig: NextConfig = {
         // CNS-09 / CNS-10 (preferences, unsubscribe), SGN-02 (signing), LIB-02 (a tracked library link), BIZ-05 (the prefill
         // form, RVW-111), USR-11 (the summary's stop link) and BIZ-03's page before a link (the scan route sets it too): like
         // the statement page, never framed, no referrer. Every prefix of NOT_EMBEDDABLE_PUBLIC_PREFIXES (tests/unit/csp.test.ts).
-        source: "/f/:page(q|prefs|unsub|sign|lib|fill|digest-stop)/:path*",
+        source: "/f/:page(q|doc|prefs|unsub|sign|lib|fill|digest-stop)/:path*",
         headers: [
           { key: "Referrer-Policy", value: "no-referrer" },
           { key: "X-Content-Type-Options", value: "nosniff" },

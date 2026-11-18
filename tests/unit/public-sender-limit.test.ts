@@ -183,6 +183,7 @@ describe("OPS-02: the shared per-sender limit of the secret-link pages", () => {
       ["order decide", () => import("@/app/api/forms/order/[token]/decide/route"), "POST", rejected, "order_public_decide"],
       ["order pdf", () => import("@/app/api/forms/order/[token]/pdf/route"), "GET", null, "order_public_pdf"],
       ["statement pdf", () => import("@/app/api/forms/statement/[token]/pdf/route"), "GET", null, "statement_public"],
+      ["document file", () => import("@/app/api/forms/doc/[token]/file/route"), "GET", null, "document_public_file"],
       ["booking manage", () => import("@/app/api/forms/booking/manage/[token]/route"), "POST", JSON.stringify({ action: "cancel" }), "booking_manage_cancel"],
     ];
     for (const [label, load, method, body, read] of cases) {

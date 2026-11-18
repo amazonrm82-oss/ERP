@@ -92,6 +92,9 @@ import { getSupabaseEnv } from "@/lib/env";
  *     order_public_decide() only;
  *   - the customer's statement page (BAL-04)
  *     (src/features/statements/public-server.ts): public.statement_public() only;
+ *   - the customer's page of one accounting document and its PDF (DOC-15, owner 18 November 2026, answer (414) א)
+ *     (src/features/document-links/public-server.ts): public.document_public() and document_public_file() only, and a
+ *     download of the one Storage object the latter answers;
  *   - the public business page (BIZ-01, owner 11 November 2026, answer (271) ב)
  *     (src/features/business-page/public-server.ts): public.business_page_public() and
  *     business_page_submit() only;

@@ -4,6 +4,8 @@ import { Detail, DetailList } from "@/components/detail-list";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { TextLink } from "@/components/ui/text-link";
 import { OrgLogo } from "@/features/branding/components/org-logo";
+import { DocumentDeliveryForm } from "@/features/document-links/components/delivery-form";
+import { getDocumentDelivery } from "@/features/document-links/queries";
 import { getOrgBranding } from "@/features/branding/queries";
 import { isAdminRole } from "@/features/settings/permissions";
 import { getOrgContext } from "@/features/shell/queries";
@@ -36,12 +38,13 @@ function chargesText(value: boolean | null): string {
 export default async function DocumentSettingsPage({ params }: Props) {
   const { orgId } = await params;
   const { role, canWrite, org } = await getOrgContext(orgId);
-  const [tax, details, branding, rates, pricesIncludeVat] = await Promise.all([
+  const [tax, details, branding, rates, pricesIncludeVat, delivery] = await Promise.all([
     getTaxSettings(orgId),
     getDocumentDetails(orgId),
     getOrgBranding(orgId),
     getVatRates(),
     getPricesIncludeVat(orgId),
+    getDocumentDelivery(orgId),
   ]);
   const charges = chargesVat(tax.vatStatus, tax.otherChargesVat);
   const ratesCard = <VatRatesCard rates={rates} today={zoneDate(new Date(), org.timeZone)} charges={charges} />;
@@ -76,6 +79,13 @@ export default async function DocumentSettingsPage({ params }: Props) {
         <PricesModeForm orgId={orgId} pricesIncludeVat={pricesIncludeVat} charges={charges} />
         <DocumentDetailsForm orgId={orgId} details={details} />
         {bank ? <BankDetailsForm orgId={orgId} details={bank} /> : null}
+        {/* DOC-15 (owner (413) ג) */}
+        <Card aria-labelledby="doc-delivery-title">
+          <CardHeader id="doc-delivery-title" title="שליחת מסמכים ללקוח" />
+          <CardBody>
+            <DocumentDeliveryForm orgId={orgId} value={delivery} />
+          </CardBody>
+        </Card>
         {logoCard}
       </div>
     );
@@ -106,6 +116,7 @@ export default async function DocumentSettingsPage({ params }: Props) {
             <Detail label="טלפון" value={details.phone} ltr />
             <Detail label="אימייל" value={details.email} ltr />
             {bank ? <Detail label="העברה בנקאית" value={bankTransferText(bank)} /> : null}
+            <Detail label="שליחת מסמכים ללקוח" value={delivery === "provider" ? "ספק החשבוניות שולח את המסמך מהאימייל שלו" : "אנשי הצוות שולחים את הקישור מכרטיס המסמכים"} />
           </DetailList>
           {bank ? null : <p className="mt-4 text-sm text-ink-soft">פרטי הבנק מוצגים לבעלים ולמנהלי מערכת</p>}
           <p className="mt-4 text-sm text-ink-soft">

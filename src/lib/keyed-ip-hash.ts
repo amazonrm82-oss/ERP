@@ -12,7 +12,7 @@ import { logEvent } from "@/lib/log";
 /** `login` / `login-email` (USR-13): the sign-in lockout hashes the sender and the typed address (never stored plain). */
 /** `landing` (LND-14): the landing page's counters (a visit, a sign-up press, a sign-up), only a bucket number kept. */
 /** `public` (OPS-02, owner (40) ב) is the one value per visitor across every public page, for the shared limit before a token is looked up. */
-export type IpHashScope = "intake" | "booking" | "card" | "widget" | "waitlist" | "order" | "quote" | "preview" | "statement" | "public" | "privacy" | "preferences" | "signature" | "library" | "bizpage" | "prefill" | "login" | "login-email" | "digest" | "landing";
+export type IpHashScope = "intake" | "booking" | "card" | "widget" | "waitlist" | "order" | "quote" | "preview" | "statement" | "document" | "public" | "privacy" | "preferences" | "signature" | "library" | "bizpage" | "prefill" | "login" | "login-email" | "digest" | "landing";
 
 const missingLogged = new Set<string>();
 

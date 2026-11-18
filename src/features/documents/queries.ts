@@ -59,12 +59,15 @@ export type AccountingDocument = {
   originalDocumentId: string | null;
   // DOC-14 (owner (409) ב): a credit invoice issued through the provider keeps its reason (server only)
   creditReason: string | null;
+  // DOC-15: the records it hangs on (the WhatsApp message to the customer is logged on the contact, else the deal)
+  dealId: string | null;
+  contactId: string | null;
 };
 
 export type DocumentsSubject = MoneySubject;
 
 const RECORD_COLUMNS =
-  "id, doc_type, number, doc_date, amount_agorot, proforma_id, due_date, status, cancel_reason, cancelled_at, cancelled_by, created_by, created_at, provider, allocation_number, allocation_error_code, net_agorot, vat_agorot, vat_rate_bp, quote_id, original_document_id, credit_reason";
+  "id, doc_type, number, doc_date, amount_agorot, proforma_id, due_date, status, cancel_reason, cancelled_at, cancelled_by, created_by, created_at, provider, allocation_number, allocation_error_code, net_agorot, vat_agorot, vat_rate_bp, quote_id, original_document_id, credit_reason, deal_id, contact_id";
 
 type RecordRow = {
   id: string;
@@ -89,6 +92,8 @@ type RecordRow = {
   quote_id: string | null;
   original_document_id: string | null;
   credit_reason: string | null;
+  deal_id: string | null;
+  contact_id: string | null;
 };
 
 const num = (value: number | null) => (value === null ? null : Number(value));
@@ -117,6 +122,8 @@ function documentFromRow(row: RecordRow, docType: DocumentType): AccountingDocum
     quoteId: row.quote_id,
     originalDocumentId: row.original_document_id,
     creditReason: row.credit_reason,
+    dealId: row.deal_id,
+    contactId: row.contact_id,
   };
 }
 

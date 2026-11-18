@@ -141,6 +141,8 @@ const serviceKeyAllowList = {
     "src/features/orders/public-server.ts",
     // BAL-04: the customer's statement page, approved public secret-link pattern (owner, 8 October 2026)
     "src/features/statements/public-server.ts",
+    // DOC-15: the customer's document page and its file, approved public secret-link pattern (owner, 18 November 2026)
+    "src/features/document-links/public-server.ts",
     // LIB-02: a library item sent by a tracked link, approved public secret-link pattern (owner, 11 November 2026)
     "src/features/library-links/public-server.ts",
     // BIZ-01: the public business page, approved public secret-link pattern (owner, 11 November 2026, answer (271) ב)

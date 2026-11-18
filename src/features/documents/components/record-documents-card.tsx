@@ -17,6 +17,9 @@ import { listHolderFiles } from "@/features/files/holder-queries";
 import type { MoneySubject } from "@/features/payments/money-subject";
 import { getInvoicingAccess } from "@/features/invoicing/queries";
 import { creditDocumentPath, issueDocumentPath } from "@/features/invoicing/paths";
+import { DocumentSendButton } from "@/features/document-links/components/document-send-button";
+import { isDocumentLinkType } from "@/features/document-links/public";
+import { canManageDocumentLinks, canSendDocuments, documentRecipients, existingDocumentLinks, getDocumentDelivery } from "@/features/document-links/queries";
 import { getOrgContext } from "@/features/shell/queries";
 import { formatDate, formatMoney, zoneDate } from "@/lib/format";
 
@@ -36,10 +39,14 @@ type Props = { orgId: string; subject: MoneySubject };
  * what was issued): the same people attach it, a new file becomes the current one and the earlier ones stay as versions.
  * GAP-12: an imported customer's opening balance (no number; a debt, or a negative amount for a credit) is recorded,
  * changed and cancelled by owners and admins only.
+ * DOC-15: "שליחה ללקוח" (make and send a link) while the business is writable and the plan holds the key. A link that exists
+ * but cannot be made now (the plan lost `documents`, the business is not writable, the document was cancelled) is still shown
+ * in status-and-revoke mode to whoever has the link's rights, so it can be turned off and never comes back; without the key
+ * the rest of the card stays hidden and only those links are listed.
  */
 export async function RecordDocumentsCard({ orgId, subject }: Props) {
   const access = await getDocumentsAccess(orgId);
-  if (!access.inPlan) return null;
+  if (!access.inPlan) return <DormantDocumentLinks orgId={orgId} subject={subject} />;
   const [{ documents, names }, context, invoicing] = await Promise.all([listRecordDocuments(orgId, subject), getOrgContext(orgId), getInvoicingAccess(orgId)]);
   if (documents.length === 0 && !access.canRecord && !invoicing.canIssue) return null;
   const { files, names: uploaders } = await listHolderFiles(
@@ -70,6 +77,15 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
     access.canRecord ? listDocumentSources(orgId, subject, documents) : Promise.resolve({ quotes: [], originals: [] }),
   ]);
   const titles = new Map(documents.map((d) => [d.id, documentTitle(d)]));
+  // DOC-15: the customer's link to each document, for whoever records or issues documents; where a new link cannot be made
+  // (not writable, a cancelled document), an existing link is still shown to turn it off
+  const canSend = documents.length > 0 && (await canSendDocuments(orgId, access.canRecord));
+  const dormantCandidates = documents.filter((d) => isDocumentLinkType(d.docType) && d.number && (!canSend || d.cancelled)).map((d) => d.id);
+  const dormantLinks =
+    dormantCandidates.length > 0 && (await canManageDocumentLinks(orgId)) ? await existingDocumentLinks(orgId, dormantCandidates) : new Set<string>();
+  const [delivery, recipients] = canSend
+    ? await Promise.all([getDocumentDelivery(orgId), documentRecipients(orgId, documents.flatMap((d) => (d.contactId ? [d.contactId] : [])))])
+    : ["system" as const, new Map()];
   const quoteLabels = new Map(sources.quotes.map((quote) => [quote.id, quote.label]));
   const today = zoneDate(new Date(), context.org.timeZone);
   const titleId = `documents-${subject.id}`;
@@ -241,6 +257,28 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
                         זיכוי
                       </Link>
                     ) : null}
+                    {canSend && !doc.cancelled && isDocumentLinkType(doc.docType) && doc.number ? (
+                      <DocumentSendButton
+                        orgId={orgId}
+                        documentId={doc.id}
+                        title={label}
+                        businessName={context.org.name}
+                        recipient={(doc.contactId ? recipients.get(doc.contactId) : null) ?? { name: null, phoneE164: null, email: null }}
+                        logOn={doc.contactId && recipients.has(doc.contactId) ? { kind: "contact", id: doc.contactId } : doc.dealId ? { kind: "deal", id: doc.dealId } : null}
+                        providerEmails={delivery === "provider" && doc.provider !== null}
+                      />
+                    ) : dormantLinks.has(doc.id) ? (
+                      <DocumentSendButton
+                        orgId={orgId}
+                        documentId={doc.id}
+                        title={label}
+                        businessName={context.org.name}
+                        recipient={{ name: null, phoneE164: null, email: null }}
+                        logOn={null}
+                        providerEmails={false}
+                        manageOnly
+                      />
+                    ) : null}
                     {canChangeDoc && !doc.cancelled ? <CancelDocumentButton orgId={orgId} subject={subject} documentId={doc.id} label={label} /> : null}
                   </span>
                 </li>
@@ -259,3 +297,48 @@ export async function RecordDocumentsCard({ orgId, subject }: Props) {
   );
 }
 
+/**
+ * DOC-15: the plan lost the `documents` key, so the card is hidden; only the documents of this record whose customer link
+ * still exists are listed, in status-and-revoke mode, to whoever has the link's rights (the database judges each one again).
+ */
+async function DormantDocumentLinks({ orgId, subject }: Props) {
+  if (!(await canManageDocumentLinks(orgId))) return null;
+  const [{ documents }, context] = await Promise.all([listRecordDocuments(orgId, subject), getOrgContext(orgId)]);
+  const linkable = documents.filter((d) => isDocumentLinkType(d.docType) && d.number);
+  if (linkable.length === 0) return null;
+  const existing = await existingDocumentLinks(
+    orgId,
+    linkable.map((d) => d.id),
+  );
+  const shown = linkable.filter((d) => existing.has(d.id));
+  if (shown.length === 0) return null;
+  const titleId = `document-links-${subject.id}`;
+  return (
+    <Card aria-labelledby={titleId} className="print:hidden">
+      <CardHeader id={titleId} title="קישורים ללקוח למסמכים" />
+      <CardBody className="p-0">
+        <p className="px-4 pt-3 text-sm text-ink-soft">המסמכים לא כלולים בחבילה כרגע, ולכן הקישורים לא פעילים. אפשר לבטל אותם.</p>
+        <ul className="divide-y divide-line">
+          {shown.map((doc) => {
+            const label = documentTitle(doc);
+            return (
+              <li key={doc.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                <span className="text-sm font-medium">{label}</span>
+                <DocumentSendButton
+                  orgId={orgId}
+                  documentId={doc.id}
+                  title={label}
+                  businessName={context.org.name}
+                  recipient={{ name: null, phoneE164: null, email: null }}
+                  logOn={null}
+                  providerEmails={false}
+                  manageOnly
+                />
+              </li>
+            );
+          })}
+        </ul>
+      </CardBody>
+    </Card>
+  );
+}

@@ -33,6 +33,11 @@ export function auditEntryNote(action: string, changes: Json, terms: OrgTerms = 
     if (changes.link === "revoked") return "הקישור לדף החשבון בוטל";
     return null;
   }
+  if (action === "document_link") {
+    if (changes.link === "created") return "נוצר קישור חדש ללקוח למסמך (קישור קודם, אם היה, הפסיק לעבוד)";
+    if (changes.link === "revoked") return "הקישור ללקוח למסמך בוטל";
+    return null;
+  }
   if (action === "library_link") {
     if (changes.link === "created") return "נשלח ללקוח קישור אישי לפריט מספריית התוכן";
     if (changes.link === "revoked") return "קישור לפריט מספריית התוכן בוטל";

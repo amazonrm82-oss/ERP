@@ -293,6 +293,21 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
     refusal: TEXT_429,
     sender: "first",
   },
+  // DOC-15 (owner (414) א)
+  "/f/doc/[token]": {
+    guard: "database",
+    functions: ["public_sender_check", "public_sender_miss", "document_public"],
+    limit: SENDER + "120 views per link and 60 per sender (keyed IP hash, scope document, re-scoped per link) in 10 min, after the lookup, shared with the file route; a preview bot gets a generic page and no read",
+    refusal: PAGE_TEXT,
+    sender: "first",
+  },
+  "/api/forms/doc/[token]/file": {
+    guard: "database",
+    functions: ["public_sender_check", "public_sender_miss", "document_public_file"],
+    limit: SENDER + "a view of the document (the page's counters)",
+    refusal: TEXT_429,
+    sender: "first",
+  },
   // CNS-09 / CNS-10 (owner's answer (225) א)
   "/f/prefs/[token]": {
     guard: "database",
