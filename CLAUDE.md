@@ -437,8 +437,9 @@ and build this CRM here instead. The old code is preserved on the branch
    `BACKGROUND_JWT_SIGNING=es256`, signed with the P-256 JWK `BACKGROUND_JWT_PRIVATE_JWK` (the same file is its ONLY reader; lint refuses
    the name elsewhere) whose public key the owner imported into Supabase as a STANDBY key (kid in the header; never rotated); a bad key or
    an unknown switch value refuses every signing and `backgroundJobsReady()` is false (one redacted `background.token_key_invalid`
-   line), never a silent HS256; the legacy secret stays until the switch is proven live (proof on the local stack:
-   `tests/e2e/background-token-es256.mjs`, needs `BG_ES256_RESTART_OK=1`, passed 18 November 2026); a refusal ends the job and the order with a notice. The worker runs the browser path's own code
+   line), never a silent HS256; the switch is ON in Production since 18 November 2026 (proven live: a background export ran and wrote its file; proof on the local stack:
+   `tests/e2e/background-token-es256.mjs`, needs `BG_ES256_RESTART_OK=1`, passed 18 November 2026); the legacy HS256 secret stays, because the
+   site's anon and service-role keys are legacy JWTs signed with it; a refusal ends the job and the order with a notice. The worker runs the browser path's own code
    (`src/features/imports/run-core.ts`, `buildFullExport`) through PostgREST and Storage, so every write is the person's. Trigger
    `audit_log_background` stamps `changes.background = {request_id}` on the person's non-delete audit entries while the claim names
    their running order of that business. A background import only skips or updates duplicates (`background_requests.duplicate_mode`).
