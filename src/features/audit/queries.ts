@@ -107,7 +107,7 @@ export async function listAudit(orgId: string, filters: AuditFilters): Promise<{
   if (filters.from) query = query.gte("created_at", filters.from);
   if (filters.to) query = query.lt("created_at", filters.to);
   const { data, error } = await query;
-  if (error) throw new Error(`audit query failed: ${error.message}`);
+  if (error) throw new Error(`audit query failed: ${error.code}`);
   const rows = data.slice(0, AUDIT_PAGE);
   // PRV-01: a note that counts leads says it in the business's words
   const [names, terms] = await Promise.all([getUserNames(rows.map((r) => r.actor_id)), getOrgTerms(orgId)]);

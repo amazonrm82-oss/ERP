@@ -11,7 +11,8 @@ export class DbReadError extends Error {
   readonly code: string | null;
   readonly hint: string | null;
   constructor(what: string, cause: ReadError) {
-    super(`database read failed: ${what}: ${cause.code ?? ""} ${cause.message}`);
+    // the label, and the code only: the database's own text can hold a row's values (owner (436) א, the error-message rule)
+    super(`database read failed: ${what}: ${cause.code ?? "no code"}`);
     this.name = "DbReadError";
     this.code = typeof cause.code === "string" ? cause.code : null;
     this.hint = typeof cause.hint === "string" ? cause.hint : null;

@@ -37,7 +37,7 @@ export default async function InPersonQuotePage({ params }: Props) {
   const back = { href: quotePath(orgId, quote.id), label: quote.title };
   const supabase = await createClient();
   const open = await supabase.rpc("quote_in_person_open", { p_org: orgId, p_quote: quote.id });
-  if (open.error && open.error.code !== "42501" && open.error.code !== "P0001") throw new Error(`quote_in_person_open: ${open.error.code} ${open.error.message}`);
+  if (open.error && open.error.code !== "42501" && open.error.code !== "P0001") throw new Error(`quote_in_person_open: ${open.error.code}`);
   const answer = open.error ? null : (open.data as { state?: unknown; fingerprint?: unknown } | null);
   const state = typeof answer?.state === "string" ? answer.state : null;
   const fingerprint = state === "open" && typeof answer?.fingerprint === "string" && /^[0-9a-f]{64}$/.test(answer.fingerprint) ? answer.fingerprint : null;

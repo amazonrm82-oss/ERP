@@ -34,7 +34,7 @@ const NUMBER = /^-?[0-9.]+$/;
 
 /** A number comparison raises in the database when a side passes the pattern but is no number ("1.2.3"); so does this. */
 function numeric(text: string): number {
-  if (!/^-?(\d+\.?\d*|\.\d+)$/.test(text)) throw new Error(`invalid input syntax for type numeric: "${text}"`);
+  if (!/^-?(\d+\.?\d*|\.\d+)$/.test(text)) throw new Error("invalid input syntax for type numeric");
   return Number(text);
 }
 

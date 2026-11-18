@@ -67,7 +67,7 @@ export async function getViewSeatUsage(orgId: string): Promise<ViewSeatUsage | n
     .is("revoked_at", null)
     .gt("expires_at", new Date().toISOString());
   if (error) {
-    throw new Error(`viewer invitations query failed: ${error.message}`);
+    throw new Error(`viewer invitations query failed: ${error.code}`);
   }
   return { limit: row.limit, used: row.used, pending: count ?? 0 };
 }

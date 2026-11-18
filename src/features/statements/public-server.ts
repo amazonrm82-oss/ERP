@@ -27,7 +27,7 @@ export async function getPublicStatement(token: string, ip: string | null): Prom
   const { data, error } = await service.rpc("statement_public", { p_token: token, p_ip_hash: keyedIpHash(ip, "statement") });
   if (error) {
     if (error.code === "P0002") return "not-found";
-    throw new Error(`statement_public failed: ${error.code} ${error.message}`);
+    throw new Error(`statement_public failed: ${error.code}`);
   }
   if (data && typeof data === "object" && !Array.isArray(data) && (data as { rate_limited?: unknown }).rate_limited === true) {
     return "rate-limited";

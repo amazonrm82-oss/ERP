@@ -106,7 +106,7 @@ async function readTimelineRows(orgId: string, subject: TimelineSubject, filter?
     .order("id", { ascending: false })
     .limit(TIMELINE_LIMIT);
   if (error) {
-    throw new Error(`timeline query failed: ${error.message}`);
+    throw new Error(`timeline query failed: ${error.code}`);
   }
   return activities;
 }

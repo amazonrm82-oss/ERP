@@ -32,10 +32,10 @@ export const getLeadLookups = cache(async (orgId: string): Promise<{ statuses: L
       .order("name", { ascending: true }),
   ]);
   if (statuses.error) {
-    throw new Error(`lead statuses query failed: ${statuses.error.message}`);
+    throw new Error(`lead statuses query failed: ${statuses.error.code}`);
   }
   if (sources.error) {
-    throw new Error(`lead sources query failed: ${sources.error.message}`);
+    throw new Error(`lead sources query failed: ${sources.error.code}`);
   }
   return {
     statuses: statuses.data.map((s) => ({ id: s.id, name: s.name, kind: s.kind, isDefault: s.is_default })),
@@ -159,7 +159,7 @@ export async function listLeads(
   );
   const { data, error } = guarded.result;
   if (error) {
-    throw new Error(`leads query failed: ${error.message}`);
+    throw new Error(`leads query failed: ${error.code}`);
   }
 
   const rows = data.slice(0, size);
@@ -213,7 +213,7 @@ export async function getLead(orgId: string, leadId: string) {
     .is("deleted_at", null)
     .maybeSingle();
   if (error) {
-    throw new Error(`lead query failed: ${error.message}`);
+    throw new Error(`lead query failed: ${error.code}`);
   }
   return data;
 }
@@ -243,7 +243,7 @@ export type UnownedLead = {
 export async function getUnownedLead(orgId: string, leadId: string): Promise<UnownedLead | null> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("unowned_lead", { p_org: orgId, p_lead: leadId });
-  if (error) throw new Error(`unowned lead query failed: ${error.message}`);
+  if (error) throw new Error(`unowned lead query failed: ${error.code}`);
   return (data as UnownedLead | null) ?? null;
 }
 
@@ -253,7 +253,7 @@ export type UnownedLeadFile = { id: string; name: string; mime_type: string; siz
 export async function getUnownedLeadTimeline(orgId: string, leadId: string): Promise<{ activities: TimelineRow[]; files: UnownedLeadFile[] } | null> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("unowned_lead_timeline", { p_org: orgId, p_lead: leadId });
-  if (error) throw new Error(`unowned lead timeline query failed: ${error.message}`);
+  if (error) throw new Error(`unowned lead timeline query failed: ${error.code}`);
   return (data as { activities: TimelineRow[]; files: UnownedLeadFile[] } | null) ?? null;
 }
 
@@ -299,7 +299,7 @@ export async function getLeadBoard(orgId: string, options: { search: string; tag
           .limit(LEAD_COLUMN_LIMIT),
         filtered(supabase.from("leads").select("id", { count: "exact", head: true }), status.id),
       ]);
-      if (rows.error) throw new Error(`lead board query failed: ${rows.error.message}`);
+      if (rows.error) throw new Error(`lead board query failed: ${rows.error.code}`);
       return { statusId: status.id, rows: rows.data, count: count.count ?? 0 };
     }),
   );

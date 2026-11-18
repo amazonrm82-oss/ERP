@@ -97,7 +97,7 @@ export async function listCompanies(
   );
   const { data, error } = guarded.result;
   if (error) {
-    throw new Error(`companies query failed: ${error.message}`);
+    throw new Error(`companies query failed: ${error.code}`);
   }
   const rows = data.slice(0, size);
   const [owners, types] = await Promise.all([getUserNames(rows.map((row) => row.owner_id)), recordTypeNames(orgId, "company")]);
@@ -136,7 +136,7 @@ export async function getCompany(orgId: string, companyId: string) {
     .is("deleted_at", null)
     .maybeSingle();
   if (error) {
-    throw new Error(`company query failed: ${error.message}`);
+    throw new Error(`company query failed: ${error.code}`);
   }
   if (!data) {
     return null;
@@ -162,7 +162,7 @@ export async function listCompanyOptions(orgId: string): Promise<CompanyOption[]
     .order("name", { ascending: true })
     .limit(500);
   if (error) {
-    throw new Error(`company options query failed: ${error.message}`);
+    throw new Error(`company options query failed: ${error.code}`);
   }
   return data;
 }
@@ -204,10 +204,10 @@ export async function getCompanyFamily(
       .limit(CHILD_COMPANIES_SHOWN),
   ]);
   if (parentResult.error) {
-    throw new Error(`parent company query failed: ${parentResult.error.message}`);
+    throw new Error(`parent company query failed: ${parentResult.error.code}`);
   }
   if (childResult.error) {
-    throw new Error(`child companies query failed: ${childResult.error.message}`);
+    throw new Error(`child companies query failed: ${childResult.error.code}`);
   }
   const row = parentResult.data;
   const parent: CompanyParent | null = !parentId

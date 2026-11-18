@@ -66,7 +66,7 @@ export async function getPrivacyLinkStatus(orgId: string): Promise<{ active: boo
   const { data, error } = await supabase.rpc("privacy_request_link_status", { p_org: orgId });
   if (error) {
     if (error.code === "42501") return null;
-    throw new Error(`privacy_request_link_status failed: ${error.code} ${error.message}`);
+    throw new Error(`privacy_request_link_status failed: ${error.code}`);
   }
   const value = data as { active?: unknown; created_at?: unknown; pages_open?: unknown } | null;
   return {

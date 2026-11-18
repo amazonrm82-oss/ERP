@@ -61,7 +61,7 @@ export async function findPersonDuplicate(supabase: Supabase, orgId: string, pho
   // CON-01: a contact's further phone or email counts too
   const { data: matches, error } = await supabase.rpc("contact_channel_matches", { p_org: orgId, p_phones: e164s, p_emails: lowered });
   if (error) {
-    throw new Error(`duplicate search: ${error.message}`);
+    throw new Error(`duplicate search: ${error.code}`);
   }
   const ids = [...new Set(matches.map((m) => m.contact_id))];
   if (ids.length > 0) {
@@ -127,7 +127,7 @@ export async function findUniqueFieldClashes(supabase: Supabase, orgId: string, 
   if (asked.length === 0) return [];
   const { data, error } = await supabase.rpc("custom_unique_clashes", { p_org: orgId, p_type: type, p_ids: asked });
   if (error) {
-    throw new Error(`unique field clashes: ${error.message}`);
+    throw new Error(`unique field clashes: ${error.code}`);
   }
   if (!data?.length) return [];
   const otherIds = [...new Set(data.map((row) => row.other_id).filter((id): id is string => Boolean(id)))];

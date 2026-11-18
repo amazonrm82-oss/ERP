@@ -54,7 +54,7 @@ export async function listNotifications(orgId: string, userId: string, limit: nu
     .limit(limit),
   ]);
   if (error) {
-    throw new Error(`notifications query failed: ${error.message}`);
+    throw new Error(`notifications query failed: ${error.code}`);
   }
   return data.map((row) => toNotificationView(orgId, row, terms));
 }
@@ -68,7 +68,7 @@ export async function countUnread(orgId: string, userId: string): Promise<number
     .eq("user_id", userId)
     .is("read_at", null);
   if (error) {
-    throw new Error(`unread count failed: ${error.message}`);
+    throw new Error(`unread count failed: ${error.code}`);
   }
   return count ?? 0;
 }

@@ -17,7 +17,7 @@ export async function listMyOrganizations(userId: string): Promise<MyOrganizatio
     .eq("status", "active")
     .order("created_at", { ascending: true });
   if (error) {
-    throw new Error(`memberships query failed: ${error.message}`);
+    throw new Error(`memberships query failed: ${error.code}`);
   }
   if (memberships.length === 0) {
     return [];
@@ -32,7 +32,7 @@ export async function listMyOrganizations(userId: string): Promise<MyOrganizatio
     )
     .is("deleted_at", null);
   if (orgError) {
-    throw new Error(`organizations query failed: ${orgError.message}`);
+    throw new Error(`organizations query failed: ${orgError.code}`);
   }
 
   const names = new Map(organizations.map((org) => [org.id, org.name]));

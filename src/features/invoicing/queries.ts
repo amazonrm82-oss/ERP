@@ -110,7 +110,7 @@ export async function getOpenIssueRequests(orgId: string): Promise<OpenIssueRequ
   const { data, error } = await supabase.rpc("invoice_issue_requests_open", { p_org: orgId });
   if (error) {
     if (error.code === "42501") return [];
-    throw new Error(`invoice_issue_requests_open: ${error.message}`);
+    throw new Error(`invoice_issue_requests_open: ${error.code}`);
   }
   if (!Array.isArray(data)) return [];
   return data.flatMap((item) => {
@@ -151,7 +151,7 @@ export async function getIssueRequest(orgId: string, requestId: string): Promise
   const { data, error } = await supabase.rpc("invoice_issue_state", { p_org: orgId, p_request: requestId });
   if (error) {
     if (error.code === "42501" || error.hint === "invoice:request") return null;
-    throw new Error(`invoice_issue_state: ${error.message}`);
+    throw new Error(`invoice_issue_state: ${error.code}`);
   }
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
   const row = data as Record<string, unknown>;
@@ -224,7 +224,7 @@ export async function getCreditRoom(orgId: string, documentId: string): Promise<
   const { data, error } = await supabase.rpc("invoice_credit_room", { p_org: orgId, p_document: documentId });
   if (error) {
     if (error.code === "42501" || error.hint === "invoice_credit:original" || error.hint === "feature:documents") return null;
-    throw new Error(`invoice_credit_room: ${error.message}`);
+    throw new Error(`invoice_credit_room: ${error.code}`);
   }
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
   const row = data as Record<string, unknown>;

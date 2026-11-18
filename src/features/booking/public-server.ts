@@ -39,7 +39,7 @@ export async function getPublicBooking(token: string, from: string | null, ip: s
   const { data, error } = await service.rpc("booking_page_public", { p_token: token, p_from: from, p_ip_hash: keyedIpHash(ip) });
   if (error) {
     if (error.code === "P0002") return "not-found";
-    throw new Error(`booking_page_public failed: ${error.code} ${error.message}`);
+    throw new Error(`booking_page_public failed: ${error.code}`);
   }
   if (data && typeof data === "object" && !Array.isArray(data)) {
     if ((data as { unavailable?: unknown }).unavailable === true) return "unavailable";
@@ -161,7 +161,7 @@ export async function getBookingManage(token: string, from: string | null, ip: s
   const { data, error } = await service.rpc("booking_manage_public", { p_token: token, p_from: from, p_ip_hash: keyedIpHash(ip) });
   if (error) {
     if (error.code === "P0002") return "not-found";
-    throw new Error(`booking_manage_public failed: ${error.code} ${error.message}`);
+    throw new Error(`booking_manage_public failed: ${error.code}`);
   }
   if (data && typeof data === "object" && !Array.isArray(data)) {
     if ((data as { unavailable?: unknown }).unavailable === true) return "unavailable";

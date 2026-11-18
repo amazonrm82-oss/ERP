@@ -91,7 +91,7 @@ export async function listPipelines(orgId: string): Promise<PipelineOption[]> {
     .order("position", { ascending: true })
     .order("created_at", { ascending: true });
   if (error) {
-    throw new Error(`pipelines query failed: ${error.message}`);
+    throw new Error(`pipelines query failed: ${error.code}`);
   }
   return data.map((row) => ({ id: row.id, name: row.name, isDefault: row.is_default }));
 }
@@ -117,7 +117,7 @@ export async function getPipeline(
     .eq("pipeline_id", pipeline.id)
     .order("position", { ascending: true });
   if (stagesError) {
-    throw new Error(`stages query failed: ${stagesError.message}`);
+    throw new Error(`stages query failed: ${stagesError.code}`);
   }
   return { id: pipeline.id, name: pipeline.name, stages };
 }
@@ -182,11 +182,11 @@ export async function getBoard(
     ),
   ]);
   if ("error" in totalsResult && totalsResult.error) {
-    throw new Error(`deal totals query failed: ${totalsResult.error.message}`);
+    throw new Error(`deal totals query failed: ${totalsResult.error.code}`);
   }
   for (const result of stageResults) {
     if (result.error) {
-      throw new Error(`deals query failed: ${result.error.message}`);
+      throw new Error(`deals query failed: ${result.error.code}`);
     }
   }
   const rows = stageResults.flatMap((result) => result.data ?? []);
@@ -335,7 +335,7 @@ export async function listRelatedDeals(
     .order("created_at", { ascending: false })
     .limit(50);
   if (error) {
-    throw new Error(`related deals query failed: ${error.message}`);
+    throw new Error(`related deals query failed: ${error.code}`);
   }
   if (data.length === 0) {
     return [];
@@ -369,7 +369,7 @@ export async function getDeal(orgId: string, dealId: string) {
     .is("deleted_at", null)
     .maybeSingle();
   if (error) {
-    throw new Error(`deal query failed: ${error.message}`);
+    throw new Error(`deal query failed: ${error.code}`);
   }
   if (!data) {
     return null;
@@ -503,7 +503,7 @@ export async function listDeals(
   );
   const { data, error } = guarded.result;
   if (error) {
-    throw new Error(`deals query failed: ${error.message}`);
+    throw new Error(`deals query failed: ${error.code}`);
   }
   const rows = data.slice(0, size);
 

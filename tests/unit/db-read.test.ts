@@ -12,4 +12,12 @@ describe("must() (FXC-05)", () => {
     expect(() => must({ data: null, error: { message: "timeout", code: "57014" } }, "leads")).toThrow(DbReadError);
     expect(() => must({ data: null, error: { message: "timeout" } }, "leads")).toThrow(/leads/);
   });
+
+  it("names the read and the code only, never the database's own text (owner (436) א)", () => {
+    const error = new DbReadError("leads", { message: "Key (email)=(dana@example.com) already exists", code: "23505", hint: "quote:frozen" });
+    expect(error.message).toBe("database read failed: leads: 23505");
+    expect(error.code).toBe("23505");
+    expect(error.hint).toBe("quote:frozen");
+    expect(new DbReadError("leads", { message: "x" }).message).toBe("database read failed: leads: no code");
+  });
 });

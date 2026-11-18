@@ -460,7 +460,7 @@ export async function getQuoteLinkStatus(orgId: string, quoteId: string): Promis
   if (error) {
     // not someone who manages the quote, or the plan has no quotes: no link card
     if (error.code === "42501" || error.code === "P0001") return null;
-    throw new Error(`quote_link_status failed: ${error.code} ${error.message}`);
+    throw new Error(`quote_link_status failed: ${error.code}`);
   }
   const value = data as { active?: unknown; created_at?: unknown } | null;
   return { active: value?.active === true, createdAt: typeof value?.created_at === "string" ? value.created_at : null };

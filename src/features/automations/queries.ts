@@ -219,7 +219,7 @@ export async function listAutomations(orgId: string): Promise<AutomationSummary[
     .eq("organization_id", orgId)
     .order("created_at", { ascending: false });
   if (error) {
-    throw new Error(`automations query failed: ${error.message}`);
+    throw new Error(`automations query failed: ${error.code}`);
   }
   const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
   const counts = await Promise.all(
@@ -290,7 +290,7 @@ export async function listRuns(orgId: string, automationId: string): Promise<Run
     .order("created_at", { ascending: false })
     .limit(50);
   if (error) {
-    throw new Error(`runs query failed: ${error.message}`);
+    throw new Error(`runs query failed: ${error.code}`);
   }
   return data.map((row) => ({
     id: row.id,

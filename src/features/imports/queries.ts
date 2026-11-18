@@ -16,7 +16,7 @@ export async function listImportJobs(orgId: string): Promise<ImportJobItem[]> {
     .order("created_at", { ascending: false })
     .limit(50);
   if (error) {
-    throw new Error(`import jobs query failed: ${error.message}`);
+    throw new Error(`import jobs query failed: ${error.code}`);
   }
   const names = await getUserNames(data.map((job) => job.created_by));
   return data.map((job) => ({ ...job, createdByName: job.created_by ? (names.get(job.created_by) ?? null) : null }));

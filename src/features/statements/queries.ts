@@ -15,7 +15,7 @@ export async function getStatementLinkStatus(orgId: string, customer: StatementC
   if (error) {
     // not someone who records payments: no link card
     if (error.code === "42501") return null;
-    throw new Error(`statement_link_status failed: ${error.code} ${error.message}`);
+    throw new Error(`statement_link_status failed: ${error.code}`);
   }
   const value = data as { active?: unknown; created_at?: unknown } | null;
   return { active: value?.active === true, createdAt: typeof value?.created_at === "string" ? value.created_at : null };

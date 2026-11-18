@@ -49,7 +49,7 @@ export async function listTrash(orgId: string): Promise<TrashedRecord[]> {
   ]);
   for (const result of [leads, contacts, companies, deals]) {
     if (result.error) {
-      throw new Error(`trash query failed: ${result.error.message}`);
+      throw new Error(`trash query failed: ${result.error.code}`);
     }
   }
 

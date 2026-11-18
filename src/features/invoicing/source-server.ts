@@ -53,7 +53,7 @@ export async function getIssueSource(orgId: string, kind: IssueSourceKind, id: s
   const { data: customerData, error } = await supabase.rpc("invoice_issue_customer", { p_org: orgId, p_kind: kind, p_id: id });
   if (error) {
     if (error.code === "42501" || error.hint === "invoice:source" || error.hint === "invoice:order_cancelled" || error.hint === "feature:documents") return null;
-    throw new Error(`invoice_issue_customer: ${error.message}`);
+    throw new Error(`invoice_issue_customer: ${error.code}`);
   }
   const answer = (customerData ?? {}) as Record<string, unknown>;
   const text = (key: string) => (typeof answer[key] === "string" ? (answer[key] as string) : null);

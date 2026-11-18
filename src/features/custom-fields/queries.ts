@@ -31,7 +31,7 @@ export async function listFieldDefinitions(
   }
   const { data, error } = await query.order("position", { ascending: true }).order("created_at", { ascending: true });
   if (error) {
-    throw new Error(`field definitions query failed: ${error.message}`);
+    throw new Error(`field definitions query failed: ${error.code}`);
   }
   const definitions: FieldDefinition[] = data
     .filter((row) => isFieldType(row.field_type))

@@ -25,7 +25,7 @@ export async function getPublicOrder(token: string, ip: string | null): Promise<
   const { data, error } = await service.rpc("order_public", { p_token: token, p_ip_hash: keyedIpHash(ip, "order") });
   if (error) {
     if (error.code === "P0002") return "not-found";
-    throw new Error(`order_public failed: ${error.code} ${error.message}`);
+    throw new Error(`order_public failed: ${error.code}`);
   }
   if (data && typeof data === "object" && !Array.isArray(data) && (data as { rate_limited?: unknown }).rate_limited === true) {
     return "rate-limited";

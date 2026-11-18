@@ -15,7 +15,7 @@ const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 function parts(day: string): [number, number, number] {
   const m = DAY.exec(day);
-  if (!m) throw new Error(`not a calendar day: ${day}`);
+  if (!m) throw new Error("not a calendar day");
   return [Number(m[1]), Number(m[2]), Number(m[3])];
 }
 

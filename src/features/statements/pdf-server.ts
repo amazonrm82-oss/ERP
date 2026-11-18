@@ -47,7 +47,7 @@ export async function handleStaffStatementPdf(orgId: string, kind: string, id: s
     p_contact: kind === "contact" ? id : null,
     p_company: kind === "company" ? id : null,
   });
-  if (error) throw new Error(`statement_staff_view failed: ${error.code} ${error.message}`);
+  if (error) throw new Error(`statement_staff_view failed: ${error.code}`);
   const view = staffStatementFrom(data);
   if (!view) throw new Error("statement_staff_view: unexpected answer");
   if (view.state === "not-allowed") return text(403, NOT_ALLOWED);

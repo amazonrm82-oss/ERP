@@ -38,7 +38,7 @@ export async function listPipelineSettings(orgId: string): Promise<PipelineSetti
       .order("position", { ascending: true }),
   ]);
   if (pipelines.error || stages.error) {
-    throw new Error(`pipeline settings query failed: ${(pipelines.error ?? stages.error)?.message}`);
+    throw new Error(`pipeline settings query failed: ${(pipelines.error ?? stages.error)?.code}`);
   }
 
   // Counted in the database (one small query each): a stage that holds deals,
@@ -99,7 +99,7 @@ export async function listLeadSettings(orgId: string): Promise<{ statuses: Statu
     supabase.from("lead_sources").select("id, name, is_active").eq("organization_id", orgId).order("name", { ascending: true }),
   ]);
   if (statuses.error || sources.error) {
-    throw new Error(`lead settings query failed: ${(statuses.error ?? sources.error)?.message}`);
+    throw new Error(`lead settings query failed: ${(statuses.error ?? sources.error)?.code}`);
   }
   const counts = await Promise.all(
     statuses.data.map((status) =>

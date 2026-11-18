@@ -56,7 +56,7 @@ export async function getPublicQuote(token: string, ip: string | null = null): P
   const { data, error } = await (sender ? call.setHeader(SENDER_HEADER, sender) : call);
   if (error) {
     if (error.code === "P0002") return "not-found";
-    throw new Error(`quote_public failed: ${error.code} ${error.message}`);
+    throw new Error(`quote_public failed: ${error.code}`);
   }
   if (data && typeof data === "object" && !Array.isArray(data) && (data as { rate_limited?: unknown }).rate_limited === true) {
     return "rate-limited";

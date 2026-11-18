@@ -40,7 +40,7 @@ export async function listFiles(orgId: string, subject: TimelineSubject): Promis
     .is("unconfirmed_since", null)
     .order("created_at", { ascending: false })
     .limit(200);
-  if (error) throw new Error(`files query failed: ${error.message}`);
+  if (error) throw new Error(`files query failed: ${error.code}`);
   // FLD-06 part B: which field files are a field's current value, and the fields' labels
   const fieldKeys = [...new Set(data.flatMap((f) => (f.custom_field_key ? [f.custom_field_key] : [])))];
   const current = new Set<string>();
@@ -50,8 +50,8 @@ export async function listFiles(orgId: string, subject: TimelineSubject): Promis
       supabase.from(RECORD_TABLE[subject.kind]).select("custom_fields").eq("organization_id", orgId).eq("id", subject.id).maybeSingle(),
       supabase.from("field_definitions").select("key, label").eq("organization_id", orgId).eq("object_type", subject.kind).in("key", fieldKeys),
     ]);
-    if (record.error) throw new Error(`files query failed: ${record.error.message}`);
-    if (definitions.error) throw new Error(`files query failed: ${definitions.error.message}`);
+    if (record.error) throw new Error(`files query failed: ${record.error.code}`);
+    if (definitions.error) throw new Error(`files query failed: ${definitions.error.code}`);
     const values = record.data?.custom_fields;
     if (values && typeof values === "object" && !Array.isArray(values)) {
       for (const key of fieldKeys) {
@@ -105,7 +105,7 @@ export async function listNoteFiles(orgId: string, activityIds: string[]): Promi
     .is("unconfirmed_since", null)
     .order("created_at", { ascending: true })
     .limit(500);
-  if (error) throw new Error(`note files query failed: ${error.message}`);
+  if (error) throw new Error(`note files query failed: ${error.code}`);
   const groups = versionGroups(data.map((f) => ({ ...f, previousId: f.previous_id, createdAt: f.created_at })));
   for (const { current, earlier } of groups) {
     const note = current.activity_id as string;

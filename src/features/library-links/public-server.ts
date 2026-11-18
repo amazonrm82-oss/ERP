@@ -33,7 +33,7 @@ export async function getPublicLibraryItem(token: string, ip: string | null): Pr
   const { data, error } = await service.rpc("library_link_public", { p_token: token, p_ip_hash: keyedIpHash(ip, "library") });
   if (error) {
     if (error.code === "P0002") return "not-found";
-    throw new Error(`library_link_public failed: ${error.code} ${error.message}`);
+    throw new Error(`library_link_public failed: ${error.code}`);
   }
   if (data && typeof data === "object" && !Array.isArray(data) && (data as { rate_limited?: unknown }).rate_limited === true) {
     return "rate-limited";

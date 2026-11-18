@@ -30,7 +30,7 @@ export async function getOrganizationSettings(orgId: string): Promise<Organizati
     .eq("id", orgId)
     .maybeSingle();
   if (error) {
-    throw new Error(`organization settings query failed: ${error.message}`);
+    throw new Error(`organization settings query failed: ${error.code}`);
   }
   if (!data) {
     return null;
@@ -120,7 +120,7 @@ export const listMembers = cache(async (orgId: string): Promise<Member[]> => {
     .select("user_id, role, seat_type, status, is_available, created_at")
     .eq("organization_id", orgId);
   if (error) {
-    throw new Error(`memberships query failed: ${error.message}`);
+    throw new Error(`memberships query failed: ${error.code}`);
   }
   if (memberships.length === 0) {
     return [];
@@ -177,7 +177,7 @@ export async function listPendingInvitations(orgId: string): Promise<PendingInvi
     .gt("expires_at", new Date().toISOString())
     .order("created_at", { ascending: false });
   if (error) {
-    throw new Error(`invitations query failed: ${error.message}`);
+    throw new Error(`invitations query failed: ${error.code}`);
   }
   return data.map((row) => ({
     id: row.id,
@@ -197,7 +197,7 @@ export async function listTeams(orgId: string): Promise<TeamSummary[]> {
     supabase.from("team_members").select("team_id, user_id, is_manager").eq("organization_id", orgId),
   ]);
   if (teamsResult.error) {
-    throw new Error(`teams query failed: ${teamsResult.error.message}`);
+    throw new Error(`teams query failed: ${teamsResult.error.code}`);
   }
   const rows = membersResult.data ?? [];
   const managerIds = rows.filter((row) => row.is_manager).map((row) => row.user_id);
@@ -229,7 +229,7 @@ export async function getTeam(orgId: string, teamId: string): Promise<TeamDetail
     .eq("id", teamId)
     .maybeSingle();
   if (error) {
-    throw new Error(`team query failed: ${error.message}`);
+    throw new Error(`team query failed: ${error.code}`);
   }
   if (!team) {
     return null;

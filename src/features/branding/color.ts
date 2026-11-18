@@ -130,7 +130,7 @@ export type BrandPalette = {
  */
 export function brandPalette(color: string, theme: BrandTheme = "light"): BrandPalette {
   const picked = normalizeHex(color);
-  if (!picked) throw new Error(`not a colour: ${color}`);
+  if (!picked) throw new Error("not a colour");
   const page = BRAND_THEMES[theme];
   const { h, s } = toHsl(picked);
   const light = theme === "light";
@@ -161,7 +161,7 @@ export function brandVars(palette: BrandPalette): Record<string, string> {
  */
 export function brandScopeClass(color: string): string {
   const hex = normalizeHex(color);
-  if (!hex) throw new Error(`not a colour: ${color}`);
+  if (!hex) throw new Error("not a colour");
   return `mx-brand-${hex.slice(1)}`;
 }
 

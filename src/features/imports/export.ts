@@ -26,7 +26,7 @@ async function fetchAll(supabase: Client, t: ExportTable, orgId: string): Promis
     // rows written in one statement share created_at; without a tie-breaker a row can be skipped or repeated between pages (FXC-07)
     for (const column of exportKey(t)) query = query.order(column as "id", { ascending: true });
     const { data, error } = await query.range(from, to);
-    if (error) throw new Error(`export of ${t.table} failed: ${error.message}`);
+    if (error) throw new Error(`export of ${t.table} failed: ${error.code}`);
     return data as unknown as ExportRow[];
   });
   return rows;

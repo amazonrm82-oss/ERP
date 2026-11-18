@@ -48,7 +48,7 @@ export async function listOrderPdfFiles(supabase: Client, orgId: string, orderId
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(100);
-  if (error) throw new Error(`order pdf: ${error.message}`);
+  if (error) throw new Error(`order pdf: ${error.code}`);
   return (data ?? []).filter((row) => row.unconfirmed_since === null).map((row) => ({ id: row.id, name: row.name, createdAt: row.created_at, contentStamp: row.order_content_stamp }));
 }
 

@@ -127,7 +127,7 @@ export async function getQuotePdfFile(
     // QUO-09: the PDF as sent (a signed version after it is its own row)
     .is("quote_signed", null)
     .maybeSingle();
-  if (error) throw new Error(`quote pdf: ${error.message}`);
+  if (error) throw new Error(`quote pdf: ${error.code}`);
   return data && data.unconfirmed_since === null ? { id: data.id, name: data.name, fingerprinted: data.sha256 !== null } : null;
 }
 
@@ -215,7 +215,7 @@ export async function getSignedQuotePdfFile(supabase: Client, orgId: string, quo
     .eq("quote_id", quoteId)
     .eq("quote_signed", true)
     .maybeSingle();
-  if (error) throw new Error(`signed quote pdf: ${error.message}`);
+  if (error) throw new Error(`signed quote pdf: ${error.code}`);
   return data && data.unconfirmed_since === null ? { id: data.id, name: data.name } : null;
 }
 

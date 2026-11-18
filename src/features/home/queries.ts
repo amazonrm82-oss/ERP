@@ -134,13 +134,13 @@ export async function getMyDay(orgId: string, userId: string, timeZone?: string)
   ]);
 
   if (tasks.error) {
-    throw new Error(`my tasks query failed: ${tasks.error.message}`);
+    throw new Error(`my tasks query failed: ${tasks.error.code}`);
   }
   if (leads.error) {
-    throw new Error(`my new leads query failed: ${leads.error.message}`);
+    throw new Error(`my new leads query failed: ${leads.error.code}`);
   }
   if (deals.error) {
-    throw new Error(`my deals query failed: ${deals.error.message}`);
+    throw new Error(`my deals query failed: ${deals.error.code}`);
   }
 
   // FXC-12: checked before it is read; a mismatch throws (the page's error screen)

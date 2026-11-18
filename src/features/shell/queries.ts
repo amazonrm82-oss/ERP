@@ -73,7 +73,7 @@ const loadOrgContext = cache(async (orgId: string): Promise<OrgContext> => {
   // one round trip, read with the user's rights (migration 0028)
   const { data, error } = await supabase.rpc("org_context", { p_org: orgId });
   if (error) {
-    throw new Error(`organization context failed: ${error.message}`);
+    throw new Error(`organization context failed: ${error.code}`);
   }
   const ctx = (data ?? {}) as RawContext;
   const raw = ctx.org ?? null;

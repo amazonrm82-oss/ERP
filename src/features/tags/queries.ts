@@ -12,7 +12,7 @@ export const listTags = cache(async (orgId: string): Promise<TagOption[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase.from("tags").select("id, name, color").eq("organization_id", orgId).order("name", { ascending: true });
   if (error) {
-    throw new Error(`tags query failed: ${error.message}`);
+    throw new Error(`tags query failed: ${error.code}`);
   }
   return data;
 });

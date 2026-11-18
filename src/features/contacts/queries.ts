@@ -155,7 +155,7 @@ export async function listContacts(
   );
   const { data, error } = guarded.result;
   if (error) {
-    throw new Error(`contacts query failed: ${error.message}`);
+    throw new Error(`contacts query failed: ${error.code}`);
   }
 
   const rows = data.slice(0, size);
@@ -213,7 +213,7 @@ export async function getContact(orgId: string, contactId: string) {
     .is("deleted_at", null)
     .maybeSingle();
   if (error) {
-    throw new Error(`contact query failed: ${error.message}`);
+    throw new Error(`contact query failed: ${error.code}`);
   }
   if (!data) {
     return null;

@@ -145,7 +145,7 @@ async function rpc<N extends ReportFn & ReportFunction>(name: N, args: Functions
   const supabase = await createClient();
   const { data, error } = await supabase.rpc(name, args);
   if (error) {
-    throw new Error(`${name} failed: ${error.message}`);
+    throw new Error(`${name} failed: ${error.code}`);
   }
   // a mismatch throws ReportShapeError; withReportShape() logs it and shows the message
   parseReportData(name, data);

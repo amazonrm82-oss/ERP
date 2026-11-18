@@ -20,7 +20,7 @@ export async function scanQrCode(token: string): Promise<QrScanResult> {
   const { data, error } = await service.rpc("qr_scan", { p_token: token });
   if (error) {
     if (error.code === "P0002") return { ok: false, reason: "not-found" };
-    throw new Error(`qr_scan failed: ${error.code} ${error.message}`);
+    throw new Error(`qr_scan failed: ${error.code}`);
   }
   const target = qrScanTarget(data);
   return target ? { ok: true, target } : { ok: false, reason: "not-found" };

@@ -33,7 +33,7 @@ export async function getGoalProgress(orgId: string, options: Options = {}): Pro
     p_user: options.userId ?? null,
   });
   if (error) {
-    throw new Error(`report_goal_progress failed: ${error.message}`);
+    throw new Error(`report_goal_progress failed: ${error.code}`);
   }
   // a mismatch throws ReportShapeError; withReportShape() logs it and shows the message
   const rows = parseReportData("report_goal_progress", data);
@@ -83,7 +83,7 @@ export async function getMyMonthClosings(orgId: string, userId: string, timeZone
     p_owner: userId,
   });
   if (error) {
-    throw new Error(`report_revenue failed: ${error.message}`);
+    throw new Error(`report_revenue failed: ${error.code}`);
   }
   return parseReportData("report_revenue", data).by_owner.reduce((sum, row) => sum + row.amount, 0);
 }

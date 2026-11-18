@@ -26,7 +26,7 @@ export async function listSavedViews(orgId: string, objectType: ViewObject): Pro
     .eq("object_type", objectType)
     .order("name", { ascending: true });
   if (error) {
-    throw new Error(`saved views query failed: ${error.message}`);
+    throw new Error(`saved views query failed: ${error.code}`);
   }
   return data.map((row) => ({ id: row.id, name: row.name, scope: row.scope, teamId: row.team_id, ownerId: row.owner_id, config: readConfig(row.config) }));
 }

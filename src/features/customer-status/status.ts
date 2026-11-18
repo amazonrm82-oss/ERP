@@ -52,7 +52,7 @@ function pad(n: number, width = 2): string {
 /** A calendar day plus whole months, clamped to the month's last day (PostgreSQL's date + interval 'n months'). */
 export function addMonths(day: string, months: number): string {
   const parsed = parseDay(day);
-  if (!parsed) throw new Error(`not a calendar day: ${day}`);
+  if (!parsed) throw new Error("not a calendar day");
   const index = parsed.y * 12 + (parsed.m - 1) + months;
   const y = Math.floor(index / 12);
   const m = index - y * 12 + 1;

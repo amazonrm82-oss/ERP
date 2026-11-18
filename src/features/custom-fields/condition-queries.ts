@@ -28,7 +28,7 @@ export async function conditionBuiltinChoices(orgId: string, objectType: FieldOb
       .select("id, name, pipeline_id, position")
       .eq("organization_id", orgId)
       .order("position", { ascending: true });
-    if (error) throw new Error(`stages query failed: ${error.message}`);
+    if (error) throw new Error(`stages query failed: ${error.code}`);
     const choices: BuiltinChoices[string] = [];
     for (const pipeline of pipelines) {
       for (const stage of data.filter((row) => row.pipeline_id === pipeline.id)) {

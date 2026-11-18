@@ -33,8 +33,8 @@ class ReadError extends Error {}
 const SIGNATURE_DOCUMENT_COLUMNS =
   "id, organization_id, lead_id, contact_id, company_id, deal_id, template_id, title, body, status, sent_by, sent_at, viewed_at, signed_at, cancelled_at, cancelled_by, expires_at, content_sha256, former_lead_id, former_contact_id, former_company_id, former_deal_id, customer_deleted_at, erased_at, text_erased_at, expired_at, valid_until, renewal_on, created_at, updated_at";
 
-function check<T>(result: { data: T | null; error: { message: string } | null }, what: string): T {
-  if (result.error) throw new ReadError(`${what}: ${result.error.message}`);
+function check<T>(result: { data: T | null; error: { message: string; code?: string } | null }, what: string): T {
+  if (result.error) throw new ReadError(`${what}: ${result.error.code ?? "no code"}`);
   return (result.data ?? []) as T;
 }
 
@@ -49,7 +49,7 @@ async function readLinked(supabase: Supabase, orgId: string, table: string, colu
       .or(filter)
       .order(order as "id", { ascending: true })
       .range(from, to);
-    if (error) throw new ReadError(`${table}: ${error.message}`);
+    if (error) throw new ReadError(`${table}: ${error.code}`);
     return data as unknown as Row[];
   });
   return rows;

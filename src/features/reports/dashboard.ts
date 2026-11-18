@@ -67,7 +67,7 @@ export async function getDashboard(orgId: string, options: { unteamed?: { timeZo
     p_prev_to: previous.to,
   });
   if (error) {
-    throw new Error(`report_summary failed: ${error.message}`);
+    throw new Error(`report_summary failed: ${error.code}`);
   }
   const s = parseReportData("report_summary", data) as Obj;
   // FLD-10: the tiles name leads and deals in the business's words

@@ -39,7 +39,7 @@ export async function getPublicWidget(token: string, ip: string | null): Promise
   const { data, error } = await service.rpc("site_widget_public", { p_token: token, p_ip_hash: keyedIpHash(ip) });
   if (error) {
     if (error.code === "P0002") return "not-found";
-    throw new Error(`site_widget_public failed: ${error.code} ${error.message}`);
+    throw new Error(`site_widget_public failed: ${error.code}`);
   }
   if (data && typeof data === "object" && !Array.isArray(data) && (data as { rate_limited?: unknown }).rate_limited === true) {
     return "rate-limited";
