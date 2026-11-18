@@ -86,6 +86,12 @@ async function newPage(width, height = 800) {
     colorScheme: "light",
     reducedMotion: "reduce",
   });
+  // The device bar on My day (GAP-01) reads Notification.permission. Headless Chromium used to start at
+  // "denied" and newer builds start at "default", which shows a longer line ("off") and moves the page.
+  // Pin it to the state the baselines were made with, so the shot does not depend on the browser build.
+  await context.addInitScript(() => {
+    if ("Notification" in window) Object.defineProperty(Notification, "permission", { get: () => "denied" });
+  });
   return context.newPage();
 }
 
