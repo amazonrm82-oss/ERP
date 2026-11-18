@@ -769,9 +769,11 @@ describe("background job queue (OPS-04)", () => {
   // DOC-07: invoice.issue, owner's answer (398) א, 16 November 2026 (test 381-invoice-issue; its functions are pinned there).
   // LNK-02 / LNK-07: payment_link.create and payment_link.refund, owner's answer (394) א, 16 November 2026 (tests 385 and 387;
   // their functions are pinned there).
-  it("(55) א: the job kinds are exactly {message.send, import.run, export.run, digest.send, report.send, invite.send, invoice.issue, payment_link.create, payment_link.refund}", async () => {
+  // WEB-05: signup.send, owner's answer (418) ב, 18 November 2026 (test 391; queued only while a worker asked for it; its
+  // functions are pinned below).
+  it("(55) א: the job kinds are exactly {message.send, import.run, export.run, digest.send, report.send, invite.send, invoice.issue, payment_link.create, payment_link.refund, signup.send}", async () => {
     const kinds = await asAdmin(async (q) => (await q<{ k: string[] }>("select app.job_kinds() as k")).rows[0].k);
-    expect(kinds).toEqual(["message.send", "import.run", "export.run", "digest.send", "report.send", "invite.send", "invoice.issue", "payment_link.create", "payment_link.refund"]);
+    expect(kinds).toEqual(["message.send", "import.run", "export.run", "digest.send", "report.send", "invite.send", "invoice.issue", "payment_link.create", "payment_link.refund", "signup.send"]);
   });
 
   // USR-11 / WAB-03 (owner (267) א, (375) ב): the daily summary's worker path, pinned like the queue's own functions (body,
@@ -863,6 +865,30 @@ describe("background job queue (OPS-04)", () => {
       "public.invitation_email_queue": "88f3b4fdad05598a4e8012ae6da40250",
       "public.invitation_email_status": "1d0945cbbe84bffee900bd8f91214e36",
       "public.invitation_job_compose": "4f0cec5df21692055df1aabd21be16c1",
+    });
+  });
+
+  // WEB-05 (owner (418) ב): the sign-up service emails' path, pinned like the invitation's. A change needs a fresh independent
+  // review (ids and a kind only in the queue; service texts only; once per business and kind; the composer re-checks the
+  // trial, the business and its active owner on the live lease and answers only the address, the name, the kind and the day).
+  it("WEB-05: the signup.send functions are the reviewed ones", async () => {
+    const rows = await asAdmin(
+      async (q) =>
+        (
+          await q<{ name: string; md5: string }>(
+            `select n.nspname || '.' || p.proname as name,
+                    md5(p.prosrc || '|' || p.prosecdef::text || '|' || coalesce(p.proconfig::text, '') || '|' || pg_get_function_identity_arguments(p.oid)) as md5
+               from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+              where (n.nspname, p.proname) in (('public', 'signup_job_compose'), ('app', 'queue_signup_emails'),
+                                               ('app', 'signup_email_limits'))
+              order by 1`,
+          )
+        ).rows,
+    );
+    expect(Object.fromEntries(rows.map((r) => [r.name, r.md5]))).toEqual({
+      "app.queue_signup_emails": "65ec2cc40cb11791163a08c5be2ab2d2",
+      "app.signup_email_limits": "2e68353e0ad0977afd3546eadda59a3b",
+      "public.signup_job_compose": "30bd8d352a04f3a4cbffd5869b3a4b53",
     });
   });
 

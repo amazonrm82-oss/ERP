@@ -6,6 +6,7 @@ import { backgroundJobsReady, createBackgroundTokenSource, createUserClient } fr
 import { createDigestHandler } from "@/features/digest/send-handler";
 import { createReportHandler } from "@/features/report-schedules/send-handler";
 import { createInvitationHandler } from "@/features/invitations/send-handler";
+import { createSignupHandler } from "@/features/signup-emails/send-handler";
 import { createInvoiceIssueHandler } from "@/features/invoicing/issue-handler";
 import { invoiceProviderFor } from "@/features/invoicing/providers/select";
 import { AGREEMENT_VERSION } from "@/features/legal/agreement";
@@ -54,7 +55,7 @@ export function jobTimeLeftMs(now: number, claimedAt: number, routeStartedAt: nu
  * The background job worker (OPS-04), route POST /api/jobs/run. Called by the database (app.wake_job_worker, through
  * pg_net, every minute while work is due), never by a user: it carries the push dispatcher's shared secret, checked
  * timing-safe before anything else. With the service role it calls only public.claim_jobs(), public.finish_job() and,
- * for message.send, public.job_message_may_send() and, for a composing SMS provider (InforU, SMS-05), public.sms_job_compose() and public.sms_quota_return() (owner (326) ב), and for the composing email provider (Resend, EML-01, owner (195) א) public.email_job_compose() and public.email_quota_return(), for digest.send (USR-11 / WAB-03) only public.digest_job_compose(), for report.send (RPT-03) only public.scheduled_report_compose(), for invite.send (USR-09) only public.invitation_job_compose(), for invoice.issue (DOC-07, owner (398) א) only public.invoice_issue_claim() and public.invoice_issue_record(), for payment_link.create (LNK-02, owner (394) א) only public.payment_link_page_claim() and public.payment_link_page_record(), for payment_link.refund (LNK-07) only public.payment_link_refund_claim() and public.payment_link_refund_record(), reading Storage only at the paths the composer answered (email-attachments-server.ts); for import.run and export.run (IMP-04, owner (155) א, (160) א) only
+ * for message.send, public.job_message_may_send() and, for a composing SMS provider (InforU, SMS-05), public.sms_job_compose() and public.sms_quota_return() (owner (326) ב), and for the composing email provider (Resend, EML-01, owner (195) א) public.email_job_compose() and public.email_quota_return(), for digest.send (USR-11 / WAB-03) only public.digest_job_compose(), for report.send (RPT-03) only public.scheduled_report_compose(), for invite.send (USR-09) only public.invitation_job_compose(), for signup.send (WEB-05, owner (418) ב) only public.signup_job_compose(), for invoice.issue (DOC-07, owner (398) א) only public.invoice_issue_claim() and public.invoice_issue_record(), for payment_link.create (LNK-02, owner (394) א) only public.payment_link_page_claim() and public.payment_link_page_record(), for payment_link.refund (LNK-07) only public.payment_link_refund_claim() and public.payment_link_refund_record(), reading Storage only at the paths the composer answered (email-attachments-server.ts); for import.run and export.run (IMP-04, owner (155) א, (160) א) only
  * public.background_job_begin(), background_job_progress() and background_job_end(), and, through the token source it hands
  * this client to (src/features/background/user-token.ts), background_job_token() before every signing of the person's token. No table is read or written with
  * the service role, and Storage is read only in the one line that hands the attachment downloader a reader of record-files (CLAUDE.md hard rule 5, wave 3 use (1)): a background job's own work is done with a short-lived token
@@ -156,6 +157,19 @@ export async function runJobsRoute(request: Request): Promise<Response> {
           siteOrigin,
           compose: async (job) => {
             const { data, error } = await supabase.rpc("invitation_job_compose", { p_job: job.id, p_lease: job.lease });
+            if (error) throw new Error("compose failed");
+            return data;
+          },
+        })
+      : null,
+    // WEB-05 (owner (418) ב): the two service emails to a new sign-up (welcome, the trial is about to end), the fixed text;
+    // the composer re-checks the business (still on its trial, open), its owner and the trial's end on the live lease
+    "signup.send": providers.email
+      ? createSignupHandler({
+          provider: providers.email,
+          siteOrigin,
+          compose: async (job) => {
+            const { data, error } = await supabase.rpc("signup_job_compose", { p_job: job.id, p_lease: job.lease });
             if (error) throw new Error("compose failed");
             return data;
           },

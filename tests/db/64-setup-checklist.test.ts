@@ -950,6 +950,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_payment_link_closed_notice.sql",
       // SMS-05b redefines app.jobs_record_message() of _composer_refusal_notices.sql last (the 'unknown' message status)
       "_sms_unknown_outcome.sql",
+      // WEB-05 redefines app.job_kinds() and app.job_payload_ok() of _payment_link_refunds.sql last (signup.send)
+      "_signup_service_emails.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

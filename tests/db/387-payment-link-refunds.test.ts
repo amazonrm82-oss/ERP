@@ -13,8 +13,10 @@ type Job = { id: string; lease: string };
 // needs a fresh independent review (ids only in the queue; a refund recorded only after the provider answered ok; PAY-08's
 // rights at the request and again at the claim).
 const REVIEWED_MD5: Record<string, string> = {
-  "app.job_kinds": "af20fc3f6ae938e0447f119549e5a7d0",
-  "app.job_payload_ok": "0a583cd61b41ec40e991fd08ff8138d4",
+  // WEB-05 (migration signup_service_emails; was af20fc3f… and 0a583cd6…): signup.send added, payment_link.refund's branch
+  // and every other one unchanged (021317's body copied)
+  "app.job_kinds": "bae046b31963282b6dd2b64d358056df",
+  "app.job_payload_ok": "1ef8d4ac2cff3931fb2b740bee4d0101",
   "app.payment_link_refund_notice": "cb4670d41f7dedfcdcb4228beb353a4c",
   "app.payment_link_refund_room": "017e752938c8f68846a8d376e2977175",
   // review of the LNK branch (2, 3): PAY-08's check, 021154's body plus the open provider requests and refund:provider_made

@@ -4925,6 +4925,7 @@ export type Database = {
       scheduled_report_compose: { Args: { p_job: string; p_lease: string }; Returns: Json };
       // USR-09
       invitation_job_compose: { Args: { p_job: string; p_lease: string }; Returns: Json };
+      signup_job_compose: { Args: { p_job: string; p_lease: string }; Returns: Json };
       invitation_email_queue: { Args: { p_org: string; p_invitation: string }; Returns: Json };
       invitation_email_status: { Args: { p_org: string }; Returns: Json };
       scheduled_report_create: {

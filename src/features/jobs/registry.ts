@@ -13,7 +13,9 @@
 // LNK-02 (owner (394) א): payment_link.create, the provider's hosted page of a payment link
 // (src/features/payment-links/page-handler.ts), registered while this deployment offers a payment provider; LNK-07:
 // payment_link.refund, a refund of a link's payment through it (src/features/payment-links/refund-handler.ts).
-export const JOB_KINDS = ["message.send", "import.run", "export.run", "digest.send", "report.send", "invite.send", "invoice.issue", "payment_link.create", "payment_link.refund"] as const;
+// WEB-05 (owner (418) ב): signup.send, the two service emails to a new sign-up (welcome, trial ending;
+// src/features/signup-emails/send-handler.ts), in the staff pass beside invite.send while the email channel has a provider.
+export const JOB_KINDS = ["message.send", "import.run", "export.run", "digest.send", "report.send", "invite.send", "invoice.issue", "payment_link.create", "payment_link.refund", "signup.send"] as const;
 export type JobKind = (typeof JOB_KINDS)[number];
 
 export function isJobKind(value: unknown): value is JobKind {

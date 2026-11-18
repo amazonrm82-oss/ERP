@@ -231,6 +231,8 @@ const RERUN = [
   migrationFile("_payment_link_closed_notice.sql"),
   // SMS-05b redefines app.jobs_record_message() of _composer_refusal_notices.sql last (the 'unknown' message status)
   migrationFile("_sms_unknown_outcome.sql"),
+  // WEB-05 redefines app.job_kinds() and app.job_payload_ok() last (signup.send)
+  migrationFile("_signup_service_emails.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its
