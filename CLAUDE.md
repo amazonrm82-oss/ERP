@@ -714,6 +714,43 @@ and build this CRM here instead. The old code is preserved on the branch
   `invoice_issue_record`, `invoice_issue_close`, `invoice_issue_requests_open`, `app.invoice_issue_open`, `app.invoice_issue_payload_erased`
   and `app.member_permission_built_keys` were last redefined in 021313/021314; pinned by md5 in test 381; tests 64 and 88 end with
   `_invoice_provider_customers.sql`, `_invoice_credit.sql`. The advisor's findings on `invoice_credit_release` and the two app tables are expected.
+  In use (LNK-02 payment_link.create, owner (394) א; migration 021315; an independent review and two delta reviews): the OPS-04 worker
+  (same route and secret) claims `payment_link.create` (payload `{link_id}` only, queued by trigger `payment_links_queue_page` on a new
+  pending link) and calls with the service key only `public.payment_link_page_claim()` and `public.payment_link_page_record()` (service_role,
+  the live lease only; link row FOR UPDATE). The claim re-checks the link (pending, before its last moment, no page yet),
+  `app.payment_link_provider_usable` (fake only while `app.settings` `payment_links_fake` is 'on'), a writable business with `payments` +
+  `payment_links`, and `app.payment_link_source_open`; a refusal cancels the link `page_failed` (or `source_closed`) and tells its maker
+  (`app.payment_link_notice`). The link id is the provider's idempotency key; only the record keeps the provider's id and the https page,
+  once (`page_created_at`). Since 021316 a link whose quote, order or document has neither a deal nor a contact is refused
+  (`payment_link:no_customer`). Pinned by md5 in test 385. The advisor's findings on the two definers are expected.
+  In use (LNK-04, wave 3 use (2); migration 021316; same reviews): `src/features/payment-links/webhook-server.ts`, route
+  `POST /api/payments/<provider>/webhook` (public prefix in proxy.ts, OPS-02 list), refused (401) before the database unless the adapter's
+  `verifyWebhook` accepts the signature over the exact body; the body is never logged; 413 over 64 KB, 404 for another provider; the fake
+  accepts nothing without `FAKE_PAYMENTS_WEBHOOK_SECRET` outside tests. It calls only `public.payment_link_webhook()` (service_role): 3,000
+  events a minute in total (`app.payment_webhook_minutes`), each provider event once (`app.payment_webhook_events`). A paid event must carry
+  amount, currency and the provider payment id (else 400); only a pending link is paid, only for exactly its amount in ILS within its
+  instalments, else `amount_mismatch`, no payment and owners/admins told to check at the provider. A paid event records one confirmed credit
+  payment on the link's source (quote advance, order_id, the document's allocation up to its balance, contact), no recorder; the link then
+  becomes paid with `provider_payment_id`. A paid event for a link that is not pending records nothing and tells owners/admins; an unknown or
+  ambiguous link writes one `app.platform_log` line `payment_link.webhook_unknown` (ids and codes only). The link is found by provider id
+  across businesses: acceptable only for one platform merchant account; a real adapter with per-business merchant accounts must first bind
+  the event to the business whose credentials signed it. Owner questions 422-424 (closed business, the payment's status, who refunds) built
+  as (א) until answered. Pinned by md5 in test 386. In the eslint allow-list. The advisor's findings on the two app tables are expected.
+  In use (LNK-07 payment_link.refund, owner (394) א; migration 021317; same reviews): owners/admins ask through
+  `public.payment_link_refund_begin` (definer: PAY-08's rights, a writable business, `payments` + `payment_links`, a recorded/confirmed payment
+  that paid a link, at most `app.payment_link_refund_room`; one request per idempotency key in `app.payment_link_refund_requests`, no grants,
+  re-read after the payment lock so a double submit answers the same request; audited `refund_request`). The OPS-04 worker claims
+  `payment_link.refund` (payload `{request_id}` only) and calls only `public.payment_link_refund_claim()` and `public.payment_link_refund_record()`;
+  lock order everywhere payment row, then request. A `payment_refunds` row is written only after the provider answered ok; a first-try failure
+  records nothing and tells the requester; anything that may have reached the provider ends `unrecorded`, and the requester and owners/admins
+  are sent to the card's "בוצע אצל הספק / לא בוצע" (`public.payment_link_refund_close`, owners/admins, audited `refund_request_close`; refuses
+  `refunded_at_provider` when an active refund already carries the provider's refund id, `payment_link_refund:recorded`). PAY-08's
+  `app.payment_refunds_check` and `app.payments_refund_guard` (both last redefined in 021317) count open provider requests (pending or
+  unrecorded): a manual refund's cap subtracts them, and while one is open the payment keeps its status between recorded and confirmed and its
+  amount above refunds plus open requests (`payment:refund_request_open`); allocations are still judged against active refunds only; a refund
+  row a provider request recorded is never cancelled by hand (`refund:provider_made`). `app.job_kinds` and `app.job_payload_ok` were last
+  redefined in 021317. Pinned by md5 in test 387. The advisor's findings on the three authenticated definers and
+  `app.payment_link_refund_requests` are expected. Follow-ups: retention of the webhook events and refund requests needs a hand-pasted delete.
   In use (OPS-04, owner 26 October 2026, answer (א) and wave 3 use (1); conditions of 2 November 2026, answers (52)-(55); migration
    `_jobs_queue.sql`): the background job worker (`src/features/jobs/run-server.ts`, route `POST /api/jobs/run`, public prefix in
    `src/lib/supabase/proxy.ts`), woken by `app.wake_job_worker()` (pg_cron `crm-jobs-wake`, pg_net; `app.settings` `jobs_run_url`,
