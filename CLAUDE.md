@@ -2636,6 +2636,20 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   (02:41 UTC) calls `app.purge_old_integration_events()`, which runs the pasted `app.integration_events_purge_rows` (live lines 12
   months after `last_at`, deleted connections' 12 months after the delete). The token-expiry alert waits for the real Graph
   adapter (226). Since 021215 (independent review 10 November 2026) `meta_lead_finish`'s lost-the-race branch answers `refused`, marks its own connection `page_taken` (status kept, so `app.meta_lead_connection_open` closes it; one log line and the daily notice) and ends its pending arrivals; no lead. Since 021217 (independent review) `app.integrations_check` (pinned in test 305) also runs the going-live check when a write clears `last_error_code` (a re-open), so a new token on a connection ended by `page_taken` is refused (`integration:taken`) while the page is verified elsewhere; its owner can only disconnect or delete it.
+- Invoice provider sync log (DOC-16, migrations 021319 and 021320 (021320 to be pasted by hand); owner (425) ג, (426) א; an independent
+  review and a delta review): `public.invoice_provider_events` (INT-03's shape, its own table: one line per business, provider, kind,
+  code and business day folded with `hits`/`last_at`; ids and codes only; owners/admins read, no client writes; in `EXPORT_TABLES`),
+  written only by `app.invoice_provider_event_log` from definer AFTER triggers `invoice_provider_settings_events` and
+  `invoice_issue_requests_events` (every error swallowed, so a log line never fails an issue, a record or a person's action; the pinned
+  test 381 functions unchanged). Kinds connected|disconnected|check_ok|check_failed|issued|retry|failed|unrecorded|closed|checked|stale.
+  A provider code is kept in the log only when `^[a-z][a-z0-9_:]{0,63}$` with no 4 digits in a row, else `other` (no id numbers kept
+  12 months; the request keeps the raw code). The worker sends an auth failure as `auth:<code>` (`customer_auth:`/`product_auth:` for
+  DOC-13's calls). The connection "fell" only at issue time: an auth code (`app.invoice_provider_auth_code`), or every try of one
+  request unreachable (`retries_spent` after unreachable|timeout); a failed check writes only `check_failed` (425 ג). Then one `system`
+  notice "החיבור לספק החשבוניות הפסיק לעבוד" to active owners/admins, once per business day (`app.invoice_provider_notice_days`,
+  entity_type `invoice_provider` opens the settings page). Card "יומן סנכרון" on `/settings/invoicing` (owners/admins). Lines are removed
+  after 12 months by the pasted `app.invoice_provider_events_purge_rows` (021320) through pg_cron `crm-invoice-provider-events-purge`
+  (02:39 UTC, a no-op until pasted). The advisor's findings on the new app tables are expected.
 - Punch card alerts (PKG-03, migrations 021176-021178; owner (127)-(132), (137)-(142), (148); three independent reviews):
   `public.punch_card_alert_settings` (one row per business; `low_entries` 0..100 default 2, `expiry_days` 0..365 default 14, 0 = that
   alert off; `customer_messages` default false; members read; owners/admins of a writable business write through column grants; no
