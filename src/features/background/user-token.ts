@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHmac } from "node:crypto";
+import { createHmac, createPrivateKey, createPublicKey, sign as signWith, type KeyObject } from "node:crypto";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
@@ -8,6 +8,7 @@ import { AGREEMENT_VERSION } from "@/features/legal/agreement";
 import type { ClaimedJob } from "@/features/jobs/registry";
 import type { Database } from "@/lib/database.types";
 import { getSupabaseEnv } from "@/lib/env";
+import { logEvent } from "@/lib/log";
 
 import { parseTokenAnswer, USER_TOKEN_SECONDS, type TokenClaims } from "./rules";
 
@@ -22,6 +23,13 @@ import { parseTokenAnswer, USER_TOKEN_SECONDS, type TokenClaims } from "./rules"
 // claims: sub, role 'authenticated', the ordering session's aal (the lower of the order's and the session's now) and id,
 // crm_background (the order, which the audit records), and the lease's end. The token lives 10 minutes, never past the
 // lease (review 2). Every write then goes through PostgREST and Storage exactly like the browser's.
+// Owner (421) א, 18 November 2026: the token may instead be signed ES256 with the private half of a P-256 key the owner
+// imported into Supabase as a STANDBY signing key (Supabase keeps signing sessions with its own key; PostgREST and Storage
+// accept every key of the project's JWKS). THIS FILE IS ALSO THE ONLY READER OF BACKGROUND_JWT_PRIVATE_JWK (a JSON JWK:
+// kty EC, crv P-256, d, x, y, kid; as strong as the JWT secret). ES256 is used only while BACKGROUND_JWT_SIGNING is
+// "es256"; unset, empty or "hs256" = HS256 exactly as before. Any other switch value, or "es256" with a missing or bad key,
+// signs nothing (fail closed, never HS256 instead) and writes one redacted line, background.token_key_invalid, naming
+// only the reason code.
 
 /** Raised when the database refused the claims (the job and the order were already ended there). */
 export class TokenRefused extends Error {
@@ -36,16 +44,68 @@ function userTokenSecret(): string | null {
   return secret && secret.length >= 32 ? secret : null;
 }
 
+type Signer = { alg: "HS256"; secret: string } | { alg: "ES256"; key: KeyObject; kid: string };
+type SignerState = { ok: true; signer: Signer } | { ok: false; reason: "not_configured" | "key_invalid" | "signing_unknown" };
+
+const B64URL = /^[A-Za-z0-9_-]+$/;
+const KID = /^[A-Za-z0-9_.:-]{1,128}$/;
+
+/** The standby ES256 key from its JWK text, or null when it is not a P-256 private key with a kid (never says why). */
+function standbyKey(text: string | undefined): { key: KeyObject; kid: string } | null {
+  if (!text || text.length > 4096) return null;
+  try {
+    const jwk: unknown = JSON.parse(text);
+    if (!jwk || typeof jwk !== "object" || Array.isArray(jwk)) return null;
+    const { kty, crv, d, x, y, kid, alg, use } = jwk as Record<string, unknown>;
+    if (kty !== "EC" || crv !== "P-256") return null;
+    if (alg !== undefined && alg !== "ES256") return null;
+    if (use !== undefined && use !== "sig") return null;
+    if (typeof kid !== "string" || !KID.test(kid)) return null;
+    if (typeof d !== "string" || typeof x !== "string" || typeof y !== "string") return null;
+    if (![d, x, y].every((part) => B64URL.test(part) && Buffer.from(part, "base64url").length === 32)) return null;
+    const key = createPrivateKey({ key: { kty, crv, d, x, y }, format: "jwk" });
+    if (key.asymmetricKeyType !== "ec" || key.asymmetricKeyDetails?.namedCurve !== "prime256v1") return null;
+    // the public half the JWK states must be the one d makes (a pasted mix of two keys is refused)
+    const own = createPublicKey(key).export({ format: "jwk" });
+    if (own.x !== x || own.y !== y) return null;
+    return { key, kid };
+  } catch {
+    return null;
+  }
+}
+
+let invalidLogged = false;
+
+/** The signer the environment asks for; a refusal is logged once per process, by reason code only. */
+function userTokenSigner(): SignerState {
+  const mode = (process.env.BACKGROUND_JWT_SIGNING ?? "").trim().toLowerCase();
+  let state: SignerState;
+  if (mode === "" || mode === "hs256") {
+    const secret = userTokenSecret();
+    return secret ? { ok: true, signer: { alg: "HS256", secret } } : { ok: false, reason: "not_configured" };
+  } else if (mode === "es256") {
+    const standby = standbyKey(process.env.BACKGROUND_JWT_PRIVATE_JWK?.trim());
+    state = standby ? { ok: true, signer: { alg: "ES256", ...standby } } : { ok: false, reason: "key_invalid" };
+  } else {
+    state = { ok: false, reason: "signing_unknown" };
+  }
+  if (!state.ok && !invalidLogged) {
+    invalidLogged = true;
+    logEvent("error", "background.token_key_invalid", { reason: state.reason });
+  }
+  return state;
+}
+
 /** True when the worker can act for a person (the import wizard and the export page offer the background path). */
 export function backgroundJobsReady(): boolean {
-  return userTokenSecret() !== null && getSupabaseEnv() !== null;
+  return userTokenSigner().ok && getSupabaseEnv() !== null;
 }
 
 const base64url = (input: Buffer | string) => Buffer.from(input).toString("base64url");
 
-/** Module-private: an HS256 token with exactly the database's claims, until `expSeconds`. */
-function signUserToken(claims: TokenClaims, secret: string, iatSeconds: number, expSeconds: number): string {
-  const header = base64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+/** Module-private: a token with exactly the database's claims, until `expSeconds`, HS256 or ES256 by the signer. */
+function signUserToken(claims: TokenClaims, signer: Signer, iatSeconds: number, expSeconds: number): string {
+  const header = base64url(JSON.stringify(signer.alg === "ES256" ? { alg: "ES256", typ: "JWT", kid: signer.kid } : { alg: "HS256", typ: "JWT" }));
   const payload = base64url(
     JSON.stringify({
       aud: "authenticated",
@@ -58,8 +118,12 @@ function signUserToken(claims: TokenClaims, secret: string, iatSeconds: number, 
       exp: expSeconds,
     }),
   );
-  const signature = createHmac("sha256", secret).update(`${header}.${payload}`).digest("base64url");
-  return `${header}.${payload}.${signature}`;
+  const input = `${header}.${payload}`;
+  const signature =
+    signer.alg === "ES256"
+      ? signWith("sha256", Buffer.from(input), { key: signer.key, dsaEncoding: "ieee-p1363" }).toString("base64url")
+      : createHmac("sha256", signer.secret).update(input).digest("base64url");
+  return `${input}.${signature}`;
 }
 
 /** Signing again this long before the token runs out (each time after asking the database again). */
@@ -100,8 +164,8 @@ export function createBackgroundTokenSource(
       if (refusal) throw new TokenRefused(refusal);
       const seconds = Math.floor(now() / 1000);
       if (current && seconds < expiresAt - REFRESH_BEFORE_SECONDS) return current;
-      const secret = userTokenSecret();
-      if (!secret) return refuse("not_configured");
+      const signing = userTokenSigner();
+      if (!signing.ok) return refuse(signing.reason);
       const { data, error } = await service.rpc("background_job_token", { p_job: job.id, p_lease: job.lease, p_legal_version: AGREEMENT_VERSION });
       if (error) throw new Error("token check failed");
       const answer = parseTokenAnswer(data, requestId);
@@ -110,7 +174,7 @@ export function createBackgroundTokenSource(
       // review 2: never past the lease's end
       const exp = Math.min(seconds + USER_TOKEN_SECONDS, answer.lockedUntilSeconds);
       if (exp <= seconds) return refuse("stale");
-      current = signUserToken(answer.claims, secret, seconds, exp);
+      current = signUserToken(answer.claims, signing.signer, seconds, exp);
       expiresAt = exp;
       return current;
     },

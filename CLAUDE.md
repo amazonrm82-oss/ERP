@@ -433,7 +433,12 @@ and build this CRM here instead. The old code is preserved on the branch
    version and registered in `app.agreement_texts`; and the right of the work (`app.can_import` or the owner) judged with the person's
    own claims. It logs the signing in `app.platform_log` (`background.token`, ids only) and answers sub, role authenticated, the lower of
    the order's and the session's current aal, the session id, `crm_background` (the order) and the lease's end. The token is HS256, 10
-   minutes and never past the lease; a refusal ends the job and the order with a notice. The worker runs the browser path's own code
+   minutes and never past the lease; since owner (421) א (18 November 2026; an independent review) it is ES256 instead while
+   `BACKGROUND_JWT_SIGNING=es256`, signed with the P-256 JWK `BACKGROUND_JWT_PRIVATE_JWK` (the same file is its ONLY reader; lint refuses
+   the name elsewhere) whose public key the owner imported into Supabase as a STANDBY key (kid in the header; never rotated); a bad key or
+   an unknown switch value refuses every signing and `backgroundJobsReady()` is false (one redacted `background.token_key_invalid`
+   line), never a silent HS256; the legacy secret stays until the switch is proven live (proof on the local stack:
+   `tests/e2e/background-token-es256.mjs`, needs `BG_ES256_RESTART_OK=1`, passed 18 November 2026); a refusal ends the job and the order with a notice. The worker runs the browser path's own code
    (`src/features/imports/run-core.ts`, `buildFullExport`) through PostgREST and Storage, so every write is the person's. Trigger
    `audit_log_background` stamps `changes.background = {request_id}` on the person's non-delete audit entries while the claim names
    their running order of that business. A background import only skips or updates duplicates (`background_requests.duplicate_mode`).

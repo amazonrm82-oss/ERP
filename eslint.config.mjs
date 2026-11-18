@@ -33,21 +33,24 @@ const readAndDesignSelectors = [
   }),
 ];
 
-// IMP-04 (owner (160) א): SUPABASE_JWT_SECRET (the project's JWT secret, as strong as the service key) is read in ONE file
-// only, the background job worker's signer. Its name anywhere else in src is refused: process.env.X, process.env["X"] and
-// destructuring alike.
+// IMP-04 (owner (160) א, (421) א): SUPABASE_JWT_SECRET (the project's JWT secret, as strong as the service key) and
+// BACKGROUND_JWT_PRIVATE_JWK (the private half of the standby ES256 signing key the owner imported into Supabase, just as
+// strong) are read in ONE file only, the background job worker's signer. Their names anywhere else in src are refused:
+// process.env.X, process.env["X"] and destructuring alike.
 const JWT_SECRET_SIGNER = "src/features/background/user-token.ts";
-const jwtSecretSelectors = [
-  "MemberExpression[property.name='SUPABASE_JWT_SECRET']",
-  "MemberExpression[property.value='SUPABASE_JWT_SECRET']",
-  "Property[key.name='SUPABASE_JWT_SECRET']",
-  "Property[key.value='SUPABASE_JWT_SECRET']",
-  "Literal[value='SUPABASE_JWT_SECRET']",
-  "TemplateElement[value.raw=/SUPABASE_JWT_SECRET/]",
-].map((selector) => ({
-  selector,
-  message: "SUPABASE_JWT_SECRET is read only by the background job worker's signer (src/features/background/user-token.ts), owner (160) א.",
-}));
+const jwtSecretSelectors = ["SUPABASE_JWT_SECRET", "BACKGROUND_JWT_PRIVATE_JWK"].flatMap((name) =>
+  [
+    `MemberExpression[property.name='${name}']`,
+    `MemberExpression[property.value='${name}']`,
+    `Property[key.name='${name}']`,
+    `Property[key.value='${name}']`,
+    `Literal[value='${name}']`,
+    `TemplateElement[value.raw=/${name}/]`,
+  ].map((selector) => ({
+    selector,
+    message: `${name} is read only by the background job worker's signer (src/features/background/user-token.ts), owner (160) א and (421) א.`,
+  })),
+);
 
 // FXS-12 (owner (281) א): SUPABASE_SECRET_KEY (the project's sb_secret_ key) is read in ONE file only, the sign-in
 // forwarding client, and only the auth actions import that file.

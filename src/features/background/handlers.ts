@@ -74,8 +74,10 @@ async function begin(deps: BackgroundDeps, job: ClaimedJob, kind: "import" | "ex
 }
 
 /**
- * A refresh the database refused (TokenRefused, raised from inside a client call) already ended the job and the order
- * there: the handler stops at once and reports nothing more.
+ * A refresh refused (TokenRefused, raised from inside a client call) stops the handler at once. A refusal from the database
+ * already ended the job and the order there; a local refusal (key_invalid, signing_unknown, not_configured) never reached the
+ * database, but cannot happen here in practice: handlers are registered only while backgroundJobsReady() is true, and the
+ * environment does not change inside a process.
  */
 function stopOnRefusal(handler: JobHandler): JobHandler {
   return async (job) => {
