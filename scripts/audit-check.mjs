@@ -1,15 +1,23 @@
 #!/usr/bin/env node
 // FXS-06 / OPS-05, owner (433) א (18 November 2026): the CI check of known vulnerabilities in what the app ships.
 //
-// Runs `npm audit --omit=dev --json` and fails on any finding of severity high or critical that is not on the allowlist
-// (scripts/audit-allowlist.json). A moderate or low finding that is not listed only prints a note, as
-// `npm audit --audit-level=high` did. Each allowlist entry names the exact package, the GHSA ids it carries, the exact
-// install paths (npm audit's `nodes`) it is allowed at, and the reason. The owner allowed these findings only because they
-// sit in Sentry's build-time code, so:
-// - a listed finding installed at any path the entry does not name (the same advisory reaching the app through a runtime
-//   dependency) fails;
-// - an entry that matches no finding fails (the list must say exactly what npm audit reports);
-// - an entry without a package, GHSA ids, paths or reason, or with a wildcard, fails;
+// Runs `npm audit --omit=dev --json` and fails on any finding of severity high or critical that is not covered by the
+// allowlist (scripts/audit-allowlist.json). A moderate or low finding that touches nothing on the allowlist only prints a
+// note, as `npm audit --audit-level=high` did. The allowlist names ONLY the root vulnerable packages (the ones that carry an
+// advisory themselves): the exact package, its severity, the exact GHSA ids npm audit gives for it, the exact install paths
+// (npm audit's `nodes`), every chain of packages through which the app reaches each path (from the app's direct dependency
+// down, read from package-lock.json), and the reason. The owner allowed these findings only because they sit in Sentry's
+// build-time code, so:
+// - a root finding is covered only when its ids, paths and chains are exactly the entry's and its severity is not above the
+//   entry's: any other package depending on the vulnerable copy (a runtime dependency resolving to the same hoisted folder,
+//   say) adds a chain and fails, an id or chain npm audit or the lockfile no longer gives fails (the list must say exactly
+//   what is there), a new advisory on the package fails;
+// - a parent finding (one npm audit reports only because it depends on a vulnerable package, like @sentry/nextjs) is not
+//   listed: it is covered when every `via` it has is a covered finding, it carries no advisory of its own, every install path
+//   of it lies on a chain of each root it reaches, and its severity is not above theirs;
+// - any finding, whatever its severity, that reaches an allowlisted advisory but is not covered fails;
+// - an entry for a package npm audit does not report fails, and so does one for a package that carries no advisory itself;
+// - an entry without a package, severity, GHSA ids, paths, chains or reason, or with a wildcard, fails;
 // - an advisory npm audit gives without a GHSA id fails (it cannot be judged);
 // - after `recheck_by` (a real calendar date, read as an Israel date) the check fails until the date is renewed or the
 //   findings are gone;
@@ -163,6 +171,29 @@ export function chainTo(lock, node) {
   return null;
 }
 
+/**
+ * Every chain through which this app reaches the installed copy at `node`, as "a > b > node" strings of lock paths, from
+ * the app's direct dependency down. A package that depends on a copy but does not itself lead back to the app gives a
+ * chain starting with "(not reached from the app)", which no allowlist can name. Cycles are not routes and are skipped.
+ */
+export function chainsTo(lock, node, limit = 200) {
+  const found = new Set();
+  const walk = (path, below, seen) => {
+    if (found.size >= limit) return;
+    const dependents = dependentsOf(lock, path, nameOf(path));
+    if (dependents.length === 0) {
+      found.add(["(not reached from the app)", path, ...below].join(" > "));
+      return;
+    }
+    for (const dependent of dependents) {
+      if (dependent.path === "") found.add([path, ...below].join(" > "));
+      else if (!seen.has(dependent.path)) walk(dependent.path, [path, ...below], new Set([...seen, dependent.path]));
+    }
+  };
+  walk(node, [], new Set([node]));
+  return [...found].sort();
+}
+
 // ---------------------------------------------------------------- the allowlist
 
 const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -176,14 +207,25 @@ export function calendarDate(value) {
   return check.getUTCFullYear() === y && check.getUTCMonth() === mo - 1 && check.getUTCDate() === d ? value : null;
 }
 
-/** Why an allowlist entry cannot be used, or null: package, GHSA ids, the install paths it is allowed at, and a reason. */
+const RANK = { info: 0, low: 1, moderate: 2, high: 3, critical: 4 };
+const EXACT_PATH = (p) => typeof p === "string" && p.startsWith("node_modules/") && !/[*?\s]/.test(p);
+const chainParts = (chain) => chain.split(" > ");
+
+/** Why an allowlist entry cannot be used, or null: package, severity, GHSA ids, install paths, their chains, and a reason. */
 function entryProblem(entry) {
   if (!entry || typeof entry !== "object") return "not an object";
   if (typeof entry.package !== "string" || entry.package.trim() === "" || /[*?]/.test(entry.package)) return "no exact package name";
+  if (!Object.hasOwn(RANK, entry.severity)) return "no severity (info, low, moderate, high or critical)";
   if (!Array.isArray(entry.advisories) || entry.advisories.length === 0) return "no advisory ids";
   if (entry.advisories.some((id) => canonicalId(id) === null)) return "an advisory id that is not GHSA-xxxx-xxxx-xxxx";
   if (!Array.isArray(entry.paths) || entry.paths.length === 0) return "no install paths";
-  if (entry.paths.some((p) => typeof p !== "string" || !p.startsWith("node_modules/") || /[*?]/.test(p))) return "an install path that is not an exact node_modules path";
+  if (!entry.paths.every(EXACT_PATH)) return "an install path that is not an exact node_modules path";
+  if (!Array.isArray(entry.chains) || entry.chains.length === 0) return "no dependent chains";
+  for (const chain of entry.chains) {
+    if (typeof chain !== "string" || !chainParts(chain).every(EXACT_PATH)) return "a chain that is not exact node_modules paths joined by \" > \"";
+    if (!entry.paths.includes(chainParts(chain).at(-1))) return `a chain that does not end at one of its install paths: ${chain}`;
+  }
+  for (const path of entry.paths) if (!entry.chains.some((c) => chainParts(c).at(-1) === path)) return `no chain for install path ${path}`;
   if (typeof entry.reason !== "string" || entry.reason.trim() === "") return "no reason";
   return null;
 }
@@ -253,8 +295,86 @@ export function decide({ audit, lock, allowlist, published, registry, now }) {
     failures.push(`the allowlist's recheck_by date ${allowlist.recheck_by} has passed: look at the findings again, then fix them or renew the date`);
   }
 
-  const usedEntries = new Set();
+  const byPackage = new Map(usable.map((e) => [e.package, e]));
+  const allowedIds = new Set(usable.flatMap((e) => e.advisories.map((id) => `${canonicalId(id)}:${e.package}`)));
+  const ownAdvisories = (finding) => rootAdvisories({ [finding.name]: { ...finding, via: (finding.via ?? []).filter((v) => typeof v !== "string") } }, finding.name);
+
+  // whether a finding is covered: { covered, entries (the root entries it stands on), problems (why not, when known) }
+  const memo = new Map();
+  const cover = (name) => {
+    if (memo.has(name)) return memo.get(name);
+    // blocked: not covered only because something it stands on is not (that one's failure names the cause)
+    const result = { covered: false, blocked: false, entries: new Set(), problems: [] };
+    memo.set(name, result); // a cycle in `via` is not covered
+    const finding = vulnerabilities[name];
+    if (!finding) return result;
+    const own = ownAdvisories({ ...finding, name });
+    const ownIds = [...new Set(own.map((a) => a.id))].sort();
+    const parents = (finding.via ?? []).filter((v) => typeof v === "string");
+    const nodes = Array.isArray(finding.nodes) ? finding.nodes : [];
+    const entry = byPackage.get(name);
+    const label = `${name} (${finding.severity}; ${ownIds.join(", ") || "no advisory of its own"})`;
+    if (ownIds.includes(null) || nodes.length === 0) {
+      if (nodes.length === 0) result.problems.push(`${label}: npm audit gives no install path`);
+      return result;
+    }
+    if (ownIds.length > 0) {
+      if (!entry) return result;
+      const listed = [...new Set(entry.advisories.map(canonicalId))].sort();
+      const unlisted = ownIds.filter((id) => !listed.includes(id));
+      const stale = listed.filter((id) => !ownIds.includes(id));
+      if (unlisted.length > 0) result.problems.push(`${label} carries an advisory its allowlist entry does not name: ${unlisted.join(", ")}`);
+      if (stale.length > 0) result.problems.push(`allowlist entry ${name} lists ${stale.join(", ")}, which npm audit no longer reports for it; remove the id`);
+      if (RANK[finding.severity] === undefined || RANK[finding.severity] > RANK[entry.severity]) {
+        result.problems.push(`${label} is more severe than its allowlist entry (${entry.severity})`);
+      }
+      const outside = nodes.filter((n) => !entry.paths.includes(n));
+      const gone = entry.paths.filter((p) => !nodes.includes(p));
+      if (outside.length > 0) result.problems.push(`${label} is installed at a path the allowlist does not name: ${outside.join(", ")}`);
+      if (gone.length > 0) result.problems.push(`allowlist entry ${name} names an install path npm audit no longer reports: ${gone.join(", ")}; remove it`);
+      for (const node of nodes.filter((n) => entry.paths.includes(n))) {
+        const actual = chainsTo(lock, node);
+        const expected = entry.chains.filter((c) => chainParts(c).at(-1) === node);
+        const extra = actual.filter((c) => !expected.includes(c));
+        const missing = expected.filter((c) => !actual.includes(c));
+        if (extra.length > 0) {
+          // another package depends on the vulnerable copy (a runtime dependency resolving to the same folder, say)
+          result.problems.push(`${label} at ${node} is also reached through a chain the allowlist does not name: ${extra.join("; ")}`);
+        }
+        if (missing.length > 0) result.problems.push(`allowlist entry ${name} names a chain the lockfile no longer has: ${missing.join("; ")}; remove it`);
+      }
+      result.entries.add(entry);
+    } else {
+      if (entry) result.problems.push(`allowlist entry ${name} names a package that carries no advisory itself: list only the root packages`);
+      if (parents.length === 0) return result;
+    }
+    for (const parent of parents) {
+      const sub = cover(parent);
+      if (!sub.covered) {
+        if (sub.problems.length > 0 || sub.blocked) result.blocked = true;
+        else result.problems.push(`${label} stands on ${parent}, which the allowlist does not cover`);
+        continue;
+      }
+      for (const e of sub.entries) result.entries.add(e);
+    }
+    if (parents.length > 0 && !result.blocked && result.entries.size > 0) {
+      for (const e of result.entries) {
+        if (e === entry) continue;
+        const onChain = (n) => e.chains.some((c) => chainParts(c).slice(0, -1).includes(n));
+        const off = nodes.filter((n) => !onChain(n));
+        if (off.length > 0) result.problems.push(`${label} is installed at ${off.join(", ")}, which is not on a chain the allowlist names for ${e.package}`);
+      }
+      const ceiling = Math.max(...[...result.entries].map((e) => RANK[e.severity]));
+      if (ownIds.length === 0 && !(RANK[finding.severity] <= ceiling)) {
+        result.problems.push(`${label} is more severe than the allowlist entries it stands on`);
+      }
+    }
+    result.covered = result.problems.length === 0 && !result.blocked && result.entries.size > 0;
+    return result;
+  };
+
   const allowedAdvisories = new Map();
+  const silent = [];
   for (const [name, finding] of Object.entries(vulnerabilities)) {
     const advisories = rootAdvisories(vulnerabilities, name);
     const unnamed = advisories.filter((a) => a.id === null);
@@ -262,26 +382,25 @@ export function decide({ audit, lock, allowlist, published, registry, now }) {
       failures.push(`${name}: npm audit gives an advisory without a GHSA id (${unnamed.map((a) => a.package).join(", ")}): it cannot be judged`);
       continue;
     }
-    const ids = advisories.map((a) => a.id);
-    const nodes = Array.isArray(finding.nodes) ? finding.nodes : [];
+    const ids = [...new Set(advisories.map((a) => a.id))];
     const label = `${name} (${finding.severity}; ${ids.join(", ") || "no advisory"})`;
-    const entry = usable.find((e) => e.package === name && ids.length > 0 && ids.every((id) => e.advisories.map(canonicalId).includes(id)));
-    if (!entry) {
-      if (FAILING.has(finding.severity)) failures.push(`not on the allowlist: ${label}`);
-      else notes.push(`not on the allowlist (does not fail at this severity): ${label}`);
+    const verdict = cover(name);
+    if (verdict.covered) {
+      for (const a of ownAdvisories({ ...finding, name })) allowedAdvisories.set(`${a.id}:${a.package}`, a);
       continue;
     }
-    usedEntries.add(entry);
-    const outside = nodes.length === 0 ? ["(no install path given)"] : nodes.filter((node) => !entry.paths.includes(node));
-    if (outside.length > 0) {
-      // the same advisory reached through another path (a runtime dependency, say) is not what the owner allowed
-      failures.push(`${label} is installed at a path the allowlist does not name: ${outside.join(", ")}`);
-      continue;
-    }
-    for (const a of advisories) allowedAdvisories.set(`${a.id}:${a.package}`, a);
+    if (advisories.some((a) => allowedIds.has(`${a.id}:${a.package}`)) || byPackage.has(name)) {
+      // it touches what the owner allowed, but not the way he allowed it: fails whatever its severity
+      if (verdict.problems.length > 0) failures.push(...verdict.problems);
+      else if (verdict.blocked) silent.push(label);
+      else failures.push(`not covered by the allowlist although it reaches an allowlisted advisory: ${label}`);
+    } else if (FAILING.has(finding.severity)) failures.push(`not on the allowlist: ${label}`);
+    else notes.push(`not on the allowlist (does not fail at this severity): ${label}`);
   }
+  // a finding blocked by another is named only when no failure names the cause (it can never pass silently)
+  if (failures.length === 0) for (const label of silent) failures.push(`not covered by the allowlist although it reaches an allowlisted advisory: ${label}`);
   for (const entry of usable) {
-    if (!usedEntries.has(entry)) failures.push(`allowlist entry no longer matches any finding: ${entry.package} (${entry.advisories.join(", ")}); remove it`);
+    if (!vulnerabilities[entry.package]) failures.push(`allowlist entry no longer matches any finding: ${entry.package} (${entry.advisories.join(", ")}); remove it`);
   }
 
   // a fixed version an update can take

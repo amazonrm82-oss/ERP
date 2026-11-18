@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { calendarDate, chainTo, decide, rootAdvisories, satisfies } from "../../scripts/audit-check.mjs";
+import { calendarDate, chainTo, chainsTo, decide, rootAdvisories, satisfies } from "../../scripts/audit-check.mjs";
 
 const ROOT = join(__dirname, "..", "..");
 const readJson = (path: string) => JSON.parse(readFileSync(join(ROOT, path), "utf8"));
@@ -24,15 +24,21 @@ const run = (over: Partial<Parameters<typeof decide>[0]> = {}) =>
   decide({ audit: AUDIT, lock: LOCK, allowlist: ALLOWLIST, published: PUBLISHED, now: BEFORE, ...over });
 
 describe("audit-check: the decision on a captured report", () => {
-  it("passes with the owner's allowlist, which lists exactly what npm audit reports", () => {
+  it("passes with the owner's allowlist, which lists only the root packages, exactly as npm audit and the lockfile give them", () => {
     const result = run();
     expect(result.failures).toEqual([]);
     expect(result.ok).toBe(true);
-    expect(ALLOWLIST.entries.map((e: { package: string }) => e.package).sort()).toEqual(Object.keys(AUDIT.vulnerabilities).sort());
+    // the runtime @sentry/* packages are never listed: they are covered as parents through the build-time chain
+    expect(ALLOWLIST.entries.map((e: { package: string }) => e.package).sort()).toEqual(["glob", "minimatch"]);
     for (const entry of ALLOWLIST.entries) {
       expect(entry.reason).toBe("build-time only (Sentry bundler plugins), owner (433) א");
       expect(entry.paths).toEqual(AUDIT.vulnerabilities[entry.package].nodes);
+      expect([...entry.chains].sort()).toEqual(entry.paths.flatMap((node: string) => chainsTo(LOCK, node)).sort());
     }
+    expect(chainsTo(LOCK, "node_modules/glob")).toEqual([
+      "node_modules/@sentry/nextjs > node_modules/@sentry/bundler-plugins > node_modules/glob",
+      "node_modules/@sentry/nextjs > node_modules/@sentry/node > node_modules/@sentry/bundler-plugins > node_modules/glob",
+    ]);
     expect(ALLOWLIST.recheck_by).toBe("2026-12-15");
     expect(result.notes.join("\n")).toContain("a newer @sentry/bundler-plugins is needed");
   });
@@ -61,9 +67,14 @@ describe("audit-check: the decision on a captured report", () => {
     audit.vulnerabilities.glob.nodes.push("node_modules/some-runtime-lib/node_modules/glob");
     const result = run({ audit });
     expect(result.ok).toBe(false);
-    expect(result.failures).toEqual([
-      "glob (moderate; GHSA-3g3m-2fjr-6pw4, GHSA-g3hv-75wg-m249) is installed at a path the allowlist does not name: node_modules/some-runtime-lib/node_modules/glob",
-    ]);
+    expect(result.failures).toContain(
+      "glob (moderate; GHSA-3g3m-2fjr-6pw4) is installed at a path the allowlist does not name: node_modules/some-runtime-lib/node_modules/glob",
+    );
+    expect(result.failures).toContain(
+      "glob (moderate; GHSA-3g3m-2fjr-6pw4) is installed at node_modules/some-runtime-lib/node_modules/glob, which is not on a chain the allowlist names for minimatch",
+    );
+    // the parents standing on it are no longer covered, and add no noise of their own
+    expect(result.failures).toHaveLength(2);
   });
 
   it("a listed package with a new advisory is not covered by its old entry", () => {
@@ -71,20 +82,29 @@ describe("audit-check: the decision on a captured report", () => {
     audit.vulnerabilities.minimatch.severity = "critical";
     audit.vulnerabilities.minimatch.via.push({ name: "minimatch", url: "https://github.com/advisories/GHSA-zzzz-yyyy-xxxx", range: "<=11.0.9", severity: "critical" });
     const result = run({ audit });
-    expect(result.failures.join("\n")).toContain("not on the allowlist: minimatch (critical;");
-    // and its entry, now matching nothing, fails too
-    expect(result.failures.join("\n")).toContain("allowlist entry no longer matches any finding: minimatch");
+    expect(result.ok).toBe(false);
+    expect(result.failures).toContain(
+      "minimatch (critical; GHSA-g3hv-75wg-m249, GHSA-zzzz-yyyy-xxxx) carries an advisory its allowlist entry does not name: GHSA-zzzz-yyyy-xxxx",
+    );
+    expect(result.failures).toContain("minimatch (critical; GHSA-g3hv-75wg-m249, GHSA-zzzz-yyyy-xxxx) is more severe than its allowlist entry (moderate)");
   });
 
   it("an entry that matches no finding fails", () => {
     const allowlist = clone(ALLOWLIST);
-    allowlist.entries.push({ package: "picomatch", advisories: ["GHSA-fc5q-39xc-vjpf"], paths: ["node_modules/picomatch"], reason: "build-time only" });
+    allowlist.entries.push({
+      package: "picomatch",
+      severity: "moderate",
+      advisories: ["GHSA-fc5q-39xc-vjpf"],
+      paths: ["node_modules/picomatch"],
+      chains: ["node_modules/@sentry/nextjs > node_modules/picomatch"],
+      reason: "build-time only",
+    });
     const result = run({ allowlist });
     expect(result.ok).toBe(false);
     expect(result.failures).toEqual(["allowlist entry no longer matches any finding: picomatch (GHSA-fc5q-39xc-vjpf); remove it"]);
   });
 
-  it("an entry with no ids, a wildcard, no paths or no reason cannot be used", () => {
+  it("an entry with no ids, severity, chains, a wildcard, no paths or no reason cannot be used", () => {
     const base = ALLOWLIST.entries.find((e: { package: string }) => e.package === "minimatch");
     const cases: [Record<string, unknown>, string][] = [
       [{ ...base, advisories: [] }, "no advisory ids"],
@@ -93,6 +113,11 @@ describe("audit-check: the decision on a captured report", () => {
       [{ ...base, paths: [] }, "no install paths"],
       [{ ...base, paths: ["node_modules/*"] }, "an install path that is not an exact node_modules path"],
       [{ ...base, reason: " " }, "no reason"],
+      [{ ...base, severity: undefined }, "no severity (info, low, moderate, high or critical)"],
+      [{ ...base, severity: "severe" }, "no severity (info, low, moderate, high or critical)"],
+      [{ ...base, chains: [] }, "no dependent chains"],
+      [{ ...base, chains: ["node_modules/@sentry/* > node_modules/glob/node_modules/minimatch"] }, "a chain that is not exact node_modules paths"],
+      [{ ...base, chains: ["node_modules/@sentry/nextjs > node_modules/glob"] }, "a chain that does not end at one of its install paths"],
     ];
     for (const [entry, problem] of cases) {
       const allowlist = { ...ALLOWLIST, entries: ALLOWLIST.entries.map((e: { package: string }) => (e.package === "minimatch" ? entry : e)) };
@@ -153,6 +178,102 @@ describe("audit-check: the decision on a captured report", () => {
       { name: "@sentry/nextjs", range: "11.10.0" },
       { name: "@sentry/bundler-plugins", range: "11.10.0" },
       { name: "glob", range: "^13.0.6" },
+    ]);
+  });
+
+  it("fails when a runtime package depends on the same hoisted copy (install location alone is not enough)", () => {
+    // a non-dev package declaring glob@^13 resolves to the very node_modules/glob the allowlist names
+    const lock = clone(LOCK);
+    lock.packages[""].dependencies["runtime-lib"] = "^1.0.0";
+    lock.packages["node_modules/runtime-lib"] = { version: "1.0.0", dependencies: { glob: "^13.0.0" } };
+    const result = run({ lock });
+    expect(result.ok).toBe(false);
+    expect(result.failures).toContain(
+      "glob (moderate; GHSA-3g3m-2fjr-6pw4) at node_modules/glob is also reached through a chain the allowlist does not name: node_modules/runtime-lib > node_modules/glob",
+    );
+    // a runtime package depending on the bundler plugins one level up is caught on both roots
+    const lock2 = clone(LOCK);
+    lock2.packages[""].dependencies["runtime-lib"] = "^1.0.0";
+    lock2.packages["node_modules/runtime-lib"] = { version: "1.0.0", dependencies: { "@sentry/bundler-plugins": "11.10.0" } };
+    const failures = run({ lock: lock2 }).failures.join("\n");
+    expect(failures).toContain("node_modules/runtime-lib > node_modules/@sentry/bundler-plugins > node_modules/glob");
+    expect(failures).toContain("node_modules/runtime-lib > node_modules/@sentry/bundler-plugins > node_modules/glob > node_modules/glob/node_modules/minimatch");
+    // a dev package depending on it changes nothing: it is not shipped
+    const lock3 = clone(LOCK);
+    lock3.packages["node_modules/dev-lib"] = { version: "1.0.0", dev: true, dependencies: { glob: "^13.0.0" } };
+    expect(run({ lock: lock3 }).ok).toBe(true);
+  });
+
+  it("covers the parents only while every via leads to allowlisted advisories through the named chain", () => {
+    const result = run();
+    expect(result.ok).toBe(true);
+    // a parent with a via the allowlist does not cover fails, even at moderate
+    const audit = clone(AUDIT);
+    audit.vulnerabilities["@sentry/node"].via.push("left-pad");
+    audit.vulnerabilities["left-pad"] = {
+      name: "left-pad",
+      severity: "moderate",
+      via: [{ name: "left-pad", url: "https://github.com/advisories/GHSA-aaaa-bbbb-cccc", range: "<2.0.0", severity: "moderate" }],
+      nodes: ["node_modules/left-pad"],
+    };
+    const failed = run({ audit });
+    expect(failed.ok).toBe(false);
+    expect(failed.failures).toEqual(["@sentry/node (moderate; no advisory of its own) stands on left-pad, which the allowlist does not cover"]);
+    // a parent with an advisory of its own is not a parent: it fails as usual
+    const own = clone(AUDIT);
+    own.vulnerabilities["@sentry/nextjs"].via.push({ name: "@sentry/nextjs", url: "https://github.com/advisories/GHSA-1111-2222-3333", range: "<99", severity: "low" });
+    expect(run({ audit: own }).failures).toEqual([
+      "not covered by the allowlist although it reaches an allowlisted advisory: @sentry/nextjs (moderate; GHSA-3g3m-2fjr-6pw4, GHSA-g3hv-75wg-m249, GHSA-1111-2222-3333)",
+    ]);
+    // a parent installed off the named chain fails
+    const off = clone(AUDIT);
+    off.vulnerabilities["@sentry/node"].nodes = ["node_modules/other/node_modules/@sentry/node"];
+    expect(run({ audit: off }).failures.join("\n")).toContain("is not on a chain the allowlist names for glob");
+    // listing a parent is refused: only roots go on the list
+    const allowlist = clone(ALLOWLIST);
+    allowlist.entries.push({ ...ALLOWLIST.entries[0], package: "@sentry/nextjs", paths: ["node_modules/@sentry/nextjs"], chains: ["node_modules/@sentry/nextjs"] });
+    expect(run({ allowlist }).failures).toContain(
+      "allowlist entry @sentry/nextjs names a package that carries no advisory itself: list only the root packages",
+    );
+  });
+
+  it("fails when a finding is more severe than its entry, also through a parent", () => {
+    const audit = clone(AUDIT);
+    audit.vulnerabilities.glob.severity = "high";
+    audit.vulnerabilities.glob.via[0].severity = "high";
+    expect(run({ audit }).failures).toContain("glob (high; GHSA-3g3m-2fjr-6pw4) is more severe than its allowlist entry (moderate)");
+    const parent = clone(AUDIT);
+    parent.vulnerabilities["@sentry/nextjs"].severity = "critical";
+    expect(run({ audit: parent }).failures).toEqual([
+      "@sentry/nextjs (critical; no advisory of its own) is more severe than the allowlist entries it stands on",
+    ]);
+  });
+
+  it("fails when an entry lists an id, a path or a chain npm audit or the lockfile no longer gives", () => {
+    const allowlist = clone(ALLOWLIST);
+    allowlist.entries[0].advisories.push("GHSA-g3hv-75wg-m249");
+    expect(run({ allowlist }).failures).toEqual([
+      "allowlist entry glob lists GHSA-g3hv-75wg-m249, which npm audit no longer reports for it; remove the id",
+    ]);
+    const chains = clone(ALLOWLIST);
+    chains.entries[0].chains.push("node_modules/@sentry/nextjs > node_modules/glob");
+    expect(run({ allowlist: chains }).failures).toEqual([
+      "allowlist entry glob names a chain the lockfile no longer has: node_modules/@sentry/nextjs > node_modules/glob; remove it",
+    ]);
+    const paths = clone(ALLOWLIST);
+    paths.entries[1].paths.push("node_modules/minimatch");
+    paths.entries[1].chains.push("node_modules/eslint > node_modules/minimatch");
+    expect(run({ allowlist: paths }).failures).toContain(
+      "allowlist entry minimatch names an install path npm audit no longer reports: node_modules/minimatch; remove it",
+    );
+  });
+
+  it("fails on a moderate finding that reaches an allowlisted advisory but is not covered", () => {
+    const audit = clone(AUDIT);
+    audit.vulnerabilities["other-tool"] = { name: "other-tool", severity: "moderate", via: ["glob"], nodes: ["node_modules/other-tool"] };
+    expect(run({ audit }).failures).toEqual([
+      "other-tool (moderate; no advisory of its own) is installed at node_modules/other-tool, which is not on a chain the allowlist names for glob",
+      "other-tool (moderate; no advisory of its own) is installed at node_modules/other-tool, which is not on a chain the allowlist names for minimatch",
     ]);
   });
 

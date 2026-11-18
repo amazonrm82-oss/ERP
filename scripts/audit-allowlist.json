@@ -2,31 +2,14 @@
   "recheck_by": "2026-12-15",
   "entries": [
     {
-      "package": "@sentry/nextjs",
-      "severity": "moderate",
-      "advisories": ["GHSA-3g3m-2fjr-6pw4", "GHSA-g3hv-75wg-m249"],
-      "paths": ["node_modules/@sentry/nextjs"],
-      "reason": "build-time only (Sentry bundler plugins), owner (433) א"
-    },
-    {
-      "package": "@sentry/node",
-      "severity": "moderate",
-      "advisories": ["GHSA-3g3m-2fjr-6pw4", "GHSA-g3hv-75wg-m249"],
-      "paths": ["node_modules/@sentry/node"],
-      "reason": "build-time only (Sentry bundler plugins), owner (433) א"
-    },
-    {
-      "package": "@sentry/bundler-plugins",
-      "severity": "moderate",
-      "advisories": ["GHSA-3g3m-2fjr-6pw4", "GHSA-g3hv-75wg-m249"],
-      "paths": ["node_modules/@sentry/bundler-plugins"],
-      "reason": "build-time only (Sentry bundler plugins), owner (433) א"
-    },
-    {
       "package": "glob",
       "severity": "moderate",
-      "advisories": ["GHSA-3g3m-2fjr-6pw4", "GHSA-g3hv-75wg-m249"],
+      "advisories": ["GHSA-3g3m-2fjr-6pw4"],
       "paths": ["node_modules/glob"],
+      "chains": [
+        "node_modules/@sentry/nextjs > node_modules/@sentry/bundler-plugins > node_modules/glob",
+        "node_modules/@sentry/nextjs > node_modules/@sentry/node > node_modules/@sentry/bundler-plugins > node_modules/glob"
+      ],
       "reason": "build-time only (Sentry bundler plugins), owner (433) א"
     },
     {
@@ -34,6 +17,10 @@
       "severity": "moderate",
       "advisories": ["GHSA-g3hv-75wg-m249"],
       "paths": ["node_modules/glob/node_modules/minimatch"],
+      "chains": [
+        "node_modules/@sentry/nextjs > node_modules/@sentry/bundler-plugins > node_modules/glob > node_modules/glob/node_modules/minimatch",
+        "node_modules/@sentry/nextjs > node_modules/@sentry/node > node_modules/@sentry/bundler-plugins > node_modules/glob > node_modules/glob/node_modules/minimatch"
+      ],
       "reason": "build-time only (Sentry bundler plugins), owner (433) א"
     }
   ]
