@@ -13,7 +13,7 @@ import { createPaymentLinkPageHandler } from "@/features/payment-links/page-hand
 import { createPaymentLinkRefundHandler } from "@/features/payment-links/refund-handler";
 import { paymentProvider } from "@/features/payment-links/providers/select";
 import { downloadEmailAttachment, EMAIL_ATTACHMENT_BUCKET } from "@/features/messaging/email-attachments-server";
-import { createSendHandler } from "@/features/messaging/send-handler";
+import { createSendHandler, marketingSmsEnabled } from "@/features/messaging/send-handler";
 import { messagingProviders } from "@/features/messaging/providers/select";
 import type { Json } from "@/lib/database.types";
 import { logEvent } from "@/lib/log";
@@ -78,6 +78,8 @@ export async function runJobsRoute(request: Request): Promise<Response> {
     "message.send": Object.keys(providers).length > 0
       ? createSendHandler({
           providerFor: (channel) => providers[channel] ?? null,
+          // SMS-05c (owner (431)): marketing SMS only once the owner sets SMS_MARKETING_ENABLED=on
+          smsMarketingOn: () => marketingSmsEnabled(process.env),
           maySend: async (job) => {
             const { data, error } = await supabase.rpc("job_message_may_send", { p_job: job.id, p_lease: job.lease });
             if (error) throw new Error("send check failed");

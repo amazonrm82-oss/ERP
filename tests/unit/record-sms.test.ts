@@ -241,7 +241,8 @@ describe("SMS-02: the send handler hands an SMS's ids to the provider", () => {
   });
 
   it("gives the fake provider the SMS parts of a card's SMS", async () => {
-    const handler = createSendHandler({ maySend: async () => ({ may_send: true }), providerFor: () => createFakeProvider({ channel: "sms" }) });
+    // SMS-05c: a marketing SMS goes only while marketing SMS are on
+    const handler = createSendHandler({ maySend: async () => ({ may_send: true }), providerFor: () => createFakeProvider({ channel: "sms" }), smsMarketingOn: () => true });
     const result = await handler(job({ channel: "sms", contact_id: id(4), deal_id: id(7), message_type: "marketing", template_id: id(5), sent_by_user_id: id(6) }));
     expect(result).toMatchObject({ status: "done" });
     expect(fakeSentMessages()[0]).toMatchObject({

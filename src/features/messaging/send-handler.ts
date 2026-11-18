@@ -107,6 +107,17 @@ function emailAttachmentCount(payload: Record<string, unknown>): number {
   return count(payload.file_ids) + count(payload.library_file_ids);
 }
 
+/**
+ * SMS-05c (owner (431), 18 November 2026): marketing SMS (every type that is not a service type, and a job queued without a
+ * type) stay off until the owner turns them on with SMS_MARKETING_ENABLED=on; any other value, or none, is off. Service
+ * messages (meeting reminders, requested documents, collection, verification codes, punch card notices, instant replies)
+ * always pass.
+ */
+export const MARKETING_SMS_OFF_CODE = "marketing_sms_off";
+export function marketingSmsEnabled(env: Record<string, string | undefined>): boolean {
+  return env.SMS_MARKETING_ENABLED === "on";
+}
+
 function parseAnswer(data: unknown): MaySendAnswer | null {
   if (!data || typeof data !== "object") return null;
   const r = data as Record<string, unknown>;
@@ -201,6 +212,8 @@ export function createSendHandler(deps: {
   loadAttachment?: (ref: EmailAttachmentRef, job: ClaimedJob, timeoutMs: number) => Promise<string | null>;
   // EML-01 delta review (1): the time left for this job, the lesser of its lease and the run (ms), null = unknown
   timeLeftMs?: (job: ClaimedJob) => number | null;
+  // SMS-05c: whether marketing SMS may go out (SMS_MARKETING_ENABLED=on); not given = off
+  smsMarketingOn?: () => boolean;
   now?: () => number;
 }): JobHandler {
   const now = deps.now ?? Date.now;
@@ -209,6 +222,14 @@ export function createSendHandler(deps: {
     if (!to) return { status: "failed", error: "payload", final: true };
     const provider = deps.providerFor(to.channel);
     if (!provider || provider.channel !== to.channel) return { status: "failed", error: "no provider for channel" };
+    // SMS-05c (owner (431)): a marketing SMS while marketing SMS are off ends here, before the send check, so nothing is
+    // counted (no day usage, no monthly SMS quota), composed, minted or sent, and InforU is never asked. The job ends
+    // refused with its code kept on the queue (the card's list shows it as not sent). Accepted: with no send check there is
+    // no public.messages row, so no timeline line and no sender notice (both need the send check, which counts the SMS,
+    // and giving that count back needs the composer's stamp; changing that needs a migration).
+    if (to.channel === "sms" && to.purpose === "marketing" && !(deps.smsMarketingOn?.() ?? false)) {
+      return { status: "failed", error: `refused ${MARKETING_SMS_OFF_CODE}`, final: true, receipt: { provider: null, errorCode: MARKETING_SMS_OFF_CODE } };
+    }
     // EML-01 delta review (1): an email that may not finish within its lease or the run is handed back uncounted before the
     // send check (nothing counted, nothing minted), so it is never cut off mid-upload
     if (provider.composes && to.channel === "email" && deps.timeLeftMs) {

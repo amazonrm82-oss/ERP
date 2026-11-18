@@ -20,6 +20,7 @@ const job = (payload: Record<string, unknown>): ClaimedJob => ({
   attempt: 1,
 });
 
+// SMS-05c: these cases test routing and receipts, so marketing SMS are switched on (the gate is tested in sms-05c.test.ts)
 describe("MSG-01: a provider per channel", () => {
   it("names one env variable per channel", () => {
     expect(MESSAGE_CHANNELS.map(providerEnvKey)).toEqual(["MESSAGING_PROVIDER_EMAIL", "MESSAGING_PROVIDER_SMS", "MESSAGING_PROVIDER_WHATSAPP"]);
@@ -62,7 +63,7 @@ describe("MSG-01: the send handler uses the job's channel's provider", () => {
   it("sends through the channel's provider only", async () => {
     const providers = messagingProviders({ MESSAGING_PROVIDER_SMS: "fake" });
     const maySend = vi.fn(async () => ({ may_send: true }));
-    const handler = createSendHandler({ maySend, providerFor: (channel) => providers[channel] ?? null });
+    const handler = createSendHandler({ maySend, smsMarketingOn: () => true, providerFor: (channel) => providers[channel] ?? null });
     const sms = await handler(job({ channel: "sms", lead_id: "44444444-4444-4444-8444-444444444444" }));
     expect(sms.status).toBe("done");
     // email has no provider: a failed try, and the database is not asked (nothing checked or recorded)
@@ -74,7 +75,7 @@ describe("MSG-01: the send handler uses the job's channel's provider", () => {
 
   it("never hands a job to a provider of another channel", async () => {
     const maySend = vi.fn(async () => ({ may_send: true }));
-    const handler = createSendHandler({ maySend, providerFor: () => createFakeProvider({ channel: "email" }) });
+    const handler = createSendHandler({ maySend, smsMarketingOn: () => true, providerFor: () => createFakeProvider({ channel: "email" }) });
     expect(await handler(job({ channel: "whatsapp", contact_id: "55555555-5555-4555-8555-555555555555" }))).toEqual({
       status: "failed",
       error: "no provider for channel",
@@ -104,10 +105,10 @@ describe("MSG-03: the provider's receipt reaches the queue", () => {
 
   it("a sent message carries the provider's code and its id; a failure its code and error code; never a cost", async () => {
     const provider = { ...createFakeProvider({ channel: "sms" }), send: async () => ({ ok: true as const, providerId: "p-1" }) };
-    const handler = createSendHandler({ maySend: async () => ({ may_send: true }), providerFor: () => provider });
+    const handler = createSendHandler({ maySend: async () => ({ may_send: true }), smsMarketingOn: () => true, providerFor: () => provider });
     expect(await handler(job({ channel: "sms", lead_id: lead }))).toEqual({ status: "done", receipt: { provider: "fake", providerMessageId: "p-1" } });
     const failing = { ...provider, send: async () => ({ ok: false as const, error: "rejected", final: true, code: "E.21" }) };
-    const h = createSendHandler({ maySend: async () => ({ may_send: true }), providerFor: () => failing });
+    const h = createSendHandler({ maySend: async () => ({ may_send: true }), smsMarketingOn: () => true, providerFor: () => failing });
     expect(await h(job({ channel: "sms", lead_id: lead }))).toEqual({
       status: "failed",
       error: "rejected",
@@ -115,7 +116,7 @@ describe("MSG-03: the provider's receipt reaches the queue", () => {
       receipt: { provider: "fake", errorCode: "E.21" },
     });
     const bare = { ...provider, send: async () => ({ ok: false as const, error: "down" }) };
-    const hb = createSendHandler({ maySend: async () => ({ may_send: true }), providerFor: () => bare });
+    const hb = createSendHandler({ maySend: async () => ({ may_send: true }), smsMarketingOn: () => true, providerFor: () => bare });
     expect(await hb(job({ channel: "sms", lead_id: lead }))).toEqual({ status: "failed", error: "down", final: undefined, receipt: { provider: "fake" } });
   });
 
@@ -161,7 +162,7 @@ describe("CNS-07: a closed list of message types; service is a closed list too",
 
   it("hands the type and its purpose to the provider; none = marketing; an unknown type is never sent", async () => {
     const maySend = vi.fn(async () => ({ may_send: true }));
-    const handler = createSendHandler({ maySend, providerFor: (channel) => createFakeProvider({ channel }) });
+    const handler = createSendHandler({ maySend, smsMarketingOn: () => true, providerFor: (channel) => createFakeProvider({ channel }) });
     for (const type of [...MESSAGE_TYPES]) await handler(job({ channel: "sms", lead_id: lead, message_type: type }));
     await handler(job({ channel: "sms", lead_id: lead }));
     expect(fakeSentMessages().map((m) => [m.messageType, m.purpose])).toEqual([
