@@ -3258,6 +3258,20 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   no error text. The function is sql, stable, invoker, `search_path ''`, body `select true`, and is the ONLY function anon may execute
   (test 01 names it; test 289-health-check pins body, settings and grants; a change needs a fresh review). OPS-02 lists it as guard
   `constant` (the route may call only that function, no `.from(`/`.auth.`). Cron runs and queue sizes belong to the platform screen.
+- Error monitoring (OPS-05 Sentry, owner 18 November 2026, answers (427) א, (433) א, (434) א, (435)/(436) built as (א); migration 021322,
+  applied 18 November 2026; independent reviews of the code and three of the audit check): `@sentry/nextjs`, EU region, only in a Vercel
+  production deployment with `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` (empty = off) and only from Israel midnight of `SENTRY_ACTIVE_FROM`
+  (runtime) / `NEXT_PUBLIC_SENTRY_ACTIVE_FROM` (browser, fixed at build), both 2026-12-02 = the subprocessor entry's `effective_from`
+  (021322 adds 'Functional Software, Inc. (Sentry)', Germany, announced once); a malformed or unset day = never. Rules in
+  `src/lib/monitoring/sentry-rules.ts`: `sendDefaultPii: false`, `tracesSampleRate: 0`, no replay, no breadcrumbs, sessions or logs
+  (a whitelist of event fields); `scrubEvent` drops headers, cookies, bodies and query strings, replaces a public link's token by
+  `[token]`, removes emails, phones, tokens, `Key (...)=(...)` values, DETAIL tails and non-Latin letter runs from message text, and
+  sends only the user id and business id; never on `/f/...` pages. `SENTRY_AUTH_TOKEN` (org:ci) is used only at build for source maps.
+  CI runs `node scripts/audit-check.mjs` (`.github/workflows/ci.yml`): any production npm-audit finding fails, except the entries of
+  `scripts/audit-allowlist.json` (root packages glob and minimatch only, by GHSA id and severity, each bound to exact versioned chains
+  through `@sentry/bundler-plugins`, which only `@sentry/nextjs/config` in next.config.ts loads); a new route, version, id, a higher
+  severity, a stale entry, an unreadable range, or a fix that `npm update` can bring fails; the allowlist expires 2026-12-15 (CI fails
+  from 16 December Israel time) until it is checked again.
 - Messages (MSG-01/MSG-03, migrations 021151, 021152): one provider per channel (`src/features/messaging/providers/select.ts`, only
   `fake`, refused on Vercel production/preview); a message of a channel without a provider waits unclaimed and uncounted
   (`app.job_channel_asked`). `public.messages` (one lead or contact, composite FKs cascade, so purge/erasure/retention take them;
