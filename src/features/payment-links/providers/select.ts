@@ -8,7 +8,9 @@ type Env = Record<string, string | undefined>;
  * line here and its code in `payment_links.provider`'s check; no module changes.
  */
 const ADAPTERS: Record<PaymentProviderCode, { built: boolean; create(env: Env): PaymentProvider | null }> = {
-  fake: { built: true, create: () => createFakePaymentProvider() },
+  // LNK-04: FAKE_PAYMENTS_WEBHOOK_SECRET replaces the fake's default webhook secret (a local developer's choice; the fake
+  // never runs on a Vercel production or preview deployment)
+  fake: { built: true, create: (env) => createFakePaymentProvider({ webhookSecret: env.FAKE_PAYMENTS_WEBHOOK_SECRET?.trim() || undefined }) },
 };
 
 /** Adapters that may run only off Vercel or on a Vercel development environment. */

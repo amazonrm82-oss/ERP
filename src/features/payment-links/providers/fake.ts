@@ -48,18 +48,48 @@ function readEvent(body: string): PaymentWebhookEvent | null {
   }
   if (typeof value !== "object" || value === null) return null;
   const v = value as Record<string, unknown>;
+  const eventId = v.event_id;
+  if (typeof eventId !== "string" || !/^[A-Za-z0-9_.:-]{1,128}$/.test(eventId)) return null;
   const id = v.link_id;
   const status = v.status;
   if (typeof id !== "string" || !/^[A-Za-z0-9_.:-]{1,128}$/.test(id)) return null;
   if (typeof status !== "string" || !(STATUSES as readonly string[]).includes(status)) return null;
   const whole = (x: unknown) => (typeof x === "number" && Number.isSafeInteger(x) && x >= 0 ? x : null);
   return {
+    eventId,
     providerLinkId: id,
     status: status as ProviderLinkStatus,
     paidAgorot: whole(v.paid_agorot),
+    currency: typeof v.currency === "string" && /^[A-Z]{3}$/.test(v.currency) ? v.currency : null,
     providerPaymentId: typeof v.payment_id === "string" && /^[A-Za-z0-9_.:-]{1,128}$/.test(v.payment_id) ? v.payment_id : null,
     installments: whole(v.installments),
   };
+}
+
+/**
+ * The secret the fake's tests sign with. Review 7: it is no public default: outside the test runner (NODE_ENV=test) a fake
+ * without FAKE_PAYMENTS_WEBHOOK_SECRET accepts no webhook at all.
+ */
+export const FAKE_WEBHOOK_DEFAULT_SECRET = "fake-payments-secret";
+
+/**
+ * TEST ONLY: a validly signed webhook of the fake, as the route receives it (the exact body and its signature header).
+ * The event carries ids and codes only.
+ */
+export function fakeWebhookRequest(
+  event: { eventId: string; providerLinkId: string; status: ProviderLinkStatus; paidAgorot?: number; currency?: string; providerPaymentId?: string; installments?: number },
+  secret: string = FAKE_WEBHOOK_DEFAULT_SECRET,
+): { body: string; headers: Headers } {
+  const body = JSON.stringify({
+    event_id: event.eventId,
+    link_id: event.providerLinkId,
+    status: event.status,
+    ...(event.paidAgorot === undefined ? {} : { paid_agorot: event.paidAgorot }),
+    ...(event.currency === undefined ? {} : { currency: event.currency }),
+    ...(event.providerPaymentId === undefined ? {} : { payment_id: event.providerPaymentId }),
+    ...(event.installments === undefined ? {} : { installments: event.installments }),
+  });
+  return { body, headers: new Headers({ [FAKE_SIGNATURE_HEADER]: signFakeWebhook(body, secret), "content-type": "application/json" }) };
 }
 
 export type FakePaymentProvider = PaymentProvider & {
@@ -68,7 +98,7 @@ export type FakePaymentProvider = PaymentProvider & {
 };
 
 export function createFakePaymentProvider(options: { webhookSecret?: string } = {}): FakePaymentProvider {
-  const secret = options.webhookSecret ?? "fake-payments-secret";
+  const secret: string | null = options.webhookSecret ?? (process.env.NODE_ENV === "test" ? FAKE_WEBHOOK_DEFAULT_SECRET : null);
   const links = new Map<string, Link>();
   const tokens = new Map<string, CardToken>();
   let counter = 0;
@@ -109,7 +139,7 @@ export function createFakePaymentProvider(options: { webhookSecret?: string } = 
       return { ok: true, providerPaymentId: `fake_payment_${counter}` };
     },
     async verifyWebhook(input): Promise<WebhookVerdict> {
-      if (!signatureMatches(input.headers.get(FAKE_SIGNATURE_HEADER), input.body, secret)) return { ok: false };
+      if (secret === null || !signatureMatches(input.headers.get(FAKE_SIGNATURE_HEADER), input.body, secret)) return { ok: false };
       const event = readEvent(input.body);
       return event ? { ok: true, event } : { ok: false };
     },

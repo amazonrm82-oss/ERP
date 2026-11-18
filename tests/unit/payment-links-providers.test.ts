@@ -67,11 +67,12 @@ describe("LNK-01: the fake adapter", () => {
 
   it("accepts a webhook only with a valid signature over the exact body", async () => {
     const fake = createFakePaymentProvider({ webhookSecret: "s3cret" });
-    const body = JSON.stringify({ link_id: fakePaymentLinkId(LINK), status: "paid", paid_agorot: 100, payment_id: "p_1", installments: 2 });
+    const body = JSON.stringify({ event_id: "ev_1", link_id: fakePaymentLinkId(LINK), status: "paid", paid_agorot: 100, currency: "ILS", payment_id: "p_1", installments: 2 });
     const signed = new Headers({ [FAKE_SIGNATURE_HEADER]: signFakeWebhook(body, "s3cret") });
     expect(await fake.verifyWebhook({ headers: signed, body })).toEqual({
       ok: true,
-      event: { providerLinkId: fakePaymentLinkId(LINK), status: "paid", paidAgorot: 100, providerPaymentId: "p_1", installments: 2 },
+      // LNK-04: the event's own id, so the database takes it once
+      event: { eventId: "ev_1", providerLinkId: fakePaymentLinkId(LINK), status: "paid", paidAgorot: 100, currency: "ILS", providerPaymentId: "p_1", installments: 2 },
     });
     expect(await fake.verifyWebhook({ headers: signed, body: body.replace("100", "101") })).toEqual({ ok: false });
     expect(await fake.verifyWebhook({ headers: new Headers({ [FAKE_SIGNATURE_HEADER]: signFakeWebhook(body, "other") }), body })).toEqual({ ok: false });

@@ -38,6 +38,8 @@ const PUBLIC_PREFIXES = [
   "/api/meta/leads",
   // SMS-05: InforU's delivery reports and replies (the secret is the last path segment, checked first)
   "/api/sms/inforu/",
+  // LNK-04: the payment provider's webhook (its own signature check, before the database)
+  "/api/payments/",
   // CAL-07: calendar apps fetch the personal feed with no session; the route checks its own secret token
   "/api/calendar-feed/",
   "/sw.js",

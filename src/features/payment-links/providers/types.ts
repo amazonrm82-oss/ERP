@@ -58,9 +58,13 @@ export type ChargeAnswer = { ok: true; providerPaymentId: string } | { ok: false
 
 /** A webhook event after its signature was checked: ids and codes only. */
 export type PaymentWebhookEvent = {
+  // LNK-04: the provider's own id of this event; the database takes each event once
+  eventId: string;
   providerLinkId: string;
   status: ProviderLinkStatus;
   paidAgorot: number | null;
+  // LNK-04 review (1): the currency of the paid amount (ISO 4217); the database takes only ILS equal to the link's amount
+  currency: string | null;
   providerPaymentId: string | null;
   installments: number | null;
 };

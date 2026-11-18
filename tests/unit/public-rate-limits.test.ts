@@ -459,6 +459,14 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
     refusal: "503 + Retry-After (InforU posts again; a repeated opt-out changes nothing); 400 / 404 / 413",
     sender: { leftOut: "(43) א: server-to-server from InforU's servers; the path secret is the secret" },
   },
+  "/api/payments/[provider]/webhook": {
+    guard: "database",
+    functions: ["payment_link_webhook"],
+    limit:
+      "LNK-04: refused (401) BEFORE the database unless the provider adapter's verifyWebhook accepts the signature over the exact body (the fake: HMAC-SHA256 hex in x-fake-signature), bodies over 64 KB refused (413), a provider other than the deployment's answers 404; then 3,000 events a minute in total (app.payment_webhook_minutes), each provider event taken once (app.payment_webhook_events), only a pending link is paid",
+    refusal: "503 + Retry-After (the provider sends it again; an event already taken is answered duplicate); 400 / 401 / 404 / 413",
+    sender: { leftOut: "(43) א: server-to-server from the payment provider's servers; the signature is the secret" },
+  },
   "/api/meta/leads/sweep": { guard: "secret", limit: "Bearer PUSH_DISPATCH_SECRET (timing-safe); woken by pg_cron every 5 minutes while a Meta lead is due", refusal: "401" },
 };
 

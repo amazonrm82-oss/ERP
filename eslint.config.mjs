@@ -169,6 +169,8 @@ const serviceKeyAllowList = {
     // SMS-05 (owner (318) א, wave 3 use (2)): InforU's delivery reports and replies (public.sms_delivery_status,
     // public.sms_inbound_reply), after the secret in the path is checked
     "src/features/inforu-callbacks/webhook-server.ts",
+    // LNK-04 (wave 3 use (2)): the payment provider's webhook (public.payment_link_webhook), after its signature is checked
+    "src/features/payment-links/webhook-server.ts",
     // INT-01 (owner, 10 November 2026, answer (227) ב): "test connection" with the stored token
     // (public.integration_test_claim, public.integration_test_finish), after the owner's or admin's session was checked
     "src/features/integrations/test-server.ts",

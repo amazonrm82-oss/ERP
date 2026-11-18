@@ -941,6 +941,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       // LNK-02 redefines app.job_kinds() and app.job_payload_ok() of _invoice_issue.sql and app.payment_links_check() of
       // _payment_links.sql last (payment_link.create)
       "_payment_link_pages.sql",
+      // LNK-04 redefines app.payment_links_check() of _payment_link_pages.sql last (the provider's payment id)
+      "_payment_link_webhook.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

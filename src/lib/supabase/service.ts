@@ -44,6 +44,11 @@ import { getSupabaseEnv } from "@/lib/env";
  *   only public.digest_job_compose() (the daily summary's counts under the recipient's own read rules), report.send
  *   (public.scheduled_report_compose(), RPT-03), invite.send (public.invitation_job_compose(), USR-09) and invoice.issue
  *   (public.invoice_issue_claim() and public.invoice_issue_record(), DOC-07);
+ * - the payment provider's webhook (src/features/payment-links/webhook-server.ts, route
+ *   /api/payments/<provider>/webhook; LNK-04, wave 3 use (2)): the client is made only after the
+ *   provider adapter's signature check passed, and calls only public.payment_link_webhook(); the
+ *   OPS-04 worker also calls public.payment_link_page_claim() / payment_link_page_record() (LNK-02,
+ *   owner (394) א);
  * - InforU's delivery reports and replies (src/features/inforu-callbacks/webhook-server.ts,
  *   routes /api/sms/inforu/status/<secret> and /api/sms/inforu/inbound/<secret>; SMS-05,
  *   owner (318) א, wave 3 use (2)): the client is made only after the secret in the path

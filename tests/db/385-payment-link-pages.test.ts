@@ -12,11 +12,11 @@ type Job = { id: string; lease: string; payload: Record<string, string> };
 // LNK-02 (owner (394) א): the worker's path, pinned by md5(pg_get_functiondef) without carriage returns (body, security
 // definer, settings, arguments). A change needs a fresh independent review against answer (55)'s conditions (ids only in the
 // queue; the service key calls only the claim and the record; no person records a provider's answer).
+// app.payment_links_check (021315's page branch) was redefined by LNK-04 and is pinned in test 386.
 const REVIEWED_MD5: Record<string, string> = {
   "app.payment_link_notice": "29f10fbe38f5e0eb57e9b65423dbd07e",
   "app.payment_link_page_close": "bcffd876414e5173f4e3c4fb398d1588",
   "app.payment_link_provider_usable": "0e3c9c3c178613665cdea4d949b26335",
-  "app.payment_links_check": "6b6db348ec1c7a6e32c7764314a707d9",
   "app.payment_links_queue_page": "bb1e033ecc02b8371738ddfbe5509354",
   "public.payment_link_page_claim": "c45ac4e2f2cbb8eff6299a08da5523c3",
   "public.payment_link_page_record": "0c09bc2235e5869dbc6c09163d305e27",

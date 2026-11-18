@@ -2851,6 +2851,8 @@ export type PaymentLinkRow = {
   // LNK-02: when the worker kept the provider's page, and the provider's last error code (server only)
   page_created_at: string | null;
   page_error_code: string | null;
+  // LNK-04: the provider's id of the payment that paid it (server only)
+  provider_payment_id: string | null;
   payment_id: string | null;
   paid_at: string | null;
   cancelled_at: string | null;
@@ -4635,6 +4637,8 @@ export type Database = {
       // LNK-02 (owner (394) א): the payment_link.create worker's claim and record (service_role, the job's live lease)
       payment_link_page_claim: { Args: { p_job: string; p_lease: string }; Returns: Json };
       payment_link_page_record: { Args: { p_job: string; p_lease: string; p_result: Json }; Returns: Json };
+      // LNK-04: the payment provider's signed webhook (service_role only, after the route checked the signature)
+      payment_link_webhook: { Args: { p_provider: string; p_event: Json }; Returns: Json };
       invoice_issue_requests_open: { Args: { p_org: string }; Returns: Json };
       invoice_issue_close: { Args: { p_org: string; p_request: string }; Returns: Json };
       // DOC-14 (migration invoice_credit): a credit invoice through the provider, and what is left to credit
