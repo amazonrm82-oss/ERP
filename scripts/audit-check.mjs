@@ -35,7 +35,7 @@
 // forms npm advisories and package.json files use (^, ~, comparators, x-ranges, hyphens, ||).
 
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -484,6 +484,60 @@ export function decide({ audit, lock, allowlist, published, registry, now }) {
   return { ok: failures.length === 0, failures: [...new Set(failures)], notes: [...new Set(notes)] };
 }
 
+// ---------------------------------------------------------------- the run summary (owner (435) א)
+
+/** Markdown text for one line of the summary: backticks and line breaks taken out, so a note cannot break the layout. */
+function summaryLine(text) {
+  return String(text).replace(/[\r\n]+/g, " ").replace(/`/g, "'");
+}
+
+/**
+ * The section this check adds to the GitHub Actions run summary: a heading with the outcome, the failures (if any), the
+ * notes (a fix that only a newer Sentry release brings, owner (435) א: CI passes, but the note must be seen), and the
+ * allowlist's recheck date. Pure: the caller writes it.
+ * @param {{ result: { ok: boolean, failures: string[], notes: string[] }, total: number, recheckBy?: string | null }} input
+ * @returns {string}
+ */
+export function summaryMarkdown({ result, total, recheckBy }) {
+  const lines = [];
+  lines.push(result.ok ? "## Audit check: passed" : "## Audit check: FAILED");
+  lines.push("");
+  lines.push(`${total} finding(s) in production dependencies.`);
+  if (result.failures.length > 0) {
+    lines.push("", "### Failures", "");
+    for (const failure of result.failures) lines.push(`- :x: ${summaryLine(failure)}`);
+  }
+  if (result.notes.length > 0) {
+    lines.push("", "### :warning: Notes (CI passes, but look at these)", "");
+    for (const note of result.notes) lines.push(`- ${summaryLine(note)}`);
+  }
+  lines.push("");
+  lines.push(
+    calendarDate(recheckBy)
+      ? `Allowlist recheck date: **${recheckBy}** (CI fails after it until the findings are checked again).`
+      : "Allowlist recheck date: none set.",
+  );
+  return `${lines.join("\n")}\n`;
+}
+
+/**
+ * Appends the summary to the file GitHub names in GITHUB_STEP_SUMMARY; does nothing when it is not set (a local run).
+ * The write itself is injected so a test can see it. A failed write never changes the check's outcome.
+ * @param {string} markdown
+ * @param {{ env?: Record<string, string | undefined>, append?: (path: string, text: string) => void }} [io]
+ * @returns {boolean} whether it was written
+ */
+export function writeStepSummary(markdown, { env = process.env, append = (path, text) => appendFileSync(path, text, "utf8") } = {}) {
+  const path = env.GITHUB_STEP_SUMMARY;
+  if (!path) return false;
+  try {
+    append(path, markdown);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------- running it
 
 function npmJson(args) {
@@ -523,6 +577,9 @@ function main() {
   for (const note of result.notes) console.log(`note: ${note}`);
   for (const failure of result.failures) console.log(`FAIL: ${failure}`);
   console.log(result.ok ? "audit-check: ok" : "audit-check: failed");
+  if (!writeStepSummary(summaryMarkdown({ result, total, recheckBy: allowlist?.recheck_by ?? null })) && process.env.GITHUB_STEP_SUMMARY) {
+    console.log("audit-check: could not write the run summary");
+  }
   process.exitCode = result.ok ? 0 : 1;
 }
 

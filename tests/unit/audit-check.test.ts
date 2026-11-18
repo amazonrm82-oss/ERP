@@ -3,7 +3,16 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { calendarDate, chainTo, chainsTo, decide, rootAdvisories, satisfies } from "../../scripts/audit-check.mjs";
+import {
+  calendarDate,
+  chainTo,
+  chainsTo,
+  decide,
+  rootAdvisories,
+  satisfies,
+  summaryMarkdown,
+  writeStepSummary,
+} from "../../scripts/audit-check.mjs";
 
 const ROOT = join(__dirname, "..", "..");
 const readJson = (path: string) => JSON.parse(readFileSync(join(ROOT, path), "utf8"));
@@ -366,5 +375,55 @@ describe("audit-check in CI", () => {
     const ci = readFileSync(join(ROOT, ".github", "workflows", "ci.yml"), "utf8");
     expect(ci).toContain("run: node scripts/audit-check.mjs");
     expect(ci).not.toContain("npm audit --omit=dev --audit-level=high");
+  });
+});
+
+describe("audit-check: the run summary (owner (435) א)", () => {
+  it("shows the notes prominently, with the recheck date, when the check passes", () => {
+    const result = run();
+    expect(result.ok).toBe(true);
+    expect(result.notes.length).toBeGreaterThan(0);
+    const md = summaryMarkdown({ result, total: 5, recheckBy: "2026-12-15" });
+    expect(md.startsWith("## Audit check: passed\n")).toBe(true);
+    expect(md).toContain("### :warning: Notes (CI passes, but look at these)");
+    for (const note of result.notes) expect(md).toContain(`- ${note.replace(/`/g, "'")}`);
+    expect(md).toContain("Allowlist recheck date: **2026-12-15**");
+    expect(md).not.toContain("### Failures");
+  });
+
+  it("lists the failures when the check fails", () => {
+    const md = summaryMarkdown({
+      result: { ok: false, failures: ["the allowlist's recheck_by date 2026-12-15 has passed"], notes: [] },
+      total: 5,
+      recheckBy: "2026-12-15",
+    });
+    expect(md.startsWith("## Audit check: FAILED\n")).toBe(true);
+    expect(md).toContain("### Failures\n\n- :x: the allowlist's recheck_by date 2026-12-15 has passed");
+    expect(md).not.toContain("Notes");
+  });
+
+  it("keeps each note on one line and says when no recheck date is set", () => {
+    const md = summaryMarkdown({ result: { ok: true, failures: [], notes: ["a\nb `c`"] }, total: 0, recheckBy: "not a date" });
+    expect(md).toContain("- a b 'c'\n");
+    expect(md).toContain("Allowlist recheck date: none set.");
+  });
+
+  it("writes to GITHUB_STEP_SUMMARY only when it is set, and a failed write is not an error", () => {
+    const writes: Array<[string, string]> = [];
+    const append = (path: string, text: string) => void writes.push([path, text]);
+    expect(writeStepSummary("x", { env: {}, append })).toBe(false);
+    expect(writes).toEqual([]);
+    expect(writeStepSummary("## y\n", { env: { GITHUB_STEP_SUMMARY: "/tmp/summary.md" }, append })).toBe(true);
+    expect(writes).toEqual([["/tmp/summary.md", "## y\n"]]);
+    const broken = () => {
+      throw new Error("disk full");
+    };
+    expect(writeStepSummary("z", { env: { GITHUB_STEP_SUMMARY: "/tmp/s" }, append: broken })).toBe(false);
+  });
+
+  it("package.json holds no npm overrides (no override of Sentry's dependencies, owner (435) א)", () => {
+    const pkg = readJson("package.json");
+    expect(pkg).not.toHaveProperty("overrides");
+    expect(pkg).not.toHaveProperty("resolutions");
   });
 });
