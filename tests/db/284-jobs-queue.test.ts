@@ -68,7 +68,10 @@ const REVIEWED_MD5 = {
 // 'failed') and passes the job's own code as the reason; every other line unchanged (rechecked by its writer against
 // 021220's body: same early returns, the call still in its own exception block, the messages insert untouched; independent
 // review done, BACKLOG 13 November 2026)
-const REVIEWED_RECORD_MESSAGE_MD5 = "b199d6f71298fe017d030ecc19b0fb75";
+// SMS-05b (021321, live incident of 18 November 2026): plus one block after the refusal notice: an outcome 'failed' with a
+// provider and a code starting 'unknown_' (the send may have reached the provider) writes public.messages status 'unknown';
+// every other line unchanged (rechecked by its writer against 021267's body; needs its independent review)
+const REVIEWED_RECORD_MESSAGE_MD5 = "3597c4efc963f73c93b0c405caab2355";
 
 type Claimed = { id: string; lease: string; kind: string; organization_id: string; payload: Record<string, unknown>; attempt: number };
 type Job = { status: string; attempts: number; last_error: string | null; next_run_at: Date; lease_id: string | null; locked_until: Date | null };

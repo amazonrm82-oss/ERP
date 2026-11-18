@@ -229,6 +229,8 @@ const RERUN = [
   migrationFile("_payment_link_refunds.sql"),
   // LNK-04b redefines public.payment_link_webhook() last (the closed-business owner notice)
   migrationFile("_payment_link_closed_notice.sql"),
+  // SMS-05b redefines app.jobs_record_message() of _composer_refusal_notices.sql last (the 'unknown' message status)
+  migrationFile("_sms_unknown_outcome.sql"),
 ];
 
 // Owner's decision, 13 October 2026 (DEAL-01, MNY-01, MNY-05): a deal is stuck by time in its

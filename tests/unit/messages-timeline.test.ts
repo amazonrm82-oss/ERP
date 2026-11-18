@@ -15,7 +15,7 @@ describe("MSG-03: messages on the timeline", () => {
     expect(messageEntryLabel({ channel: "fax", direction: "outbound", status: "sent" })).toBe("הודעה יוצאת");
     expect(messageEntryText({ channel: "sms", direction: "outbound", status: "failed" })).toBe("השליחה נכשלה.");
     expect(messageEntryText({ channel: "sms", direction: "outbound", status: "delivered" })).toBe("נמסרה.");
-    expect(messageEntryText({ channel: "sms", direction: "outbound", status: "unknown" })).toBe("");
+    expect(messageEntryText({ channel: "sms", direction: "outbound", status: "bogus" })).toBe("");
     // owner (96): a message refused for its filled length reads "ארוכה מדי"
     expect(messageEntryText({ channel: "sms", direction: "outbound", status: "failed", provider_error_code: "too_long" })).toBe("לא נשלחה: ארוכה מדי.");
     expect(messageEntryText({ channel: "sms", direction: "outbound", status: "failed", provider_error_code: "E42" })).toBe("השליחה נכשלה.");
@@ -81,11 +81,29 @@ describe("MSG-03: messages on the timeline", () => {
     expect(first.map((x) => x.id).filter((id) => next.some((n) => n.id === id))).toEqual([]);
   });
 
+  it("SMS-05b: a send whose outcome is not known never reads as failed", () => {
+    const waiting = "לא ידוע אם נשלחה; ממתינים לדוח מהספק.";
+    expect(messageEntryText({ channel: "sms", direction: "outbound", status: "unknown", provider: "inforu", provider_error_code: "unknown_timeout" })).toBe(waiting);
+    // a row written before 021321 (failed, a provider, an unknown_* code) reads the same
+    expect(messageEntryText({ channel: "sms", direction: "outbound", status: "failed", provider: "inforu", provider_error_code: "unknown_timeout" })).toBe(waiting);
+    // an email has no delivery report to wait for
+    expect(messageEntryText({ channel: "email", direction: "outbound", status: "unknown", provider: "resend", provider_error_code: "unknown_http_502" })).toBe("לא ידוע אם נשלחה.");
+    // the same code with no provider is not a send that may have gone out
+    expect(messageEntryText({ channel: "sms", direction: "outbound", status: "failed", provider_error_code: "unknown_timeout" })).toBe("השליחה נכשלה.");
+    // a reported failure stays a failure
+    expect(messageEntryText({ channel: "sms", direction: "outbound", status: "failed", provider: "inforu", provider_error_code: "inforu_undelivered" })).toBe("השליחה נכשלה.");
+  });
+
   it("every status and channel the table allows has its words", () => {
     const dir = join(root, "supabase/migrations");
-    const sql = readFileSync(join(dir, readdirSync(dir).find((f) => f.endsWith("_messages.sql")) as string), "utf8");
-    const statuses = [...(sql.match(/status in \(([^)]*)\)\)/)?.[1] ?? "").matchAll(/'([a-z]+)'/g)].map((m) => m[1]);
-    expect(statuses).toEqual(["sent", "delivered", "read", "failed"]);
+    // the latest definition of the constraint (021152, re-added by SMS-05b's 021321)
+    const files = readdirSync(dir)
+      .filter((f) => f.endsWith(".sql"))
+      .sort()
+      .filter((f) => /constraint messages_status check/.test(readFileSync(join(dir, f), "utf8")));
+    const sql = readFileSync(join(dir, files[files.length - 1]), "utf8");
+    const statuses = [...(sql.match(/messages_status check \(\s*\(direction = 'outbound' and status in \(([^)]*)\)\)/)?.[1] ?? "").matchAll(/'([a-z]+)'/g)].map((m) => m[1]);
+    expect(statuses).toEqual(["sent", "delivered", "read", "failed", "unknown"]);
     for (const status of [...statuses, "received"]) expect(messageEntryText({ channel: "sms", direction: "outbound", status }), status).not.toBe("");
     for (const channel of ["email", "sms", "whatsapp"]) {
       expect(messageEntryLabel({ channel, direction: "outbound", status: "sent" })).not.toMatch(/^הודעה /);

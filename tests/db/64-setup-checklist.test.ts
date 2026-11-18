@@ -948,6 +948,8 @@ describe("setup checklist and sample data (USR-04)", () => {
       "_payment_link_refunds.sql",
       // LNK-04b redefines public.payment_link_webhook() of _payment_link_webhook.sql last (the closed-business owner notice)
       "_payment_link_closed_notice.sql",
+      // SMS-05b redefines app.jobs_record_message() of _composer_refusal_notices.sql last (the 'unknown' message status)
+      "_sms_unknown_outcome.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

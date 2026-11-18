@@ -8,6 +8,12 @@ import { inforuSecretMatches } from "@/features/messaging/providers/inforu";
 // and "Receiving SMS / Push Option using json"):
 //   delivery: [{"InforuId", "PhoneNumber", "Status": 2 delivered | -2 not delivered | -4 blocked by InforU | 6 clicked,
 //               "StatusDescription", "CustomerMessageId", ...}]  (an array; one object is accepted too)
+//             SMS-05b (live incident of 18 November 2026): the documentation says "To configure push DLR in json format,
+//             contact the support department", so an account without that setting gets InforU's default push (SMS API 6.1,
+//             https://www.inforu.co.il/wp-content/uploads/2020/12/SMS_API-6.1.pdf, page 13): an HTTP POST "with parameters"
+//             PhoneNumber=...&Network=...&Status=2&StatusDescription=Delivered&ProjectId=...&CustomerMessageId=...&...
+//             The status route takes both: a body that starts with [ or { is JSON, any other body is form parameters, and an
+//             empty body reads the same parameters from the URL's query (the documentation does not say which of the two).
 //   inbound:  {"CustomerId", "ProjectId", "Data": [{"Channel": "SMS_MO", "Type": "PhoneNumber", "Value": "05...",
 //              "Keyword", "Message", "ShortCode", ...}]}
 
@@ -28,10 +34,11 @@ const noStore = { "Cache-Control": "no-store" };
 const json = (status: number, body: Record<string, unknown>) => Response.json(body, { status, headers: noStore });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-async function readJson(request: Request): Promise<{ ok: true; value: unknown } | { ok: false; status: number }> {
+async function readText(request: Request): Promise<{ ok: true; value: string } | { ok: false; status: number }> {
   const declared = Number(request.headers.get("content-length") ?? "0");
   if (Number.isFinite(declared) && declared > INFORU_MAX_BODY_BYTES) return { ok: false, status: 413 };
-  if (!request.body) return { ok: false, status: 400 };
+  // SMS-05b: no body reads as an empty text (the delivery report may carry its parameters in the query)
+  if (!request.body) return { ok: true, value: "" };
   const reader = request.body.getReader();
   const parts: Uint8Array[] = [];
   let size = 0;
@@ -45,11 +52,47 @@ async function readJson(request: Request): Promise<{ ok: true; value: unknown } 
     }
     parts.push(value);
   }
+  return { ok: true, value: Buffer.concat(parts).toString("utf8") };
+}
+
+async function readJson(request: Request): Promise<{ ok: true; value: unknown } | { ok: false; status: number }> {
+  const text = await readText(request);
+  if (!text.ok) return text;
   try {
-    return { ok: true, value: JSON.parse(Buffer.concat(parts).toString("utf8")) as unknown };
+    return { ok: true, value: JSON.parse(text.value) as unknown };
   } catch {
     return { ok: false, status: 400 };
   }
+}
+
+/** One parameter list (form body or query) as one report object; null when it names no report field. */
+function paramsReport(params: URLSearchParams): Record<string, string> | null {
+  if (!params.has("CustomerMessageId") && !params.has("Status")) return null;
+  const out: Record<string, string> = {};
+  for (const key of ["CustomerMessageId", "Status"]) {
+    const value = params.get(key);
+    if (value !== null) out[key] = value;
+  }
+  return out;
+}
+
+/**
+ * SMS-05b: a delivery report in either of InforU's push formats (see the header): JSON, or form parameters in the body, or
+ * (an empty body) in the URL's query. Only CustomerMessageId and Status are taken from form parameters; nothing else is kept.
+ */
+export async function readDeliveryReport(request: Request): Promise<{ ok: true; value: unknown } | { ok: false; status: number }> {
+  const text = await readText(request);
+  if (!text.ok) return text;
+  const body = text.value.trim();
+  if (body.startsWith("[") || body.startsWith("{")) {
+    try {
+      return { ok: true, value: JSON.parse(body) as unknown };
+    } catch {
+      return { ok: false, status: 400 };
+    }
+  }
+  const report = body !== "" ? paramsReport(new URLSearchParams(body)) : paramsReport(new URL(request.url).searchParams);
+  return report ? { ok: true, value: report } : { ok: false, status: 400 };
 }
 
 /** The delivery report's items we keep: our job id (CustomerMessageId) and delivered / not delivered; clicks are left out. */
@@ -95,10 +138,19 @@ export async function inforuStatusRoute(request: Request, secret: string, deps: 
   // RVW-101: the service-key client is made only after the secret in the path passed
   const db = deps.db();
   if (!db) return json(503, { error: "not configured" });
-  const body = await readJson(request);
-  if (!body.ok) return json(body.status, { error: "bad request" });
+  const body = await readDeliveryReport(request);
+  if (!body.ok) {
+    // SMS-05b: counts-only, so a report in a format we do not read is seen in the logs (never the body)
+    deps.log("sms.inforu.status_unreadable", { reason: body.status === 413 ? "too_large" : "format" });
+    return json(body.status, { error: "bad request" });
+  }
   const items = deliveryItems(body.value);
-  if (items.length === 0) return json(200, { ok: true });
+  if (items.length === 0) {
+    // SMS-05b: a report that named none of our messages (or only clicks) is counted in the logs, never kept
+    const rows = Array.isArray(body.value) ? body.value.length : 1;
+    if (rows > 0) deps.log("sms.inforu.status_ignored", { count: rows });
+    return json(200, { ok: true });
+  }
   try {
     const answer = await db.deliveryStatus(items);
     if (rateLimited(answer)) {

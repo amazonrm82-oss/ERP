@@ -11,7 +11,12 @@ const STATUS: Record<string, string> = {
   read: "נקראה.",
   failed: "השליחה נכשלה.",
   received: "התקבלה.",
+  // SMS-05b (021321): the send may have reached the provider (a timeout, a broken connection, an unreadable answer); it is
+  // never sent twice. An SMS is settled by InforU's delivery report; an email has no report yet, so its line says only that.
+  unknown: "לא ידוע אם נשלחה.",
 };
+
+const UNKNOWN_WAITING: Record<string, string> = { sms: "לא ידוע אם נשלחה; ממתינים לדוח מהספק." };
 
 export type MessageEntryInput = {
   channel: string;
@@ -92,6 +97,13 @@ export function messageEntryLabel(message: MessageEntryInput): string {
 export function messageEntryText(message: MessageEntryInput): string {
   if (message.status === "failed" && !message.provider && message.provider_error_code && Object.prototype.hasOwnProperty.call(REFUSED, message.provider_error_code)) {
     return REFUSED[message.provider_error_code];
+  }
+  // a row written before 021321 kept 'failed' with the adapter's unknown_* code and a provider: it reads the same way
+  const unknown =
+    message.direction !== "inbound" &&
+    (message.status === "unknown" || (message.status === "failed" && !!message.provider && (message.provider_error_code ?? "").startsWith("unknown_")));
+  if (unknown) {
+    return Object.prototype.hasOwnProperty.call(UNKNOWN_WAITING, message.channel) ? UNKNOWN_WAITING[message.channel] : STATUS.unknown;
   }
   return STATUS[message.status] ?? "";
 }

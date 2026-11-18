@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createInforuProvider, INFORU_SEND_URL, inforuPhone, inforuSecretMatches, inforuWebhookSecret } from "@/features/messaging/providers/inforu";
+import { jobTimeLeftMs } from "@/features/jobs/run-server";
+import { createInforuProvider, INFORU_SEND_URL, INFORU_TIMEOUT_MS, inforuPhone, inforuSecretMatches, inforuWebhookSecret } from "@/features/messaging/providers/inforu";
 import type { OutgoingMessage } from "@/features/messaging/providers/types";
 import { createSendHandler, parseComposed } from "@/features/messaging/send-handler";
 import type { ClaimedJob } from "@/features/jobs/registry";
@@ -106,6 +107,17 @@ describe("SMS-05: the InforU adapter", () => {
     expect(await provider.send(message({ ...content, to: "+12025550100" }))).toMatchObject({ ok: false, code: "foreign_number", final: true, notSent: true });
     expect(never).not.toHaveBeenCalled();
     await expect(createInforuProvider({ ...ENV, INFORU_SENDER: "" }, { fetch: never })!.send(message(content))).resolves.toMatchObject({ code: "no_sender" });
+  });
+
+  it("SMS-05b: waits 30 s for InforU, which a job started at the message pass's last moment still fits", async () => {
+    expect(INFORU_TIMEOUT_MS).toBe(30_000);
+    // the message pass starts no job after 40 s (runner.ts); the lease and the run must still hold the call and a 10 s margin
+    expect(INFORU_TIMEOUT_MS + 10_000).toBeLessThanOrEqual(jobTimeLeftMs(40_000, 0, 0));
+    const timeout = vi.spyOn(AbortSignal, "timeout");
+    const provider = createInforuProvider(ENV, { fetch: vi.fn(async () => answer({ StatusId: 1 })) })!;
+    await provider.send(message({ to: "+972521234567", sender: null, text: "x" }));
+    expect(timeout).toHaveBeenCalledWith(INFORU_TIMEOUT_MS);
+    timeout.mockRestore();
   });
 
   it("an error never carries the token, the number or the text", async () => {

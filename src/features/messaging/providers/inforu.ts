@@ -30,12 +30,23 @@ type Env = Record<string, string | undefined>;
  *   The answer carries no per-message id: the delivery report names our CustomerMessageID, so the job id is the message's
  *   provider id (public.messages: provider 'inforu', provider_message_id = the job id).
  * The text is ONLY what public.sms_job_compose answered (the database fills and judges it); the phone and the text are never
- * logged, kept or returned, and the token never leaves the Authorization header. One call per message, within 10 seconds.
+ * logged, kept or returned, and the token never leaves the Authorization header. One call per message, within
+ * INFORU_TIMEOUT_MS.
+ * Delivery reports: InforU posts to DeliveryNotificationUrl in its default format (form parameters, SMS API 6.1 page 13)
+ * unless its support switched the account to JSON ("To configure push DLR in json format, contact the support department";
+ * there is no request parameter for it); the status route reads both (src/features/inforu-callbacks/webhook.ts).
  */
 export const INFORU: SmsStubSpec = { name: "inforu", keys: ["INFORU_USERNAME", "INFORU_API_TOKEN"], defaultSenderKey: "INFORU_SENDER" };
 
 export const INFORU_SEND_URL = "https://capi.inforu.co.il/api/v2/SMS/SendSms";
-export const INFORU_TIMEOUT_MS = 10_000;
+/**
+ * SMS-05b (live incident of 18 November 2026): the first real SMS was delivered while our call was cut off at 10 s, so its job
+ * ended "unknown". 30 s fits the worker: the message pass starts no job after 40 s (runner.ts), so a job started at the last
+ * moment ends by about 70 s plus the finish, inside its 120 s lease (MESSAGE_LEASE_MS, run-server.ts) and the route's 180 s
+ * (maxDuration), and the summaries' pass that follows only runs when time is left (it skips itself past 45 s). A slower answer
+ * still ends "unknown" (never sent twice) and is settled by the delivery report.
+ */
+export const INFORU_TIMEOUT_MS = 30_000;
 
 /** Our callback paths (src/app/api/sms/inforu/...); the secret is the last segment. */
 export const INFORU_STATUS_PATH = "/api/sms/inforu/status/";

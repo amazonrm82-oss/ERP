@@ -102,6 +102,37 @@ describe("SMS-05: InforU's callbacks", () => {
     expect(inboundItems([])).toEqual([]);
   });
 
+  it("SMS-05b: reads InforU's default push (form parameters in the body, or in the query) as well as JSON", async () => {
+    const db = fakeDb();
+    const log = vi.fn();
+    // SMS API 6.1, page 13: the parameters of the default push
+    const form =
+      `PhoneNumber=0527777888&Network=052&Status=2&StatusDescription=Delivered&ProjectId=10838&CustomerMessageId=${JOB}` +
+      "&CustomerParam=&id=&SenderNumber=MEXUZ&BillingCodeId=1&Price=0.00&SegmentsNumber=1&ActionType=Content" +
+      "&OriginalMessage=%D7%A1%D7%95%D7%93&NotificationDate=18/11/2026 17:07:00&RetriesNumber=0";
+    const byForm = new Request("https://mexuzsystem.com/api/sms/inforu/status/x", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: form,
+    });
+    expect((await inforuStatusRoute(byForm, SECRET, { db: () => db, log, env })).status).toBe(200);
+    expect(db.deliveryStatus).toHaveBeenLastCalledWith([{ id: JOB, status: "delivered" }]);
+    const byQuery = new Request(`https://mexuzsystem.com/api/sms/inforu/status/x?Status=-2&CustomerMessageId=${JOB.toUpperCase()}&PhoneNumber=0527777888`, { method: "POST" });
+    expect((await inforuStatusRoute(byQuery, SECRET, { db: () => db, log, env })).status).toBe(200);
+    expect(db.deliveryStatus).toHaveBeenLastCalledWith([{ id: JOB, status: "failed", code: "inforu_undelivered" }]);
+    // never the number, the text or the sender in a log line
+    expect(JSON.stringify(log.mock.calls)).not.toMatch(/0527777888|סוד|MEXUZ/);
+    // a body that is neither is refused and counted in the logs, without its content
+    const junk = new Request("https://x.test/", { method: "POST", body: "hello 0527777888" });
+    expect((await inforuStatusRoute(junk, SECRET, { db: () => db, log, env })).status).toBe(400);
+    expect(log).toHaveBeenLastCalledWith("sms.inforu.status_unreadable", { reason: "format" });
+    const broken = new Request("https://x.test/", { method: "POST", body: "[{" });
+    expect((await inforuStatusRoute(broken, SECRET, { db: () => db, log, env })).status).toBe(400);
+    // a report that names none of our messages (a click) is answered 200 and counted
+    expect((await inforuStatusRoute(post([{ CustomerMessageId: JOB, Status: 6 }]), SECRET, { db: () => db, log, env })).status).toBe(200);
+    expect(log).toHaveBeenLastCalledWith("sms.inforu.status_ignored", { count: 1 });
+  });
+
   it("the secret in the path never reaches a log line", () => {
     expect(redactPublicPath(`/api/sms/inforu/status/${SECRET}`)).toBe("/api/sms/inforu/status/[token]");
     expect(redactPublicPath(`/api/sms/inforu/inbound/${SECRET}`)).toBe("/api/sms/inforu/inbound/[token]");

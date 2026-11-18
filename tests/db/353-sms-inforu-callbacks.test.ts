@@ -12,7 +12,10 @@ type Answer = Record<string, unknown>;
 // consent_hash_key (app.sms_inbound_number_take, pinned here too); sms_inbound_reply's body unchanged
 // Then the final review of 902dcbfa: an id is cast to uuid only when it has the shape (1), and a message settled from
 // unknown_* as delivered gets sent_at (2)
-const REVIEWED_STATUS_MD5 = "b68858d0c5f0b15b83441313ffe0f52f";
+// SMS-05b (021321, live incident of 18 November 2026): one more line in the match, a message in the new status 'unknown'
+// found by its job id (the 021248 line for failed + unknown_* rows kept); every other line unchanged (rechecked by its
+// writer against 021248's body; needs its independent review)
+const REVIEWED_STATUS_MD5 = "20256e0f5c8397f1c2e8c51021e9feb3";
 const REVIEWED_TAKE_MD5 = "f6f63fc115fed7ad5b4d5bf598bce6e5";
 const REVIEWED_REPLY_MD5 = "32283b28a308b691c0bf3b2d61da23b9";
 
@@ -133,7 +136,8 @@ describe("InforU callbacks (SMS-05)", () => {
     await asService((q) => q("select public.finish_job($1, $2, false, 'inforu unknown_timeout', true, true, 'inforu', null, 'unknown_timeout')", [job, mine.lease]));
     const msg = () =>
       asAdmin(async (q) => (await q<{ status: string; code: string | null; pid: string | null }>("select status, provider_error_code as code, provider_message_id as pid from public.messages where job_id = $1", [job])).rows[0]);
-    expect(await msg()).toEqual({ status: "failed", code: "unknown_timeout", pid: null });
+    // SMS-05b (021321): it may have gone out, so it reads 'unknown', not 'failed', until the report comes
+    expect(await msg()).toEqual({ status: "unknown", code: "unknown_timeout", pid: null });
     expect(await status([{ id: job, status: "delivered" }])).toEqual({ delivered: 1, failed: 0, pending: 0 });
     expect(await msg()).toEqual({ status: "delivered", code: null, pid: job });
     // final review (2): settled as delivered = sent
@@ -149,6 +153,53 @@ describe("InforU callbacks (SMS-05)", () => {
     );
     await asAdmin((q) => q("update app.jobs set status = 'dead', finished_at = now() - interval '16 minutes' where id = $1", [old]));
     expect(await status([{ id: old, status: "delivered" }])).toEqual({ delivered: 0, failed: 0, pending: 0 });
+  });
+
+  it("SMS-05b: settles an 'unknown' message as not delivered, never backwards, and a row written before 021321 too", async () => {
+    const lead = await insertLead(owner.id, org, { full_name: "ט", phone: "052-4440004", owner_id: owner.id });
+    const enqueue = () =>
+      asAdmin(
+        async (q) =>
+          (await q<{ id: string }>("select app.enqueue_job($1, 'message.send', $2::jsonb, null) as id", [org, JSON.stringify({ channel: "sms", message_type: "requested_document", lead_id: lead, template_id: randomUUID() })]))
+            .rows[0].id,
+      );
+    const claimAndCheck = async (id: string) => {
+      const claimed = await asService(async (q) => (await q<{ r: { id: string; lease: string }[] }>("select public.claim_jobs(array['message.send'], 100) as r")).rows[0].r);
+      await asAdmin((q) => q("update app.jobs set send_checked_lease = lease_id where id = $1", [id]));
+      return claimed.find((r) => r.id === id)!.lease;
+    };
+    const msg = (id: string) =>
+      asAdmin(async (q) => (await q<{ status: string; code: string | null; sent: boolean }>("select status, provider_error_code as code, sent_at is not null as sent from public.messages where job_id = $1", [id])).rows[0]);
+
+    const job = await enqueue();
+    const lease = await claimAndCheck(job);
+    await asService((q) => q("select public.finish_job($1, $2, false, 'inforu unknown_http_502', true, true, 'inforu', null, 'unknown_http_502')", [job, lease]));
+    expect(await msg(job)).toEqual({ status: "unknown", code: "unknown_http_502", sent: false });
+    // the job itself still ended dead with outcome 'failed' (never sent twice; the queue's closed list is unchanged)
+    expect(await asAdmin(async (q) => (await q<{ s: string; o: string }>("select status as s, message_outcome as o from app.jobs where id = $1", [job])).rows[0])).toEqual({ s: "dead", o: "failed" });
+    expect(await status([{ id: job, status: "failed", code: "inforu_undelivered" }])).toEqual({ delivered: 0, failed: 1, pending: 0 });
+    expect(await msg(job)).toEqual({ status: "failed", code: "inforu_undelivered", sent: false });
+    // never backwards: a later delivered report does not move a reported failure
+    expect(await status([{ id: job, status: "delivered" }])).toEqual({ delivered: 0, failed: 0, pending: 0 });
+    expect((await msg(job)).status).toBe("failed");
+
+    // a failure with no provider (the composer's own refusal) stays 'failed', whatever its code
+    const refused = await enqueue();
+    const refusedLease = await claimAndCheck(refused);
+    await asService((q) => q("select public.finish_job($1, $2, false, 'refused unknown_x', true, true, null, null, 'unknown_x')", [refused, refusedLease]));
+    expect((await msg(refused)).status).toBe("failed");
+
+    // a row written before 021321 (failed + unknown_*) is still settled by its job id
+    const legacy = randomUUID();
+    await asAdmin((q) =>
+      q(
+        `insert into public.messages (organization_id, lead_id, channel, direction, status, provider, provider_error_code, job_id, occurred_at)
+         values ($1, $2, 'sms', 'outbound', 'failed', 'inforu', 'unknown_timeout', $3, now())`,
+        [org, lead, legacy],
+      ),
+    );
+    expect(await status([{ id: legacy, status: "delivered" }])).toEqual({ delivered: 1, failed: 0, pending: 0 });
+    expect(await msg(legacy)).toEqual({ status: "delivered", code: null, sent: true });
   });
 
   it("goes to every business, past the old cap of 20, and limits one number before the total (review (4), (5))", async () => {
