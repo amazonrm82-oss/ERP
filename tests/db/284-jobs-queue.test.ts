@@ -880,15 +880,21 @@ describe("background job queue (OPS-04)", () => {
                     md5(p.prosrc || '|' || p.prosecdef::text || '|' || coalesce(p.proconfig::text, '') || '|' || pg_get_function_identity_arguments(p.oid)) as md5
                from pg_proc p join pg_namespace n on n.oid = p.pronamespace
               where (n.nspname, p.proname) in (('public', 'signup_job_compose'), ('app', 'queue_signup_emails'),
-                                               ('app', 'signup_email_limits'))
+                                               ('app', 'signup_email_limits'), ('app', 'signup_trial_end_applies'),
+                                               ('app', 'signup_trial_last_day'))
               order by 1`,
           )
         ).rows,
     );
     expect(Object.fromEntries(rows.map((r) => [r.name, r.md5]))).toEqual({
-      "app.queue_signup_emails": "65ec2cc40cb11791163a08c5be2ab2d2",
-      "app.signup_email_limits": "2e68353e0ad0977afd3546eadda59a3b",
-      "public.signup_job_compose": "30bd8d352a04f3a4cbffd5869b3a4b53",
+      // rechecked 18 November 2026 after the review of 5f123fa5: owner (444) א (trial ending told only while BIL-08's switch is on
+      // and no hand assignment after the trial end, judged by the composer), the last day = local date of trial_ends_at minus
+      // 1 µs (two new helpers pinned), and caps a test may only lower per transaction; nothing else changed
+      "app.queue_signup_emails": "bcff97161630ed7d2f6d5564ef01077f",
+      "app.signup_email_limits": "323cabb119e962d662a1d3837b097c5e",
+      "app.signup_trial_end_applies": "dd9a28aa329c92f973276f0bcdc51bd6",
+      "app.signup_trial_last_day": "5a8a266ae562b1a9e18187e3aab43187",
+      "public.signup_job_compose": "925c3b5f200780f68bc576c43cab67a0",
     });
   });
 

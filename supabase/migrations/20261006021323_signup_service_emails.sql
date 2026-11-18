@@ -10,9 +10,16 @@
 -- * welcome: queued for a business made in the last 2 days, still on its trial (organizations 'trial' + subscriptions
 --   'trialing'), open (not deleted, closed or waiting to be removed), whose creator is still its active owner and created no
 --   business before it (organizations.created_by). Sent at once (an answer to the person's own action).
--- * trial_ending: from 09:00 in the business's zone, 3 calendar days before the trial's last moment (the business's local
---   day of trial_ends_at minus 3), on a working day of the business, only while more than 12 hours of trial are left; to the
---   business's CURRENT active owner; the person's quiet hours move it later on the same day (app.digest_run_at).
+-- * trial_ending: from 09:00 in the business's zone, 3 calendar days before the trial's last day (the business's local
+--   date of trial_ends_at minus one microsecond, so a trial ending at local midnight ends the day before; minus 3), on a
+--   working day of the business, only while more than 12 hours of trial are left; to the business's CURRENT active owner;
+--   the person's quiet hours move it later on the same day (app.digest_run_at).
+-- * Owner (444) א: the trial_ending email, and the welcome's line "the trial is active until X", go ONLY while the trial-end
+--   switch is on (app.trial_end_settings.enabled, BIL-08) and staff did not assign the business by hand after its trial end
+--   (app.platform_assignments.assigned_at >= trial_ends_at, the rule of app.trial_end_candidates): only then will the trial
+--   really end. app.signup_trial_end_applies() is that rule; it is judged at SEND time by the composer (switch off =
+--   trial_ending refused 'trial_end_off', a welcome answers no trial end day); the queue also skips trial_ending while it
+--   does not hold (cheap, not the rule).
 -- * Once per business and kind (app.signup_email_sends, primary key; cascades with the business, so no purge is needed:
 --   two rows per business at most). Caps: 1,000 emails an hour system-wide, 3 trial_ending emails per person a day (a person
 --   owns at most 5 businesses), 500 queued a run.
@@ -23,7 +30,8 @@
 -- What this file holds:
 -- * app.job_kinds() gains 'signup.send'; app.job_payload_ok() (021317's body, one more branch) takes exactly
 --   {organization_id, user_id, kind} with kind welcome | trial_ending.
--- * app.signup_email_sends (RLS on, no grants) and app.signup_email_limits().
+-- * app.signup_email_sends (RLS on, no grants), app.signup_email_limits() (tests may only LOWER a cap per transaction through
+--   app.signup_email_per_hour | _per_person_day | _per_run), app.signup_trial_end_applies() and app.signup_trial_last_day().
 -- * app.queue_signup_emails(): pg_cron `crm-signup-emails` (every 10 minutes).
 -- * public.signup_job_compose(job, lease) (service_role, the live lease only) for the worker.
 -- Every statement is safe to run twice. No drop statement, no row removal.
@@ -290,11 +298,36 @@ alter table app.signup_email_sends enable row level security;
 revoke all on app.signup_email_sends from public, anon, authenticated, service_role;
 
 -- the caps: emails queued an hour across every business, trial_ending emails per person in 24 hours, queued a run
+-- (a transaction-local setting may only lower a cap, never raise it; the cron sets none)
 create or replace function app.signup_email_limits(out per_hour integer, out per_person_day integer, out per_run integer)
-language sql immutable
+language sql stable
 set search_path = ''
-as $$ select 1000, 3, 500 $$;
+as $$
+  select least(1000, greatest(1, coalesce(nullif(current_setting('app.signup_email_per_hour', true), '')::integer, 1000))),
+         least(3, greatest(1, coalesce(nullif(current_setting('app.signup_email_per_person_day', true), '')::integer, 3))),
+         least(500, greatest(1, coalesce(nullif(current_setting('app.signup_email_per_run', true), '')::integer, 500)))
+$$;
 revoke all on function app.signup_email_limits() from public, anon, authenticated, service_role;
+
+-- Owner (444) א: the trial will really end only while BIL-08's switch is on and staff did not assign the business by hand
+-- after its trial end (app.trial_end_candidates' rule; keep in step). Only then is "the trial ends" told to the owner.
+create or replace function app.signup_trial_end_applies(p_org uuid, p_trial_ends_at timestamptz) returns boolean
+language sql stable security definer
+set search_path = ''
+as $$
+  select p_trial_ends_at is not null
+     and coalesce((select st.enabled from app.trial_end_settings st where st.id), false)
+     and not exists (select 1 from app.platform_assignments pa
+                      where pa.organization_id = p_org and pa.assigned_at >= p_trial_ends_at)
+$$;
+revoke all on function app.signup_trial_end_applies(uuid, timestamptz) from public, anon, authenticated, service_role;
+
+-- the trial's last day in the business's zone: the local date of its last moment (trial_ends_at is the first moment after it)
+create or replace function app.signup_trial_last_day(p_trial_ends_at timestamptz, p_zone text) returns date
+language sql stable
+set search_path = ''
+as $$ select ((p_trial_ends_at - interval '1 microsecond') at time zone p_zone)::date $$;
+revoke all on function app.signup_trial_last_day(timestamptz, text) from public, anon, authenticated, service_role;
 
 -- ----------------------------------------------------------------------------
 -- The cron: welcome and trial_ending, each once per business
@@ -383,12 +416,13 @@ begin
        and s.trial_ends_at > v_now + interval '12 hours'
        and s.trial_ends_at <= v_now + interval '4 days'
        and not app.org_deletion_pending(o.id)
+       and app.signup_trial_end_applies(o.id, s.trial_ends_at)
        and not exists (select 1 from app.signup_email_sends x where x.organization_id = o.id and x.kind = 'trial_ending')
      order by s.trial_ends_at, o.id
   loop
     exit when v_queued >= v_limit;
     exit when (select count(*) from app.signup_email_sends x where x.queued_at > v_now - interval '1 hour') >= v_limits.per_hour;
-    v_target := (v_row.trial_ends_at at time zone v_row.zone)::date - 3;
+    v_target := app.signup_trial_last_day(v_row.trial_ends_at, v_row.zone) - 3;
     continue when v_row.local_day < v_target or v_row.local_time < time '09:00';
     begin
       continue when app.org_rest_day(v_row.organization_id, v_row.local_day);
@@ -429,10 +463,11 @@ $$;
 -- Answers {refused: stale} on a lease that is not this job's live one, {refused: <code>} when nothing may be sent (the worker
 -- ends the job, nothing sent): invalid (a payload or a queued row that is not this job's), business_closed (deleted, closed,
 -- waiting to be removed), not_trialing (the business left its trial: a paid or active plan, read-only, suspended),
--- trial_over (trial_ending only: no trial end, or it passed), not_owner (the person is no longer the business's active owner;
+-- trial_over (trial_ending only: no trial end, or it passed), trial_end_off (trial_ending only: owner (444) א, the trial will
+-- not end by itself, app.signup_trial_end_applies), not_owner (the person is no longer the business's active owner;
 -- a welcome only to its creator), no_address. Else {to, business_name, kind, trial_end_day}: the owner's sign-in address, the
 -- business's display name (the neutral "העסק" when the name holds a link, an "@" or a "://"), the kind, and the trial's last
--- day in the business's zone (YYYY-MM-DD, or null). Nothing else.
+-- day in the business's zone (YYYY-MM-DD; null when the trial will not end by itself). Nothing else.
 create or replace function public.signup_job_compose(p_job uuid, p_lease uuid) returns jsonb
 language plpgsql volatile security definer
 set search_path = ''
@@ -445,6 +480,7 @@ declare
   v_kind text;
   v_email text;
   v_name text;
+  v_trial_end boolean;
 begin
   select * into v_job from app.jobs j where j.id = p_job for update;
   if v_job.id is null or v_job.kind <> 'signup.send' or v_job.status <> 'running' or v_job.lease_id is distinct from p_lease
@@ -473,6 +509,10 @@ begin
   if v_kind = 'trial_ending' and (v_sub.trial_ends_at is null or v_sub.trial_ends_at <= now()) then
     return jsonb_build_object('refused', 'trial_over');
   end if;
+  v_trial_end := app.signup_trial_end_applies(v_org.id, v_sub.trial_ends_at);
+  if v_kind = 'trial_ending' and not v_trial_end then
+    return jsonb_build_object('refused', 'trial_end_off');
+  end if;
   if not exists (select 1 from public.memberships m
                   where m.organization_id = v_org.id and m.user_id = v_user and m.role = 'owner' and m.status = 'active')
      or (v_kind = 'welcome' and v_org.created_by is distinct from v_user) then
@@ -493,8 +533,8 @@ begin
     'to', v_email,
     'business_name', v_name,
     'kind', v_kind,
-    'trial_end_day', case when v_sub.trial_ends_at is not null
-                          then to_char((v_sub.trial_ends_at at time zone app.intake_zone(v_org.timezone))::date, 'YYYY-MM-DD') end);
+    'trial_end_day', case when v_trial_end
+                          then to_char(app.signup_trial_last_day(v_sub.trial_ends_at, app.intake_zone(v_org.timezone)), 'YYYY-MM-DD') end);
 end;
 $$;
 revoke all on function public.signup_job_compose(uuid, uuid) from public, anon, authenticated;

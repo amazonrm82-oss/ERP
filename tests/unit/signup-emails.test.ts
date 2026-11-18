@@ -28,6 +28,12 @@ describe("the fixed texts", () => {
     expect(mail.links).toEqual([link]);
   });
 
+  it("owner (444) א: a welcome without a trial end day (the trial-end switch off) has no trial line", () => {
+    const mail = buildSignupEmail({ kind: "welcome", businessName: "עסק", trialEndDay: null, link })!;
+    expect(mail.text).not.toContain("תקופת הניסיון");
+    expect(mail.text.split("\n").slice(0, 3)).toEqual(["שלום,", "החשבון של עסק במקסוז נפתח.", ""]);
+  });
+
   it("trial ending says the day and points to the plan screen; nothing without a valid day", () => {
     const mail = buildSignupEmail({ kind: "trial_ending", businessName: "עסק", trialEndDay: "2026-11-21", link })!;
     expect(mail.subject).toBe("תקופת הניסיון של עסק במקסוז מסתיימת בקרוב");
