@@ -8,6 +8,8 @@ import { contentSecurityPolicy, isEmbeddablePublicPath, makeNonce } from "@/lib/
 import type { Database } from "@/lib/database.types";
 import { getSupabaseEnv } from "@/lib/env";
 import { safeNextPath } from "@/lib/paths";
+import { MONITORING_USER_HEADER, monitoringUserHeaderValue } from "@/lib/monitoring/request-identity";
+import { isCustomerPagePath, sentryConfigured, sentryIngestOrigin } from "@/lib/monitoring/sentry-rules";
 
 const AUTH_PAGES = ["/login", "/signup", "/forgot-password"];
 
@@ -84,19 +86,41 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     // forms are often reached by a client-side navigation (a link from the landing page, the redirect after signing out), which
     // keeps that document's policy; a policy on the three pages alone would block the widget there.
     turnstile: turnstileAllowed(request.nextUrl.pathname, process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY),
+    // OPS-05: the browser may send error events to Sentry's ingest host of the DSN, only where Sentry may load at all
+    sentryOrigin: sentryConnectOrigin(request.nextUrl.pathname),
   });
   // OPS-06: one id per request for the server log lines (Vercel's x-vercel-id when valid, else a new one); always set
   // here, so a visitor's own x-crm-request-id never counts
   const requestId = requestIdFor(request.headers);
+  // OPS-05: the signed-in user's id for a server error's monitoring event (set after Auth answered; a visitor's own header
+  // never counts, so it is always removed first)
+  let monitoringUser: string | null = null;
+  // the session cookies and no-store headers Auth asked for, kept so the response can be built again with the user header
+  let sessionCookies: { name: string; value: string; options: Parameters<NextResponse["cookies"]["set"]>[2] }[] = [];
+  let sessionHeaders: Record<string, string> = {};
   // the request as the page sees it: the current cookies, plus the policy
   const next = () => {
     const headers = new Headers(request.headers);
     headers.set("content-security-policy", csp);
     headers.set(REQUEST_ID_HEADER, requestId);
+    headers.delete(MONITORING_USER_HEADER);
+    if (monitoringUser) headers.set(MONITORING_USER_HEADER, monitoringUser);
     // USR-07: the root layout keeps customer-facing pages light; set here, so a visitor's own header never counts
     headers.set(PATH_HEADER, request.nextUrl.pathname);
     const res = NextResponse.next({ request: { headers } });
     res.headers.set("Content-Security-Policy", csp);
+    return res;
+  };
+  // the response with the session cookies and headers Auth set
+  const withSession = () => {
+    const res = next();
+    for (const { name, value, options } of sessionCookies) {
+      res.cookies.set(name, value, options);
+    }
+    // no-store headers: a refreshed session must never be cached by a CDN
+    for (const [key, value] of Object.entries(sessionHeaders)) {
+      res.headers.set(key, value);
+    }
     return res;
   };
   let response = next();
@@ -116,14 +140,9 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
         for (const { name, value } of cookiesToSet) {
           request.cookies.set(name, value);
         }
-        response = next();
-        for (const { name, value, options } of cookiesToSet) {
-          response.cookies.set(name, value, options);
-        }
-        // no-store headers: a refreshed session must never be cached by a CDN
-        for (const [key, value] of Object.entries(headers)) {
-          response.headers.set(key, value);
-        }
+        sessionCookies = cookiesToSet;
+        sessionHeaders = headers;
+        response = withSession();
       },
     },
   });
@@ -143,6 +162,11 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
     // run before any response is produced so refreshed cookies can still be written.
     const { data, error } = await supabase.auth.getUser();
     isSignedIn = !error && Boolean(data.user?.id);
+    // OPS-05: only while Sentry is set up on the server, and never on a public page
+    if (isSignedIn && sentryConfigured(process.env.SENTRY_DSN, process.env.VERCEL_ENV)) {
+      monitoringUser = monitoringUserHeaderValue(data.user?.id, isPublicPath(request.nextUrl.pathname));
+      if (monitoringUser) response = withSession();
+    }
     authUnavailable = error !== null && isTransientAuthError(error);
   } catch (error) {
     isSignedIn = false;
@@ -178,6 +202,13 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   }
 
   return response;
+}
+
+/** The Sentry ingest origin the CSP allows: production with a browser DSN, and never on a public customer page. */
+export function sentryConnectOrigin(pathname: string): string | null {
+  const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+  if (!sentryConfigured(dsn, process.env.VERCEL_ENV) || isCustomerPagePath(pathname)) return null;
+  return sentryIngestOrigin(dsn);
 }
 
 function redirectKeepingCookies(url: URL, from: NextResponse): NextResponse {

@@ -84,6 +84,25 @@ describe("ADM-01: subprocessors from the platform panel", () => {
       )).rows[0],
     );
     expect(google).toEqual({ n: 1, days: 14, location: "ארצות הברית", data: "שם, אימייל ותמונת פרופיל של משתמש שבחר בכך." });
+    // OPS-05 (subprocessor_sentry): Sentry for error monitoring, from 2 December 2026 (or 14 days ahead when later), in
+    // Germany (EU region), technical details and ids only, once
+    const sentry = await asAdmin(async (q) =>
+      (await q<{ n: number; days_ok: boolean; from_ok: boolean; location: string; purpose: string; data: string }>(
+        `select count(*)::int as n,
+                bool_and(effective_from - (created_at at time zone 'Asia/Jerusalem')::date >= 14) as days_ok,
+                bool_and(effective_from >= date '2026-12-02') as from_ok,
+                max(location) as location, max(purpose) as purpose, max(data_categories) as data
+           from public.subprocessors where name = 'Functional Software, Inc. (Sentry)' and cancelled_at is null`,
+      )).rows[0],
+    );
+    expect(sentry).toEqual({
+      n: 1,
+      days_ok: true,
+      from_ok: true,
+      location: "גרמניה",
+      purpose: "ניטור תקלות טכניות במערכת.",
+      data: "פרטי תקלות טכניות, מזהה משתמש ומזהה עסק, בלי פרטי קשר.",
+    });
     const list = result.entries;
     expect(list.length).toBeGreaterThanOrEqual(3);
     for (const entry of list) {

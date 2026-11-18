@@ -104,7 +104,7 @@ export function redactText(text: string): string {
  * a public link hidden (prefixes compared in lower case), emails and token-like segments (16+ characters with a
  * digit, not a uuid) redacted, printable ASCII only, at most 200.
  */
-function cleanPath(value: string): string {
+export function cleanLogPath(value: string): string {
   let path = value.split("?")[0].split("#")[0];
   try {
     path = decodeURIComponent(path);
@@ -138,7 +138,7 @@ function cleanValue(kind: FieldKind, value: unknown): string | number | boolean 
     case "route":
       return typeof value === "string" && ROUTE.test(value) && !JWT_SHAPE.test(value) ? value : undefined;
     case "path":
-      return typeof value === "string" ? cleanPath(value) : undefined;
+      return typeof value === "string" ? cleanLogPath(value) : undefined;
     case "object_path":
       return typeof value === "string" && OBJECT_PATH.test(value) ? value : undefined;
     case "text":

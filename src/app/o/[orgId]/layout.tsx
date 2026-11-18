@@ -9,6 +9,7 @@ import { OrgLogo } from "@/features/branding/components/org-logo";
 import { getOrgBranding } from "@/features/branding/queries";
 import { OrgDeletionBanner } from "@/features/org-deletion/components/org-deletion-banner";
 import { SendingPauseBanner } from "@/features/sending-pause/components/sending-pause-banner";
+import { MonitoringIdentity } from "@/features/monitoring/components/monitoring-identity";
 import { RememberOrg } from "@/features/shortcuts/components/remember-org";
 import { withOrdersPlan } from "@/features/modules/modules";
 import { countUnownedLeads } from "@/features/leads/waiting";
@@ -134,6 +135,7 @@ export default async function OrgLayout({ children, params }: Props) {
       {syncTheme ? <ThemeSync choice={syncTheme} /> : null}
       {/* USR-08: the app's shortcuts open in this business next time */}
       <RememberOrg orgId={org.id} />
+      <MonitoringIdentity userId={user.id} orgId={org.id} />
       {/* UX-05: the first-visit tour; the account menu opens it again */}
       <GuideTour orgId={org.id} steps={tourSteps(terms, modules)} seenAt={tourSeenAt} support={context.supportUntil !== null} />
       <a

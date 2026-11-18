@@ -1,3 +1,4 @@
+import { withSentryConfig } from "@sentry/nextjs/config";
 import type { NextConfig } from "next";
 // Next's own list of bots that get the metadata in <head> before the body (no streamed metadata)
 import { HTML_LIMITED_BOT_UA_RE } from "next/dist/shared/lib/router/utils/html-bots";
@@ -14,6 +15,8 @@ const nextConfig: NextConfig = {
   // (and the e2e clicks there). Errors are still shown in development.
   devIndicators: false,
   htmlLimitedBots: HTML_LIMITED_BOTS,
+  // OPS-05: the browser learns Vercel's environment from the build (VERCEL_ENV is server-only); Sentry runs only in production
+  env: { NEXT_PUBLIC_SENTRY_ENVIRONMENT: process.env.VERCEL_ENV ?? "" },
   async headers() {
     return [
       {
@@ -67,4 +70,26 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+/**
+ * OPS-05: Sentry's build step only uploads source maps, and only while the owner has set SENTRY_AUTH_TOKEN, SENTRY_ORG and
+ * SENTRY_PROJECT in Vercel; the maps are deleted from the build after the upload, so they are never served. Without the three
+ * the config is left as it is and the build needs nothing from Sentry. No build-time instrumentation, no tunnel route, no
+ * telemetry: Sentry itself is started at run time by src/instrumentation.ts and src/instrumentation-client.ts.
+ */
+export function sourceMapUploadReady(env: Record<string, string | undefined>): boolean {
+  return ["SENTRY_AUTH_TOKEN", "SENTRY_ORG", "SENTRY_PROJECT"].every((name) => (env[name] ?? "").trim() !== "");
+}
+
+export default sourceMapUploadReady(process.env)
+  ? withSentryConfig(nextConfig, {
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      silent: true,
+      telemetry: false,
+      widenClientFileUpload: false,
+      buildTimeInstrumentation: false,
+      webpack: { autoInstrumentServerFunctions: false, autoInstrumentMiddleware: false, autoInstrumentAppDirectory: false },
+      sourcemaps: { deleteSourcemapsAfterUpload: true },
+    })
+  : nextConfig;

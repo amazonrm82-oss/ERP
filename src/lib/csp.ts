@@ -2,7 +2,8 @@
 // with the nonce the proxy makes for each page view ('strict-dynamic' lets
 // those scripts load the app's chunks). Styles may be inline: React writes
 // style attributes, and a style cannot run code. The page connects only to
-// this site and to Supabase (REST, Auth, Storage, Realtime over wss).
+// this site and to Supabase (REST, Auth, Storage, Realtime over wss), and (OPS-05) to
+// the Sentry ingest host of the DSN where error monitoring may load.
 
 export function makeNonce(): string {
   const bytes = new Uint8Array(16);
@@ -22,6 +23,9 @@ type Options = {
   // src/lib/supabase/proxy.ts): the widget's script and challenge frame come from TURNSTILE_ORIGIN, and a client-side move
   // into the sign-in, sign-up or forgot-password page keeps the policy of the first page loaded
   turnstile?: boolean;
+  // OPS-05: the Sentry ingest origin of the browser DSN (https://<host>, from sentryIngestOrigin), only where Sentry may load:
+  // production with a DSN, never a customer page under /f/. connect-src only, never a wider pattern than that host.
+  sentryOrigin?: string | null;
 };
 
 /** Cloudflare Turnstile's origin (= TURNSTILE_ORIGIN in src/features/auth/turnstile.ts; a unit test keeps them equal). */
@@ -43,11 +47,14 @@ export function isEmbeddablePublicPath(pathname: string): boolean {
   return pathname.startsWith("/f/") && !NOT_EMBEDDABLE_PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
-export function contentSecurityPolicy({ nonce, supabaseUrl, isDev, publicForm, turnstile = false }: Options): string {
+export function contentSecurityPolicy({ nonce, supabaseUrl, isDev, publicForm, turnstile = false, sentryOrigin = null }: Options): string {
   const supabase = supabaseUrl ? new URL(supabaseUrl) : null;
   const connect = ["'self'"];
   if (supabase) {
     connect.push(supabase.origin, `${supabase.protocol === "https:" ? "wss" : "ws"}://${supabase.host}`);
+  }
+  if (sentryOrigin && /^https:\/\/[a-z0-9.-]+\.sentry\.io$/.test(sentryOrigin)) {
+    connect.push(sentryOrigin);
   }
   // after a sign-in form, the browser may follow redirects to Supabase Auth and Google
   const formAction = publicForm ? ["'self'", "https:"] : ["'self'", ...(supabase ? [supabase.origin] : []), "https://accounts.google.com"];
