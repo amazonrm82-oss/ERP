@@ -5,3 +5,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ sec
   const { secret } = await params;
   return inforuStatus(request, secret);
 }
+
+// SMS-05c: InforU's push may come as a GET with the parameters in the query; the same route, the secret checked first, and
+// a GET reads only the query
+export async function GET(request: Request, { params }: { params: Promise<{ secret: string }> }) {
+  const { secret } = await params;
+  return inforuStatus(request, secret);
+}

@@ -447,7 +447,7 @@ export const PUBLIC_ENTRY_POINTS: Record<string, Entry> = {
     guard: "database",
     functions: ["sms_delivery_status"],
     limit:
-      "SMS-05: refused (404) BEFORE the body is read unless the last path segment is INFORU_WEBHOOK_SECRET (timing-safe; InforU signs nothing), bodies over 256 KB refused (413), 500 items a post; then 20,000 items a minute in total (app.sms_callback_counts); updates only public.messages of provider inforu still 'sent'; a report before the message row answers 503",
+      "SMS-05: POST or GET (SMS-05c; a GET reads only the query) refused (404) BEFORE the body is read unless the last path segment is INFORU_WEBHOOK_SECRET (timing-safe; InforU signs nothing), bodies over 256 KB refused (413), 500 items a post; one shape log line (field names only, never values); then 20,000 items a minute in total (app.sms_callback_counts); updates only public.messages of provider inforu still 'sent'; a report before the message row answers 503",
     refusal: "503 + Retry-After (InforU posts again; no 429 so it retries); 400 / 404 / 413",
     sender: { leftOut: "(43) א: server-to-server from InforU's servers; the path secret is the secret" },
   },

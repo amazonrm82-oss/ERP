@@ -11,7 +11,7 @@ import { validRequestId } from "@/lib/request-id";
 
 export type LogLevel = "info" | "warn" | "error";
 
-type FieldKind = "uuid" | "id" | "code" | "route" | "path" | "object_path" | "text" | "plain" | "number" | "boolean";
+type FieldKind = "uuid" | "id" | "code" | "route" | "path" | "object_path" | "text" | "plain" | "number" | "boolean" | "media_type" | "names";
 
 /** The closed list of field names a log line may carry, with the kind each value is judged by. */
 export const LOG_FIELDS = {
@@ -39,10 +39,21 @@ export const LOG_FIELDS = {
   details: "plain",
   count: "number",
   busy: "boolean",
+  // SMS-05c: the shape of a provider's callback, never its values: the media type, the body's size bucket and format,
+  // whether a body and a query were there, and the field NAMES seen (names only, comma-joined; anything that is not a
+  // plain name is left out and counted in other_fields by the caller)
+  content_type: "media_type",
+  body_size: "code",
+  body_format: "code",
+  has_body: "boolean",
+  has_query: "boolean",
+  body_fields: "names",
+  query_fields: "names",
+  other_fields: "number",
 } as const satisfies Record<string, FieldKind>;
 
 export type LogField = keyof typeof LOG_FIELDS;
-export type LogFields = Partial<Record<LogField, string | number | boolean | null | undefined>>;
+export type LogFields = Partial<Record<LogField, string | number | boolean | readonly string[] | null | undefined>>;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CODE = /^[A-Za-z0-9_.:/?[\]-]{1,64}$/;
@@ -53,6 +64,16 @@ const JWT_SHAPE = /[A-Za-z0-9_-]{16,}(?:\.[A-Za-z0-9_-]{16,})+/;
 const UUID_SEGMENT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const OBJECT_PATH = /^[0-9a-f-]{36}(\/[0-9a-f-]{36}(\.[a-z0-9]{1,8})?)*$/i;
 const EVENT = /^[a-z0-9_.-]{1,80}$/;
+// SMS-05c: a media type as a Content-Type names it, parameters already dropped
+const MEDIA_TYPE = /^[a-z0-9.+/-]{1,60}$/;
+// SMS-05c: a field name: word characters only, at least one letter, never a run of 5+ digits (so a number is never a name)
+const FIELD_NAME = /^[A-Za-z0-9_]{1,40}$/;
+export const LOG_NAMES_MAX = 30;
+
+/** SMS-05c: whether a callback's field name may be logged as a name (never a value, a number or a text). */
+export function loggableFieldName(name: string): boolean {
+  return FIELD_NAME.test(name) && /[A-Za-z]/.test(name) && !/\d{5,}/.test(name);
+}
 
 /**
  * Secrets and personal details out of a text: the word after Bearer/Basic and after token=/key=/secret=/password=
@@ -132,6 +153,13 @@ function cleanValue(kind: FieldKind, value: unknown): string | number | boolean 
       return typeof value === "number" && Number.isFinite(value) ? value : undefined;
     case "boolean":
       return typeof value === "boolean" ? value : undefined;
+    case "media_type":
+      return typeof value === "string" && MEDIA_TYPE.test(value) ? value : undefined;
+    case "names": {
+      if (!Array.isArray(value)) return undefined;
+      const names = [...new Set(value.filter((name): name is string => typeof name === "string" && loggableFieldName(name)))];
+      return names.slice(0, LOG_NAMES_MAX).join(",");
+    }
   }
 }
 

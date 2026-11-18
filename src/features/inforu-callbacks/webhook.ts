@@ -1,4 +1,5 @@
 import { inforuSecretMatches } from "@/features/messaging/providers/inforu";
+import { LOG_NAMES_MAX, loggableFieldName, type LogFields } from "@/lib/log";
 
 // SMS-05 (owner (318) א), wave 3 use (2): InforU's delivery reports and replies. Pure: the database calls come in through
 // `db` (webhook-server.ts gives the service_role ones). The secret (the adapter's webhook secret, the last path segment;
@@ -28,17 +29,20 @@ export type InforuWebhookDb = {
   deliveryStatus(items: DeliveryItem[]): Promise<unknown>;
   inboundReply(item: InboundItem): Promise<unknown>;
 };
-export type WebhookLog = (event: string, fields: { count?: number; status?: string; reason?: string }) => void;
+export type WebhookLog = (event: string, fields: Pick<LogFields, "count" | "status" | "reason" | ReportShapeField>) => void;
 
 const noStore = { "Cache-Control": "no-store" };
 const json = (status: number, body: Record<string, unknown>) => Response.json(body, { status, headers: noStore });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-async function readText(request: Request): Promise<{ ok: true; value: string } | { ok: false; status: number }> {
+type TextRead = { ok: true; value: string; bytes: number } | { ok: false; status: number };
+
+async function readText(request: Request): Promise<TextRead> {
   const declared = Number(request.headers.get("content-length") ?? "0");
   if (Number.isFinite(declared) && declared > INFORU_MAX_BODY_BYTES) return { ok: false, status: 413 };
   // SMS-05b: no body reads as an empty text (the delivery report may carry its parameters in the query)
-  if (!request.body) return { ok: true, value: "" };
+  // SMS-05c: a GET reads only the query, never a body
+  if (!request.body || request.method === "GET" || request.method === "HEAD") return { ok: true, value: "", bytes: 0 };
   const reader = request.body.getReader();
   const parts: Uint8Array[] = [];
   let size = 0;
@@ -52,7 +56,7 @@ async function readText(request: Request): Promise<{ ok: true; value: string } |
     }
     parts.push(value);
   }
-  return { ok: true, value: Buffer.concat(parts).toString("utf8") };
+  return { ok: true, value: Buffer.concat(parts).toString("utf8"), bytes: size };
 }
 
 async function readJson(request: Request): Promise<{ ok: true; value: unknown } | { ok: false; status: number }> {
@@ -76,12 +80,119 @@ function paramsReport(params: URLSearchParams): Record<string, string> | null {
   return out;
 }
 
+export type ReportShapeField = "method" | "content_type" | "body_size" | "body_format" | "has_body" | "has_query" | "body_fields" | "query_fields" | "other_fields";
+export type ReportShape = Pick<LogFields, ReportShapeField>;
+
+const SIZE_BUCKETS: [number, string][] = [
+  [0, "0"],
+  [255, "1-255"],
+  [1023, "256-1k"],
+  [4095, "1k-4k"],
+  [16383, "4k-16k"],
+  [65535, "16k-64k"],
+  [INFORU_MAX_BODY_BYTES, "64k-256k"],
+];
+
+/** SMS-05c: a body's length as a bucket, never the exact size. */
+export function bodySizeBucket(bytes: number | null): string {
+  if (bytes === null) return "over_limit";
+  for (const [max, label] of SIZE_BUCKETS) if (bytes <= max) return label;
+  return "over_limit";
+}
+
+/** SMS-05c: the Content-Type's media type only (lower case, parameters dropped); "none" when absent, "other" when odd. */
+export function mediaTypeOf(header: string | null): string {
+  if (header === null || header.trim() === "") return "none";
+  const media = header.split(";")[0].trim().toLowerCase();
+  return /^[a-z0-9.+/-]{1,60}$/.test(media) ? media : "other";
+}
+
+/** SMS-05c: the plain names of a list (deduplicated, at most LOG_NAMES_MAX), and how many others were seen. */
+function namesOf(keys: Iterable<string>): { names: string[]; other: number } {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  let other = 0;
+  for (const key of keys) {
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (loggableFieldName(key) && names.length < LOG_NAMES_MAX) names.push(key);
+    else other += 1;
+  }
+  return { names, other };
+}
+
+/** The keys of form pairs that carry "=": a bare word (a text with no "=") is never read as a name. */
+function formKeys(body: string): string[] {
+  const keys: string[] = [];
+  for (const pair of body.split("&")) {
+    const at = pair.indexOf("=");
+    if (at <= 0) continue;
+    try {
+      keys.push(decodeURIComponent(pair.slice(0, at).replace(/\+/g, " ")));
+    } catch {
+      keys.push("");
+    }
+  }
+  return keys;
+}
+
+/**
+ * SMS-05c (owner's update to (428)): the shape of a delivery report, for one log line after the secret passed: the method,
+ * the media type, the body's size bucket and format, whether a body and a query were there, and the field NAMES (form keys,
+ * the JSON keys of the first item, the query's keys). Never a value, the text, a number, the path or its secret.
+ */
+export function deliveryReportShape(request: Request, read: TextRead): ReportShape {
+  const url = new URL(request.url);
+  const query = namesOf(url.searchParams.keys());
+  const shape: ReportShape = {
+    method: /^[A-Z]{1,10}$/.test(request.method) ? request.method : "other",
+    content_type: mediaTypeOf(request.headers.get("content-type")),
+    has_query: url.search.length > 1,
+    query_fields: query.names,
+  };
+  let other = query.other;
+  if (!read.ok) {
+    shape.has_body = true;
+    shape.body_size = bodySizeBucket(null);
+    shape.body_format = "unread";
+  } else {
+    shape.has_body = read.bytes > 0;
+    shape.body_size = bodySizeBucket(read.bytes);
+    const body = read.value.trim();
+    let keys: string[] = [];
+    if (body === "") shape.body_format = "empty";
+    else if (body.startsWith("[") || body.startsWith("{")) {
+      shape.body_format = "json";
+      try {
+        const value = JSON.parse(body) as unknown;
+        const first = Array.isArray(value) ? value[0] : value;
+        if (first && typeof first === "object" && !Array.isArray(first)) keys = Object.keys(first);
+      } catch {
+        shape.body_format = "json_broken";
+      }
+    } else {
+      keys = formKeys(body);
+      shape.body_format = keys.length > 0 ? "form" : "other";
+    }
+    const fields = namesOf(keys);
+    shape.body_fields = fields.names;
+    other += fields.other;
+  }
+  shape.other_fields = other;
+  return shape;
+}
+
 /**
  * SMS-05b: a delivery report in either of InforU's push formats (see the header): JSON, or form parameters in the body, or
  * (an empty body) in the URL's query. Only CustomerMessageId and Status are taken from form parameters; nothing else is kept.
+ * SMS-05c: `onShape` gets the report's shape (names only) once the body was read.
  */
-export async function readDeliveryReport(request: Request): Promise<{ ok: true; value: unknown } | { ok: false; status: number }> {
+export async function readDeliveryReport(
+  request: Request,
+  onShape?: (shape: ReportShape) => void,
+): Promise<{ ok: true; value: unknown } | { ok: false; status: number }> {
   const text = await readText(request);
+  onShape?.(deliveryReportShape(request, text));
   if (!text.ok) return text;
   const body = text.value.trim();
   if (body.startsWith("[") || body.startsWith("{")) {
@@ -138,7 +249,8 @@ export async function inforuStatusRoute(request: Request, secret: string, deps: 
   // RVW-101: the service-key client is made only after the secret in the path passed
   const db = deps.db();
   if (!db) return json(503, { error: "not configured" });
-  const body = await readDeliveryReport(request);
+  // SMS-05c: one line with the report's shape (method, media type, size bucket, field names), never a value
+  const body = await readDeliveryReport(request, (shape) => deps.log("sms.inforu.status_shape", shape));
   if (!body.ok) {
     // SMS-05b: counts-only, so a report in a format we do not read is seen in the logs (never the body)
     deps.log("sms.inforu.status_unreadable", { reason: body.status === 413 ? "too_large" : "format" });

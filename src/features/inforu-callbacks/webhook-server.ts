@@ -3,7 +3,7 @@ import "server-only";
 import { logEvent } from "@/lib/log";
 import { createServiceClient } from "@/lib/supabase/service";
 
-import { inforuInboundRoute, inforuStatusRoute, type InforuWebhookDb } from "./webhook";
+import { inforuInboundRoute, inforuStatusRoute, type InforuWebhookDb, type WebhookLog } from "./webhook";
 
 /**
  * SMS-05 (owner (318) א), wave 3 use (2): the service_role path of InforU's two callbacks. The routes in webhook.ts
@@ -27,7 +27,7 @@ function database(): InforuWebhookDb | null {
   };
 }
 
-const log = (event: string, fields: { count?: number; status?: string; reason?: string }) => logEvent("info", event, fields);
+const log: WebhookLog = (event, fields) => logEvent("info", event, fields);
 
 export function inforuStatus(request: Request, secret: string) {
   return inforuStatusRoute(request, secret, { db: database, log });
