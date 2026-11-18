@@ -3,34 +3,37 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { decide, rootAdvisories, satisfies } from "../../scripts/audit-check.mjs";
+import { calendarDate, chainTo, decide, rootAdvisories, satisfies } from "../../scripts/audit-check.mjs";
 
 const ROOT = join(__dirname, "..", "..");
 const readJson = (path: string) => JSON.parse(readFileSync(join(ROOT, path), "utf8"));
 
-// npm audit --omit=dev --json as it stood on 18 November 2026 with @sentry/nextjs 11.10.0, and the lockfile entries around it
+// npm audit --omit=dev --json as it stood on 18 November 2026 with @sentry/nextjs 11.10.0 (5 moderate findings), and the
+// lockfile entries around them
 const AUDIT = readJson("tests/unit/fixtures/audit/sentry-build-time.json");
 const LOCK = readJson("tests/unit/fixtures/audit/lock-subset.json");
 const ALLOWLIST = readJson("scripts/audit-allowlist.json");
-// published versions on that day (picomatch's latest is still vulnerable; glob and minimatch have fixes a newer dependent needs)
+// published versions on that day: glob and minimatch have fixes, but only a newer dependent accepts them
 const PUBLISHED = {
-  picomatch: ["2.3.1", "2.3.2", "4.0.6", "4.0.7"],
   glob: ["13.0.6", "13.0.7", "14.0.1", "14.0.2", "14.0.6", "15.0.0-rc.1"],
   minimatch: ["10.2.5", "10.2.6", "11.0.0", "11.0.9"],
 };
 const BEFORE = new Date("2026-11-18T12:00:00Z");
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+const run = (over: Partial<Parameters<typeof decide>[0]> = {}) =>
+  decide({ audit: AUDIT, lock: LOCK, allowlist: ALLOWLIST, published: PUBLISHED, now: BEFORE, ...over });
 
 describe("audit-check: the decision on a captured report", () => {
-  it("passes with the owner's allowlist: every one of the 11 findings is listed by package and advisory id", () => {
-    const result = decide({ audit: AUDIT, lock: LOCK, allowlist: ALLOWLIST, published: PUBLISHED, now: BEFORE });
+  it("passes with the owner's allowlist, which lists exactly what npm audit reports", () => {
+    const result = run();
     expect(result.failures).toEqual([]);
     expect(result.ok).toBe(true);
-    expect(Object.keys(AUDIT.vulnerabilities)).toHaveLength(11);
     expect(ALLOWLIST.entries.map((e: { package: string }) => e.package).sort()).toEqual(Object.keys(AUDIT.vulnerabilities).sort());
-    for (const entry of ALLOWLIST.entries) expect(entry.reason).toBe("build-time only (Sentry bundler plugins), owner (433) א");
+    for (const entry of ALLOWLIST.entries) {
+      expect(entry.reason).toBe("build-time only (Sentry bundler plugins), owner (433) א");
+      expect(entry.paths).toEqual(AUDIT.vulnerabilities[entry.package].nodes);
+    }
     expect(ALLOWLIST.recheck_by).toBe("2026-12-15");
-    // the fixes that only a newer dependent can take are notes, not failures
     expect(result.notes.join("\n")).toContain("a newer @sentry/bundler-plugins is needed");
   });
 
@@ -48,61 +51,121 @@ describe("audit-check: the decision on a captured report", () => {
       via: [{ name: "right-pad", url: "https://github.com/advisories/GHSA-dddd-eeee-ffff", range: "<2.0.0", severity: "moderate" }],
       nodes: ["node_modules/right-pad"],
     };
-    const result = decide({ audit, lock: LOCK, allowlist: ALLOWLIST, published: PUBLISHED, now: BEFORE });
-    expect(result.ok).toBe(false);
+    const result = run({ audit });
     expect(result.failures).toEqual(["not on the allowlist: left-pad (high; GHSA-aaaa-bbbb-cccc)"]);
     expect(result.notes.join("\n")).toContain("right-pad (moderate; GHSA-dddd-eeee-ffff)");
   });
 
-  it("a listed package with a new advisory is not covered by its old entry", () => {
+  it("fails when an allowlisted advisory reaches the app at a path the entry does not name (a runtime dependency)", () => {
     const audit = clone(AUDIT);
-    audit.vulnerabilities.picomatch.via.push({ name: "picomatch", url: "https://github.com/advisories/GHSA-zzzz-yyyy-xxxx", range: "<=4.0.7", severity: "critical" });
-    const result = decide({ audit, lock: LOCK, allowlist: ALLOWLIST, published: PUBLISHED, now: BEFORE });
+    audit.vulnerabilities.glob.nodes.push("node_modules/some-runtime-lib/node_modules/glob");
+    const result = run({ audit });
     expect(result.ok).toBe(false);
-    expect(result.failures.join("\n")).toContain("not on the allowlist: picomatch");
+    expect(result.failures).toEqual([
+      "glob (moderate; GHSA-3g3m-2fjr-6pw4, GHSA-g3hv-75wg-m249) is installed at a path the allowlist does not name: node_modules/some-runtime-lib/node_modules/glob",
+    ]);
   });
 
-  it("fails after the recheck date (Israel date) and passes on the day itself", () => {
+  it("a listed package with a new advisory is not covered by its old entry", () => {
+    const audit = clone(AUDIT);
+    audit.vulnerabilities.minimatch.severity = "critical";
+    audit.vulnerabilities.minimatch.via.push({ name: "minimatch", url: "https://github.com/advisories/GHSA-zzzz-yyyy-xxxx", range: "<=11.0.9", severity: "critical" });
+    const result = run({ audit });
+    expect(result.failures.join("\n")).toContain("not on the allowlist: minimatch (critical;");
+    // and its entry, now matching nothing, fails too
+    expect(result.failures.join("\n")).toContain("allowlist entry no longer matches any finding: minimatch");
+  });
+
+  it("an entry that matches no finding fails", () => {
+    const allowlist = clone(ALLOWLIST);
+    allowlist.entries.push({ package: "picomatch", advisories: ["GHSA-fc5q-39xc-vjpf"], paths: ["node_modules/picomatch"], reason: "build-time only" });
+    const result = run({ allowlist });
+    expect(result.ok).toBe(false);
+    expect(result.failures).toEqual(["allowlist entry no longer matches any finding: picomatch (GHSA-fc5q-39xc-vjpf); remove it"]);
+  });
+
+  it("an entry with no ids, a wildcard, no paths or no reason cannot be used", () => {
+    const base = ALLOWLIST.entries.find((e: { package: string }) => e.package === "minimatch");
+    const cases: [Record<string, unknown>, string][] = [
+      [{ ...base, advisories: [] }, "no advisory ids"],
+      [{ ...base, advisories: ["*"] }, "an advisory id that is not GHSA-xxxx-xxxx-xxxx"],
+      [{ ...base, package: "*" }, "no exact package name"],
+      [{ ...base, paths: [] }, "no install paths"],
+      [{ ...base, paths: ["node_modules/*"] }, "an install path that is not an exact node_modules path"],
+      [{ ...base, reason: " " }, "no reason"],
+    ];
+    for (const [entry, problem] of cases) {
+      const allowlist = { ...ALLOWLIST, entries: ALLOWLIST.entries.map((e: { package: string }) => (e.package === "minimatch" ? entry : e)) };
+      const result = run({ allowlist });
+      expect(result.ok).toBe(false);
+      expect(result.failures.join("\n")).toContain(`cannot be used: ${problem}`);
+    }
+  });
+
+  it("an advisory without a GHSA id fails the run instead of being dropped", () => {
+    const audit = clone(AUDIT);
+    audit.vulnerabilities.minimatch.via.push({ name: "minimatch", url: "https://example.com/advisory/123", range: "<99", severity: "moderate" });
+    const result = run({ audit });
+    expect(result.ok).toBe(false);
+    expect(result.failures.join("\n")).toContain("minimatch: npm audit gives an advisory without a GHSA id (minimatch): it cannot be judged");
+  });
+
+  it("fails after the recheck date (Israel date), passes on the day, and needs a real calendar date", () => {
     // 15 December 2026 ends at 22:00 UTC in Israel (UTC+2)
-    const onDay = decide({ audit: AUDIT, lock: LOCK, allowlist: ALLOWLIST, published: PUBLISHED, now: new Date("2026-12-15T21:59:59Z") });
-    expect(onDay.ok).toBe(true);
-    const after = decide({ audit: AUDIT, lock: LOCK, allowlist: ALLOWLIST, published: PUBLISHED, now: new Date("2026-12-15T22:00:00Z") });
-    expect(after.ok).toBe(false);
-    expect(after.failures).toEqual([
+    expect(run({ now: new Date("2026-12-15T21:59:59Z") }).ok).toBe(true);
+    expect(run({ now: new Date("2026-12-15T22:00:00Z") }).failures).toEqual([
       "the allowlist's recheck_by date 2026-12-15 has passed: look at the findings again, then fix them or renew the date",
     ]);
-    const noDate = decide({ audit: AUDIT, lock: LOCK, allowlist: { ...ALLOWLIST, recheck_by: "soon" }, published: PUBLISHED, now: BEFORE });
-    expect(noDate.failures).toEqual(["the allowlist has no valid recheck_by date (YYYY-MM-DD)"]);
+    for (const bad of ["soon", "2026-99-99", "2026-02-30", "", undefined]) {
+      expect(run({ allowlist: { ...ALLOWLIST, recheck_by: bad } }).failures).toEqual(["the allowlist has no valid recheck_by date (a real YYYY-MM-DD)"]);
+    }
+    expect(calendarDate("2026-12-15")).toBe("2026-12-15");
+    expect(calendarDate("2026-99-99")).toBeNull();
   });
 
   it("fails as soon as a fixed version exists that the dependent accepts", () => {
-    const published = { ...PUBLISHED, picomatch: [...PUBLISHED.picomatch, "4.0.8"] };
-    const result = decide({ audit: AUDIT, lock: LOCK, allowlist: ALLOWLIST, published, now: BEFORE });
+    // as if glob's advisory were fixed in 13.0.8, a version @sentry/bundler-plugins' ^13.0.6 accepts
+    const audit = clone(AUDIT);
+    audit.vulnerabilities.glob.via[0].range = ">=9.0.0 <13.0.8";
+    const result = run({ audit, published: { ...PUBLISHED, glob: [...PUBLISHED.glob, "13.0.8"] } });
     expect(result.ok).toBe(false);
-    expect(result.failures.some((f: string) => f.startsWith("GHSA-fc5q-39xc-vjpf: picomatch 4.0.8 is fixed and") && f.includes("npm update picomatch"))).toBe(true);
-    // a newer minimatch that is still inside the vulnerable range is no fix
-    const minimatch = decide({ audit: AUDIT, lock: LOCK, allowlist: ALLOWLIST, published: { ...PUBLISHED, minimatch: [...PUBLISHED.minimatch, "10.2.9"] }, now: BEFORE });
-    expect(minimatch.ok).toBe(true);
+    expect(result.failures).toEqual([
+      "GHSA-3g3m-2fjr-6pw4: glob 13.0.8 is fixed and @sentry/bundler-plugins accepts it (^13.0.6): update it (npm update glob) and remove the allowlist entry",
+    ]);
+    // a newer minimatch still inside the vulnerable range is no fix
+    expect(run({ published: { ...PUBLISHED, minimatch: [...PUBLISHED.minimatch, "10.2.9"] } }).ok).toBe(true);
+  });
+
+  it("names the release of the top-level package that would bring a fix", () => {
+    const manifests: Record<string, { version: string; dependencies: Record<string, string> }> = {
+      "@sentry/nextjs@latest": { version: "11.14.0", dependencies: { "@sentry/bundler-plugins": "11.14.0" } },
+      "@sentry/bundler-plugins@11.14.0": { version: "11.14.0", dependencies: { glob: "^14.0.3" } },
+    };
+    const registry = { manifest: (name: string, range: string) => manifests[`${name}@${range}`] ?? null };
+    const result = run({ registry });
+    expect(result.ok).toBe(true);
+    expect(result.notes).toContain(
+      "GHSA-3g3m-2fjr-6pw4: glob 14.0.6 is fixed, but @sentry/bundler-plugins declares ^13.0.6: a newer @sentry/bundler-plugins is needed; @sentry/nextjs 11.14.0 brings a fixed glob (upgrade once it is two weeks old)",
+    );
+    const stale = { manifest: (name: string, range: string) => (name === "@sentry/bundler-plugins" ? { version: "11.14.0", dependencies: { glob: "^13.0.6" } } : manifests[`${name}@${range}`] ?? null) };
+    expect(run({ registry: stale }).notes.join("\n")).toContain("the newest @sentry/nextjs (11.14.0) still does not take it");
+    expect(chainTo(LOCK, "node_modules/glob")).toEqual([
+      { name: "@sentry/nextjs", range: "11.10.0" },
+      { name: "@sentry/bundler-plugins", range: "11.10.0" },
+      { name: "glob", range: "^13.0.6" },
+    ]);
   });
 
   it("fails when published versions cannot be read, or the report is unreadable", () => {
-    const result = decide({ audit: AUDIT, lock: LOCK, allowlist: ALLOWLIST, published: { glob: PUBLISHED.glob, minimatch: PUBLISHED.minimatch }, now: BEFORE });
-    expect(result.failures).toEqual(["could not read the published versions of picomatch to look for a fix of GHSA-fc5q-39xc-vjpf"]);
-    expect(decide({ audit: null, lock: LOCK, allowlist: ALLOWLIST, published: PUBLISHED, now: BEFORE }).ok).toBe(false);
-  });
-
-  it("notes allowlist entries that are no longer needed, without failing", () => {
-    const allowlist = clone(ALLOWLIST);
-    allowlist.entries.push({ package: "gone", advisories: ["GHSA-1111-2222-3333"], reason: "old" });
-    const result = decide({ audit: AUDIT, lock: LOCK, allowlist, published: PUBLISHED, now: BEFORE });
-    expect(result.ok).toBe(true);
-    expect(result.notes).toContain("allowlist entry no longer needed: gone (GHSA-1111-2222-3333); remove it");
+    expect(run({ published: { glob: PUBLISHED.glob } }).failures).toEqual([
+      "could not read the published versions of minimatch to look for a fix of GHSA-g3hv-75wg-m249",
+    ]);
+    expect(run({ audit: null }).ok).toBe(false);
   });
 
   it("follows a finding to the advisories it stands on", () => {
     expect(rootAdvisories(AUDIT.vulnerabilities, "@sentry/nextjs").map((a: { id: string }) => a.id).sort()).toEqual([
       "GHSA-3g3m-2fjr-6pw4",
-      "GHSA-fc5q-39xc-vjpf",
       "GHSA-g3hv-75wg-m249",
     ]);
   });
