@@ -7,13 +7,18 @@
 -- only in the queue, the worker's functions pinned by md5 (test 284), its own "In use" line.
 --
 -- The lead's choices (questions in the worker's report):
--- * welcome: queued for a business made in the last 2 days, still on its trial (organizations 'trial' + subscriptions
---   'trialing'), open (not deleted, closed or waiting to be removed), whose creator is still its active owner and created no
---   business before it (organizations.created_by). Sent at once (an answer to the person's own action).
+-- * welcome (owner (440) ב, 18 November 2026): queued for a business made in the last 2 days, in EVERY plan (a trial, or a
+--   zero-price plan that starts 'active' with no trial, WEB-02 021312), open (not deleted, closed or waiting to be removed),
+--   whose creator is still its active owner and created no business before it (organizations.created_by). Sent at once (an
+--   answer to the person's own action).
 -- * trial_ending: from 09:00 in the business's zone, 3 calendar days before the trial's last day (the business's local
 --   date of trial_ends_at minus one microsecond, so a trial ending at local midnight ends the day before; minus 3), on a
 --   working day of the business, only while more than 12 hours of trial are left; to the business's CURRENT active owner;
 --   the person's quiet hours move it later on the same day (app.digest_run_at).
+-- * Owner (441) א: trial_ending as above (3 days before the last day, 09:00, working days only, until 12 hours before).
+-- * Owner (443) ב: the texts (src/features/signup-emails/email.ts, signup-draft-2) open with the owner's first name; the
+--   composer answers it (the first word of profiles.full_name, at most 40 characters; none when it holds a link, an "@", a
+--   "://", a control, bidi or invisible character).
 -- * Owner (444) א: the trial_ending email, and the welcome's line "the trial is active until X", go ONLY while the trial-end
 --   switch is on (app.trial_end_settings.enabled, BIL-08) and staff did not assign the business by hand after its trial end
 --   (app.platform_assignments.assigned_at >= trial_ends_at, the rule of app.trial_end_candidates): only then will the trial
@@ -359,20 +364,18 @@ begin
   select * into v_limits from app.signup_email_limits();
   v_limit := least(greatest(coalesce(p_limit, v_limits.per_run), 0), v_limits.per_run);
 
-  -- welcome: a business made in the last 2 days, on its trial and open, whose creator is its active owner and made no
-  -- business before it
+  -- welcome (owner (440) ב): a business made in the last 2 days, in any plan, open, whose creator is its active owner and
+  -- made no business before it
   for v_row in
     select o.id as organization_id, o.created_by as user_id
       from public.organizations o
-      join public.subscriptions s on s.organization_id = o.id
       join public.memberships m on m.organization_id = o.id and m.user_id = o.created_by
                                and m.role = 'owner' and m.status = 'active'
      where o.created_at > v_now - interval '2 days'
        and o.created_at <= v_now
        and o.created_by is not null
        and o.deleted_at is null
-       and o.status = 'trial'
-       and s.status = 'trialing'
+       and not app.org_status_closed(o.status)
        and not app.org_deletion_pending(o.id)
        and not exists (select 1 from public.organizations e
                         where e.created_by = o.created_by and e.id <> o.id
@@ -461,13 +464,16 @@ $$;
 -- The worker's composer: one function, service_role only, on the job's live lease
 -- ----------------------------------------------------------------------------
 -- Answers {refused: stale} on a lease that is not this job's live one, {refused: <code>} when nothing may be sent (the worker
--- ends the job, nothing sent): invalid (a payload or a queued row that is not this job's), business_closed (deleted, closed,
--- waiting to be removed), not_trialing (the business left its trial: a paid or active plan, read-only, suspended),
+-- ends the job, nothing sent; a refusal is final): invalid (a payload or a queued row that is not this job's), business_closed
+-- (deleted, closed, waiting to be removed), not_trialing (trial_ending only: the business left its trial: a paid or active
+-- plan, read-only; owner (440) ב sends a welcome in every plan),
 -- trial_over (trial_ending only: no trial end, or it passed), trial_end_off (trial_ending only: owner (444) א, the trial will
 -- not end by itself, app.signup_trial_end_applies), not_owner (the person is no longer the business's active owner;
--- a welcome only to its creator), no_address. Else {to, business_name, kind, trial_end_day}: the owner's sign-in address, the
--- business's display name (the neutral "העסק" when the name holds a link, an "@" or a "://"), the kind, and the trial's last
--- day in the business's zone (YYYY-MM-DD; null when the trial will not end by itself). Nothing else.
+-- a welcome only to its creator), no_address. Else {to, first_name, business_name, kind, trial_end_day}: the owner's sign-in
+-- address, their first name (owner (443) ב: the first word of profiles.full_name, at most 40 characters; null when there is
+-- none or it holds a link, an "@", a "://", a control, bidi or invisible character), the business's display name (the neutral
+-- "העסק" when the name holds a link, an "@" or a "://"), the kind, and the trial's last day in the business's zone (YYYY-MM-DD;
+-- null when the business is not on a trial or the trial will not end by itself). Nothing else.
 create or replace function public.signup_job_compose(p_job uuid, p_lease uuid) returns jsonb
 language plpgsql volatile security definer
 set search_path = ''
@@ -480,6 +486,7 @@ declare
   v_kind text;
   v_email text;
   v_name text;
+  v_first text;
   v_trial_end boolean;
 begin
   select * into v_job from app.jobs j where j.id = p_job for update;
@@ -503,13 +510,16 @@ begin
     return jsonb_build_object('refused', 'business_closed');
   end if;
   select * into v_sub from public.subscriptions s where s.organization_id = v_org.id;
-  if v_org.status <> 'trial' or v_sub.organization_id is null or v_sub.status <> 'trialing' then
+  -- owner (440) ב: a welcome in every plan; trial_ending only while the business is on its trial
+  if v_kind = 'trial_ending'
+     and (v_org.status <> 'trial' or v_sub.organization_id is null or v_sub.status <> 'trialing') then
     return jsonb_build_object('refused', 'not_trialing');
   end if;
   if v_kind = 'trial_ending' and (v_sub.trial_ends_at is null or v_sub.trial_ends_at <= now()) then
     return jsonb_build_object('refused', 'trial_over');
   end if;
-  v_trial_end := app.signup_trial_end_applies(v_org.id, v_sub.trial_ends_at);
+  v_trial_end := v_org.status = 'trial' and v_sub.status is not distinct from 'trialing'
+                 and app.signup_trial_end_applies(v_org.id, v_sub.trial_ends_at);
   if v_kind = 'trial_ending' and not v_trial_end then
     return jsonb_build_object('refused', 'trial_end_off');
   end if;
@@ -529,8 +539,18 @@ begin
                    or coalesce(app.message_external_link(v_org.name, null, null), true) then 'העסק'
               else v_org.name
             end;
+  -- owner (443) ב: the first word of the person's name, only when it is a plain name
+  select (regexp_split_to_array(btrim(p.full_name), '[[:space:]]+'))[1] into v_first
+    from public.profiles p where p.id = v_user;
+  if v_first is null or v_first = '' or char_length(v_first) > 40
+     or position('@' in v_first) > 0 or position('://' in v_first) > 0
+     or v_first ~ '[[:cntrl:]]' or v_first ~ app.document_invisible_class() or position(chr(65279) in v_first) > 0
+     or coalesce(app.message_external_link(v_first, null, null), true) then
+    v_first := null;
+  end if;
   return jsonb_build_object(
     'to', v_email,
+    'first_name', v_first,
     'business_name', v_name,
     'kind', v_kind,
     'trial_end_day', case when v_trial_end

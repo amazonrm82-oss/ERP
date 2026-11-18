@@ -160,7 +160,7 @@ describe("queuing and composing", () => {
   it("the composer answers only the address, the name, the kind and the day", async () => {
     const welcome = (await jobsOf(first)).find((j) => j.payload.kind === "welcome")!;
     const answer = await claimAndCompose(welcome.id);
-    expect(answer).toEqual({ to: owner.email, business_name: "סטודיו ראשון", kind: "welcome", trial_end_day: "2099-01-07" });
+    expect(answer).toEqual({ to: owner.email, first_name: "signup-owner", business_name: "סטודיו ראשון", kind: "welcome", trial_end_day: "2099-01-07" });
     const stamped = await asAdmin(async (q) => one<{ c: boolean }>(q, "select composed_at is not null as c from app.signup_email_sends where job_id = $1", [welcome.id]));
     expect(stamped.c).toBe(true);
     // a wrong lease is stale
@@ -199,7 +199,7 @@ describe("the stops", () => {
     expect(await claimAndCompose(jobs[1].id)).toEqual({ refused: "business_closed" });
   });
 
-  it("a business already active from the start (a zero-price plan) or deleted is never queued", async () => {
+  it("owner (440) ב: a business active from the start (a zero-price plan) gets a welcome without a trial line and no trial_ending; a deleted one nothing", async () => {
     const owner = await createUser("signup-active-owner");
     const org = await createOrg(owner.id, "עסק פעיל");
     await placeOrg(org, "2099-01-04T08:00:00Z", "2099-01-07T20:00:00Z");
@@ -213,8 +213,35 @@ describe("the stops", () => {
     await asAdmin((q) => q("update public.organizations set deleted_at = now() where id = $1", [gone]));
     await workerSeen(true);
     await queue(NOW);
-    expect(await jobsOf(org)).toEqual([]);
+    const jobs = await jobsOf(org);
+    expect(jobs.map((j) => j.payload)).toEqual([{ organization_id: org, user_id: owner.id, kind: "welcome" }]);
+    expect(await claimAndCompose(jobs[0].id)).toEqual({ to: owner.email, first_name: "signup-active-owner", business_name: "עסק פעיל", kind: "welcome", trial_end_day: null });
     expect(await jobsOf(gone)).toEqual([]);
+  });
+
+  it("owner (443) ב: the first name is the first word of the profile's name, never a link, an address or an invisible character", async () => {
+    const names: Array<[string | null, string | null]> = [
+      ["  דנה   כהן ", "דנה"],
+      [null, null],
+      ["   ", null],
+      ["www.spam.example שלום", null],
+      ["a@b.co", null],
+      ["https://x.co", null],
+      [`דנה${String.fromCharCode(0x202e)}`, null],
+      [`דנה${String.fromCharCode(0xfeff)}`, null],
+      ["א".repeat(41), null],
+      ["א".repeat(40), "א".repeat(40)],
+    ];
+    await workerSeen(true);
+    for (const [full, expected] of names) {
+      const owner = await createUser("signup-first-name");
+      await asAdmin((q) => q("update public.profiles set full_name = $2 where id = $1", [owner.id, full]));
+      const org = await createOrg(owner.id, "עסק שם");
+      await placeOrg(org, "2099-01-04T08:00:00Z", "2099-01-20T20:00:00Z");
+      await queue(NOW);
+      const [welcome] = await jobsOf(org);
+      expect(await claimAndCompose(welcome.id), String(full)).toMatchObject({ first_name: expected, kind: "welcome" });
+    }
   });
 
   it("trial_ending goes to the current owner, not before 3 days ahead, nor in the last 12 hours", async () => {
@@ -269,7 +296,7 @@ describe("owner (444) א: the trial ending is told only while BIL-08 will really
     await queue(NOW);
     const jobs = await jobsOf(org);
     expect(jobs.map((j) => j.payload.kind)).toEqual(["welcome"]);
-    expect(await claimAndCompose(jobs[0].id)).toEqual({ to: owner.email, business_name: "עסק כבוי", kind: "welcome", trial_end_day: null });
+    expect(await claimAndCompose(jobs[0].id)).toEqual({ to: owner.email, first_name: "signup-off-owner", business_name: "עסק כבוי", kind: "welcome", trial_end_day: null });
   });
 
   it("switch on at queue time, off at send time: trial_ending is refused, nothing sent", async () => {

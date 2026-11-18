@@ -870,7 +870,8 @@ describe("background job queue (OPS-04)", () => {
 
   // WEB-05 (owner (418) ב): the sign-up service emails' path, pinned like the invitation's. A change needs a fresh independent
   // review (ids and a kind only in the queue; service texts only; once per business and kind; the composer re-checks the
-  // trial, the business and its active owner on the live lease and answers only the address, the name, the kind and the day).
+  // trial, the business and its active owner on the live lease and answers only the address, the first name, the business name,
+  // the kind and the day).
   it("WEB-05: the signup.send functions are the reviewed ones", async () => {
     const rows = await asAdmin(
       async (q) =>
@@ -890,11 +891,15 @@ describe("background job queue (OPS-04)", () => {
       // rechecked 18 November 2026 after the review of 5f123fa5: owner (444) א (trial ending told only while BIL-08's switch is on
       // and no hand assignment after the trial end, judged by the composer), the last day = local date of trial_ends_at minus
       // 1 µs (two new helpers pinned), and caps a test may only lower per transaction; nothing else changed
-      "app.queue_signup_emails": "bcff97161630ed7d2f6d5564ef01077f",
+      // rechecked 18 November 2026 for owner (440) ב and (443) ב: the welcome is queued and composed for every open first business
+      // in any plan (no trial condition; trial_ending still trialing-only, its refusal not_trialing unchanged), the trial day only
+      // while the business is on its trial and the switch holds, and the composer adds first_name (first word of profiles.full_name,
+      // at most 40, null for a link, "@", "://", control, bidi or invisible character); nothing else changed
+      "app.queue_signup_emails": "2807bb95671713015892e219321a980e",
       "app.signup_email_limits": "323cabb119e962d662a1d3837b097c5e",
       "app.signup_trial_end_applies": "dd9a28aa329c92f973276f0bcdc51bd6",
       "app.signup_trial_last_day": "5a8a266ae562b1a9e18187e3aab43187",
-      "public.signup_job_compose": "925c3b5f200780f68bc576c43cab67a0",
+      "public.signup_job_compose": "2e36056d14662d6a2ef4f8c3f10328ae",
     });
   });
 
