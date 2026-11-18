@@ -564,6 +564,14 @@ and build this CRM here instead. The old code is preserved on the branch
    1,200 a minute in total; every business that texted the number through InforU in 90 days (owner (320) א), in pages of 100, through
    `public.sms_inbound_optout` (its first caller, idempotent); any limit → 503. Pinned by md5 in test 353. The advisor's findings on
    `app.sms_callback_counts` and `app.sms_inbound_number_counts` are expected.
+   SMS-05b/05c (live test of 18 November 2026, owner (428)-(432); migration 021321, applied and md5 checked 18 November 2026; an
+   independent review): the adapter waits 30 s (`INFORU_TIMEOUT_MS`); a job that ends with a provider and an `unknown_*` code writes
+   `public.messages.status = 'unknown'` (constraint `messages_status`; the job still ends dead, never sent twice), shown "לא ידוע אם
+   נשלחה" until a report settles it; `sms_delivery_status` also settles 'unknown' rows by job id (pins: test 284 `app.jobs_record_message`,
+   test 353). A sent SMS with no report after 48 hours reads "אין דיווח מסירה." (status unchanged, (430) א; no PullData). The status route
+   reads a report as form parameters, query or JSON and also answers GET; one `sms.inforu.status_shape` line logs only the media type and
+   field names (never values) until the shape is fixed (428 ב). Marketing SMS is sent only while `SMS_MARKETING_ENABLED=on` (432 א; off =
+   not sent, not kept in the queue, code `marketing_sms_off`); service messages are unaffected.
    In use (EML-01 sender, owner (268) א, (195) א, wave 3 use (1); migration 021275, applied and md5 checked 13 November 2026, and 021278; an
    independent review and two delta reviews, and one review of 021278): the OPS-04 worker (same route and secret) sends email through Resend
    (`src/features/messaging/providers/resend.ts`, the ONLY reader of `RESEND_API_KEY|RESEND_FROM`; lint refuses the names elsewhere;
