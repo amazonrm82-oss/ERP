@@ -938,6 +938,9 @@ describe("setup checklist and sample data (USR-04)", () => {
       // DOC-14 redefines the claim and the record of _invoice_provider_customers.sql, app.invoice_issue_payload_erased() of
       // _invoice_issue.sql and app.member_permission_built_keys() of _invoice_provider_settings.sql last (issue_credits)
       "_invoice_credit.sql",
+      // LNK-02 redefines app.job_kinds() and app.job_payload_ok() of _invoice_issue.sql and app.payment_links_check() of
+      // _payment_links.sql last (payment_link.create)
+      "_payment_link_pages.sql",
     ].map((suffix) => {
       const file = readdirSync(dir).find((f) => f.endsWith(suffix));
       expect(file, suffix).toBeDefined();

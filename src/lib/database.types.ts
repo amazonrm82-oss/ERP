@@ -2846,8 +2846,11 @@ export type PaymentLinkRow = {
   status_at: string | null;
   // when the closing job last judged its source (server only)
   source_checked_at: string | null;
-  // the server cancelled it because its source closed ('source_closed'); null for a person's cancel
+  // the server cancelled it because its source closed ('source_closed') or its page was not made ('page_failed'); null for a person's cancel
   closed_reason: string | null;
+  // LNK-02: when the worker kept the provider's page, and the provider's last error code (server only)
+  page_created_at: string | null;
+  page_error_code: string | null;
   payment_id: string | null;
   paid_at: string | null;
   cancelled_at: string | null;
@@ -4629,6 +4632,9 @@ export type Database = {
       invoice_issue_claim: { Args: { p_job: string; p_lease: string }; Returns: Json };
       invoice_issue_record: { Args: { p_job: string; p_lease: string; p_result: Json }; Returns: Json };
       invoice_issue_state: { Args: { p_org: string; p_request: string }; Returns: Json };
+      // LNK-02 (owner (394) א): the payment_link.create worker's claim and record (service_role, the job's live lease)
+      payment_link_page_claim: { Args: { p_job: string; p_lease: string }; Returns: Json };
+      payment_link_page_record: { Args: { p_job: string; p_lease: string; p_result: Json }; Returns: Json };
       invoice_issue_requests_open: { Args: { p_org: string }; Returns: Json };
       invoice_issue_close: { Args: { p_org: string; p_request: string }; Returns: Json };
       // DOC-14 (migration invoice_credit): a credit invoice through the provider, and what is left to credit

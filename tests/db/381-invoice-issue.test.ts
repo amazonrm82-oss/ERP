@@ -68,8 +68,10 @@ const REVIEWED_MD5: Record<string, string> = {
   "app.invoice_provider_products_of": "82760c861a9b91e4350c07581825944e",
   "app.invoice_provider_usable": "6caf3afd4259a3055e8aa1fd6ab43356",
   "app.invoice_source": "ba98c89124588ce8250c141a9d02bd6a",
-  "app.job_kinds": "c14758df00a669161454c6cb830bb315",
-  "app.job_payload_ok": "7e63dd97ead04e0002f172c5912e6144",
+  // LNK-02 (migration payment_link_pages; was c14758df… and 7e63dd97…): payment_link.create added, exactly {link_id}; every
+  // earlier kind's branch, invoice.issue's included, is unchanged
+  "app.job_kinds": "ac248c413963f96a8a04f46dbb895ec3",
+  "app.job_payload_ok": "f56961310204ad5f229cef1639a108e4",
   "app.merge_invoice_issue_requests": "1cd6caad6241cf0e7e225ae508862f6e",
   "public.invoice_credit_begin": "b078292f9cd4aac6ec416ee597fe0d7e",
   // delta review (was 89d27137…): refuses a request the provider issued; stamps credit_released_at / _by only

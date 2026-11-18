@@ -10,7 +10,9 @@
 // USR-09 (owner (387) א): invite.send, a staff invitation email (src/features/invitations/send-handler.ts), in the same pass.
 // DOC-07 (owner (398) א): invoice.issue, a document through the invoice provider (src/features/invoicing/issue-handler.ts),
 // registered while this deployment offers a provider.
-export const JOB_KINDS = ["message.send", "import.run", "export.run", "digest.send", "report.send", "invite.send", "invoice.issue"] as const;
+// LNK-02 (owner (394) א): payment_link.create, the provider's hosted page of a payment link
+// (src/features/payment-links/page-handler.ts), registered while this deployment offers a payment provider.
+export const JOB_KINDS = ["message.send", "import.run", "export.run", "digest.send", "report.send", "invite.send", "invoice.issue", "payment_link.create"] as const;
 export type JobKind = (typeof JOB_KINDS)[number];
 
 export function isJobKind(value: unknown): value is JobKind {
