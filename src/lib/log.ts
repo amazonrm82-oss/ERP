@@ -72,7 +72,8 @@ export const LOG_NAMES_MAX = 30;
 
 /** SMS-05c: whether a callback's field name may be logged as a name (never a value, a number or a text). */
 export function loggableFieldName(name: string): boolean {
-  return FIELD_NAME.test(name) && /[A-Za-z]/.test(name) && !/\d{5,}/.test(name);
+  // SMS-05c review: also never a long run of hex (an id or secret without dashes) and never longer than 24
+  return FIELD_NAME.test(name) && name.length <= 24 && /[A-Za-z]/.test(name) && !/\d{5,}/.test(name) && !/^[0-9A-Fa-f]{16,}$/.test(name);
 }
 
 /**

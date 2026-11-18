@@ -104,7 +104,8 @@ export function bodySizeBucket(bytes: number | null): string {
 export function mediaTypeOf(header: string | null): string {
   if (header === null || header.trim() === "") return "none";
   const media = header.split(";")[0].trim().toLowerCase();
-  return /^[a-z0-9.+/-]{1,60}$/.test(media) ? media : "other";
+  // a media type only (type/subtype), never a run of 5+ digits (SMS-05c review)
+  return /^[a-z]{1,20}\/[a-z0-9.+-]{1,40}$/.test(media) && !/\d{5,}/.test(media) ? media : "other";
 }
 
 /** SMS-05c: the plain names of a list (deduplicated, at most LOG_NAMES_MAX), and how many others were seen. */

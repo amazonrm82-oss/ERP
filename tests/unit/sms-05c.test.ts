@@ -175,3 +175,16 @@ describe("SMS-05c: marketing SMS stay off until the owner turns them on (owner (
     expect(REFUSED[MARKETING_SMS_OFF_CODE]).toBe("לא נשלחה: שליחת SMS שיווקי עדיין לא פעילה.");
   });
 });
+
+describe("SMS-05c review: names and media types stay names", () => {
+  it("refuses long hex runs, long names and odd media types", () => {
+    expect(loggableFieldName("CustomerMessageId")).toBe(true);
+    expect(loggableFieldName("a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6")).toBe(false);
+    expect(loggableFieldName("abcdefABCDEF0123")).toBe(false);
+    expect(loggableFieldName("x".repeat(25))).toBe(false);
+    expect(mediaTypeOf("application/x-www-form-urlencoded; charset=utf-8")).toBe("application/x-www-form-urlencoded");
+    expect(mediaTypeOf("application/json")).toBe("application/json");
+    expect(mediaTypeOf("text/0527777888")).toBe("other");
+    expect(mediaTypeOf("8a1b2c3d-1111-2222-3333-444455556666")).toBe("other");
+  });
+});
