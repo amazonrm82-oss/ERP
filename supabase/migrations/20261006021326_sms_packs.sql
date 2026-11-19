@@ -88,6 +88,8 @@ create table if not exists app.sms_balance_movements (
 );
 create index if not exists sms_balance_movements_org_idx on app.sms_balance_movements (organization_id, created_at desc);
 create index if not exists sms_balance_movements_job_idx on app.sms_balance_movements (job_id) where job_id is not null;
+-- the refund's "a clear after the charge" and the card's newest movements read by write order (delta review)
+create index if not exists sms_balance_movements_org_seq_idx on app.sms_balance_movements (organization_id, seq desc);
 alter table app.sms_balance_movements enable row level security;
 revoke all on app.sms_balance_movements from public, anon, authenticated, service_role;
 
