@@ -3512,6 +3512,31 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   lease-bound) has its first caller in the SMS composer (021247, In use (SMS-05 sender)). The advisor's
   findings on `record_sms_queue`, `sms_sender_verify(_start)`, the two `platform_*sms_sender*` functions and the four new app tables
   (`sms_optout_counts`, `sms_quota_months`, `sms_quota_notices`, `sms_sender_checks`) are expected.
+- SMS packs (SMS-06, migration 021326; owner 18-19 November 2026, answers (437) א, (438) א, (439) א, (445) ב, (446) א, (447) א,
+  (448) א, (449) א; an independent review and a delta review): SMS to customers is paid from a prepaid balance of segments, packs
+  300/1,000/5,000 (35/99/390 ₪ before VAT, `app.sms_packs()` = `SMS_PACKS`). `app.sms_balances` (one row per business) and
+  `app.sms_balance_movements` (grant|purchase|charge|refund|clear|verification, balance after, `seq` identity taken under the balance
+  lock; RLS on, no grants) change only through `app.sms_balance_move`; trigger `sms_balances_guard` refuses a balance change without its
+  movement, movements are frozen, the balance is never below -50. Segments by `app.sms_segments` = `smsSegments()` (GSM-7 160/153,
+  extension characters 2, else UCS-2 70/67; fixture `sms-segments.json`). `public.job_message_may_send` (last redefined there; test
+  284's pin rechecked) replaces the monthly quota: an SMS needs the `sms` flag (on in every plan, the free one too, (445) ב;
+  `max_sms_per_month` 0 everywhere and not read) and a loaded balance with room (marketing to 0, (447) א; service to minus
+  `app.sms_service_overdraft()` = 50, by the job's `sms_segments`, else 1); else it waits uncounted (cap_wait `sms_balance`) and is
+  refused `sms_balance_expired` after 24 hours waiting ((446) א); it marks `app.jobs.sms_metered`. `public.sms_job_compose` (test 352's
+  pin rechecked) runs the core and the charge (`app.sms_balance_charge`) in one sub-block; no room raises SQLSTATE `SMS06`, which undoes
+  every link and stamp the core wrote, then the count is given back from the day read before the block and the job waits
+  (`{refused:'sms_balance'}`, a wait for the worker). The sender-number code is never charged and never refused for balance: one
+  `verification` movement per job, delta 0, `message_segments` set (a business with no row gets one at 0, unloaded; (438) א, (449) א),
+  at most 3 checks a business day (`sms_sender_verify_start` answers `daily`). `app.sms_usage_give_back` refunds a metered job
+  (`app.sms_balance_refund`, idempotent, never into a balance cleared after the charge, judged by `seq`); trigger
+  `messages_sms_failed_refund` on `public.messages` refunds a failed SMS (delivered and unknown stay charged). A business that becomes
+  cancelled or is deleted gets a final `clear` movement and the channel off (trigger `organizations_sms_balance_clear`; a purge
+  cascades); suspended and read-only keep the balance and send nothing. Notices to active owners at 20% of the last pack loaded and at
+  0, once each until the next load. `public.platform_sms_grant` (platform owner, aal2, logged `sms.grant`; the only way to load until a
+  clearing provider is chosen, (448) א: no opening grant by migration), `public.platform_sms_balance` (staff) and
+  `public.sms_balance_summary` (owners/admins, counts only; `/settings/plan`, `/settings/message-sending`); `record_sms_send` raises
+  `sms_balance:none` after the enqueue's own refusals; `app.collection_sms_room` = flag + loaded balance above 0. Tests 64 and 88 end
+  with `_sms_packs.sql`. The advisor's findings on the two app tables and the two platform definers are expected.
 - Document templates (SGN-01, migration 021200; owner (67) ג, (200) א, (201) ב, (202) ב; independent review): plan key
   `signatures` (personal off; basic, pro, business on) and `max_signatures_per_month` (0 / 20 / 100 / no cap; counted by SGN-02,
   nothing counts it yet); `app.plan_key_defaults` was last redefined in 021200. `public.document_templates` (managed list: members
