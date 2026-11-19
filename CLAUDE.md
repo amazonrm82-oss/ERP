@@ -3512,7 +3512,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   lease-bound) has its first caller in the SMS composer (021247, In use (SMS-05 sender)). The advisor's
   findings on `record_sms_queue`, `sms_sender_verify(_start)`, the two `platform_*sms_sender*` functions and the four new app tables
   (`sms_optout_counts`, `sms_quota_months`, `sms_quota_notices`, `sms_sender_checks`) are expected.
-- SMS packs (SMS-06, migration 021326; owner 18-19 November 2026, answers (437) א, (438) א, (439) א, (445) ב, (446) א, (447) א,
+- SMS packs (SMS-06, migration 021326, applied by the courier and md5 checked 19 November 2026; owner 18-19 November 2026, answers (437) א, (438) א, (439) א, (445) ב, (446) א, (447) א,
   (448) א, (449) א; an independent review and a delta review): SMS to customers is paid from a prepaid balance of segments, packs
   300/1,000/5,000 (35/99/390 ₪ before VAT, `app.sms_packs()` = `SMS_PACKS`). `app.sms_balances` (one row per business) and
   `app.sms_balance_movements` (grant|purchase|charge|refund|clear|verification, balance after, `seq` identity taken under the balance
@@ -3536,7 +3536,7 @@ A worker starts and stops only its own database, naming `TEST_DB_DIR` and `TEST_
   clearing provider is chosen, (448) א: no opening grant by migration), `public.platform_sms_balance` (staff) and
   `public.sms_balance_summary` (owners/admins, counts only; `/settings/plan`, `/settings/message-sending`); `record_sms_send` raises
   `sms_balance:none` after the enqueue's own refusals; `app.collection_sms_room` = flag + loaded balance above 0. Tests 64 and 88 end
-  with `_sms_packs.sql`. The advisor's findings on the two app tables and the two platform definers are expected.
+  with `_sms_packs.sql`. The advisor's findings on the two app tables, the two platform definers and `sms_balance_summary` are expected.
 - Document templates (SGN-01, migration 021200; owner (67) ג, (200) א, (201) ב, (202) ב; independent review): plan key
   `signatures` (personal off; basic, pro, business on) and `max_signatures_per_month` (0 / 20 / 100 / no cap; counted by SGN-02,
   nothing counts it yet); `app.plan_key_defaults` was last redefined in 021200. `public.document_templates` (managed list: members
