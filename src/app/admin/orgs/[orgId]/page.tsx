@@ -193,7 +193,7 @@ export default async function AdminOrgPage({ params }: { params: Promise<{ orgId
             <p className="text-md">{smsBalance ? smsBalanceLine(smsBalance) : "לא הצלחנו לקרוא את היתרה."}</p>
             {me.role === "owner" ? (
               <PlatformForm action={smsGrantAction.bind(null, orgId)} submitLabel="טעינת חבילה">
-                <SelectField label="חבילה" name="pack" defaultValue={String(SMS_PACKS[0].segments)}>
+                <SelectField label="חבילת SMS" name="pack" defaultValue={String(SMS_PACKS[0].segments)}>
                   {SMS_PACKS.map((p) => (
                     <option key={p.segments} value={p.segments}>
                       {`${formatNumber(p.segments)} מקטעים`}
