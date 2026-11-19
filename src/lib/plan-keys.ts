@@ -108,7 +108,8 @@ const FEATURES: Record<string, Record<SoldPlan, boolean>> = {
   meta_leads: BASIC_UP, // CAP-11 (owner, 8 November 2026, answer (143) ב: the plans of lead_distribution)
   meeting_reminders: BASIC_UP, // CAL-12 (owner, 9 November 2026, answer (178) ב: the plans of lead_distribution)
   signatures: BASIC_UP, // SGN-01 (owner, 3 November 2026, answer (67) ג: basic and up)
-  // SMS (owner (210) ב, 10 November 2026): basic and up; SMS-06 (18 November 2026): the packs are sold in every plan, so the
+  // SMS (owner (210) ב, 10 November 2026): basic and up; SMS-06 (18 November 2026): the packs are sold in every plan (the free
+  // plan too, owner (445) ב, set in the migration), so the
   // flag (the channel offered at all) is on in every sold plan (migration sms_packs)
   sms: ALL,
   // RET-02 (owner, 11 November 2026, answer (273)): a new key, basic and up

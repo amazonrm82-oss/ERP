@@ -43,6 +43,7 @@ export function SmsBalanceCard({ balance, id = "sms-balance-title" }: { balance:
                   <span>
                     {SMS_MOVEMENT_LABELS[m.kind]}
                     {m.pack ? ` (${formatNumber(m.pack)})` : ""}
+                    {m.kind === "verification" && m.messageSegments ? ` (${formatNumber(m.messageSegments)} מקטעים)` : ""}
                     <span className="ms-2 text-ink-soft">{formatDateTime(m.at)}</span>
                   </span>
                   <span className="tabular-nums">

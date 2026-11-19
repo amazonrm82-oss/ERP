@@ -14,7 +14,7 @@ export const SMS_PACKS: readonly SmsPack[] = [
 /** How far below 0 a service SMS may take the balance; the next pack covers it. */
 export const SMS_SERVICE_OVERDRAFT = 50;
 
-export const SMS_MOVEMENT_KINDS = ["grant", "purchase", "charge", "refund", "clear"] as const;
+export const SMS_MOVEMENT_KINDS = ["grant", "purchase", "charge", "refund", "clear", "verification"] as const;
 export type SmsMovementKind = (typeof SMS_MOVEMENT_KINDS)[number];
 
 export const SMS_MOVEMENT_LABELS: Record<SmsMovementKind, string> = {
@@ -23,11 +23,13 @@ export const SMS_MOVEMENT_LABELS: Record<SmsMovementKind, string> = {
   charge: "שליחת SMS",
   refund: "החזר ליתרה: ההודעה לא נשלחה או לא נמסרה",
   clear: "איפוס היתרה",
+  // owner (438) א, (449) א: recorded with its segments, never deducted
+  verification: "קוד אימות מספר שולח (לא מחויב)",
 };
 
 export type SmsChannelState = "off_plan" | "no_balance" | "open";
 
-export type SmsMovement = { kind: SmsMovementKind; segments: number; balanceAfter: number; pack: number | null; at: string };
+export type SmsMovement = { kind: SmsMovementKind; segments: number; balanceAfter: number; pack: number | null; messageSegments: number | null; at: string };
 
 export type SmsBalance = {
   channel: SmsChannelState | null;
@@ -57,7 +59,7 @@ export function parseSmsBalance(raw: unknown): SmsBalance | null {
         const segments = int(x.segments);
         const after = int(x.balance_after);
         if (!isKind(x.kind) || segments === null || after === null || typeof x.at !== "string") return [];
-        return [{ kind: x.kind, segments, balanceAfter: after, pack: int(x.pack), at: x.at }];
+        return [{ kind: x.kind, segments, balanceAfter: after, pack: int(x.pack), messageSegments: int(x.message_segments), at: x.at }];
       })
     : [];
   return {

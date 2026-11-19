@@ -20,12 +20,13 @@
 --   that the channel is offered at all (kept, now on in every sold plan); a business that never loaded a balance, or whose
 --   balance was cleared, sends no SMS. Without room a job waits uncounted (cap_wait 'sms_balance') and is cancelled after 24
 --   hours of waiting ('sms_balance_expired'): a marketing SMS needs the balance to hold its segments, a service SMS
---   (app.service_message_types) may take it down to minus 50 (app.sms_service_overdraft), which the next pack covers. Lead's
---   choice: a service SMS that would pass minus 50 waits and is cancelled after 24 hours the same way.
+--   (app.service_message_types) may take it down to minus 50 (app.sms_service_overdraft), which the next pack covers. Owner
+--   (446) א: a service SMS that would pass minus 50 waits and is cancelled after 24 hours the same way.
 -- * Give-back: a composer refusal, the adapter's notSent (public.sms_quota_return) and a failed delivery report (trigger
 --   messages_sms_failed_refund on public.messages, which also covers public.sms_delivery_status without changing its pinned
 --   body) give the job's segments back (app.sms_balance_refund, idempotent per job). 'delivered' and 'unknown' stay charged.
--- * (438) א: the sender-number verification code is never charged; at most 3 such checks (= codes) a business day
+-- * (438) א, (449) א: the sender-number verification code is never charged (a 'verification' movement records its segments with
+--   a delta of 0, once per job; a business with no balance row gets one at 0, unloaded); at most 3 such checks (= codes) a business day
 --   (public.sms_sender_verify_start answers reason 'daily').
 -- * (439) א: the balance is cleared (a final 'clear' movement to 0, the channel off) when the business becomes cancelled or is
 --   marked deleted (trigger organizations_sms_balance_clear); when ADM-03's purge completes, the rows go with the business by
@@ -35,7 +36,10 @@
 --   choice: of the last pack's size, 60 / 200 / 1,000), once when it reaches 0; both re-armed by the next load.
 -- * (437) א: max_sms_per_month is 0 in every plan and no longer read; the plan flag `sms` is on in the four sold plans (the
 --   packs are offered in every plan). app.sms_quota_months and app.sms_quota_notices keep their history; nothing new is
---   counted there (the give-back still returns a job counted before this migration to its month).
+--   counted there (the give-back still returns a job counted before this migration to its month). Owner (445) ב: the hidden
+--   free plan holds the flag too. Owner (446) א, (447) א: a marketing SMS never takes the balance below 0, a service SMS
+--   never below -50 (beyond it waits, cancelled after 24 hours); only the sender-number code always goes out and is recorded as a
+--   'verification' movement with its segments and a delta of 0 (owner (449) א).
 -- * Reads: public.sms_balance_summary (owners/admins; the balance, the last 20 movements without ids, the packs) and
 --   public.platform_sms_balance (platform staff).
 -- No row is deleted. No statement starts with drop. Every statement is safe to run twice.
@@ -60,8 +64,11 @@ revoke all on app.sms_balances from public, anon, authenticated, service_role;
 create table if not exists app.sms_balance_movements (
   id              uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations (id) on delete cascade,
-  kind            text not null check (kind in ('grant', 'purchase', 'charge', 'refund', 'clear')),
+  kind            text not null check (kind in ('grant', 'purchase', 'charge', 'refund', 'clear', 'verification')),
+  -- the change to the balance (0 for a verification code)
   segments        integer not null,
+  -- the segments of the message itself (a charge's, and a verification code's, which is recorded but never deducted)
+  message_segments integer check (message_segments is null or message_segments > 0),
   balance_after   integer not null,
   job_id          uuid,
   pack            integer check (pack is null or pack in (300, 1000, 5000)),
@@ -75,7 +82,9 @@ create table if not exists app.sms_balance_movements (
     (kind in ('grant', 'purchase') and pack is not null and segments = pack and job_id is null)
     or (kind = 'charge' and segments < 0 and job_id is not null and pack is null)
     or (kind = 'refund' and segments > 0 and job_id is not null and pack is null)
-    or (kind = 'clear' and balance_after = 0 and job_id is null and pack is null))
+    or (kind = 'clear' and balance_after = 0 and job_id is null and pack is null)
+    -- owner (449) א: the sender-number code is recorded with its segments, never deducted (delta 0)
+    or (kind = 'verification' and segments = 0 and message_segments is not null and job_id is not null and pack is null))
 );
 create index if not exists sms_balance_movements_org_idx on app.sms_balance_movements (organization_id, created_at desc);
 create index if not exists sms_balance_movements_job_idx on app.sms_balance_movements (job_id) where job_id is not null;
@@ -245,7 +254,7 @@ revoke all on function app.sms_balance_notice(uuid, text, integer) from public, 
 -- THE one writer of a balance: the movement row and the new balance together, under the balance row's lock; the notices of a
 -- charge that crosses 20% of the last pack, or 0, once each until the next load. Answers the balance after it.
 create or replace function app.sms_balance_move(p_org uuid, p_kind text, p_segments integer, p_job uuid, p_pack integer,
-                                                p_actor uuid, p_note text) returns integer
+                                                p_actor uuid, p_note text, p_message_segments integer default null) returns integer
 language plpgsql volatile security definer
 set search_path = ''
 as $$
@@ -259,8 +268,8 @@ begin
   insert into app.sms_balances (organization_id) values (p_org) on conflict (organization_id) do nothing;
   select * into v_row from app.sms_balances b where b.organization_id = p_org for update;
   v_new := v_row.balance + p_segments;
-  insert into app.sms_balance_movements (organization_id, kind, segments, balance_after, job_id, pack, actor_id, note)
-  values (p_org, p_kind, p_segments, v_new, p_job, p_pack, p_actor, p_note)
+  insert into app.sms_balance_movements (organization_id, kind, segments, balance_after, job_id, pack, actor_id, note, message_segments)
+  values (p_org, p_kind, p_segments, v_new, p_job, p_pack, p_actor, p_note, p_message_segments)
   returning id into v_movement;
   update app.sms_balances b
      set balance = v_new,
@@ -285,7 +294,7 @@ begin
   return v_new;
 end;
 $$;
-revoke all on function app.sms_balance_move(uuid, text, integer, uuid, integer, uuid, text) from public, anon, authenticated, service_role;
+revoke all on function app.sms_balance_move(uuid, text, integer, uuid, integer, uuid, text, integer) from public, anon, authenticated, service_role;
 
 -- The composer's charge of a job's final text: null = charged (or nothing to charge), else 'sms_balance' (no room now).
 -- Never a sender-number code, never a job the send check did not pass under the balance, never twice for one job.
@@ -301,11 +310,23 @@ declare
   v_row app.sms_balances;
 begin
   select * into v_job from app.jobs j where j.id = p_job for update;
-  if v_job.id is null or (v_job.payload ->> 'channel') is distinct from 'sms' or v_job.payload ? 'sender_check_id'
-     or not v_job.sms_metered then
+  if v_job.id is null or (v_job.payload ->> 'channel') is distinct from 'sms' then
     return null;
   end if;
   v_segments := greatest(app.sms_segments(p_text), 1);
+  -- owner (438) א and (449) א: the sender-number code is never charged and never refused for the balance (even below -50, or
+  -- with no balance at all: the row is made at 0, unloaded, so the channel stays off); it is recorded once per job as a
+  -- 'verification' movement with its segments and a delta of 0
+  if v_job.payload ? 'sender_check_id' then
+    if not exists (select 1 from app.sms_balance_movements m
+                    where m.job_id = p_job and m.organization_id = v_job.organization_id and m.kind = 'verification') then
+      perform app.sms_balance_move(v_job.organization_id, 'verification', 0, p_job, null, null, null, v_segments);
+    end if;
+    return null;
+  end if;
+  if not v_job.sms_metered then
+    return null;
+  end if;
   update app.jobs j set sms_segments = v_segments where j.id = p_job;
   insert into app.sms_balances (organization_id) values (v_job.organization_id) on conflict (organization_id) do nothing;
   select * into v_row from app.sms_balances b where b.organization_id = v_job.organization_id for update;
@@ -319,7 +340,7 @@ begin
   if v_row.loaded_at is null or v_row.balance - v_segments < v_floor then
     return 'sms_balance';
   end if;
-  perform app.sms_balance_move(v_job.organization_id, 'charge', -v_segments, p_job, null, null, null);
+  perform app.sms_balance_move(v_job.organization_id, 'charge', -v_segments, p_job, null, null, null, v_segments);
   return null;
 end;
 $$;
@@ -458,6 +479,7 @@ as $$
     'cleared_at', b.cleared_at,
     'packs', app.sms_packs(),
     'movements', coalesce((select jsonb_agg(jsonb_build_object('kind', x.kind, 'segments', x.segments,
+                                                               'message_segments', x.message_segments,
                                                                'balance_after', x.balance_after, 'pack', x.pack,
                                                                'at', x.created_at) order by x.seq desc)
                              from (select m.* from app.sms_balance_movements m
@@ -548,6 +570,14 @@ update public.plans p
   from delta d
  where p.key = d.key
    and (p.limits, p.features) is distinct from (p.limits || (d.v -> 'limits'), p.features || (d.v -> 'features'));
+
+-- owner (445) ב: the hidden free plan may buy packs too: the flag on there as well, no monthly SMS
+update public.plans p
+   set limits = coalesce(p.limits, '{}'::jsonb) || '{"max_sms_per_month": 0}'::jsonb,
+       features = coalesce(p.features, '{}'::jsonb) || '{"sms": true}'::jsonb
+ where p.key = 'free'
+   and (p.limits, p.features) is distinct from (coalesce(p.limits, '{}'::jsonb) || '{"max_sms_per_month": 0}'::jsonb,
+                                               coalesce(p.features, '{}'::jsonb) || '{"sms": true}'::jsonb);
 
 -- a room for an SMS the jobs choose a channel by (COL-07 collection reminders, RET-02 review requests): the flag and a
 -- loaded balance above 0 (021226 read the monthly quota)

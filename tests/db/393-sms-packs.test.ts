@@ -113,12 +113,12 @@ describe("prepaid SMS packs (SMS-06)", () => {
     }
   });
 
-  it("(437) א: no monthly SMS in any plan; the flag is on in every sold plan", async () => {
+  it("(437) א, (445) ב: no monthly SMS in any plan; the flag is on in every plan, the free plan too", async () => {
     const rows = await asAdmin(
       async (q) =>
-        (await q<{ key: string; quota: number; sms: boolean }>("select key, (limits ->> 'max_sms_per_month')::int as quota, (features ->> 'sms')::boolean as sms from public.plans where key in ('personal','basic','pro','business')")).rows,
+        (await q<{ key: string; quota: number; sms: boolean }>("select key, (limits ->> 'max_sms_per_month')::int as quota, (features ->> 'sms')::boolean as sms from public.plans where key in ('free','personal','basic','pro','business')")).rows,
     );
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(5);
     for (const r of rows) expect([r.key, r.quota, r.sms]).toEqual([r.key, 0, true]);
   });
 
@@ -142,7 +142,7 @@ describe("prepaid SMS packs (SMS-06)", () => {
     expect(mine.channel).toBe("open");
     expect((mine.movements as Answer[])[0]).toEqual(expect.objectContaining({ kind: "grant", segments: 300, balance_after: 300, pack: 300 }));
     // no ids in a movement
-    expect(Object.keys((mine.movements as Answer[])[0]).sort()).toEqual(["at", "balance_after", "kind", "pack", "segments"]);
+    expect(Object.keys((mine.movements as Answer[])[0]).sort()).toEqual(["at", "balance_after", "kind", "message_segments", "pack", "segments"]);
     expect((await asUser(admin.id, async (q) => (await q<{ r: Answer }>("select public.sms_balance_summary($1) as r", [org])).rows[0].r)).allowed).toBe(true);
     expect(await asUser(member.id, async (q) => (await q<{ r: Answer }>("select public.sms_balance_summary($1) as r", [org])).rows[0].r)).toEqual({ allowed: false });
     // another business's owner learns nothing
@@ -421,7 +421,12 @@ describe("prepaid SMS packs (SMS-06)", () => {
     expect(await maySend(job)).toEqual({ may_send: true });
     const composed = await compose(job);
     expect(typeof composed.text).toBe("string");
-    expect(await asAdmin(async (q) => (await q<{ n: number }>("select count(*)::int as n from app.sms_balance_movements where job_id = $1", [id])).rows[0].n)).toBe(0);
+    // owner (449) א: recorded once as a 'verification' movement with its segments and a delta of 0
+    const moves = await asAdmin(
+      async (q) => (await q<{ kind: string; segments: number; message_segments: number }>("select kind, segments, message_segments from app.sms_balance_movements where job_id = $1", [id])).rows,
+    );
+    expect(moves).toEqual([{ kind: "verification", segments: 0, message_segments: expect.any(Number) }]);
+    expect(moves[0].message_segments).toBeGreaterThan(0);
     // two more today, then refused for the day
     await asAdmin((q) =>
       q("insert into app.sms_sender_checks (organization_id, phone, created_by) select $1, '+97235550000', $2 from generate_series(1, 2)", [org, owner.id]),
@@ -431,6 +436,72 @@ describe("prepaid SMS packs (SMS-06)", () => {
     // checks of earlier days do not count
     await asAdmin((q) => q("update app.sms_sender_checks set created_at = created_at - interval '2 days' where organization_id = $1", [org]));
     expect(await asUser(owner.id, async (q) => (await q<{ r: Answer }>("select public.sms_sender_verify_start($1) as r", [org])).rows[0].r)).toEqual({ ok: true });
+  });
+
+  describe("(446) א, (449) א: the sender-number code always goes out and is recorded with a delta of 0", () => {
+    const codeJob = async (o: string) => {
+      const check = await asAdmin(async (q) => (await q<{ id: string }>("insert into app.sms_sender_checks (organization_id, phone) values ($1, '+97235550000') returning id", [o])).rows[0].id);
+      return enqueue(o, { channel: "sms", message_type: "verification_code", sender_check_id: check });
+    };
+    const sendCode = async (o: string) => {
+      const id = await codeJob(o);
+      const job = await claim(id);
+      expect(await maySend(job)).toEqual({ may_send: true });
+      const composed = await compose(job);
+      expect(typeof composed.text).toBe("string");
+      return id;
+    };
+    const moves = (id: string) =>
+      asAdmin(
+        async (q) =>
+          (await q<{ kind: string; segments: number; balance_after: number; m: number }>("select kind, segments, balance_after, message_segments as m from app.sms_balance_movements where job_id = $1", [id]))
+            .rows,
+      );
+
+    it("at a balance of -50 it is sent, one movement of delta 0, the balance unchanged", async () => {
+      const o = await createUser("packs-code-floor");
+      const b = await createOrg(o.id, "עסק קוד במינוס");
+      await asAdmin((q) => q("update public.organizations set phone = '03-5550000' where id = $1", [b]));
+      await load(b, 300);
+      await charge(b, 350, await asAdmin(async (q) => (await q<{ id: string }>("select gen_random_uuid() as id")).rows[0].id));
+      expect((await balanceOf(b))!.balance).toBe(-50);
+      const id = await sendCode(b);
+      const m = await moves(id);
+      expect(m).toEqual([{ kind: "verification", segments: 0, balance_after: -50, m: expect.any(Number) }]);
+      expect((await balanceOf(b))!.balance).toBe(-50);
+    });
+
+    it("with no balance at all it is sent; the row is made at 0 and stays unloaded (the channel off)", async () => {
+      const o = await createUser("packs-code-none");
+      const b = await createOrg(o.id, "עסק קוד בלי יתרה");
+      await asAdmin((q) => q("update public.organizations set phone = '03-5550001' where id = $1", [b]));
+      expect(await balanceOf(b)).toBeNull();
+      const id = await sendCode(b);
+      expect(await moves(id)).toEqual([{ kind: "verification", segments: 0, balance_after: 0, m: expect.any(Number) }]);
+      expect(await balanceOf(b)).toEqual({ balance: 0, loaded_at: null });
+      expect(await asUser(o.id, async (q) => (await q<{ s: string }>("select app.sms_channel_state($1) as s", [b])).rows[0].s)).toBe("no_balance");
+    });
+  });
+
+  it("(447) א: a marketing SMS longer than the balance waits; marketing never takes the balance below 0", async () => {
+    await asAdmin((q) => q("select app.sms_balance_clear($1, 'test')", [org]));
+    await load(org, 300);
+    await charge(org, 298, await asAdmin(async (q) => (await q<{ id: string }>("select gen_random_uuid() as id")).rows[0].id));
+    expect((await balanceOf(org))!.balance).toBe(2);
+    const l = await lead();
+    await asAdmin((q) =>
+      q("insert into public.consents (organization_id, lead_id, channel, state, source, method) values ($1, $2, 'sms', 'granted', 'manual', 'בשיחה')", [org, l]),
+    );
+    const id = await enqueue(org, { channel: "sms", message_type: "marketing", template_id: marketingTemplate, lead_id: l });
+    // the send check knows a 3-segment need from an earlier compose
+    await asAdmin((q) => q("update app.jobs set sms_segments = 3 where id = $1", [id]));
+    expect(await maySend(await claim(id))).toEqual({ may_send: false, reason: "sms_balance", retry: true });
+    await asAdmin((q) => q("update app.jobs set sms_metered = true where id = $1", [id]));
+    expect(await asAdmin(async (q) => (await q<{ r: string | null }>("select app.sms_balance_charge($1, $2) as r", [id, "ש".repeat(135)])).rows[0].r)).toBe("sms_balance");
+    expect((await balanceOf(org))!.balance).toBe(2);
+    // cancelled after 24 hours of waiting
+    await asAdmin((q) => q("update app.jobs set sms_balance_wait_since = now() - interval '25 hours' where id = $1", [id]));
+    expect(await maySend(await claim(id))).toEqual({ may_send: false, reason: "sms_balance_expired" });
   });
 
   describe("review (1): a charge refused for room undoes every write the composer made", () => {

@@ -54,7 +54,8 @@ describe("the balance answer (SMS-06)", () => {
       low_at: 60,
       overdraft: 50,
       movements: [
-        { kind: "charge", segments: -2, balance_after: 57, pack: null, at: "2026-11-18T10:00:00Z" },
+        { kind: "charge", segments: -2, balance_after: 57, pack: null, message_segments: 2, at: "2026-11-18T10:00:00Z" },
+        { kind: "verification", segments: 0, balance_after: 59, pack: null, message_segments: 1, at: "2026-11-18T09:00:00Z" },
         { kind: "bogus", segments: 1, balance_after: 1, at: "x" },
         { kind: "grant", segments: 300, balance_after: 59, pack: 300, at: "2026-11-17T10:00:00Z" },
       ],
@@ -67,8 +68,9 @@ describe("the balance answer (SMS-06)", () => {
       lowAt: 60,
       overdraft: 50,
       movements: [
-        { kind: "charge", segments: -2, balanceAfter: 57, pack: null, at: "2026-11-18T10:00:00Z" },
-        { kind: "grant", segments: 300, balanceAfter: 59, pack: 300, at: "2026-11-17T10:00:00Z" },
+        { kind: "charge", segments: -2, balanceAfter: 57, pack: null, messageSegments: 2, at: "2026-11-18T10:00:00Z" },
+        { kind: "verification", segments: 0, balanceAfter: 59, pack: null, messageSegments: 1, at: "2026-11-18T09:00:00Z" },
+        { kind: "grant", segments: 300, balanceAfter: 59, pack: 300, messageSegments: null, at: "2026-11-17T10:00:00Z" },
       ],
     });
   });
