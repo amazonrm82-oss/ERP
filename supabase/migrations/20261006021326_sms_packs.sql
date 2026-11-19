@@ -67,7 +67,10 @@ create table if not exists app.sms_balance_movements (
   pack            integer check (pack is null or pack in (300, 1000, 5000)),
   actor_id        uuid,
   note            text check (note is null or char_length(note) between 1 and 200),
-  created_at      timestamptz not null default now(),
+  -- the order movements were written in: taken under the balance row's lock (app.sms_balance_move), so it is the order of
+  -- the balance's changes, unlike a timestamp of the writing transaction (review 3)
+  seq             bigint generated always as identity,
+  created_at      timestamptz not null default clock_timestamp(),
   constraint sms_balance_movements_shape check (
     (kind in ('grant', 'purchase') and pack is not null and segments = pack and job_id is null)
     or (kind = 'charge' and segments < 0 and job_id is not null and pack is null)
@@ -331,21 +334,22 @@ as $$
 declare
   v_org uuid;
   v_net integer;
-  v_charged_at timestamptz;
+  v_charged_seq bigint;
 begin
   select m.organization_id into v_org from app.sms_balance_movements m where m.job_id = p_job and m.kind = 'charge' limit 1;
   if v_org is null then
     return false;
   end if;
   perform 1 from app.sms_balances b where b.organization_id = v_org for update;
-  select coalesce(sum(m.segments), 0), max(m.created_at) filter (where m.kind = 'charge') into v_net, v_charged_at
+  select coalesce(sum(m.segments), 0), max(m.seq) filter (where m.kind = 'charge') into v_net, v_charged_seq
     from app.sms_balance_movements m
    where m.job_id = p_job and m.organization_id = v_org and m.kind in ('charge', 'refund');
   if v_net >= 0 then
     return false;
   end if;
+  -- review (3): judged by the write order under the balance lock (seq), never by the transactions' start times
   if exists (select 1 from app.sms_balance_movements m
-              where m.organization_id = v_org and m.kind = 'clear' and m.created_at >= v_charged_at) then
+              where m.organization_id = v_org and m.kind = 'clear' and m.seq > v_charged_seq) then
     return false;
   end if;
   perform app.sms_balance_move(v_org, 'refund', -v_net, p_job, null, null, null);
@@ -455,10 +459,10 @@ as $$
     'packs', app.sms_packs(),
     'movements', coalesce((select jsonb_agg(jsonb_build_object('kind', x.kind, 'segments', x.segments,
                                                                'balance_after', x.balance_after, 'pack', x.pack,
-                                                               'at', x.created_at) order by x.created_at desc, x.id)
+                                                               'at', x.created_at) order by x.seq desc)
                              from (select m.* from app.sms_balance_movements m
                                     where m.organization_id = p_org
-                                    order by m.created_at desc, m.id limit greatest(least(p_limit, 100), 1)) x), '[]'::jsonb))
+                                    order by m.seq desc limit greatest(least(p_limit, 100), 1)) x), '[]'::jsonb))
     from (select p_org as id) o
     left join app.sms_balances b on b.organization_id = o.id
 $$;
@@ -960,9 +964,14 @@ $$;
 revoke all on function app.sms_usage_give_back(uuid) from public, anon, authenticated, service_role;
 
 -- The composer the worker calls: the core's answer as it is (on every refusal but 'stale' the count given back, owner (326)
--- ב). SMS-06: a composed text is charged from the balance (app.sms_balance_charge); without room now the job gives its count
--- back and waits for the balance as the send check makes it wait (uncounted, cap_wait 'sms_balance'), answering
--- {refused: 'sms_balance'}, which the worker treats as a wait (its finish finds no lease and changes nothing)
+-- ב). SMS-06: a composed text is charged from the balance (app.sms_balance_charge). The core and the charge run in one
+-- sub-block; when the charge finds no room it raises the private SQLSTATE 'SMS06', so EVERY write the core made is undone:
+-- the links it minted (app.signature_link_issue, public.meeting_reminder_link, consent and quote links: the customer's
+-- earlier link keeps working, a CAL-10b link keeps its confirmed_at), and its composed_lease and sms_counted_on stamps.
+-- Outside the block the job gives its count back from the day the core would have stamped (read before the block, with the
+-- core's own expression, so the rollback cannot lose it), and waits for the balance as the send check makes it wait
+-- (uncounted, cap_wait 'sms_balance'), answering {refused: 'sms_balance'}, which the worker treats as a wait (its finish
+-- finds no lease and changes nothing). Nothing was charged on that path, so nothing is refunded.
 create or replace function public.sms_job_compose(p_job uuid, p_lease uuid, p_site_url text) returns jsonb
 language plpgsql volatile security definer
 set search_path = ''
@@ -970,22 +979,40 @@ as $$
 declare
   v_answer jsonb;
   v_charge text;
+  v_day date;
+  v_segments integer;
 begin
-  v_answer := app.sms_compose_core(p_job, p_lease, p_site_url);
-  if v_answer ? 'refused' then
-    if (v_answer ->> 'refused') is distinct from 'stale' then
+  -- the business day the core stamps (coalesce(stamp, today in the business zone), the same now() as the core's)
+  select coalesce(j.sms_counted_on, (select (now() at time zone app.intake_zone(o.timezone))::date
+                                       from public.organizations o where o.id = j.organization_id))
+    into v_day
+    from app.jobs j where j.id = p_job;
+  begin
+    v_answer := app.sms_compose_core(p_job, p_lease, p_site_url);
+    if not (v_answer ? 'refused') then
+      v_charge := app.sms_balance_charge(p_job, v_answer ->> 'text');
+      if v_charge is not null then
+        v_segments := greatest(app.sms_segments(v_answer ->> 'text'), 1);
+        raise exception 'no room in the SMS balance' using errcode = 'SMS06';
+      end if;
+    end if;
+  exception when sqlstate 'SMS06' then
+    v_charge := 'sms_balance';
+  end;
+  if v_charge is null then
+    if v_answer ? 'refused' and (v_answer ->> 'refused') is distinct from 'stale' then
       perform app.sms_usage_give_back(p_job);
     end if;
     return v_answer;
   end if;
-  v_charge := app.sms_balance_charge(p_job, v_answer ->> 'text');
-  if v_charge is null then
-    return v_answer;
-  end if;
+  -- the core's writes are undone: the job is as the send check left it (counted, metered, no stamp). Its count goes back to
+  -- the day read above, once (app.sms_usage_give_back resets usage_counted, so a second call gives nothing)
+  update app.jobs j set sms_counted_on = v_day, sms_segments = v_segments where j.id = p_job and j.usage_counted;
   perform app.sms_usage_give_back(p_job);
   update app.jobs j set status = 'queued', attempts = greatest(j.attempts - 1, 0), lease_id = null, locked_until = null,
                         next_run_at = now() + interval '15 minutes', last_error = 'waiting:sms_balance',
-                        cap_wait = 'sms_balance', sms_balance_wait_since = coalesce(j.sms_balance_wait_since, now())
+                        cap_wait = 'sms_balance', sms_balance_wait_since = coalesce(j.sms_balance_wait_since, now()),
+                        sms_segments = v_segments
    where j.id = p_job;
   return jsonb_build_object('refused', v_charge);
 end;

@@ -40,7 +40,11 @@ const REVIEWED_MD5: Record<string, string> = {
   // SMS-06 (_sms_packs.sql): the wrapper charges the composed text's segments from the prepaid balance
   // (app.sms_balance_charge); without room it gives the count back and puts the job back to wait (cap_wait 'sms_balance',
   // attempt given back), answering {refused: 'sms_balance'}; the core is unchanged. Needs an independent review.
-  "sms_job_compose(uuid,uuid,text)": "0564876e9974c7248cf39f11a2a4cdff",
+  // Review (1) of SMS-06: the core and the charge run in one sub-block; a charge with no room raises the private SQLSTATE 'SMS06',
+  // so every write of the core (minted links, composed_lease, sms_counted_on) is undone; the count goes back from the day read
+  // before the block with the core's own expression, then the job waits. The refusal and success paths are otherwise unchanged.
+  // Needs an independent review of this delta.
+  "sms_job_compose(uuid,uuid,text)": "07f5fb9a7baa551c4d06421d444e1cb4",
   // RVW-105, owner (399) א (_org_deletion_messages_wait.sql): one block before the writable check, a business in ADM-03's
   // deletion wait answers 'paused' (tried again, count given back) instead of 'not_writable'; every other line 021283's body.
   // Needs the lead's independent review of this delta before merge.

@@ -433,6 +433,149 @@ describe("prepaid SMS packs (SMS-06)", () => {
     expect(await asUser(owner.id, async (q) => (await q<{ r: Answer }>("select public.sms_sender_verify_start($1) as r", [org])).rows[0].r)).toEqual({ ok: true });
   });
 
+  describe("review (1): a charge refused for room undoes every write the composer made", () => {
+    const contactWithPhone = (phone: string) =>
+      asAdmin(
+        async (q) =>
+          (await q<{ id: string }>("insert into public.contacts (organization_id, first_name, phone, owner_id) values ($1, 'דנה', $2, $3) returning id", [org, phone, owner.id])).rows[0].id,
+      );
+    const smsTemplate = (type: string, notice: string, body: string) =>
+      asAdmin(
+        async (q) =>
+          (
+            await q<{ id: string }>(
+              "insert into public.message_templates (organization_id, name, channel, message_type, subject, body, is_active, notice_kind) values ($1, $2, 'sms', $3, null, $4, true, $5) returning id",
+              [org, `t-${Math.random().toString(36).slice(2, 10)}`, type, body, notice],
+            )
+          ).rows[0].id,
+      );
+    /** A balance of -49: the send check passes a 1-segment need, a 2-segment text does not fit the service floor (-50). */
+    const almostEmpty = async () => {
+      await asAdmin((q) => q("select app.sms_balance_clear($1, 'test')", [org]));
+      await load(org, 300);
+      await charge(org, 349, await asAdmin(async (q) => (await q<{ id: string }>("select gen_random_uuid() as id")).rows[0].id));
+      expect((await balanceOf(org))!.balance).toBe(-49);
+    };
+    const usage = () =>
+      asAdmin(async (q) => (await q<{ n: number }>("select coalesce(sum(service), 0)::int as n from app.message_usage_days where organization_id = $1 and channel = 'sms'", [org])).rows[0].n);
+    const charges = (job: string) =>
+      asAdmin(async (q) => (await q<{ n: number }>("select count(*)::int as n from app.sms_balance_movements where job_id = $1 and kind = 'charge'", [job])).rows[0].n);
+    /** Waits, then a later try with room sends it and charges it once. */
+    const laterWithRoom = async (id: string) => {
+      expect(await jobOf(id)).toEqual(expect.objectContaining({ status: "queued", cap_wait: "sms_balance", usage_counted: false }));
+      expect(await asAdmin(async (q) => (await q<{ s: string | null }>("select sms_counted_on::text as s from app.jobs where id = $1", [id])).rows[0].s)).toBeNull();
+      await load(org, 300);
+      const again = await claim(id);
+      expect(await maySend(again)).toEqual({ may_send: true });
+      const sent = await compose(again);
+      expect(typeof sent.text).toBe("string");
+      expect(await charges(id)).toBe(1);
+    };
+
+    beforeAll(() =>
+      asAdmin(async (q) => {
+        await q(
+          "update public.subscriptions set feature_overrides = coalesce(feature_overrides, '{}'::jsonb) || '{\"meeting_reminders\": true, \"signatures\": true}'::jsonb where organization_id = $1",
+          [org],
+        );
+        await q("insert into public.org_message_settings (organization_id, meeting_remind_day) values ($1, true) on conflict (organization_id) do update set meeting_remind_day = true", [org]);
+      }),
+    );
+
+    it("a meeting reminder keeps the meeting's manage link and its confirmation, and waits", async () => {
+      const c = await contactWithPhone("052-3330001");
+      const starts = await asAdmin(async (q) => (await q<{ t: string }>("select (date_trunc('hour', now()) + interval '26 hours')::text as t")).rows[0].t);
+      const meeting = await asAdmin(
+        async (q) =>
+          (
+            await q<{ id: string }>(
+              "insert into public.meetings (organization_id, title, starts_at, ends_at, owner_id, contact_id, location, created_by) values ($1, 'פגישה', $2, $2::timestamptz + interval '1 hour', $3, $4, 'המשרד', $3) returning id",
+              [org, starts, owner.id, c],
+            )
+          ).rows[0].id,
+      );
+      const oldHash = "b".repeat(64);
+      await asAdmin((q) =>
+        q("insert into app.booking_manage_links (token_hash, organization_id, meeting_id, page_id, confirmed_at) values ($1, $2, $3, $3, now() - interval '1 hour')", [oldHash, org, meeting]),
+      );
+      const t = await smsTemplate("meeting_reminder", "meeting_day", "תזכורת לפגישה: {תאריך} ב-{שעה}{, ב-{מיקום}}. אם צריך לשנות או לבטל את הפגישה, אפשר בקישור: {קישור}");
+      const id = await enqueue(org, { channel: "sms", message_type: "meeting_reminder", template_id: t, contact_id: c, meeting_id: meeting, event_at: new Date(starts).toISOString() });
+      await asAdmin((q) =>
+        q("insert into app.meeting_customer_messages (organization_id, meeting_id, kind, starts_at, outcome, job_id) values ($1, $2, 'day', $3, 'queued', $4)", [org, meeting, starts, id]),
+      );
+      await almostEmpty();
+      const before = await usage();
+      const job = await claim(id);
+      expect(await maySend(job)).toEqual({ may_send: true });
+      expect(await compose(job)).toEqual({ refused: "sms_balance" });
+      const link = await asAdmin(
+        async (q) => (await q<{ h: string; c: boolean }>("select token_hash as h, confirmed_at is not null as c from app.booking_manage_links where meeting_id = $1", [meeting])).rows,
+      );
+      expect(link).toEqual([{ h: oldHash, c: true }]);
+      // the count went back once; nothing was charged
+      expect(await usage()).toBe(before);
+      expect(await charges(id)).toBe(0);
+      expect((await balanceOf(org))!.balance).toBe(-49);
+      await laterWithRoom(id);
+      // the try that went out minted its new link
+      expect(await asAdmin(async (q) => (await q<{ h: string }>("select token_hash as h from app.booking_manage_links where meeting_id = $1", [meeting])).rows[0].h)).not.toBe(oldHash);
+    });
+
+    it("a signature reminder keeps the document's link, and waits", async () => {
+      const c = await contactWithPhone("052-3330002");
+      const doc = await asAdmin(
+        async (q) =>
+          (
+            await q<{ id: string }>(
+              `insert into public.signature_documents (organization_id, contact_id, title, body, content_sha256, status, sent_at, expires_at)
+               values ($1, $2, 'הסכם שירות', 'טקסט', repeat('0', 64), 'sent', now(), now() + interval '3 days') returning id`,
+              [org, c],
+            )
+          ).rows[0].id,
+      );
+      const oldHash = "c".repeat(64);
+      await asAdmin((q) =>
+        q("insert into app.signature_links (document_id, organization_id, token_hash, created_at) values ($1, $2, $3, now()) on conflict (document_id) do update set token_hash = excluded.token_hash", [doc, org, oldHash]),
+      );
+      const t = await smsTemplate("requested_document", "signature_reminder", "{שם פרטי}, המסמך {שם המסמך} עדיין מחכה לחתימה שלך, עד {תאריך}. אפשר לקרוא ולחתום כאן: {קישור}");
+      const id = await enqueue(org, { channel: "sms", message_type: "requested_document", template_id: t, contact_id: c, signature_document_id: doc });
+      await asAdmin((q) =>
+        q("insert into app.signature_customer_reminders (organization_id, document_id, outcome, job_id) values ($1, $2, 'queued', $3) on conflict (document_id) do update set job_id = excluded.job_id, outcome = 'queued'", [org, doc, id]),
+      );
+      await almostEmpty();
+      const before = await usage();
+      const job = await claim(id);
+      expect(await maySend(job)).toEqual({ may_send: true });
+      expect(await compose(job)).toEqual({ refused: "sms_balance" });
+      expect(await asAdmin(async (q) => (await q<{ h: string }>("select token_hash as h from app.signature_links where document_id = $1", [doc])).rows[0].h)).toBe(oldHash);
+      expect(await usage()).toBe(before);
+      expect(await charges(id)).toBe(0);
+      await laterWithRoom(id);
+    });
+  });
+
+  it("review (3): a refund is judged by the write order under the balance lock, not by timestamps", async () => {
+    const o = await createUser("packs-order-owner");
+    const b = await createOrg(o.id, "עסק סדר התנועות");
+    await load(b, 300);
+    const j = await asAdmin(async (q) => (await q<{ id: string }>("select gen_random_uuid() as id")).rows[0].id);
+    await charge(b, 5, j);
+    await asAdmin((q) => q("select app.sms_balance_clear($1, 'test')", [b]));
+    // a clear whose transaction started before the charge's carries an earlier time; the order still decides
+    await asAdmin(async (q) => {
+      await q("set local session_replication_role = replica");
+      await q("update app.sms_balance_movements set created_at = created_at - interval '1 hour' where organization_id = $1 and kind = 'clear'", [b]);
+    });
+    expect(await asAdmin(async (q) => (await q<{ r: boolean }>("select app.sms_balance_refund($1) as r", [j])).rows[0].r)).toBe(false);
+    expect((await balanceOf(b))!.balance).toBe(0);
+    // a charge after the clear and a new load is given back
+    await load(b, 300);
+    const k = await asAdmin(async (q) => (await q<{ id: string }>("select gen_random_uuid() as id")).rows[0].id);
+    await charge(b, 3, k);
+    expect(await asAdmin(async (q) => (await q<{ r: boolean }>("select app.sms_balance_refund($1) as r", [k])).rows[0].r)).toBe(true);
+    expect((await balanceOf(b))!.balance).toBe(300);
+  });
+
   it("the collection room needs a loaded balance above 0", async () => {
     await asAdmin((q) => q("select app.sms_balance_clear($1, 'test')", [org]));
     expect(await asAdmin(async (q) => (await q<{ r: boolean }>("select app.collection_sms_room($1) as r", [org])).rows[0].r)).toBe(false);
