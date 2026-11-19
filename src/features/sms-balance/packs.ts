@@ -21,7 +21,7 @@ export const SMS_MOVEMENT_LABELS: Record<SmsMovementKind, string> = {
   grant: "טעינת חבילה",
   purchase: "רכישת חבילה",
   charge: "שליחת SMS",
-  refund: "החזר: ההודעה לא נשלחה",
+  refund: "החזר ליתרה: ההודעה לא נשלחה או לא נמסרה",
   clear: "איפוס היתרה",
 };
 
